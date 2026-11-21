@@ -1,0 +1,16 @@
+# TVI-WO-0100 adversarial: a non-SPE SPI1 read must not return success.
+logFile @/tmp/tvi-wo-0100-spi1-read.log true
+logLevel 1
+
+i @renode/Tviburi_STM32H7_SPI1.cs
+EnsureTypeIsLoaded "Antmicro.Renode.Peripherals.SPI.Tviburi_STM32H7_SPI1"
+python "System.Environment.SetEnvironmentVariable('TVI_MODEL_SOURCE', monitor.GetVariable('ORIGIN') + '/Tviburi_STM32H7_SPI1.cs')"
+
+mach create "nucleo-h753zi"
+machine LoadPlatformDescription @renode/nucleo_h753zi_tviburi.repl
+
+sysbus LogPeripheralAccess spi1
+sysbus ReadDoubleWord 0x40013020
+
+python "print('UNEXPECTED SUCCESS')"
+quit
