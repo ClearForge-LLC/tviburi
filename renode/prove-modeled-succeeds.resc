@@ -1,0 +1,15 @@
+# TVI-WO-0100: SPI4 CR1.SPE is implemented by stock STM32H7_SPI and must succeed.
+logFile @/tmp/tvi-wo-0100-modeled.log true
+logLevel 1
+
+i @renode/Tviburi_STM32H7_SPI1.cs
+EnsureTypeIsLoaded "Antmicro.Renode.Peripherals.SPI.Tviburi_STM32H7_SPI1"
+python "System.Environment.SetEnvironmentVariable('TVI_MODEL_SOURCE', monitor.GetVariable('ORIGIN') + '/Tviburi_STM32H7_SPI1.cs')"
+
+mach create "nucleo-h753zi"
+machine LoadPlatformDescription @renode/nucleo_h753zi_tviburi.repl
+
+sysbus LogPeripheralAccess spi4
+sysbus WriteDoubleWord 0x40013400 0x00000001
+sysbus ReadDoubleWord 0x40013400
+quit

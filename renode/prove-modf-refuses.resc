@@ -1,0 +1,16 @@
+# TVI-WO-0100: SPI1 SPE write must refuse by name (MODF is not modeled).
+logFile @/tmp/tvi-wo-0100-modf.log true
+logLevel 1
+
+i @renode/Tviburi_STM32H7_SPI1.cs
+EnsureTypeIsLoaded "Antmicro.Renode.Peripherals.SPI.Tviburi_STM32H7_SPI1"
+python "System.Environment.SetEnvironmentVariable('TVI_MODEL_SOURCE', monitor.GetVariable('ORIGIN') + '/Tviburi_STM32H7_SPI1.cs')"
+
+mach create "nucleo-h753zi"
+machine LoadPlatformDescription @renode/nucleo_h753zi_tviburi.repl
+
+sysbus LogPeripheralAccess spi1
+sysbus WriteDoubleWord 0x40013000 0x00000001
+
+python "print('UNEXPECTED SUCCESS')"
+quit

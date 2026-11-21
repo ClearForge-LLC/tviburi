@@ -1,0 +1,6 @@
+// Thin overlay of Renode 1.17.0's NUCLEO-H753ZI. The board file stays in the
+// Renode host; this file only adds the SPI1 refusal shim at the real address.
+// That registration shadows the upstream sysbus tag SPI1_/_I2S1.
+using "platforms/boards/nucleo_h753zi.repl"
+
+spi1: SPI.Tviburi_STM32H7_SPI1 @ sysbus 0x40013000

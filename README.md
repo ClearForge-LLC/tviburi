@@ -2,7 +2,7 @@
 
 A digital twin for commercial microcontrollers that refuses to claim it has simulated anything it has not actually modeled.
 
-**Status:** documentary backbone only. No code yet. Phase 0 of the roadmap.
+**Status:** Phase 1 spike. SPI1 `MODF` refuses by name on a thin NUCLEO-H753ZI overlay. Run `renode/run-proof.sh` (Renode 1.17.0). See `FEEDBACK.md`.
 
 ## Where to go
 
