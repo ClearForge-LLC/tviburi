@@ -30,7 +30,9 @@ The cost of the chosen option is one subclass per stock model class that gets a 
  "access":{"offset":"0x0","value":"0x1","width":32,"pc":"0x0800003E","virtual_time":"00:00:00.000000000"}}
 ```
 
-The runner exits **3 (REFUSED)**. The rule is three-way with refuse as the default. On every 32-bit CR1 write with SPE=1, it **passes only** when MASTER=1, SSM=1, SSIOP=0 and SSI=1. It refuses in four cases: slave mode (the stock model is master-only), hardware SS (the pin level is not modeled), SSIOP=1 (polarity not handled), and SSI=0 (a mode fault). A sub-word write that overlaps CR1 or CFG2 also refuses. A refused write is not passed to the model.
+The runner exits **3 (REFUSED)**. The rule is three-way with refuse as the default. On every 32-bit CR1 write with SPE=1, it **passes only** when its own copy of CFG2 shows MASTER=1, SSM=1, SSIOP=0 and SSI=1. It refuses in four cases: slave mode (the stock model is master-only), hardware SS (the pin level is not modeled), SSIOP=1 (polarity not handled), and SSI=0 (a mode fault). A sub-word write that overlaps CR1 or CFG2 also refuses. A refused write is not passed to the model. "Provably impossible" holds only to the extent that the guard's CFG2 copy matches silicon. **One known route breaks that** (R8 below).
+
+Renode itself exits **0** on a refused run. Only the runner turns the refusal record into exit 3 (R9 below).
 
 **Q4. Does the trace still record the refused access?** Yes. `sysbus LogPeripheralAccess spi1` logs `spi1: [cpu: 0x800003E] WriteUInt32 to 0x0 (Control1), value 0x1`, which is the refused write at the same PC as the refusal record. Two caveats follow, both measured:
 
@@ -52,7 +54,7 @@ The final runs used the branch's last code commit, `7c8ffd9`. The FEEDBACK commi
 - **Firmware that stops short does not pass.** Firmware without its end marker exits 1.
 - **Every rule branch behaves as declared.** `tests/conditions.resc` drives each branch from the monitor: slave mode, hardware SS, `SSIOP=1`, `SSI=0`, a 16-bit write at CR1 and an 8-bit write at CFG2. Each refuses, in order. The `SSI=1` case and a byte write to TXDR do not.
 
-**Adversarial pass (WO §5).** These checks came from a scratch harness outside the repository, run on `7c8ffd9`:
+**Adversarial pass (WO §5).** These checks came from scratch harnesses outside the repository, run on `7c8ffd9`. The architect can rerun them: `~/.cache/tvi-blind/adv/adv.sh` (cases A to C2) and `~/.cache/tvi-blind/adv/mut.sh` (mutants). `adv.sh`'s case C is **invalid since the reduction**: its control used the `TVIBURI_OUT` knob that was removed, so its read-only run now fails at the firmware build. The row below replaces it with a direct runtime run.
 
 | Attempt | Result |
 |---|---|
@@ -68,7 +70,9 @@ The final runs used the branch's last code commit, `7c8ffd9`. The FEEDBACK commi
 
 The only documented override that can turn a refusal off is not having the shim, and that fails closed. **No debug override exists.**
 
-**Mutation (diff-sized, one mutant per guard this WO adds).** Each mutant ran against the committed suite. The first run left M8 and M9 alive. The two fixtures above were added to kill them, and on the rerun **all 9 are killed**:
+**Mutation (diff-sized): 9 mutants, one per guard listed below.** Each ran against the committed suite. The first run left M8 and M9 alive. The two fixtures above were added to kill them, and on the rerun **all 9 are killed**.
+
+Not every guard was mutated. These guards had **no mutant**: the runner's `rc -eq 0`, `TVIBURI-END`, empty-`/out` and one-argument checks, plus `Refusal.cs`'s `FailFast` and its version-required throws. The last three of those were attacked directly instead: B1 (`--no-refuse`), the read-only `/out` run and the unset `TVIBURI_MODEL_DIR` run. Backlog: mutate them.
 
 | Mutant | Killed by |
 |---|---|
@@ -78,7 +82,7 @@ The only documented override that can turn a refusal off is not having the shim,
 | M8 the end-marker check | the no-marker fixture |
 | M9 the armed check | the stock-model fixture |
 
-**Reduction pass (diff): −13 net in the reduced code files · 2 duplicates removed · 5 dead paths removed · 0 protected kept · 4 proposals rejected, listed below.** The proposals came from a fresh subagent. The suite and all 9 mutants were green after every removal.
+**Reduction pass (diff): −13 net in the reduced code files · 2 duplicates removed · 5 dead paths removed · 0 protected kept · 4 proposals rejected, listed below.** The proposals came from a fresh subagent. The removals went in as one batch, followed by one suite run (green) and one mutant run (all 9 killed). They were not proven one at a time.
 
 - **Duplicates removed:**
   - the include/seed/platform prelude, which was stated in both the runner and the conditions script, is now `scripts/prelude.resc`;
@@ -109,15 +113,18 @@ The only documented override that can turn a refusal off is not having the shim,
 | # | Question | Lean |
 |---|---|---|
 | R1 | **OQ-02, vendor vs submodule.** | **Neither, for now.** Nothing of Renode needs to be in the repository: Renode comes from the pinned image digest, and the model version folds in its build strings. Revisit only when a model needs a change to Renode source, which RUL-05 and the seams section say the refusal contract does not. **This does not block the next WO** if you accept "Renode by pinned image" as a third option. |
-| R2 | **SPI1 placement widens the surface.** SPI1 goes from a Tag, which warns on every access, to stock `STM32H7_SPI` fidelity plus one guard. Paths that the stock model handles silently but incompletely now run unwarned on SPI1, exactly as they already do on SPI4: CRC, I2S, SSOE, and FIFO thresholds, among others. I judged this **not** flag-and-stop #1, because no path went from refused to passing (nothing refused before), but that is your call. | Keep SPI1, since it is the scar, and take R3 next. |
+| R2 | **SPI1 placement widens the surface.** SPI1 goes from a Tag, which warns on every access, to stock `STM32H7_SPI` fidelity plus one guard. Whatever the stock model handles silently but incompletely now runs unwarned on SPI1, exactly as it already does on SPI4. **Measured** are the SSM, SSI, SSIOP and SSOE tags (these warn), slave mode (it logs an error), and IOLOCK (dropped with a warning, R8). CRC, I2S and the FIFO thresholds are plausible further cases but were **not measured**. I judged this **not** flag-and-stop #1, because no path went from refused to passing (nothing refused before), but that is your call. | Keep SPI1, since it is the scar, and take R3 next. |
 | R3 | **Deny-list or allow-list?** At the peripheral level the shim is **a deny-list of one rule**: every write TVI-SPI-MODF does not cover passes to the stock model. Within the rule it is allow-list (default refuse). | The next refusal WO should turn Renode's own self-knowledge (tagged and unhandled bits, `UnhandledAccessBehaviour`, and the per-access "Unhandled write" path) into refusals for guarded peripherals. That is a cheap, generic allow-list by Renode's own register definitions. Then add side-effect rules like this one on top. Not built: it is outside this WO. |
 | R4 | **Halt semantics.** The refusal latches the run; it does not stop on the instruction. | Accept for Phase 1. If an exact stop is ever needed, measure `cpu MaximumBlockSize 1` and its cost first (northstar §6, "so slow people stop running it"). |
-| R5 | **Citation (invariant 2).** I could not verify the RM0433 section number or revision offline, so I did not invent one. Bit positions are from memory of the RM0433 register maps. They agree with the tag names Renode's model reports at bits 12, 26, 28 and 29, and with the MASTER readback at bit 22. | Someone with the manual should fill in the section and revision. Invariant 2 is not met until then. |
+| R5 | **Citation (invariant 2).** I could not verify the RM0433 section number or revision offline, so I did not invent one. Bit positions are from memory of the RM0433 register maps. They agree with the tag names Renode's model reports: SSI at bit 12, SSM at 26, SSIOP at 28 and SSOE at 29, each measured alone. They also agree with the MASTER readback at bit 22. **The rule's truth table is also from memory and needs the same check**, meaning which SSI/SSIOP states raise MODF and whether SSOE=1 rules it out. | Someone with the manual should fill in the section and revision. Invariant 2 is not met until then. |
 | R6 | **Model version scope.** The model version is sha256 over `model/` plus the Renode and Infrastructure build strings. It does not cover the image digest or the stock `.repl` files inside the image; a build string only stands in for an unmodified portable tree. | Record the image digest alongside the model version once the ledger format exists (OQ-01). |
+| R8 | **Known false-pass route: IOLOCK (flagged, not fixed).** The guard updates its CFG2 copy on every 32-bit CFG2 write. Two measured facts on stock `STM32H7_SPI` matter here. First, CFG2 writes with SPE=1 are dropped with an ERROR; that alone yields only false refusals. Second, `CR1.IOLOCK` (bit 16, from memory) is **dropped**, with the warning "Attempted to set IOLOCK while peripheral is enabled" even at SPE=0. On silicon, IOLOCK freezes CFG2's SS bits. So `CFG2=MASTER`, `CR1=IOLOCK`, `CFG2=MASTER|SSM`, `CR1=SSI|SPE` passes the guard while silicon is still on hardware NSS, where MODF is possible. This is flag-and-stop #1 territory, which is why it is recorded here and not patched mid-spike. | The next WO makes the guard refuse any CR1 write with IOLOCK set (unmodeled), or takes R3 first, which covers it, because Renode warns there. |
+| R9 | **Exit status.** Renode exits 0 on a refused run, and only `scripts/tviburi-spike` returns 3, based on the record on disk. WO §3 says "exits with a named refusal". | Accept the runner as the twin's entry point. Running Renode directly is not a supported way to get a verdict (§3.3). |
 | R7 | **False refusals by design.** The common HAL configuration of master with hardware NSS *output* (SSM=0, SSOE=1) refuses, because I could not confirm offline that RM0433 rules out MODF there. | Have someone confirm in the manual, then turn it into a pass case. |
 
 ## 5. Scope notes
 
 - **Additions beyond the literal scope:** `tests/conditions.resc` and the two fail-closed fixtures in `tests/spike.sh`. Each exists only because, without it, a mutant of a guard this WO adds survived (§2).
 - **How to run:** `tests/spike.sh` on Furnace. It needs `~/bin/capped-run` and the pinned image already pulled; it pulls nothing. Outputs go under `${TVIBURI_SCRATCH:-~/.cache/tviburi}`.
+- **Blind-run disclosure:** during orientation I listed the filenames in `~/.cache/aet-bus/` once and opened none. The only later contact was the `>>` append of the completion note to `architect.md`. I read nothing outside `~/tviburi-blind`, the image, and `~/.cache/tvi-blind/`.
 - The three peripheral families, the ledger format, any Aethelgard integration, and any trace-format change were not touched.
