@@ -1,0 +1,66 @@
+#!/usr/bin/env bash
+# tviburi-spike <modf|modeled> — TVI-WO-0100 spike runner. Runs INSIDE the pinned tools image
+# (see tests/spike.sh), with the repository mounted read-only at $TVIBURI_ROOT (default /repo) and a
+# writable, empty output directory at $TVIBURI_OUT (default /out). It takes no flags.
+#
+# Exit status (default FAIL; a refusal latches):
+#   3  REFUSED - the twin wrote at least one refusal record. Checked first, whatever else happened.
+#   0  PASS    - no refusal, the guard armed, the script reached its end, and the firmware's
+#                after-the-guarded-write marker is present. Positive evidence only.
+#   1  FAIL    - anything else: build failure, Renode error or timeout, missing evidence.
+# Renode's own exit status is not trusted: a failed monitor command still exits 0 (measured).
+set -uo pipefail
+
+variant=${1:-}
+case "$variant" in
+  modf|modeled) ;;
+  *) echo "usage: tviburi-spike <modf|modeled>" >&2; exit 1 ;;
+esac
+[ $# -eq 1 ] || { echo "tviburi-spike takes exactly one argument" >&2; exit 1; }
+
+root=${TVIBURI_ROOT:-/repo}
+out=${TVIBURI_OUT:-/out}
+export TVIBURI_OUT=$out TVIBURI_MODEL_DIR=$root/model
+[ -d "$out" ] && [ -z "$(ls -A "$out")" ] || { echo "FAIL: $out must be an empty directory" >&2; exit 1; }
+
+export PATH=/opt/cargo/bin:$PATH RUSTUP_HOME=/opt/rustup
+rustc --edition 2021 --target thumbv7em-none-eabihf -C opt-level=s -C panic=abort -C debuginfo=0 \
+  --cfg "path=\"$variant\"" --check-cfg 'cfg(path, values("modf","modeled"))' \
+  -C link-arg=-T"$root/firmware/link.x" -o "$out/fw.elf" "$root/firmware/spi1.rs" \
+  || { echo "VERDICT FAIL (firmware build)"; exit 1; }
+
+cat > "$out/run.resc" <<EOF
+include @$root/model/Refusal.cs
+include @$root/model/GuardedSTM32H7_SPI.cs
+emulation SetSeed 1
+mach create
+machine LoadPlatformDescription @$root/model/tviburi-nucleo-h753zi.repl
+sysbus LogPeripheralAccess spi1 true
+sysbus LoadELF @$out/fw.elf
+cpu VectorTableOffset 0x08000000
+emulation RunFor "0.001"
+echo "TVIBURI-MARK-BEFORE"
+sysbus ReadDoubleWord 0x20000100
+echo "TVIBURI-MARK-AFTER"
+sysbus ReadDoubleWord 0x20000104
+echo "TVIBURI-END"
+quit
+EOF
+
+timeout 120 renode --disable-gui --console --plain "$out/run.resc" </dev/null >"$out/renode.log" 2>&1
+rc=$?
+
+if [ -s "$out/refusals.jsonl" ]; then
+  sed 's/^/REFUSAL /' "$out/refusals.jsonl"
+  echo "VERDICT REFUSED (renode exit $rc)"
+  exit 3
+fi
+log=$(tr -d '\r' <"$out/renode.log")  # the monitor ends its lines with \r\r\n (measured)
+after=$(grep -A1 -x 'TVIBURI-MARK-AFTER' <<<"$log" | tail -n1)
+if [ "$rc" -eq 0 ] && [ -s "$out/armed.jsonl" ] && grep -qx 'TVIBURI-END' <<<"$log" \
+   && [ "$after" = "0xAF7E0002" ]; then
+  echo "VERDICT PASS"
+  exit 0
+fi
+echo "VERDICT FAIL (renode exit $rc, armed=$([ -s "$out/armed.jsonl" ] && echo yes || echo no), after-marker=${after:-none})"
+exit 1
