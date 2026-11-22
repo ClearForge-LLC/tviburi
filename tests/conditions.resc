@@ -1,0 +1,27 @@
+# Drives every branch of TVI-SPI-MODF from the monitor (bus writes reach the same guard as CPU
+# writes). Run by tests/spike.sh; expected refusals, in order, are listed there.
+include @/repo/model/Refusal.cs
+include @/repo/model/GuardedSTM32H7_SPI.cs
+emulation SetSeed 1
+mach create
+machine LoadPlatformDescription @/repo/model/tviburi-nucleo-h753zi.repl
+# 1. CFG2 at reset (MASTER=0, slave): SPE refuses
+sysbus WriteDoubleWord 0x40013000 0x1001
+# 2. master, hardware SS (SSM=0): SPE refuses
+sysbus WriteDoubleWord 0x4001300C 0x00400000
+sysbus WriteDoubleWord 0x40013000 0x1001
+# 3. master, SSM=1, SSIOP=1: SPE refuses
+sysbus WriteDoubleWord 0x4001300C 0x14400000
+sysbus WriteDoubleWord 0x40013000 0x1001
+# 4. master, SSM=1, SSIOP=0, SSI=0: mode fault, SPE refuses
+sysbus WriteDoubleWord 0x4001300C 0x04400000
+sysbus WriteDoubleWord 0x40013000 0x00000001
+# pass: SSI=1
+sysbus WriteDoubleWord 0x40013000 0x00001001
+# 5, 6. sub-word writes overlapping CR1 and CFG2 refuse
+sysbus WriteWord 0x40013002 0x0
+sysbus WriteByte 0x4001300E 0x0
+# pass: a byte write to TXDR is not guarded
+sysbus WriteByte 0x40013020 0x55
+echo "TVIBURI-END"
+quit

@@ -59,5 +59,21 @@ run modf-2 modf
 check "same invocation, same refusal record (model version stable)" \
   'cmp -s "$work/modf-1/refusals.jsonl" "$work/modf-2/refusals.jsonl"'
 
+# Every branch of the rule, driven from the monitor: exactly these refusals, in this order.
+mkdir "$work/conditions"
+set +e
+nice -n 10 "$HOME/bin/capped-run" --mem 8G -- --rm --network none -e TVIBURI_OUT=/out -e TVIBURI_MODEL_DIR=/repo/model \
+  -v "$src:/repo:ro,Z" -v "$work/conditions:/out:Z" "$IMAGE" \
+  timeout 120 renode --disable-gui --console --plain /repo/tests/conditions.resc </dev/null >"$work/conditions.stdout" 2>&1
+set -e
+check "every rule branch refuses as declared, and the two pass cases do not" 'python3 -I -c "
+import json, sys
+got = [(r[\"bit\"], r[\"access\"][\"offset\"], r[\"access\"][\"width\"]) for r in map(json.loads, open(sys.argv[1]))]
+want = [(\"CFG2.MASTER (bit 22) = 0\", \"0x0\", 32), (\"CFG2.SSM (bit 26) = 0\", \"0x0\", 32),
+        (\"CFG2.SSIOP (bit 28) = 1\", \"0x0\", 32), (\"CR1.SSI (bit 12) = 0 with CR1.SPE (bit 0) = 1\", \"0x0\", 32),
+        (\"sub-word access\", \"0x2\", 16), (\"sub-word access\", \"0xE\", 8)]
+assert got == want, got
+" "$work/conditions/refusals.jsonl" && tr -d "\r" <"$work/conditions.stdout" | grep -qx TVIBURI-END'
+
 echo "outputs: $work"
 [ $fails -eq 0 ] && echo "ALL PASS" || { echo "$fails FAILED"; exit 1; }
