@@ -1,10 +1,6 @@
 # Drives every branch of TVI-SPI-MODF from the monitor (bus writes reach the same guard as CPU
 # writes). Run by tests/spike.sh; expected refusals, in order, are listed there.
-include @/repo/model/Refusal.cs
-include @/repo/model/GuardedSTM32H7_SPI.cs
-emulation SetSeed 1
-mach create
-machine LoadPlatformDescription @/repo/model/tviburi-nucleo-h753zi.repl
+include @/repo/scripts/prelude.resc
 # 1. CFG2 at reset (MASTER=0, slave): SPE refuses
 sysbus WriteDoubleWord 0x40013000 0x1001
 # 2. master, hardware SS (SSM=0): SPE refuses

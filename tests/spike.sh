@@ -22,14 +22,24 @@ fi
 fails=0
 check() { if eval "$2"; then echo "ok   $1"; else echo "FAIL $1"; fails=$((fails + 1)); fi; }
 
-run() { # run <name> <variant>: sets $rc; outputs in $work/<name>
-  mkdir "$work/$1"
-  set +e
+pod() { # pod <name> <tree> <command...>: one capped container; sets $rc; outputs in $work/<name>
+  local name=$1 tree=$2; shift 2
+  mkdir "$work/$name"
+  rc=0
   nice -n 10 "$HOME/bin/capped-run" --mem 8G -- --rm --network none \
-    -v "$src:/repo:ro,Z" -v "$work/$1:/out:Z" "$IMAGE" /repo/scripts/tviburi-spike "$2" >"$work/$1.stdout" 2>&1
-  rc=$?
-  set -e
+    -v "$tree:/repo:ro,Z" -v "$work/$name:/out:Z" "$IMAGE" "$@" </dev/null >"$work/$name.stdout" 2>&1 || rc=$?
+}
+
+run() { # run <name> <variant> [tree]: the spike runner on <tree> (default: the source under test)
+  pod "$1" "${3:-$src}" /repo/scripts/tviburi-spike "$2"
   echo "--- $1 ($2): exit $rc"; grep -E '^(VERDICT|REFUSAL)' "$work/$1.stdout" || true
+}
+
+fixture() { # fixture <name> <file> <old> <new>: a copy of the source with one exact edit
+  mkdir "$work/$1.tree"
+  tar -C "$src" --exclude=.git -cf - . | tar -C "$work/$1.tree" -xf -
+  python3 -I -c 'import sys; p,o,n=sys.argv[1:4]; s=open(p).read(); assert s.count(o)==1; open(p,"w").write(s.replace(o,n))' \
+    "$work/$1.tree/$2" "$3" "$4"
 }
 
 fields() { # fields <refusals.jsonl>: one record, the four invariant-5 fields non-empty, our rule
@@ -59,13 +69,19 @@ run modf-2 modf
 check "same invocation, same refusal record (model version stable)" \
   'cmp -s "$work/modf-1/refusals.jsonl" "$work/modf-2/refusals.jsonl"'
 
+# Fail-closed evidence: the stock (unguarded) model at SPI1 runs the MODF firmware to its end with
+# no refusal, which is Renode's silent pass; without the guard's armed record it must not PASS.
+fixture stock model/tviburi-nucleo-h753zi.repl 'Tviburi.GuardedSTM32H7_SPI' 'SPI.STM32H7_SPI'
+run stock modf "$work/stock.tree"
+check "unguarded stock model at SPI1 does not PASS the MODF firmware (exits 1)" '[ $rc -eq 1 ]'
+# ... and firmware that never reaches its after-the-guarded-write marker must not PASS either.
+fixture nomark firmware/spi1.rs '        write_volatile(MARK_AFTER, 0xAF7E_0002);' ''
+run nomark modeled "$work/nomark.tree"
+check "modeled firmware without its end marker does not PASS (exits 1)" '[ $rc -eq 1 ]'
+
 # Every branch of the rule, driven from the monitor: exactly these refusals, in this order.
-mkdir "$work/conditions"
-set +e
-nice -n 10 "$HOME/bin/capped-run" --mem 8G -- --rm --network none -e TVIBURI_OUT=/out -e TVIBURI_MODEL_DIR=/repo/model \
-  -v "$src:/repo:ro,Z" -v "$work/conditions:/out:Z" "$IMAGE" \
-  timeout 120 renode --disable-gui --console --plain /repo/tests/conditions.resc </dev/null >"$work/conditions.stdout" 2>&1
-set -e
+pod conditions "$src" env TVIBURI_OUT=/out TVIBURI_MODEL_DIR=/repo/model \
+  timeout 120 renode --disable-gui --console --plain /repo/tests/conditions.resc
 check "every rule branch refuses as declared, and the two pass cases do not" 'python3 -I -c "
 import json, sys
 got = [(r[\"bit\"], r[\"access\"][\"offset\"], r[\"access\"][\"width\"]) for r in map(json.loads, open(sys.argv[1]))]

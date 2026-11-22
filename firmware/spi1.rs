@@ -12,8 +12,7 @@ use core::ptr::write_volatile;
 const RCC_APB2ENR: *mut u32 = 0x5802_44F0 as *mut u32;
 const SPI1_CR1: *mut u32 = 0x4001_3000 as *mut u32;
 const SPI1_CFG2: *mut u32 = 0x4001_300C as *mut u32;
-/// Markers in DTCM, read back by the run script.
-const MARK_BEFORE: *mut u32 = 0x2000_0100 as *mut u32;
+/// Marker in DTCM, read back by the run script: the firmware got past the guarded write.
 const MARK_AFTER: *mut u32 = 0x2000_0104 as *mut u32;
 
 const CR1_SPE: u32 = 1 << 0;
@@ -31,7 +30,6 @@ pub extern "C" fn reset() -> ! {
         write_volatile(RCC_APB2ENR, 1 << 12); // SPI1EN
         write_volatile(SPI1_CFG2, CFG2_MASTER | CFG2_SSM);
         write_volatile(SPI1_CR1, CR1_SSI); // SSI before SPE, as the HAL does
-        write_volatile(MARK_BEFORE, 0xB4F0_0001);
         write_volatile(SPI1_CR1, CR1_SSI | CR1_SPE); // the guarded write
         write_volatile(MARK_AFTER, 0xAF7E_0002);
     }

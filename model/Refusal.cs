@@ -89,25 +89,22 @@ namespace Antmicro.Renode.Peripherals.Tviburi
                 throw new InvalidOperationException("TVIBURI_MODEL_DIR is unset or missing; refusing to run without a model version");
             }
             var manifest = new StringBuilder();
-            using(var sha = SHA256.Create())
+            var root = Path.GetFullPath(dir);
+            var files = Directory.GetFiles(root, "*", SearchOption.AllDirectories)
+                .Select(f => Path.GetRelativePath(root, f).Replace('\\', '/'))
+                .OrderBy(f => f, StringComparer.Ordinal)
+                .ToList();
+            if(files.Count == 0)
             {
-                var root = Path.GetFullPath(dir);
-                var files = Directory.GetFiles(root, "*", SearchOption.AllDirectories)
-                    .Select(f => Path.GetRelativePath(root, f).Replace('\\', '/'))
-                    .OrderBy(f => f, StringComparer.Ordinal)
-                    .ToList();
-                if(files.Count == 0)
-                {
-                    throw new InvalidOperationException("TVIBURI_MODEL_DIR holds no files; refusing to run without a model version");
-                }
-                foreach(var rel in files)
-                {
-                    manifest.Append(rel).Append('\0').Append(Hex(sha.ComputeHash(File.ReadAllBytes(Path.Combine(root, rel))))).Append('\n');
-                }
-                manifest.Append("renode\0").Append(BuildString("Renode")).Append('\n');
-                manifest.Append("infrastructure\0").Append(BuildString("Infrastructure")).Append('\n');
-                return "sha256:" + Hex(sha.ComputeHash(Encoding.UTF8.GetBytes(manifest.ToString())));
+                throw new InvalidOperationException("TVIBURI_MODEL_DIR holds no files; refusing to run without a model version");
             }
+            foreach(var rel in files)
+            {
+                manifest.Append(rel).Append('\0').Append(Sha256(File.ReadAllBytes(Path.Combine(root, rel)))).Append('\n');
+            }
+            manifest.Append("renode\0").Append(BuildString("Renode")).Append('\n');
+            manifest.Append("infrastructure\0").Append(BuildString("Infrastructure")).Append('\n');
+            return "sha256:" + Sha256(Encoding.UTF8.GetBytes(manifest.ToString()));
         }
 
         private static string BuildString(string assembly)
@@ -147,9 +144,9 @@ namespace Antmicro.Renode.Peripherals.Tviburi
             }
         }
 
-        private static string Hex(byte[] bytes)
+        private static string Sha256(byte[] bytes)
         {
-            return string.Concat(bytes.Select(b => b.ToString("x2")));
+            return Convert.ToHexString(SHA256.HashData(bytes)).ToLowerInvariant();
         }
 
         private static string Json(string s)

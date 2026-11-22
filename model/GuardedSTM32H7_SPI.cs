@@ -9,7 +9,8 @@
 //
 // What the stock model does not model (measured on Renode 1.17.0, Infrastructure cd4b002a):
 //   - CFG2.SSM, CFG2.SSIOP, CFG2.SSOE and CR1.SSI are tags: written values are dropped and read
-//     back as 0, so the guard keeps its own copy of the last 32-bit CR1/CFG2 values written;
+//     back as 0, so the guard keeps its own copy of the last 32-bit CFG2 value written and reads
+//     SSI from the CR1 write it is evaluating;
 //   - mode fault: SPE set in master mode with the internal SS input at its active level leaves
 //     SR.MODF clear, CR1.SPE set and CFG2.MASTER set, where silicon sets MODF and clears both;
 //   - slave mode: writing CFG2.MASTER=0 is rejected with an error log and MASTER stays 1.
@@ -41,22 +42,18 @@ namespace Antmicro.Renode.Peripherals.Tviburi
         public override void Reset()
         {
             base.Reset();
-            cr1 = 0;
             cfg2 = 0;
         }
 
         public new void WriteDoubleWord(long offset, uint value)
         {
-            if(offset == Cr1Offset && (value & Cr1Spe) != 0 && !ModeFaultImpossible(value, out var register, out var bit, out var condition))
+            if(offset == Cr1Offset && (value & Cr1Spe) != 0 && !ModeFaultImpossible(value, out var bit, out var condition))
             {
-                Refusal.Refuse(machine, this, Rule, register, bit, condition, Citation, State(value), offset, value, 32);
+                Refusal.Refuse(machine, this, Rule, "SPI_CR1 / SPI_CFG2", bit, condition, Citation,
+                    "CR1 written=0x" + value.ToString("X8") + ", " + Cfg2State(), offset, value, 32);
                 return;
             }
-            if(offset == Cr1Offset)
-            {
-                cr1 = value;
-            }
-            else if(offset == Cfg2Offset)
+            if(offset == Cfg2Offset)
             {
                 cfg2 = value;
             }
@@ -83,9 +80,8 @@ namespace Antmicro.Renode.Peripherals.Tviburi
             base.WriteByte(offset, value);
         }
 
-        private bool ModeFaultImpossible(uint newCr1, out string register, out string bit, out string condition)
+        private bool ModeFaultImpossible(uint newCr1, out string bit, out string condition)
         {
-            register = "SPI_CR1 / SPI_CFG2";
             if((cfg2 & Cfg2Master) == 0)
             {
                 bit = "CFG2.MASTER (bit 22) = 0";
@@ -119,7 +115,7 @@ namespace Antmicro.Renode.Peripherals.Tviburi
         {
             Refusal.Refuse(machine, this, Rule, offset < Cr1Offset + 4 ? "SPI_CR1" : "SPI_CFG2", "sub-word access",
                 width + "-bit write overlapping CR1 or CFG2: the mode-fault guard evaluates 32-bit writes only",
-                Citation, State((uint)cr1), offset, value, width);
+                Citation, Cfg2State(), offset, value, width);
         }
 
         private static bool OverlapsGuarded(long offset, int size)
@@ -132,12 +128,11 @@ namespace Antmicro.Renode.Peripherals.Tviburi
             return offset < register + 4 && register < offset + size;
         }
 
-        private string State(uint newCr1)
+        private string Cfg2State()
         {
-            return "CR1 written=0x" + newCr1.ToString("X8") + ", CFG2 last written=0x" + cfg2.ToString("X8");
+            return "CFG2 last written=0x" + cfg2.ToString("X8");
         }
 
-        private uint cr1;
         private uint cfg2;
         private readonly IMachine machine;
 
