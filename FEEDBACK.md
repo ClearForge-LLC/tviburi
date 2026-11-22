@@ -24,7 +24,7 @@ The cost of the chosen option is one subclass per stock model class that gets a 
 {"tviburi":"refusal","rule":"TVI-SPI-MODF","peripheral":"sysbus.spi1","register":"SPI_CR1 / SPI_CFG2",
  "bit":"CR1.SSI (bit 12) = 0 with CR1.SPE (bit 0) = 1",
  "condition":"CR1.SPE set in master mode with software SS management and the internal SS input at its active level (SSM=1, SSI=0, SSIOP=0): silicon sets SR.MODF (bit 9) and clears CR1.SPE and CFG2.MASTER; the stock model implements none of these",
- "model_version":"sha256:0ca8aeba47fa2f34f9cbc712ced4c1c5d15857e5d81a55724a6e156cbf18fd1f",
+ "model_version":"sha256:87206a22291cb892958392e98a9c91e1472c59d738525119e01a2099df8610e6",
  "citation":"RM0433 … SPI chapter: mode fault (MODF) … Section number and revision not verified …",
  "state":"CR1 written=0x00000001, CFG2 last written=0x04400000",
  "access":{"offset":"0x0","value":"0x1","width":32,"pc":"0x0800003E","virtual_time":"00:00:00.000000000"}}
@@ -39,7 +39,62 @@ The runner exits **3 (REFUSED)**. The rule is three-way with refuse as the defau
 
 ## 2. Gates
 
-(filled in below)
+The final runs used the branch's last code commit, `7c8ffd9`. The FEEDBACK commit after it changes no code. All of them ran in one container at a time, with no network, under `capped-run`.
+
+**Acceptance (WO §3).** `tests/spike.sh` checks a `git archive HEAD` export by default, which is what a clean checkout looks like. It passes 9 of 9:
+
+- **The unmodeled path refuses.** The SPI1 MODF path exits **3 REFUSED**.
+- **The record is complete.** Peripheral, register/bit, condition and model version are all present (invariant 5).
+- **The trace keeps the refused access.**
+- **The modeled path still runs.** The `SSI=1` path exits **0 PASS**, with no refusal.
+- **The record is stable.** It is byte-identical across two runs of the same invocation (seed pinned).
+- **The stock model does not pass.** The stock, unguarded `STM32H7_SPI` at SPI1 runs the MODF firmware to its end with no refusal, which is Renode's silent pass. It exits **1 FAIL**, not PASS.
+- **Firmware that stops short does not pass.** Firmware without its end marker exits 1.
+- **Every rule branch behaves as declared.** `tests/conditions.resc` drives each branch from the monitor: slave mode, hardware SS, `SSIOP=1`, `SSI=0`, a 16-bit write at CR1 and an 8-bit write at CFG2. Each refuses, in order. The `SSI=1` case and a byte write to TXDR do not.
+
+**Adversarial pass (WO §5).** These checks came from a scratch harness outside the repository, run on `7c8ffd9`:
+
+| Attempt | Result |
+|---|---|
+| Modeled path | PASS, no refusal (above) |
+| Remove `GuardedSTM32H7_SPI.cs` / remove `Refusal.cs` / rename the class / remove the overlay's `spi1` entry | All 8 runs (modf and modeled each) exit **1 FAIL**. None passes. |
+| Extra runner argument `--no-refuse` | 1. The runner takes exactly one argument and has no flags. |
+| `-e TVIBURI_MODEL_DIR=/nonexistent` | 3. The runner sets its own. |
+| `sysbus SetHookBeforePeripheralWrite spi1 …` injected before the run | 3. The subclass seam is not displaced. |
+| `logLevel 3` / `sysbus UnhandledAccessBehaviour DoNotReport` injected | 3. The record does not go through Renode's logger. |
+| `sysbus ClearHookBeforePeripheralWrite spi1` injected | 1. The command does not exist in the monitor, so the script stops and the run fails closed. |
+| Output directory read-only, with the runtime run directly | `FailFast` exits **134**, with no records and no END. The writable control makes 7 records and reaches END. |
+| `TVIBURI_MODEL_DIR` unset, with Renode run directly | The guard's constructor throws, the platform load aborts, and the exit is 134 with no END. |
+
+The only documented override that can turn a refusal off is not having the shim, and that fails closed. **No debug override exists.**
+
+**Mutation (diff-sized, one mutant per guard this WO adds).** Each mutant ran against the committed suite. The first run left M8 and M9 alive. The two fixtures above were added to kill them, and on the rerun **all 9 are killed**:
+
+| Mutant | Killed by |
+|---|---|
+| M1 the slave-mode branch, M2 the SSM branch, M3 the SSIOP branch, M5 the sub-word check | `conditions` |
+| M4 the SSI (mode-fault) branch, M6 the SPE gate | acceptance and `conditions` |
+| M7 the refusal latch in the runner | acceptance |
+| M8 the end-marker check | the no-marker fixture |
+| M9 the armed check | the stock-model fixture |
+
+**Reduction pass (diff): −13 net in the reduced code files · 2 duplicates removed · 5 dead paths removed · 0 protected kept · 4 proposals rejected, listed below.** The proposals came from a fresh subagent. The suite and all 9 mutants were green after every removal.
+
+- **Duplicates removed:**
+  - the include/seed/platform prelude, which was stated in both the runner and the conditions script, is now `scripts/prelude.resc`;
+  - the capped container invocation in the test, which is now one helper.
+- **Dead paths removed:**
+  - the unchecked BEFORE marker;
+  - the unused `TVIBURI_ROOT` knob and the `TVIBURI_OUT` default;
+  - the diagnostic-only CR1 shadow;
+  - the constant register out-parameter;
+  - a hand-rolled hex helper, replaced by `SHA256.HashData` and `Convert.ToHexString`.
+- **Rejected proposals:**
+  - computing the model version on each use, because it could throw inside a CPU bus write;
+  - dropping the runner's one-argument check, which adversarial B1 shows is load-bearing;
+  - dropping the stderr echo of a refusal, which is the only visible refusal when Renode is run directly;
+  - dropping the HAL-order `SSI`-before-`SPE` write in the probe, which is documentation, not dead code.
+- **Net effect:** `tests/spike.sh` grew by +16, almost all of it the two mutant-killing fixtures.
 
 ## 3. Renode behaviour that differed from the architecture's expectations
 
@@ -63,5 +118,6 @@ The runner exits **3 (REFUSED)**. The rule is three-way with refuse as the defau
 
 ## 5. Scope notes
 
-- **One addition beyond the literal scope:** `tests/conditions.resc`, which drives every branch of the rule from the monitor. Without it, the mutants of four refusal branches survive the acceptance suite. See §2.
+- **Additions beyond the literal scope:** `tests/conditions.resc` and the two fail-closed fixtures in `tests/spike.sh`. Each exists only because, without it, a mutant of a guard this WO adds survived (§2).
+- **How to run:** `tests/spike.sh` on Furnace. It needs `~/bin/capped-run` and the pinned image already pulled; it pulls nothing. Outputs go under `${TVIBURI_SCRATCH:-~/.cache/tviburi}`.
 - The three peripheral families, the ledger format, any Aethelgard integration, and any trace-format change were not touched.
