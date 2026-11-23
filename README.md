@@ -2,7 +2,7 @@
 
 A digital twin for commercial microcontrollers that refuses to claim it has simulated anything it has not actually modeled.
 
-**Status:** Phase 1. One guarded peripheral, SPI1 on the STM32H7, refuses its unmodeled paths (`TVI-WO-0100a`). It is under review and nothing is released. No consumer uses Tviburi yet. The supported entry points are Tviburi's runner (`scripts/tviburi-spike`) and the records contract: a load witness, then an end record, with no refusal, on Renode's log under the guarded peripheral's name. A consumer checks it with `tools/tviburi-check`. Renode's own exit status is not a verdict.
+**Status:** Phase 1. One guarded peripheral, SPI1 on the STM32H7, refuses its unmodeled paths and passes unmodified ArduPilot's SPI start (`TVI-WO-0100a`, `0100b`, merged). The RCC guard is being built (`TVI-WO-1300`). Nothing is released yet (`TVI-WO-1200` builds the release). No consumer uses Tviburi yet. The supported entry points are Tviburi's runner (`scripts/tviburi-spike`) and the records contract: a load witness, then an end record, with no refusal, on Renode's log under the guarded peripheral's name. A consumer checks it with `tools/tviburi-check`. Renode's own exit status is not a verdict.
 
 ## Where to go
 
