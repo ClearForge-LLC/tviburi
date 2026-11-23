@@ -83,6 +83,10 @@ first() { records "$1" "len(recs) >= 1 and (lambda r: $2)(recs[0])"; }
 console() { "$src/scripts/monitor-output" "$work/$1/renode.out"; }
 after() { console "$1" | grep -A1 -x 'TVIBURI-MARK-AFTER' | tail -n1 | grep -qx '0xAF7E0002'; }
 run='emulation RunFor "0.001"'
+# The eleven ports' clocks (RCC_AHB4ENR = 0x7FF, GPIOAEN..GPIOKEN, RM0433 Rev 9 p461): since TVI-WO-1300a the RCC guard
+# locks a peripheral whose enable is clear, as silicon (p373), so a monitor-driven case enables them first, and again
+# after a machine Reset, as both firmwares and firmware/gpio.rs do before any GPIO access.
+clk='sysbus WriteDoubleWord 0x580244E0 0x7FF'
 marks=('echo "TVIBURI-MARK-AFTER"' 'sysbus ReadDoubleWord 0x20000104' 'echo "TVIBURI-MARK-READ"' 'sysbus ReadDoubleWord 0x20000108')
 readmark() { console "$1" | grep -A1 -x 'TVIBURI-MARK-READ' | tail -n1; }
 passes() { [ "$rc" = 0 ] && grep -qx 'CHECK PASS' "$work/$1.stdout" && after "$1"; }
@@ -172,7 +176,7 @@ for t in ${TVIBURI_TESTS:-$CASES}; do
   config)
     PLATFORM_SED='$a\
 tviburiGpioA:\
-    modeResetValue: 0x0' run_case config - 'sysbus ReadDoubleWord 0x58020000'
+    modeResetValue: 0x0' run_case config - "$clk" 'sysbus ReadDoubleWord 0x58020000'
     check "config: a port given a reset value other than RM0433's (MODER 0 for port A, p541) refuses every access, TVI-GPIO-CONFIG, unmodeled" \
       "[ \$rc = 3 ] && first config 'r[\"rule\"] == \"TVI-GPIO-CONFIG\" and r[\"kind\"] == \"unmodeled\" and \"modeResetValue\" in r[\"condition\"]'" ;;
   query)
@@ -181,21 +185,21 @@ tviburiGpioA:\
     check "query: PA5 carries SPI1_SCK/I2S1_CK (p89); PA0 is analog (silicon's reset, p541); PA13 is AF0 JTMS-SWDIO" \
       "q=\$(tr -d '\\r' < '$work/query/renode.out') && grep -qx 'Q5 SPI1_SCK/I2S1_CK' <<<\"\$q\" && grep -q '^Q5 DS12117 Rev 10 Table 9 p89' <<<\"\$q\" && grep -qx 'Q0 analog' <<<\"\$q\" && grep -qx 'Q13 JTMS-SWDIO' <<<\"\$q\"" ;;
   registrations)
-    run_case registrations - 'peripherals' 'include @/repo/tests/1301/checks.py' 'sysbus WriteDoubleWord 0x58020418 0x1' 'echo "R-GREEN"' 'sysbus.gpioPortB.GreenLED State'
+    run_case registrations - "$clk" 'peripherals' 'include @/repo/tests/1301/checks.py' 'sysbus WriteDoubleWord 0x58020418 0x1' 'echo "R-GREEN"' 'sysbus.gpioPortB.GreenLED State'
     check "registrations: the 11 ports are the guard, no stock port remains, the timers' AF routes reach the guards, and GreenLED follows BSRR" \
       "[ \$(grep -c 'gpioPort[A-K] (GuardedSTM32_GPIOPort)' '$work/registrations/renode.out') = 11 ] && grep -q 'TVICHK stock STM32_GPIOPort instances in the machine: 0' '$work/registrations/renode.out' && grep -q 'TVICHK timer1 out: .*sysbus.gpioPortA#8@1' '$work/registrations/renode.out' && console registrations | grep -A1 -x 'R-GREEN' | tail -n1 | grep -qx True" ;;
   reset)
-    run_case reset - 'sysbus WriteDoubleWord 0x58020004 0xC0' 'sysbus WriteDoubleWord 0x58020000 0x0' 'machine Reset' \
+    run_case reset - "$clk" 'sysbus WriteDoubleWord 0x58020004 0xC0' 'sysbus WriteDoubleWord 0x58020000 0x0' 'machine Reset' "$clk" \
       'echo "R-MODER"' 'sysbus ReadDoubleWord 0x58020000' 'echo "R-OTYPER"' 'sysbus ReadDoubleWord 0x58020004' 'echo "R-PUPDR"' 'sysbus ReadDoubleWord 0x5802000C'
     check "reset: after machine Reset port A reads silicon's resets (MODER 0xABFFFFFF p541, PUPDR 0x64000000 p542) and the OTYPER copy 0" \
       "[ \$rc = 0 ] && console reset | grep -A1 -x 'R-MODER' | tail -n1 | grep -qx 0xABFFFFFF && console reset | grep -A1 -x 'R-OTYPER' | tail -n1 | grep -qx 0x00000000 && console reset | grep -A1 -x 'R-PUPDR' | tail -n1 | grep -qx 0x64000000" ;;
   misaligned)
-    run_case misaligned - 'sysbus WriteDoubleWord 0x58020002 0x0'
+    run_case misaligned - "$clk" 'sysbus WriteDoubleWord 0x58020002 0x0'
     check "misaligned: a 32-bit GPIO write at 0x02 refuses TVI-GPIO-WIDTH, unmodeled" \
       "[ \$rc = 3 ] && first misaligned 'r[\"rule\"] == \"TVI-GPIO-WIDTH\" and \"misaligned\" in r[\"bit\"]'" ;;
   fields)
     mapfile -t lines < <(grep -v '^#' "$src/tests/1301/fields.resc")
-    run_case fields - "${lines[@]}"
+    run_case fields - "$clk" "${lines[@]}"
     n=$(grep -c '^# FIELD ' "$src/tests/1301/fields.resc")
     check "fields: every field value outside the allow-list refuses by name, TVI-GPIO-FIELD, unmodeled ($n cases; gate clause 6)" \
       "records fields 'len(recs) == $n and all(r[\"rule\"] == \"TVI-GPIO-FIELD\" and r[\"kind\"] == \"unmodeled\" and r[\"bit\"].startswith(f) for r, f in zip(recs, [l[8:].strip() for l in open(\"$src/tests/1301/fields.resc\") if l.startswith(\"# FIELD \")]))'" ;;
@@ -216,13 +220,13 @@ sys.exit(0 if len(f) == 31 and len({r[\"register\"] for r in f}) == 10 and pairs
     check "adv-monitor: the monitor's own WriteDoubleWord on the port (not through sysbus) reaches the guard: PA5 AF6 in AF mode refuses TVI-GPIO-AF (WO §5)" \
       "[ \$rc = 3 ] && first adv-monitor 'r[\"rule\"] == \"TVI-GPIO-AF\" and r[\"bit\"] == \"PA5 AF6\"'" ;;
   resetwrite)
-    run_case resetwrite - 'machine Reset' 'sysbus WriteDoubleWord 0x5802000C 0x0' 'sysbus WriteDoubleWord 0x58020400 0x0' \
+    run_case resetwrite - 'machine Reset' "$clk" 'sysbus WriteDoubleWord 0x5802000C 0x0' 'sysbus WriteDoubleWord 0x58020400 0x0' \
       'echo "R-PUPDR"' 'sysbus ReadDoubleWord 0x5802000C' 'echo "R-MODER"' 'sysbus ReadDoubleWord 0x58020400' \
       "python \"print('Q3 ' + str(self.Machine['sysbus.gpioPortB'].WhichSignal(3)))\""
     check "resetwrite: after a reset, writes of 0 to PUPDR A and MODER B take (the stock register's cache is refreshed first): they read 0, and PB3 is an input" \
       "[ \$rc = 0 ] && console resetwrite | grep -A1 -x 'R-PUPDR' | tail -n1 | grep -qx 0x00000000 && console resetwrite | grep -A1 -x 'R-MODER' | tail -n1 | grep -qx 0x00000000 && tr -d '\\r' < '$work/resetwrite/renode.out' | grep -qx 'Q3 input'" ;;
   recordedtwo)
-    PLATFORM_SED='s/^    mode: "enforcing"$/    mode: "recorded"/' run_case recordedtwo - 'sysbus WriteDoubleWord 0x58020020 0x06600000' 'sysbus WriteDoubleWord 0x58020000 0xABFFEBFF' 'sysbus WriteDoubleWord 0x58021C00 0xFFFFFFEF'
+    PLATFORM_SED='s/^    mode: "enforcing"$/    mode: "recorded"/' run_case recordedtwo - "$clk" 'sysbus WriteDoubleWord 0x58020020 0x06600000' 'sysbus WriteDoubleWord 0x58020000 0xABFFEBFF' 'sysbus WriteDoubleWord 0x58021C00 0xFFFFFFEF'
     check "recordedtwo: in recorded mode every pin and every rule is recorded: PA5 and PA6 on AF6 give two TVI-GPIO-AF; PH2 in AF mode on AF0 gives TVI-GPIO-AF and TVI-GPIO-PACKAGE" \
       "l='$work/recordedtwo/renode-log.txt'; [ \$(grep -c 'would-refuse.*TVI-GPIO-AF.*\"bit\":\"PA[56] AF6\"' \$l) = 2 ] && grep -q 'would-refuse.*TVI-GPIO-AF.*\"bit\":\"PH2 AF0\"' \$l && grep -q 'would-refuse.*TVI-GPIO-PACKAGE.*\"bit\":\"PH2 MODER = 10\"' \$l" ;;
   twoaddr)
@@ -231,7 +235,7 @@ tviburiGpioA: @ {\
         sysbus <0x58020000, +0x400>;\
         sysbus <0x58030000, +0x400>;\
         tviburiRcc RegistrationPeripheralAlias.GPIOA\
-    }' run_case twoaddr - 'sysbus ReadDoubleWord 0x58030000'
+    }' run_case twoaddr - "$clk" 'sysbus ReadDoubleWord 0x58030000'
     check "twoaddr: a port registered at a second address refuses every access, TVI-GPIO-CONFIG, unmodeled; the run fails (Renode names the port by its variable, which the check was not given)" \
       "[ \$rc = 1 ] && grep -q '\"tviburi\":\"refusal\".*\"rule\":\"TVI-GPIO-CONFIG\".*2 bus registrations' '$work/twoaddr/renode-log.txt'" ;;
   *) echo "unknown case $t" >&2; exit 2 ;;

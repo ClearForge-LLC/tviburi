@@ -1,6 +1,6 @@
 # TVI-WO-1301 — FEEDBACK
 
-**Builder:** Claude (Opus 5.5), Furnace, 2026-11-23. **Branch:** `wo/tvi-1301-gpio-af-guard`, from `main` `604c3d6`, with `main` `2e4c56d` and `c95f161` (docs only) merged; the suites were not rerun for them.
+**Builder:** Claude (Opus 5.5), Furnace, 2026-11-23. **Branch:** `wo/tvi-1301-gpio-af-guard`, from `main` `604c3d6`, with `main` merged three times: `2e4c56d` and `c95f161` (docs only), then `bf7fb36` and `b019105` (TVI-WO-1300a, #21). The suite was rerun on the combined tree (§7).
 
 **State:**
 - §1.1 measured and stopped (16:59Z). The architect ruled at 17:52Z (both stops, the form, A1–A10, D1–D5, records, AFRH), 18:30Z (the memory: judged in CI) and 19:08Z (Q1–Q3). The build followed.
@@ -8,7 +8,7 @@
   - no valid path refuses (both firmwares, all 15 boots);
   - the package is declared;
   - the memory is judged in CI per 18:30Z, and passes locally as a proxy (§3).
-- **STOPPED at 19:57Z: CI could not meet the memory bound** (§3). **Measured as ruled at 20:20Z** (§3a); the decision is Scotty's.
+- **The memory:** CI could not meet the bound on a slow runner (19:57Z, §3). It was measured as ruled at 20:20Z (§3a); the peak follows the runner's speed. **Ruled at 20:58Z:** the regular CI step passing on the runner CI gives is the gate until Scotty rules on the bound. The temporary measurement step is removed, and its figures stay in §3a.
 - **Ruled at 19:47Z:** F1 (follow-up `TVI-WO-1301a`), F5 kept, the harness deleted, rows (§5). The merge order: 1300a (#21) first, then `main` merged here, the suite rerun, and CI re-measuring the combined file.
 - Steering documents, `README.md`, `docs/reviews/` and Aethelgard are untouched. `model/Refusal.cs` changed only as granted at 19:08Z (Q1). One PR, left unmerged.
 
@@ -65,7 +65,7 @@
 
 ## 3a. The memory, measured in CI as ruled (20:20Z)
 
-**CI run 45257810560, head `e831735`.** A temporary step, `tests/1301/ci-memory-gc.sh`, removed before READY, ran five full ArduPilot boots per configuration, interleaved. The ELF was `a799dfb6` again.
+**CI run 45257810560, head `e831735`.** A temporary step, `tests/1301/ci-memory-gc.sh`, ran five full ArduPilot boots per configuration, interleaved. It was removed at the 20:58Z ruling and is in history at `e831735`. The ELF was `a799dfb6` again.
 
 | Configuration | Peaks (KiB), runs 1–5 | Wall (s) | 5 of 5 ≤ 1,015,808? |
 |---|---|---|---|

@@ -26,10 +26,6 @@ jobs:
       # runner. ArduPilot's ELF is built from Aethelgard's pinned image and held to its sha256; five full boots.
       - name: Pull Aethelgard's pinned ArduPilot image, by digest
         run: podman pull "$(sed -n 's/^AP_IMAGE=//p' tests/1301/ci-memory.sh)"
-      # TEMPORARY (TVI-WO-1301, ruled 2026-11-23T20:20Z; removed before READY): main's file and 1301's, each with and
-      # without Renode's .NET GC told to conserve memory, five boots each. The fetch of main is the only network use.
-      - name: TEMPORARY memory measurement, four configurations
-        run: TVIBURI_SCRATCH="$RUNNER_TEMP/tviburi" tests/1301/ci-memory-gc.sh
       - name: Memory on ArduPilot's full boot (each peak 32 MiB under 1,048,576 KiB)
         run: TVIBURI_SCRATCH="$RUNNER_TEMP/tviburi" tests/1301/ci-memory.sh
       - name: Adversarial cases
