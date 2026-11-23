@@ -4,33 +4,49 @@
 # refusals, with their kinds, in order. Values: CR1 SPE=bit 0, SSI=12, IOLOCK=16; CFG2 SP=21:19, MASTER=22, SSM=26,
 # SSIOP=28, SSOE=29; I2SCFGR I2SMOD=bit 0 (RM0433 Rev 9 §50.11).
 include @/repo/scripts/prelude.resc
+# TVI-WO-1300a: from reset every bus clock is off and no kernel clock runs (p373, p371-372). PLL1 from HSI (PLL1ON) and
+# SPI1EN, here and after each machine Reset, so that the cases below meet the SPI1 rules they are written for.
+sysbus WriteDoubleWord 0x58024400 0x01000001
+sysbus WriteDoubleWord 0x580244F0 0x00001000
 # 1. slave (CFG2 at reset): SPE refuses
 sysbus WriteDoubleWord 0x40013000 0x1001
 machine Reset
+sysbus WriteDoubleWord 0x58024400 0x01000001
+sysbus WriteDoubleWord 0x580244F0 0x00001000
 # 2. master, TI mode (SP=001): SPE refuses
 sysbus WriteDoubleWord 0x40013000 0x1000
 sysbus WriteDoubleWord 0x4001300C 0x04480000
 sysbus WriteDoubleWord 0x40013000 0x1001
 machine Reset
+sysbus WriteDoubleWord 0x58024400 0x01000001
+sysbus WriteDoubleWord 0x580244F0 0x00001000
 # 3. master, hardware SS input (SSM=0, SSOE=0): SPE refuses
 sysbus WriteDoubleWord 0x4001300C 0x00400000
 sysbus WriteDoubleWord 0x40013000 0x1001
 machine Reset
+sysbus WriteDoubleWord 0x58024400 0x01000001
+sysbus WriteDoubleWord 0x580244F0 0x00001000
 # pass: master, hardware NSS output (SSM=0, SSOE=1): the NSS input is forced inactive (p2221, p2166;
 # TVI-WO-0100b (1)), so SPE passes, and the CFG2 read that follows is served (no history)
 sysbus WriteDoubleWord 0x4001300C 0x20400000
 sysbus WriteDoubleWord 0x40013000 0x1001
 sysbus ReadDoubleWord 0x4001300C
 machine Reset
+sysbus WriteDoubleWord 0x58024400 0x01000001
+sysbus WriteDoubleWord 0x580244F0 0x00001000
 # 5. master, SSM=1, SSIOP=1: SPE refuses
 sysbus WriteDoubleWord 0x40013000 0x1000
 sysbus WriteDoubleWord 0x4001300C 0x14400000
 sysbus WriteDoubleWord 0x40013000 0x1001
 machine Reset
+sysbus WriteDoubleWord 0x58024400 0x01000001
+sysbus WriteDoubleWord 0x580244F0 0x00001000
 # 6. master, SSM=1, SSIOP=0, SSI=0: mode fault, SPE refuses
 sysbus WriteDoubleWord 0x4001300C 0x04400000
 sysbus WriteDoubleWord 0x40013000 0x00000001
 machine Reset
+sysbus WriteDoubleWord 0x58024400 0x01000001
+sysbus WriteDoubleWord 0x580244F0 0x00001000
 # 7. CFG2 master before SSI=1 (an earlier master state with SSI=0): a CFG2 read refuses (7a), and
 # SPE refuses on history
 sysbus WriteDoubleWord 0x4001300C 0x04400000
@@ -38,11 +54,15 @@ sysbus WriteDoubleWord 0x40013000 0x1000
 sysbus ReadDoubleWord 0x4001300C
 sysbus WriteDoubleWord 0x40013000 0x1001
 machine Reset
+sysbus WriteDoubleWord 0x58024400 0x01000001
+sysbus WriteDoubleWord 0x580244F0 0x00001000
 # pass: SSI=1 before CFG2, then SPE
 sysbus WriteDoubleWord 0x40013000 0x1000
 sysbus WriteDoubleWord 0x4001300C 0x04400000
 sysbus WriteDoubleWord 0x40013000 0x1001
-# 8. CFG2 while SPE=1: refuses
+# 8. CFG2 changed while SPE=1: refuses
+sysbus WriteDoubleWord 0x4001300C 0x24400000
+# pass (8a): the value CFG2 already holds, while SPE=1: write protection keeps it, so nothing changes (TVI-WO-1300a (4); p2221)
 sysbus WriteDoubleWord 0x4001300C 0x04400000
 # pass: disable, then IOLOCK with SPE=0
 sysbus WriteDoubleWord 0x40013000 0x1000
@@ -51,6 +71,8 @@ sysbus WriteDoubleWord 0x40013000 0x11000
 sysbus WriteDoubleWord 0x4001300C 0x04400000
 sysbus ReadDoubleWord 0x40013000
 machine Reset
+sysbus WriteDoubleWord 0x58024400 0x01000001
+sysbus WriteDoubleWord 0x580244F0 0x00001000
 # pass: reset cleared the IOLOCK latch and the history: the passing sequence passes again
 sysbus WriteDoubleWord 0x40013000 0x1000
 sysbus WriteDoubleWord 0x4001300C 0x04400000
@@ -69,10 +91,14 @@ sysbus ReadDoubleWord 0x4001300D
 # pass: a byte write to TXDR is not guarded
 sysbus WriteByte 0x40013020 0x55
 machine Reset
+sysbus WriteDoubleWord 0x58024400 0x01000001
+sysbus WriteDoubleWord 0x580244F0 0x00001000
 # 14. reset cleared the CFG2 copy: SPE refuses as slave; then reset cleared the CR1 copy (SPE=0): CFG2 passes
 sysbus WriteDoubleWord 0x40013000 0x1001
 sysbus WriteDoubleWord 0x4001300C 0x04400000
 machine Reset
+sysbus WriteDoubleWord 0x58024400 0x01000001
+sysbus WriteDoubleWord 0x580244F0 0x00001000
 # reads give silicon's value: the CFG2 fields the stock model drops, and CR1.SSI (no refusal)
 sysbus WriteDoubleWord 0x40013000 0x1000
 sysbus WriteDoubleWord 0x4001300C 0x10000000
@@ -99,6 +125,8 @@ sysbus ReadDoubleWord 0x40013000
 sysbus WriteDoubleWord 0x40013000 0x1000
 sysbus WriteDoubleWord 0x4001300C 0x04400000
 machine Reset
+sysbus WriteDoubleWord 0x58024400 0x01000001
+sysbus WriteDoubleWord 0x580244F0 0x00001000
 # 17 (L5). latched with SPE=0 (certain), enable, disable (silicon clears IOLOCK), then CFG2: refuses, unmodeled
 sysbus WriteDoubleWord 0x40013000 0x1000
 sysbus WriteDoubleWord 0x4001300C 0x04400000
@@ -107,6 +135,8 @@ sysbus WriteDoubleWord 0x40013000 0x11001
 sysbus WriteDoubleWord 0x40013000 0x11000
 sysbus WriteDoubleWord 0x4001300C 0x04400000
 machine Reset
+sysbus WriteDoubleWord 0x58024400 0x01000001
+sysbus WriteDoubleWord 0x580244F0 0x00001000
 # 18 (L3). IOLOCK in the write that enables (uncertain), disable, CFG2: refuses, unmodeled
 sysbus WriteDoubleWord 0x40013000 0x1000
 sysbus WriteDoubleWord 0x4001300C 0x04400000
@@ -114,6 +144,8 @@ sysbus WriteDoubleWord 0x40013000 0x11001
 sysbus WriteDoubleWord 0x40013000 0x1000
 sysbus WriteDoubleWord 0x4001300C 0x04400000
 machine Reset
+sysbus WriteDoubleWord 0x58024400 0x01000001
+sysbus WriteDoubleWord 0x580244F0 0x00001000
 # 18b (L3, no disable after). IOLOCK in the write that enables; then CFG2 while enabled: IOLOCK is
 # evaluated first, unmodeled
 sysbus WriteDoubleWord 0x40013000 0x1000
@@ -121,6 +153,8 @@ sysbus WriteDoubleWord 0x4001300C 0x04400000
 sysbus WriteDoubleWord 0x40013000 0x11001
 sysbus WriteDoubleWord 0x4001300C 0x04400000
 machine Reset
+sysbus WriteDoubleWord 0x58024400 0x01000001
+sysbus WriteDoubleWord 0x580244F0 0x00001000
 # 18c. a certain latch, then SSI cleared while master (the D1 history): CFG2 refuses unmodeled, since
 # a mode fault would have cleared IOLOCK (p2225)
 sysbus WriteDoubleWord 0x40013000 0x1000
@@ -129,11 +163,15 @@ sysbus WriteDoubleWord 0x40013000 0x11000
 sysbus WriteDoubleWord 0x40013000 0x10000
 sysbus WriteDoubleWord 0x4001300C 0x04400000
 machine Reset
+sysbus WriteDoubleWord 0x58024400 0x01000001
+sysbus WriteDoubleWord 0x580244F0 0x00001000
 # 18d (L4). IOLOCK latched while the history is set: CFG2 refuses unmodeled
 sysbus WriteDoubleWord 0x4001300C 0x04400000
 sysbus WriteDoubleWord 0x40013000 0x10000
 sysbus WriteDoubleWord 0x4001300C 0x04400000
 machine Reset
+sysbus WriteDoubleWord 0x58024400 0x01000001
+sysbus WriteDoubleWord 0x580244F0 0x00001000
 # 19 (H0). MODFC with no history has no effect: SPE passes, and a CFG2 read is served
 sysbus WriteDoubleWord 0x40013000 0x1000
 sysbus WriteDoubleWord 0x4001300C 0x04400000
@@ -141,6 +179,8 @@ sysbus WriteDoubleWord 0x40013018 0xFFFFFFFF
 sysbus WriteDoubleWord 0x40013000 0x1001
 sysbus ReadDoubleWord 0x4001300C
 machine Reset
+sysbus WriteDoubleWord 0x58024400 0x01000001
+sysbus WriteDoubleWord 0x580244F0 0x00001000
 # 20 (H1). history (CFG2 master with SSI=0), MODFC: MASTER unknown: a CFG2 read refuses, then SPE refuses
 sysbus WriteDoubleWord 0x4001300C 0x04400000
 sysbus WriteDoubleWord 0x40013018 0x200
@@ -148,6 +188,8 @@ sysbus WriteDoubleWord 0x40013000 0x1000
 sysbus ReadDoubleWord 0x4001300C
 sysbus WriteDoubleWord 0x40013000 0x1001
 machine Reset
+sysbus WriteDoubleWord 0x58024400 0x01000001
+sysbus WriteDoubleWord 0x580244F0 0x00001000
 # 21 (H2). as 20, then CFG2 written again with SSI=1: SPE passes
 sysbus WriteDoubleWord 0x4001300C 0x04400000
 sysbus WriteDoubleWord 0x40013018 0x200
@@ -155,6 +197,8 @@ sysbus WriteDoubleWord 0x40013000 0x1000
 sysbus WriteDoubleWord 0x4001300C 0x04400000
 sysbus WriteDoubleWord 0x40013000 0x1001
 machine Reset
+sysbus WriteDoubleWord 0x58024400 0x01000001
+sysbus WriteDoubleWord 0x580244F0 0x00001000
 # 22 (H3). the history built from a CR1 write (SSI cleared while master, SSM=1): SPE refuses
 sysbus WriteDoubleWord 0x40013000 0x1000
 sysbus WriteDoubleWord 0x4001300C 0x04400000
@@ -162,6 +206,8 @@ sysbus WriteDoubleWord 0x40013000 0x0
 sysbus WriteDoubleWord 0x40013000 0x1000
 sysbus WriteDoubleWord 0x40013000 0x1001
 machine Reset
+sysbus WriteDoubleWord 0x58024400 0x01000001
+sysbus WriteDoubleWord 0x580244F0 0x00001000
 # 23 (C3). CFG1 while SPE=1: unchanged passes; only the DMA enables changed refuses unmodeled; MBR
 # changed refuses predicted-fault
 sysbus WriteDoubleWord 0x40013000 0x1000
@@ -171,12 +217,16 @@ sysbus WriteDoubleWord 0x40013008 0x00070007
 sysbus WriteDoubleWord 0x40013008 0x0007C007
 sysbus WriteDoubleWord 0x40013008 0x10070007
 machine Reset
+sysbus WriteDoubleWord 0x58024400 0x01000001
+sysbus WriteDoubleWord 0x580244F0 0x00001000
 # 24 (A6). DSIZE=00000 passes at rest, and refuses at the enable
 sysbus WriteDoubleWord 0x40013008 0x00000000
 sysbus WriteDoubleWord 0x40013000 0x1000
 sysbus WriteDoubleWord 0x4001300C 0x04400000
 sysbus WriteDoubleWord 0x40013000 0x1001
 machine Reset
+sysbus WriteDoubleWord 0x58024400 0x01000001
+sysbus WriteDoubleWord 0x580244F0 0x00001000
 # 25 (C5). data registers: an 8-bit TXDR write and RXDR read pass with 8-bit frames; a 32-bit TXDR
 # write and a 16-bit RXDR read refuse; a 16-bit CR2 write refuses (every register is 32-bit)
 sysbus WriteDoubleWord 0x40013000 0x1000
@@ -189,6 +239,8 @@ sysbus WriteDoubleWord 0x40013020 0x55
 sysbus ReadWord 0x40013030
 sysbus WriteWord 0x40013004 0x1
 machine Reset
+sysbus WriteDoubleWord 0x58024400 0x01000001
+sysbus WriteDoubleWord 0x580244F0 0x00001000
 # 26 (C2, C4). reads served from the copies at reset: CFG1 (p2218) and CRCPOLY (p2228); MASRX from CR1's
 # copy; a CRCPOLY write of 0x107 passes (the other values, and offsets with no register: tests/fields.resc)
 echo "READ-CFG1"
@@ -203,16 +255,22 @@ echo "READ-IER"
 sysbus ReadDoubleWord 0x40013010
 sysbus WriteDoubleWord 0x40013040 0x107
 machine Reset
+sysbus WriteDoubleWord 0x58024400 0x01000001
+sysbus WriteDoubleWord 0x580244F0 0x00001000
 # 28. reset clears MASTER unknown and the IER copy: after a reset, the CFG2 read is served (no refusal),
 # and IER reads its reset value
 sysbus WriteDoubleWord 0x4001300C 0x04400000
 sysbus WriteDoubleWord 0x40013018 0x200
 sysbus WriteDoubleWord 0x40013010 0x41
 machine Reset
+sysbus WriteDoubleWord 0x58024400 0x01000001
+sysbus WriteDoubleWord 0x580244F0 0x00001000
 echo "READ-IER-RESET"
 sysbus ReadDoubleWord 0x40013010
 sysbus ReadDoubleWord 0x4001300C
 machine Reset
+sysbus WriteDoubleWord 0x58024400 0x01000001
+sysbus WriteDoubleWord 0x580244F0 0x00001000
 # 27 (TVI-SPI-ORDER). TXDR with SPE=0; CSTART with SPE=0, alone and in the write that enables; then
 # enabled: CR2 refuses
 sysbus WriteByte 0x40013020 0x55
@@ -223,11 +281,15 @@ sysbus WriteDoubleWord 0x40013000 0x1201
 sysbus WriteDoubleWord 0x40013000 0x1001
 sysbus WriteDoubleWord 0x40013004 0x4
 machine Reset
+sysbus WriteDoubleWord 0x58024400 0x01000001
+sysbus WriteDoubleWord 0x580244F0 0x00001000
 # 29. MASTER unknown comes before the truth table: history, MODFC, then SPE with SSI=0 refuses unmodeled
 sysbus WriteDoubleWord 0x4001300C 0x04400000
 sysbus WriteDoubleWord 0x40013018 0x200
 sysbus WriteDoubleWord 0x40013000 0x1
 machine Reset
+sysbus WriteDoubleWord 0x58024400 0x01000001
+sysbus WriteDoubleWord 0x580244F0 0x00001000
 # 30 (TVI-SPI-READ). no register; write-only IFCR and TXDR; RXDR with the RxFIFO empty
 sysbus ReadDoubleWord 0x4001301C
 sysbus ReadDoubleWord 0x40013018
@@ -237,6 +299,8 @@ sysbus WriteDoubleWord 0x4001300C 0x04400000
 sysbus WriteDoubleWord 0x40013000 0x1001
 sysbus ReadByte 0x40013030
 machine Reset
+sysbus WriteDoubleWord 0x58024400 0x01000001
+sysbus WriteDoubleWord 0x580244F0 0x00001000
 # 31. CSUSP: an SR read after the suspend refuses until EOTC; CSUSP with SPE=0 refuses; a reset clears it
 sysbus WriteDoubleWord 0x40013000 0x1000
 sysbus WriteDoubleWord 0x4001300C 0x04400000
@@ -249,14 +313,39 @@ sysbus ReadDoubleWord 0x40013014
 sysbus WriteDoubleWord 0x40013018 0x8
 sysbus ReadDoubleWord 0x40013014
 machine Reset
+sysbus WriteDoubleWord 0x58024400 0x01000001
+sysbus WriteDoubleWord 0x580244F0 0x00001000
 sysbus WriteDoubleWord 0x40013000 0x1400
 machine Reset
+sysbus WriteDoubleWord 0x58024400 0x01000001
+sysbus WriteDoubleWord 0x580244F0 0x00001000
 sysbus WriteDoubleWord 0x40013000 0x1000
 sysbus WriteDoubleWord 0x4001300C 0x04400000
 sysbus WriteDoubleWord 0x40013000 0x1001
 sysbus WriteDoubleWord 0x40013000 0x1201
 sysbus WriteDoubleWord 0x40013000 0x1601
 machine Reset
+sysbus WriteDoubleWord 0x58024400 0x01000001
+sysbus WriteDoubleWord 0x580244F0 0x00001000
 sysbus ReadDoubleWord 0x40013014
+machine Reset
+# 32 (TVI-SPI-ENABLE; TVI-WO-1300a (1)). From reset every bus clock is off (no set-up here): SPI1 written, then read, with
+# SPI1EN = 0 refuses, predicted-fault (p373: "A read access will return invalid data. A write access will be ignored")
+sysbus WriteDoubleWord 0x4001300C 0x04400000
+sysbus ReadDoubleWord 0x4001300C
+# 33 (TVI-SPI-KERNEL; (2)). SPI1EN with PLL1 off: SPI123SEL = 000 (pll1_q_ck) has no clock, so the passing start refuses,
+# predicted-fault, at SPI1 (p371, p414)
+sysbus WriteDoubleWord 0x580244F0 0x00001000
+sysbus WriteDoubleWord 0x40013000 0x1000
+sysbus WriteDoubleWord 0x4001300C 0x04400000
+sysbus WriteDoubleWord 0x40013000 0x1001
+machine Reset
+# 34 (TVI-SPI-KERNEL). SPI123SEL = 100 (per_ck on hsi_ker_ck, which runs) while the mux's input pll1_q_ck is off: the switch
+# does not take place (p371-372), so the start refuses (the generated per_ck boards' order)
+sysbus WriteDoubleWord 0x58024450 0x00004000
+sysbus WriteDoubleWord 0x580244F0 0x00001000
+sysbus WriteDoubleWord 0x40013000 0x1000
+sysbus WriteDoubleWord 0x4001300C 0x04400000
+sysbus WriteDoubleWord 0x40013000 0x1001
 echo "TVIBURI-END"
 quit

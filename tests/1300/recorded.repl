@@ -1,5 +1,9 @@
-// TVI-WO-1300: the board with the RCC guard in recorded mode (RUL-19); spi1 stays enforcing.
+// TVI-WO-1300: the board with the RCC guard in recorded mode (RUL-19). TVI-WO-1300a: spi1 too, since a start with no
+// kernel clock is now spi1's would-refuse (TVI-SPI-KERNEL).
 using "/repo/model/tviburi-nucleo-h753zi.repl"
 
 tviburiRcc:
+    mode: "recorded"
+
+spi1:
     mode: "recorded"

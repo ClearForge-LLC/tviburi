@@ -12,7 +12,7 @@
 set -euo pipefail
 
 IMAGE=ghcr.io/clearforge-llc/aethelgard-tools@sha256:1e0ab105ec42bdba66b773464f0b6679d622e4afdafef30ec4931e4326f49c63
-ACCEPTANCE="unit modf modeled ardupilot generated field stable cfg2first iolock rmw forge stock-forge stock-modf nomark conditions fields load crash identity verify reproducible recorded"
+ACCEPTANCE="unit modf modeled ardupilot generated field stable cfg2first iolock rmw forge stock-forge stock-modf nomark conditions fields load crash identity verify reproducible recorded allowlist"
 ADVERSARIAL="adv-removed adv-extra-arg adv-bad-variant adv-hook adv-loglevel adv-spray adv-noend adv-version adv-recorded adv-noname adv-release adv-cache"
 # TVI-WO-1300: the RCC guard's cases live in tests/1300/rcc.sh; each is a test here, rcc-<case>, run as part of the
 # acceptance group, so CI and tests/mutants.sh reach them.
@@ -263,7 +263,11 @@ t_conditions() {
  (\"TVI-SPI-READ\", \"unmodeled\", \"write-only register\", \"0x20\", 8),
  (\"TVI-SPI-READ\", \"unmodeled\", \"SR.RXP (bit 0) = 0, RXDR read\", \"0x30\", 8),
  (\"TVI-SPI-READ\", \"unmodeled\", \"SR.EOT (bit 3) set by the stock model at CSUSP\", \"0x14\", 32),
- (\"TVI-SPI-ORDER\", \"unmodeled\", \"CR1.CSUSP (bit 10) = 1 with SPE = 0\", \"0x0\", 32)]' \
+ (\"TVI-SPI-ORDER\", \"unmodeled\", \"CR1.CSUSP (bit 10) = 1 with SPE = 0\", \"0x0\", 32),
+ (\"TVI-SPI-ENABLE\", \"predicted-fault\", \"RCC_APB2ENR.SPI1EN = 0\", \"0xC\", 32),
+ (\"TVI-SPI-ENABLE\", \"predicted-fault\", \"RCC_APB2ENR.SPI1EN = 0\", \"0xC\", 32),
+ (\"TVI-SPI-KERNEL\", \"predicted-fault\", \"RCC_D2CCIP1R.SPI123SEL = 000\", \"0x0\", 32),
+ (\"TVI-SPI-KERNEL\", \"predicted-fault\", \"RCC_D2CCIP1R.SPI123SEL = 100\", \"0x0\", 32)]' \
       && grep -qx 'CHECK REFUSED' '$work/conditions.stdout'"
   check "every predicted-fault the conditions produce has a bench row in the release's ledger, and every bench row is produced (RUL-18)" \
     "python3 -I - '$work/conditions.stdout' '$work/conditions/release/LEDGER.jsonl' <<'EOF'
@@ -283,6 +287,12 @@ EOF
     '[ "$(r READ-CR1-L2)" = 0x00001001 ] && [ "$(r READ-CFG1)" = 0x00070007 ] && [ "$(r READ-CRCPOLY)" = 0x00000107 ] && [ "$(r READ-CR1-MASRX)" = 0x00000100 ] && [ "$(r READ-IER)" = 0x00000041 ] && [ "$(r READ-IER-RESET)" = 0x00000000 ]'
 }
 
+t_allowlist() { # TVI-WO-1300a (6): the RCC allow-list and its field sweep regenerate from the committed tables, byte for byte
+  local out; rc=0; out=$(python3 -I "$src/tests/1300/allowlist.py" check 2>&1) || rc=$?
+  echo "$out" | tail -n 3
+  check "the RCC allow-list (the guard's Fields) and tests/1300/fields.resc regenerate from tests/1300/data, byte for byte" '[ $rc -eq 0 ]'
+}
+
 t_fields() {
   # Gate clause 6 (RUL-17), with the cases generated from the release's ledger, not from a second list: each
   # field row's disallowed value refuses TVI-SPI-FIELD, unmodeled, naming the field; each allowed value passes
@@ -290,7 +300,7 @@ t_fields() {
   # before the allow-list, answers first; each must occur, so the list cannot go stale.
   need_check
   pod fields-cases "$src" -- sh -c '/repo/scripts/build-release >/dev/null &&
-    /out/release.target/debug/tviburi-release cases /out/release/LEDGER.jsonl Tviburi.GuardedSTM32H7_SPI 0x40013000 0x400 >/out/cases.txt'
+    /out/release.target/debug/tviburi-release cases /out/release/LEDGER.jsonl Tviburi.GuardedSTM32H7_SPI 0x40013000 0x400 0x580244F0 0x1000 >/out/cases.txt'
   { echo "include @/repo/scripts/prelude.resc"; cat "$work/fields-cases/cases.txt"; echo 'echo "TVIBURI-END"'; echo quit; } >"$work/fields.resc"
   renode_in fields "$src" /cases/fields.resc -v "$work/fields.resc:/cases/fields.resc:ro,Z"
   check "every ledger row: the disallowed value refuses by name, unmodeled; allowed values pass; no-register offsets refuse (gate clause 6)" \
@@ -436,7 +446,7 @@ t_recorded() {
           and recs[1][\"rule\"] == \"TVI-SPI-MODF\" and recs[1][\"kind\"] == \"predicted-fault\" and recs[-1][\"tviburi\"] == \"end\"
           and not any(r[\"tviburi\"] == \"refusal\" for r in recs))'"
   need_check
-  printf '%s\n' 'include @/repo/scripts/prelude.resc' 'sysbus WriteDoubleWord 0x4001300C 0x02000000' 'echo "READ-CFG2"' \
+  printf '%s\n' 'include @/repo/scripts/prelude.resc' 'sysbus WriteDoubleWord 0x580244F0 0x1000' 'sysbus WriteDoubleWord 0x4001300C 0x02000000' 'echo "READ-CFG2"' \
     'sysbus ReadDoubleWord 0x4001300C' 'sysbus WriteDoubleWord 0x40013020 0x41' 'sysbus WriteDoubleWord 0x40013000 0x400' \
     'echo "READ-SR"' 'sysbus ReadDoubleWord 0x40013014' 'echo "TVIBURI-END"' 'quit' >"$work/recorded-monitor.resc"
   renode_in recorded-monitor "$work/recorded.tree" /cases/r.resc -v "$work/recorded-monitor.resc:/cases/r.resc:ro,Z"

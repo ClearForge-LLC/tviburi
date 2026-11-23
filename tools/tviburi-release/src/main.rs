@@ -16,7 +16,7 @@
 //!       listed file matches; Tviburi.cs is exactly the listed body followed by the template filled with the pinned
 //!       hash; LEDGER.jsonl reads strictly for that hash; the tarball, if present, holds exactly those files.
 //!       Exit 0 on VERIFY PASS, 1 on VERIFY FAIL, 2 on a usage error.
-//!   tviburi-release cases <LEDGER.jsonl> <guard type> <base address> <region size>
+//!   tviburi-release cases <LEDGER.jsonl> <guard type> <base address> <region size> [<enable address> <enable value>]
 //!       A Renode monitor script with one write per case, generated from the ledger's field rows of one guard
 //!       (gate clause 6): the register's baseline, each allowed value other than it, and one value each field
 //!       does not allow; and a write to every 4-aligned offset of the region that holds no register. Each case
@@ -405,7 +405,8 @@ fn verify(dir: &Path, pin: &str) -> Vec<(bool, String)> {
 }
 
 /// Gate clause 6's cases for one guard, generated from its field rows in the ledger.
-fn cases(ledger_text: &str, guard: &str, base: u32, size: u32) -> Result<String, String> {
+/// With an enable (TVI-WO-1300a (1): the RCC's *ENR start at 0, as silicon), the enable is written first and after each reset.
+fn cases(ledger_text: &str, guard: &str, base: u32, size: u32, enable: Option<(u32, u32)>) -> Result<String, String> {
     let mut regs: BTreeMap<u32, Vec<(String, u32, u32, Option<Vec<u32>>)>> = BTreeMap::new();
     for line in ledger_text.lines().skip(1) {
         let Value::Object(r) = json::parse(line)? else { continue };
@@ -439,9 +440,10 @@ fn cases(ledger_text: &str, guard: &str, base: u32, size: u32) -> Result<String,
     if regs.is_empty() {
         return Err(format!("no field rows for {guard}"));
     }
-    let mut out = String::new();
+    let enable_line = enable.map(|(a, v)| format!("sysbus WriteDoubleWord 0x{a:08X} 0x{v:08X}\n")).unwrap_or_default();
+    let mut out = enable_line.clone();
     let mut case = |kind: &str, name: &str, offset: u32, value: u32| {
-        out += &format!("# CASE {kind} {name} 0x{offset:X} 0x{value:08X}\nsysbus WriteDoubleWord 0x{:08X} 0x{value:08X}\nmachine Reset\n", base + offset);
+        out += &format!("# CASE {kind} {name} 0x{offset:X} 0x{value:08X}\nsysbus WriteDoubleWord 0x{:08X} 0x{value:08X}\nmachine Reset\n{enable_line}", base + offset);
     };
     for (offset, fields) in &regs {
         let put = |v: u32, msb: u32, lsb: u32, x: u32| {
@@ -480,7 +482,7 @@ fn hex_pin(a: &str) -> Option<String> {
 fn main() -> ExitCode {
     let args: Vec<String> = std::env::args().skip(1).collect();
     let usage = || {
-        eprintln!("usage: tviburi-release build <repo> <renode-root> <out-dir> | verify <dir> <sha256:hex> | cases <ledger> <guard> <base> <size>");
+        eprintln!("usage: tviburi-release build <repo> <renode-root> <out-dir> | verify <dir> <sha256:hex> | cases <ledger> <guard> <base> <size> [<enable-address> <enable-value>]");
         ExitCode::from(2)
     };
     match args.iter().map(String::as_str).collect::<Vec<_>>().as_slice() {
@@ -508,10 +510,17 @@ fn main() -> ExitCode {
                 ExitCode::FAILURE
             }
         }
-        ["cases", ledger_path, guard, base, size] => {
+        ["cases", ledger_path, guard, base, size, rest @ ..] if rest.is_empty() || rest.len() == 2 => {
             let hex = |x: &str| x.strip_prefix("0x").and_then(|b| u32::from_str_radix(b, 16).ok());
-            match (fs::read_to_string(ledger_path).map_err(|e| e.to_string()), hex(base), hex(size)) {
-                (Ok(t), Some(b), Some(z)) => match cases(&t, guard, b, z) {
+            let enable = match rest {
+                [a, v] => match (hex(a), hex(v)) {
+                    (Some(a), Some(v)) => Some(Some((a, v))),
+                    _ => None,
+                },
+                _ => Some(None),
+            };
+            match (fs::read_to_string(ledger_path).map_err(|e| e.to_string()), hex(base), hex(size), enable) {
+                (Ok(t), Some(b), Some(z), Some(e)) => match cases(&t, guard, b, z, e) {
                     Ok(c) => {
                         print!("{c}");
                         ExitCode::SUCCESS
@@ -586,7 +595,7 @@ mod tests {
             row("R", 4, "EN", 3, 0, None, "modeled by the guard"),
         ]).unwrap();
         let led = ledger::schema_line(&"0".repeat(64)).unwrap() + &ledger::rows(rows).unwrap();
-        let c = cases(&led, "G", 0x4000_0000, 0xC).unwrap();
+        let c = cases(&led, "G", 0x4000_0000, 0xC, None).unwrap();
         let heads: Vec<&str> = c.lines().filter(|l| l.starts_with("# CASE")).collect();
         assert_eq!(heads, [
             "# CASE pass R.baseline 0x4 0x00000070",
@@ -598,6 +607,14 @@ mod tests {
             "# CASE refuse none 0x8 0x00000000",
         ]);
         assert!(c.contains("sysbus WriteDoubleWord 0x40000004 0x0000007F\nmachine Reset\n"));
+        // TVI-WO-1300a (1): with an enable, it is written first and after every reset, and nothing else changes
+        let e = cases(&led, "G", 0x4000_0000, 0xC, Some((0x5802_44F0, 0x1000))).unwrap();
+        let en = "sysbus WriteDoubleWord 0x580244F0 0x00001000\n";
+        assert!(e.starts_with(en));
+        assert_eq!(e.matches(en).count(), heads.len() + 1);
+        assert_eq!(e.matches("machine Reset\n").count(), heads.len());
+        assert!(e.contains("machine Reset\nsysbus WriteDoubleWord 0x580244F0 0x00001000\n# CASE"));
+        assert_eq!(e.replace(en, ""), c);
     }
 
     #[test]
