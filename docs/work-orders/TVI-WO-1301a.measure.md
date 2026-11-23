@@ -106,7 +106,8 @@ With the property `shadowApply` (`idr`, `drive` or `all`) it also **applies** th
 
 **Controls:**
 - The shadow-only ArduPilot boot executed `0x53EABA5` instructions, exactly `1301`'s recorded count, and 4,741 `AETHELGARD-CFG2` lines, as `1301`. A second shadow-only run was byte-identical (console minus timestamps), so the run is deterministic and the instrument does not perturb it.
-- The generated boards' `BSRR` sequences agree with `spike/1100/data/writes.tsv`'s order (the static replay `m3/static-gen.py` and the `W` lines give the same chip-select writes at the same PCs).
+- Every generated board's `BSRR` writes, in order and by value, equal `spike/1100/data/writes.tsv`'s: 11 boards with 1–16 writes each, `driver-judges-nothing` with none in either. `sentinel-02-bench-hse8` is newer than `1100` and has no row there. The static replay of `writes.tsv` (`m3/static-gen.py`) puts each diverging chip-select write at the same PC as the `DRIVE` lines.
+- The motor observers' lines (`pa8obs` and on, e.g. 77 `LED state changed` lines on `motors-pwm`) are in the console, so "identical" below is measured, not vacuous.
 
 ### 2.2 What diverges, run by run
 
@@ -128,7 +129,7 @@ With the property `shadowApply` (`idr`, `drive` or `all`) it also **applies** th
 - **Stock:** PB7 reads **1**, only because `gpio_init`'s `ODR` = `0xFFFF` (written while PB7 was analog) is what `IDR` returns (P1.1, P13). On silicon it reads 1 because of the off-chip pull-up. **The stock twin is right by accident.**
 - **Under the rule:** a floating input with no pull and no sender reads 0 under every candidate (0; `PUPDR`'s pull, which is none; and "hold", since nothing ever drove PB7). **Applied** (`idr`, `drive` and `all` give the same run, because each leaves PB7 at 0 when `read_sda` reads it):
   - ArduPilot takes `ChibiOS::I2CBus::clear_bus` after each read: **1,160 extra `GPIOB_ODR` writes** at PC `0x080F7D14`, inside `clear_bus` (20 SCL toggles × 58);
-  - **1,837,840 fewer instructions** in the 5 s (`0x53EABA5` → `0x522C475`), and the final PC differs;
+  - **1,828,656 fewer instructions** in the 5 s (`0x53EABA5` → `0x522C475`), and the final PC differs;
   - **`AETHELGARD-CFG2` lines 4,741 → 4,549**, ICM-42688 (`u5`) lines 2,355 → 2,259, BMP581 (`u7`) 487 → 483;
   - Aethelgard's register boot block, its flash hashes and the run's end are unchanged.
 - **So WO §7 fires:** "A consumer run relies on the defect. Stop with the run and the pin." The run is ArduPilot's foreign boot; the pin is PB7. Building (2) as written would move ArduPilot onto a bus-recovery path silicon does not take, because the twin does not know about the board's pull-up.
