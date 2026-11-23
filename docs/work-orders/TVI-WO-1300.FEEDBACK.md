@@ -1,6 +1,6 @@
 # TVI-WO-1300 — FEEDBACK
 
-**Builder:** Claude (Opus 5.5), Furnace, 2026-11-23. **Branch:** `wo/tvi-1300-rcc-guard`, from `main` `cde1896`, with `main` `0f00a7b` (0100b, 1200) merged.
+**Builder:** Claude (Opus 5.5), Furnace, 2026-11-23. **Branch:** `wo/tvi-1300-rcc-guard`, from `main` `cde1896`, with `main` `0f00a7b` (0100b, 1200) and then `7e9d9ac` (docs only: `architecture.md`) merged.
 
 **State:**
 - **§1.1 measured and stopped** (bus 14:16Z). The architect ruled at 13:10Z (the mux rule; the aliases; `tests/1300/`), 13:45Z (per_ck: build on) and 14:35Z (§6 of the field table). The build followed.
@@ -162,4 +162,4 @@ Findings, for the architect:
 
 **Tokens:** one mint for the §1.1 push (`tviburi` only, revoked HTTP 204). One for the PR's push and opening, revoked after (recorded on the bus).
 
-**Head at READY:** see the PR. `main` `0f00a7b` is merged in; `main` had not moved when last fetched.
+**Head at READY:** see the PR. `main` `7e9d9ac` is merged in (its only change since `0f00a7b` is `docs/architecture.md`, so the suites were not rerun for it).
