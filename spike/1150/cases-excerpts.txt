@@ -1,0 +1,159 @@
+# TVI-WO-1150 (iii), (iv): each case's records as the reader (reader/records.rs) reads them from the console, and for the runner-framed cases, 0100a's unchanged check on the logFile. harness/run-cases.sh, 2026-11-23, image e5fc7ddb…, Aethelgard 7dec1d7b's renode.config. Release A = a4a12a17…, V2 = 0423ce0b…
+
+## iii-A-clean  (commands: include @/cases/A/TviburiRelease.cs; include @/cases/A/Records1150.cs; include @/cases/A/GuardedSpi1150.cs; mach create; machine LoadPlatformDescription @/repo/spike/1150/overlay/nucleo-default.repl; sysbus LoadELF @/out/fw-modeled.elf; cpu VectorTableOffset 0)
+renode: 
+{"tviburi":"witness","seq":0,"guard":"GuardedSpi1150","model_version":"sha256:a4a12a17599117cb22c681f7b97ea7587b0f7f218c1792a22c720f08805d5461","mode":"enforcing"}
+{"tviburi":"end","seq":1,"guard":"GuardedSpi1150","model_version":"sha256:a4a12a17599117cb22c681f7b97ea7587b0f7f218c1792a22c720f08805d5461"}
+
+
+## iii-B-edited-model  (commands: include @/cases/B/TviburiRelease.cs; include @/cases/B/Records1150.cs; include @/cases/B/GuardedSpi1150.cs; mach create; machine LoadPlatformDescription @/repo/spike/1150/overlay/nucleo-default.repl; sysbus LoadELF @/out/fw-modeled.elf; cpu VectorTableOffset 0)
+renode: 
+{"tviburi":"witness","seq":0,"guard":"GuardedSpi1150","model_version":"sha256:a4a12a17599117cb22c681f7b97ea7587b0f7f218c1792a22c720f08805d5461","mode":"enforcing"}
+{"tviburi":"end","seq":1,"guard":"GuardedSpi1150","model_version":"sha256:a4a12a17599117cb22c681f7b97ea7587b0f7f218c1792a22c720f08805d5461"}
+
+
+## iii-cacheoff-A  (commands: include @/cases/A/TviburiRelease.cs; include @/cases/A/Records1150.cs; include @/cases/A/GuardedSpi1150.cs; mach create; machine LoadPlatformDescription @/repo/spike/1150/overlay/nucleo-default.repl; sysbus LoadELF @/out/fw-modeled.elf; cpu VectorTableOffset 0)
+renode: 
+{"tviburi":"witness","seq":0,"guard":"GuardedSpi1150","model_version":"sha256:a4a12a17599117cb22c681f7b97ea7587b0f7f218c1792a22c720f08805d5461","mode":"enforcing"}
+{"tviburi":"end","seq":1,"guard":"GuardedSpi1150","model_version":"sha256:a4a12a17599117cb22c681f7b97ea7587b0f7f218c1792a22c720f08805d5461"}
+
+
+## iii-cacheoff-C.again  (commands: include @/cases/C/TviburiRelease.cs; include @/cases/C/Records1150.cs; include @/cases/C/GuardedSpi1150.cs; mach create; machine LoadPlatformDescription @/repo/spike/1150/overlay/nucleo-default.repl; sysbus LoadELF @/out/fw-modeled.elf; cpu VectorTableOffset 0)
+renode: 
+{"tviburi":"witness","seq":0,"guard":"GuardedSpi1150","model_version":"sha256:0423ce0b52ed46da036f794d55c6e7122a41991f9bcff2f1f29223f32c4552e3","mode":"enforcing"}
+{"tviburi":"end","seq":1,"guard":"GuardedSpi1150","model_version":"sha256:0423ce0b52ed46da036f794d55c6e7122a41991f9bcff2f1f29223f32c4552e3"}
+
+
+## iii-cacheoff-readonly-A  (commands: include @/cases/RA/TviburiRelease.cs; include @/cases/RA/Records1150.cs; include @/cases/RA/GuardedSpi1150.cs; mach create; machine LoadPlatformDescription @/repo/spike/1150/overlay/nucleo-default.repl; sysbus LoadELF @/out/fw-modeled.elf; cpu VectorTableOffse)
+renode: 
+{"tviburi":"witness","seq":0,"guard":"GuardedSpi1150","model_version":"sha256:a4a12a17599117cb22c681f7b97ea7587b0f7f218c1792a22c720f08805d5461","mode":"enforcing"}
+{"tviburi":"end","seq":1,"guard":"GuardedSpi1150","model_version":"sha256:a4a12a17599117cb22c681f7b97ea7587b0f7f218c1792a22c720f08805d5461"}
+
+
+## iii-cacheoff-readonly-C.again  (commands: include @/cases/RC/TviburiRelease.cs; include @/cases/RC/Records1150.cs; include @/cases/RC/GuardedSpi1150.cs; mach create; machine LoadPlatformDescription @/repo/spike/1150/overlay/nucleo-default.repl; sysbus LoadELF @/out/fw-modeled.elf; cpu VectorTableOffse)
+renode: 
+{"tviburi":"witness","seq":0,"guard":"GuardedSpi1150","model_version":"sha256:0423ce0b52ed46da036f794d55c6e7122a41991f9bcff2f1f29223f32c4552e3","mode":"enforcing"}
+{"tviburi":"end","seq":1,"guard":"GuardedSpi1150","model_version":"sha256:0423ce0b52ed46da036f794d55c6e7122a41991f9bcff2f1f29223f32c4552e3"}
+
+
+## iii-cacheon-A  (commands: include @/cases/A/TviburiRelease.cs; include @/cases/A/Records1150.cs; include @/cases/A/GuardedSpi1150.cs; mach create; machine LoadPlatformDescription @/repo/spike/1150/overlay/nucleo-default.repl; sysbus LoadELF @/out/fw-modeled.elf; cpu VectorTableOffset 0)
+renode: 
+{"tviburi":"witness","seq":0,"guard":"GuardedSpi1150","model_version":"sha256:a4a12a17599117cb22c681f7b97ea7587b0f7f218c1792a22c720f08805d5461","mode":"enforcing"}
+{"tviburi":"end","seq":1,"guard":"GuardedSpi1150","model_version":"sha256:a4a12a17599117cb22c681f7b97ea7587b0f7f218c1792a22c720f08805d5461"}
+
+
+## iii-cacheon-C.again  (commands: include @/cases/C/TviburiRelease.cs; include @/cases/C/Records1150.cs; include @/cases/C/GuardedSpi1150.cs; mach create; machine LoadPlatformDescription @/repo/spike/1150/overlay/nucleo-default.repl; sysbus LoadELF @/out/fw-modeled.elf; cpu VectorTableOffset 0)
+renode: 
+{"tviburi":"witness","seq":0,"guard":"GuardedSpi1150","model_version":"sha256:a4a12a17599117cb22c681f7b97ea7587b0f7f218c1792a22c720f08805d5461","mode":"enforcing"}
+{"tviburi":"end","seq":1,"guard":"GuardedSpi1150","model_version":"sha256:a4a12a17599117cb22c681f7b97ea7587b0f7f218c1792a22c720f08805d5461"}
+
+
+## iii-cacheon-const-A  (commands: include @/cases/A/TviburiRelease.cs; include @/cases/A/Records1150.cs; include @/cases/A/GuardedSpi1150.cs; mach create; machine LoadPlatformDescription @/repo/spike/1150/overlay/nucleo-default.repl; sysbus LoadELF @/out/fw-modeled.elf; cpu VectorTableOffset 0)
+renode: 
+{"tviburi":"witness","seq":0,"guard":"GuardedSpi1150","model_version":"sha256:a4a12a17599117cb22c681f7b97ea7587b0f7f218c1792a22c720f08805d5461","mode":"enforcing"}
+{"tviburi":"end","seq":1,"guard":"GuardedSpi1150","model_version":"sha256:a4a12a17599117cb22c681f7b97ea7587b0f7f218c1792a22c720f08805d5461"}
+
+
+## iii-cacheon-const-C.again  (commands: include @/cases/C/TviburiRelease.cs; include @/cases/C/Records1150.cs; include @/cases/C/GuardedSpi1150.cs; mach create; machine LoadPlatformDescription @/repo/spike/1150/overlay/nucleo-default.repl; sysbus LoadELF @/out/fw-modeled.elf; cpu VectorTableOffset 0)
+renode: 
+{"tviburi":"witness","seq":0,"guard":"GuardedSpi1150","model_version":"sha256:a4a12a17599117cb22c681f7b97ea7587b0f7f218c1792a22c720f08805d5461","mode":"enforcing"}
+{"tviburi":"end","seq":1,"guard":"GuardedSpi1150","model_version":"sha256:a4a12a17599117cb22c681f7b97ea7587b0f7f218c1792a22c720f08805d5461"}
+
+
+## iii-cacheon-readonly-A  (commands: include @/cases/RA/TviburiRelease.cs; include @/cases/RA/Records1150.cs; include @/cases/RA/GuardedSpi1150.cs; mach create; machine LoadPlatformDescription @/repo/spike/1150/overlay/nucleo-default.repl; sysbus LoadELF @/out/fw-modeled.elf; cpu VectorTableOffse)
+renode: 
+{"tviburi":"witness","seq":0,"guard":"GuardedSpi1150","model_version":"sha256:a4a12a17599117cb22c681f7b97ea7587b0f7f218c1792a22c720f08805d5461","mode":"enforcing"}
+{"tviburi":"end","seq":1,"guard":"GuardedSpi1150","model_version":"sha256:a4a12a17599117cb22c681f7b97ea7587b0f7f218c1792a22c720f08805d5461"}
+
+
+## iii-cacheon-readonly-C.again  (commands: include @/cases/RC/TviburiRelease.cs; include @/cases/RC/Records1150.cs; include @/cases/RC/GuardedSpi1150.cs; mach create; machine LoadPlatformDescription @/repo/spike/1150/overlay/nucleo-default.repl; sysbus LoadELF @/out/fw-modeled.elf; cpu VectorTableOffse)
+renode: Unhandled exception. System.Reflection.TargetInvocationException: Exception has been thrown by the target of an invocation.
+
+
+## iii-C-swapped-constant  (commands: include @/cases/C/TviburiRelease.cs; include @/cases/C/Records1150.cs; include @/cases/C/GuardedSpi1150.cs; mach create; machine LoadPlatformDescription @/repo/spike/1150/overlay/nucleo-default.repl; sysbus LoadELF @/out/fw-modeled.elf; cpu VectorTableOffset 0)
+renode: 
+{"tviburi":"witness","seq":0,"guard":"GuardedSpi1150","model_version":"sha256:0423ce0b52ed46da036f794d55c6e7122a41991f9bcff2f1f29223f32c4552e3","mode":"enforcing"}
+{"tviburi":"end","seq":1,"guard":"GuardedSpi1150","model_version":"sha256:0423ce0b52ed46da036f794d55c6e7122a41991f9bcff2f1f29223f32c4552e3"}
+
+
+## iii-D-stock  (commands: mach create; machine LoadPlatformDescription @/repo/spike/1150/overlay/nucleo-stock.repl; sysbus LoadELF @/out/fw-modeled.elf; cpu VectorTableOffset 0x08000000; emulation RunFor "0.001"; echo "TVI1150-AFTER-RUN"; sysbus ReadDoubleWord 0x20000104; peripherals; )
+renode: 
+
+
+## iii-E-stale-constant  (commands: include @/cases/E/TviburiRelease.cs; include @/cases/E/Records1150.cs; include @/cases/E/GuardedSpi1150.cs; mach create; machine LoadPlatformDescription @/repo/spike/1150/overlay/nucleo-default.repl; sysbus LoadELF @/out/fw-modeled.elf; cpu VectorTableOffset 0)
+renode: 
+{"tviburi":"witness","seq":0,"guard":"GuardedSpi1150","model_version":"sha256:a4a12a17599117cb22c681f7b97ea7587b0f7f218c1792a22c720f08805d5461","mode":"enforcing"}
+{"tviburi":"end","seq":1,"guard":"GuardedSpi1150","model_version":"sha256:a4a12a17599117cb22c681f7b97ea7587b0f7f218c1792a22c720f08805d5461"}
+
+
+## iv-badmode  (commands: include @/cases/A/TviburiRelease.cs; include @/cases/A/Records1150.cs; include @/cases/A/GuardedSpi1150.cs; mach create; machine LoadPlatformDescription @/repo/spike/1150/overlay/nucleo-badmode.repl; sysbus LoadELF @/out/fw-modeled.elf; cpu VectorTableOffset 0)
+renode: 
+{"tviburi":"refusal","seq":0,"rule":"TVI-LOAD","kind":"unmodeled","peripheral":"sysbus.spi1","register":"none","bit":"none","condition":"the guard's model version could not be computed at load: mode must be \"enforcing\" or \"recorded\", not \"Recorded\"; the 
+{"tviburi":"refusal","seq":1,"rule":"TVI-LOAD","kind":"unmodeled","peripheral":"sysbus.spi1","register":"SPI_CR1","bit":"none","condition":"access to a guarded peripheral whose model version could not be computed at load","model_version":"sha256:a4a12a17599117
+{"tviburi":"refusal","seq":2,"rule":"TVI-LOAD","kind":"unmodeled","peripheral":"sysbus.spi1","register":"SPI_CFG2","bit":"none","condition":"access to a guarded peripheral whose model version could not be computed at load","model_version":"sha256:a4a12a1759911
+{"tviburi":"refusal","seq":3,"rule":"TVI-LOAD","kind":"unmodeled","peripheral":"sysbus.spi1","register":"SPI_CR1","bit":"none","condition":"access to a guarded peripheral whose model version could not be computed at load","model_version":"sha256:a4a12a17599117
+{"tviburi":"refusal","seq":4,"rule":"TVI-LOAD","kind":"unmodeled","peripheral":"sysbus.spi1","register":"SPI_CR1","bit":"none","condition":"access to a guarded peripheral whose model version could not be computed at load","model_version":"sha256:a4a12a17599117
+{"tviburi":"end","seq":5,"guard":"GuardedSpi1150","model_version":"sha256:a4a12a17599117cb22c681f7b97ea7587b0f7f218c1792a22c720f08805d5461"}
+
+
+## iv-enf-iolock  (commands: include @/cases/A/TviburiRelease.cs; include @/cases/A/Records1150.cs; include @/cases/A/GuardedSpi1150.cs; mach create; machine LoadPlatformDescription @/repo/spike/1150/overlay/nucleo-default.repl; sysbus LoadELF @/out/fw-iolock.elf; cpu VectorTableOffset 0x)
+renode: 
+{"tviburi":"witness","seq":0,"guard":"GuardedSpi1150","model_version":"sha256:a4a12a17599117cb22c681f7b97ea7587b0f7f218c1792a22c720f08805d5461","mode":"enforcing"}
+{"tviburi":"refusal","seq":1,"rule":"TVI-SPI-IOLOCK","kind":"predicted-fault","peripheral":"sysbus.spi1","register":"SPI_CFG2","bit":"CR1.IOLOCK (bit 16) = 1","condition":"CFG2 written after IOLOCK was set: silicon keeps the old CFG2 (\"When this bit is set, t
+{"tviburi":"end","seq":2,"guard":"GuardedSpi1150","model_version":"sha256:a4a12a17599117cb22c681f7b97ea7587b0f7f218c1792a22c720f08805d5461"}
+
+
+## iv-enf-modf  (commands: include @/cases/A/TviburiRelease.cs; include @/cases/A/Records1150.cs; include @/cases/A/GuardedSpi1150.cs; mach create; machine LoadPlatformDescription @/repo/spike/1150/overlay/nucleo-default.repl; sysbus LoadELF @/out/fw-modf.elf; cpu VectorTableOffset 0x08)
+renode: 
+{"tviburi":"witness","seq":0,"guard":"GuardedSpi1150","model_version":"sha256:a4a12a17599117cb22c681f7b97ea7587b0f7f218c1792a22c720f08805d5461","mode":"enforcing"}
+{"tviburi":"refusal","seq":1,"rule":"TVI-SPI-MODF","kind":"predicted-fault","peripheral":"sysbus.spi1","register":"SPI_CR1 / SPI_CFG2","bit":"CR1.SSI (bit 12) = 0","condition":"master mode with software SS management and the internal SS input at its active lev
+{"tviburi":"end","seq":2,"guard":"GuardedSpi1150","model_version":"sha256:a4a12a17599117cb22c681f7b97ea7587b0f7f218c1792a22c720f08805d5461"}
+
+
+## iv-rec-iolock  (commands: include @/cases/A/TviburiRelease.cs; include @/cases/A/Records1150.cs; include @/cases/A/GuardedSpi1150.cs; mach create; machine LoadPlatformDescription @/repo/spike/1150/overlay/nucleo-recorded.repl; sysbus LoadELF @/out/fw-iolock.elf; cpu VectorTableOffset 0)
+renode: 
+{"tviburi":"witness","seq":0,"guard":"GuardedSpi1150","model_version":"sha256:a4a12a17599117cb22c681f7b97ea7587b0f7f218c1792a22c720f08805d5461","mode":"recorded"}
+{"tviburi":"would-refuse","seq":1,"rule":"TVI-SPI-IOLOCK","kind":"predicted-fault","peripheral":"sysbus.spi1","register":"SPI_CFG2","bit":"CR1.IOLOCK (bit 16) = 1","condition":"CFG2 written after IOLOCK was set: silicon keeps the old CFG2 (\"When this bit is s
+{"tviburi":"end","seq":2,"guard":"GuardedSpi1150","model_version":"sha256:a4a12a17599117cb22c681f7b97ea7587b0f7f218c1792a22c720f08805d5461"}
+
+
+## iv-rec-modeled  (commands: include @/cases/A/TviburiRelease.cs; include @/cases/A/Records1150.cs; include @/cases/A/GuardedSpi1150.cs; mach create; machine LoadPlatformDescription @/repo/spike/1150/overlay/nucleo-recorded.repl; sysbus LoadELF @/out/fw-modeled.elf; cpu VectorTableOffset )
+renode: 
+{"tviburi":"witness","seq":0,"guard":"GuardedSpi1150","model_version":"sha256:a4a12a17599117cb22c681f7b97ea7587b0f7f218c1792a22c720f08805d5461","mode":"recorded"}
+{"tviburi":"end","seq":1,"guard":"GuardedSpi1150","model_version":"sha256:a4a12a17599117cb22c681f7b97ea7587b0f7f218c1792a22c720f08805d5461"}
+
+
+## iv-rec-modf  (commands: include @/cases/A/TviburiRelease.cs; include @/cases/A/Records1150.cs; include @/cases/A/GuardedSpi1150.cs; mach create; machine LoadPlatformDescription @/repo/spike/1150/overlay/nucleo-recorded.repl; sysbus LoadELF @/out/fw-modf.elf; cpu VectorTableOffset 0x0)
+renode: 
+{"tviburi":"witness","seq":0,"guard":"GuardedSpi1150","model_version":"sha256:a4a12a17599117cb22c681f7b97ea7587b0f7f218c1792a22c720f08805d5461","mode":"recorded"}
+{"tviburi":"would-refuse","seq":1,"rule":"TVI-SPI-MODF","kind":"predicted-fault","peripheral":"sysbus.spi1","register":"SPI_CR1 / SPI_CFG2","bit":"CR1.SSI (bit 12) = 0","condition":"master mode with software SS management and the internal SS input at its activ
+{"tviburi":"end","seq":2,"guard":"GuardedSpi1150","model_version":"sha256:a4a12a17599117cb22c681f7b97ea7587b0f7f218c1792a22c720f08805d5461"}
+
+
+## iv-runner-enf-modeled  (commands: logFile @/out/iv-runner-enf-modeled.logfile.txt; include @/cases/A/TviburiRelease.cs; include @/cases/A/Records1150.cs; include @/cases/A/GuardedSpi1150.cs; mach create; machine LoadPlatformDescription @/repo/spike/1150/overlay/nucleo-default.repl; sysbus Load)
+renode: 
+[11:05:53.4202]  [INFO] spi1: {"tviburi":"witness","seq":0,"guard":"GuardedSpi1150","model_version":"sha256:a4a12a17599117cb22c681f7b97ea7587b0f7f218c1792a22c720f08805d5461","mode":"enforcing"}
+[11:05:53.9202]  [INFO] spi1: {"tviburi":"end","seq":1,"guard":"GuardedSpi1150","model_version":"sha256:a4a12a17599117cb22c681f7b97ea7587b0f7f218c1792a22c720f08805d5461"}
+CHECK PASS
+
+## iv-runner-enf-modf  (commands: logFile @/out/iv-runner-enf-modf.logfile.txt; include @/cases/A/TviburiRelease.cs; include @/cases/A/Records1150.cs; include @/cases/A/GuardedSpi1150.cs; mach create; machine LoadPlatformDescription @/repo/spike/1150/overlay/nucleo-default.repl; sysbus LoadELF)
+renode: 
+[11:05:56.6020]  [INFO] spi1: {"tviburi":"witness","seq":0,"guard":"GuardedSpi1150","model_version":"sha256:a4a12a17599117cb22c681f7b97ea7587b0f7f218c1792a22c720f08805d5461","mode":"enforcing"}
+[11:05:57.0558]  [ERROR] spi1: {"tviburi":"refusal","seq":1,"rule":"TVI-SPI-MODF","kind":"predicted-fault","peripheral":"sysbus.spi1","register":"SPI_CR1 / SPI_CFG2","bit":"CR1.SSI (bit 12) = 0","condition":"master mode with software SS management and the inte
+[11:05:57.1099]  [INFO] spi1: {"tviburi":"end","seq":2,"guard":"GuardedSpi1150","model_version":"sha256:a4a12a17599117cb22c681f7b97ea7587b0f7f218c1792a22c720f08805d5461"}
+REFUSAL {"tviburi":"refusal","seq":1,"rule":"TVI-SPI-MODF","kind":"predicted-fault","peripheral":"sysbus.spi1","register":"SPI_CR1 / SPI_CFG2","bit":"CR1.SSI (b
+CHECK REFUSED
+
+## iv-runner-rec-modeled  (commands: logFile @/out/iv-runner-rec-modeled.logfile.txt; include @/cases/A/TviburiRelease.cs; include @/cases/A/Records1150.cs; include @/cases/A/GuardedSpi1150.cs; mach create; machine LoadPlatformDescription @/repo/spike/1150/overlay/nucleo-recorded.repl; sysbus Loa)
+renode: 
+[11:05:47.0078]  [INFO] spi1: {"tviburi":"witness","seq":0,"guard":"GuardedSpi1150","model_version":"sha256:a4a12a17599117cb22c681f7b97ea7587b0f7f218c1792a22c720f08805d5461","mode":"recorded"}
+[11:05:47.5133]  [INFO] spi1: {"tviburi":"end","seq":1,"guard":"GuardedSpi1150","model_version":"sha256:a4a12a17599117cb22c681f7b97ea7587b0f7f218c1792a22c720f08805d5461"}
+CHECK PASS
+
+## iv-runner-rec-modf  (commands: logFile @/out/iv-runner-rec-modf.logfile.txt; include @/cases/A/TviburiRelease.cs; include @/cases/A/Records1150.cs; include @/cases/A/GuardedSpi1150.cs; mach create; machine LoadPlatformDescription @/repo/spike/1150/overlay/nucleo-recorded.repl; sysbus LoadEL)
+renode: 
+[11:05:50.2340]  [INFO] spi1: {"tviburi":"witness","seq":0,"guard":"GuardedSpi1150","model_version":"sha256:a4a12a17599117cb22c681f7b97ea7587b0f7f218c1792a22c720f08805d5461","mode":"recorded"}
+[11:05:50.6879]  [ERROR] spi1: {"tviburi":"would-refuse","seq":1,"rule":"TVI-SPI-MODF","kind":"predicted-fault","peripheral":"sysbus.spi1","register":"SPI_CR1 / SPI_CFG2","bit":"CR1.SSI (bit 12) = 0","condition":"master mode with software SS management and the
+[11:05:50.7429]  [INFO] spi1: {"tviburi":"end","seq":2,"guard":"GuardedSpi1150","model_version":"sha256:a4a12a17599117cb22c681f7b97ea7587b0f7f218c1792a22c720f08805d5461"}
+PROBLEM line 10: spi1: unknown record kind "would-refuse"
+CHECK FAIL

@@ -1,0 +1,8 @@
+// TVI-WO-1150 spike platform: the Nucleo board with the STOCK STM32H7_SPI on spi1, as a consumer emits it today
+// (Aethelgard's `SPI.STM32H7_SPI`): a stock run, with no overlay.
+using "platforms/boards/nucleo_h753zi.repl"
+
+spi1: SPI.STM32H7_SPI @ {
+        sysbus 0x40013000;
+        rcc RegistrationPeripheralAlias.SPI1
+    }

@@ -1,0 +1,11 @@
+// N5's second description, loaded by the monitor after the first: `timer1` declared again, with the spike type.
+timer1: Tviburi1150.SpikeTimer @ {
+        sysbus 0x40010000;
+        rcc RegistrationPeripheralAlias.TIM1
+    }
+    initialLimit: 0xffff
+    frequency: 200000000
+    BreakInterrupt -> nvic@24
+    UpdateInterrupt -> nvic@25
+    [TriggerInterrupt, CommutationInterrupt] -> nvic@[26, 26]
+    CaptureCompareInterrupt -> nvic@27

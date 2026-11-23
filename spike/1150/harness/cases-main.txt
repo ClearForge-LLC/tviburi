@@ -1,0 +1,22 @@
+# (iii) the release constant
+iii-A-clean A spike/1150/overlay/nucleo-default.repl modeled
+iii-B-edited-model B spike/1150/overlay/nucleo-default.repl modeled
+iii-C-swapped-constant C spike/1150/overlay/nucleo-default.repl modeled
+iii-E-stale-constant E spike/1150/overlay/nucleo-default.repl modeled
+iii-D-stock - spike/1150/overlay/nucleo-stock.repl modeled
+iii-cacheoff-A A spike/1150/overlay/nucleo-default.repl modeled
+iii-cacheoff-C.again C spike/1150/overlay/nucleo-default.repl modeled
+iii-cacheon-A A spike/1150/overlay/nucleo-default.repl modeled cache-on
+iii-cacheon-C.again C spike/1150/overlay/nucleo-default.repl modeled cache-on
+# (iv) recorded mode, under Aethelgard's configuration
+iv-rec-modeled A spike/1150/overlay/nucleo-recorded.repl modeled
+iv-rec-modf A spike/1150/overlay/nucleo-recorded.repl modf
+iv-rec-iolock A spike/1150/overlay/nucleo-recorded.repl iolock
+iv-enf-modf A spike/1150/overlay/nucleo-default.repl modf
+iv-enf-iolock A spike/1150/overlay/nucleo-default.repl iolock
+iv-badmode A spike/1150/overlay/nucleo-badmode.repl modeled
+# (iv) the same, in Tviburi's own runner's framing, for 0100a's unchanged check
+iv-runner-rec-modeled A spike/1150/overlay/nucleo-recorded.repl modeled runner
+iv-runner-rec-modf A spike/1150/overlay/nucleo-recorded.repl modf runner
+iv-runner-enf-modeled A spike/1150/overlay/nucleo-default.repl modeled runner
+iv-runner-enf-modf A spike/1150/overlay/nucleo-default.repl modf runner

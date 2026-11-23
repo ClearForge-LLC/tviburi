@@ -1,7 +1,7 @@
 #!/bin/bash
 # TVI-WO-1150 (i): load each form in retype/forms/ under Aethelgard's Renode configuration, list the
 # peripherals, read the result back by reflection, then make a monitor write and the poke firmware's CPU
-# writes to TIM1 and RCC. Inside the pinned tools image, --network none.
+# writes to TIM1 and RCC. A form's .monitor file, if any, runs right after the load (a second description, hooks). Inside the pinned tools image, --network none.
 # Mounts: /repo = this worktree (ro), /aetcfg = Aethelgard's renode.config as captured (ro), /out (rw).
 set -u
 export PATH=/opt/cargo/bin:$PATH RUSTUP_HOME=/opt/rustup CARGO_HOME=/out/cargo-home
@@ -12,11 +12,14 @@ sed "s#^history-path = .*#history-path = /out/home/.config/renode/history#" /aet
 mkdir -p /out/home
 for f in $S/retype/forms/*.repl; do
   n=$(basename $f .repl)
+  extra=""; [ -f ${f%.repl}.monitor ] && extra=$(cat ${f%.repl}.monitor)
   cat > /out/$n.resc <<EOR
 include @$S/retype/SpikeTimer.cs
 include @$S/retype/SpikeRcc.cs
+include @$S/rcc/RccGuard.cs
 mach create
 machine LoadPlatformDescription @$f
+$extra
 peripherals
 include @$S/retype/checks.py
 sysbus LoadELF @/out/pokes.elf

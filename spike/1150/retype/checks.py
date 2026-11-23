@@ -32,7 +32,7 @@ for addr in (0x40010000, 0x58024400, 0x40017000, 0x58027000):
     p = m.SystemBus.WhatPeripheralIsAt(addr)
     print("TVICHK at 0x%X: %s %s" % (addr, name_of(p) if p is not None else "-", p.GetType().FullName if p is not None else "-"))
 
-for nm in ("timer1", "rcc", "spiketimer", "spikercc", "tim1g", "rccg"):
+for nm in ("timer1", "rcc", "spiketimer", "spikercc", "tim1g", "rccg", "rccguard"):
     p = by_name(nm)
     if p is None:
         print("TVICHK %s: not in the machine" % nm)

@@ -1,0 +1,2 @@
+sysbus SetHookBeforePeripheralWrite sysbus.rcc "__import__('Antmicro.Renode.Logging').Renode.Logging.Logger.Log(self, __import__('Antmicro.Renode.Logging').Renode.Logging.LogLevel.Warning, 'TVI1150-HOOK rcc write offset=0x%X value=0x%X pc=%s' % (offset, value, (lambda r: '0x%08X' % r[1].PC.RawValue if r[0] else 'none')(sysbus.TryGetCurrentCPU())))"
+sysbus LogPeripheralAccess sysbus.rcc true

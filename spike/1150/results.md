@@ -1,6 +1,6 @@
 # TVI-WO-1150 — the seam spike: results
 
-**Status:** (i) measured. **WO §7's first stop fired at (i):** no `.repl` form re-types a stock instance. (ii)–(vi) wait on the architect's ruling (see the end of this file).
+**Status:** (i)–(iv) and (vii) measured; (v) and (vi) in progress. **WO §7's first stop fired at (i):** no `.repl` form re-types a stock instance. The architect ruled at 11:00Z to continue, and added (vii).
 **Predictions:** `predictions.md`, commit `f26ed6c`, before any run.
 **Setup, for every item:**
 - **Aethelgard:** `main` at `7dec1d7b`, cloned read-only to `~/tvi-1150-aet` with its push URL disabled. Its CLI and `aethelgard-bridge` were built from that clone (`cargo build --locked`) into this worktree's untracked `target-aet/`.
@@ -104,8 +104,109 @@ Three firmwares, `modeled`, `modf` and `forge`, each run under two environments:
 - **For `0100b`:** the check's parser must accept the 20-byte virtual stamp. It must trim `\r` as `clean_lines` does, and anchor the source after the level. Its fixture is `fixtures/aet-7dec1d7b/*.empty.console.txt`, and `*.modeldir.*` for a guard that loads.
 - **For `1200`:** under the consumer's empty environment, today's guard is a `TVI-LOAD` on every access (the identity is (iii)'s).
 
+### (i) addendum: can the guarded instance take the stock name? (architect, 11:00Z)
+
+The same harness was used. The forms are `n3` and `n5` in `retype/forms/`, and the excerpts are in `retype/excerpts.txt`.
+
+| Form | What | Result |
+|---|---|---|
+| `n3-alias-stock-name` | `timer1: @none`, then `tim1g: Tviburi1150.SpikeTimer @ {…} as "timer1"` with everything restated (`frequency: 250000000`), then Aethelgard's untyped `timer1: frequency: 200000000` | **The name is taken.** `peripherals` lists `timer1 (SpikeTimer)`, and `sysbus.timer1` is the spike. CPU writes reach it with their PC, IRQ 25 is pending, and `TIM1RST` resets it. **Aethelgard's update does not reach it:** `Frequency` reads 250000000. The update binds to the `timer1` *variable*, which is the cancelled stock entry, with no error |
+| `n5-second-load` | first description: `timer1: @none`; then the monitor loads a second description that declares `timer1: Tviburi1150.SpikeTimer @ {…}` with everything restated | **The name is taken, and nothing is split.** Listing, class, `Frequency` 200000000 (as restated), IRQs to `nvic@24`, `@25`, `@27`, CPU and monitor writes, and `TIM1RST` all hold. A variable that is no longer registered can be declared again by a later description |
+
+**Every change a consumer sees, for an instance a stock file declares:**
+1. **Its platform must cancel the stock entry,** `timer1: @none`, and restate the instance in full: the registration with its RCC alias, the constructor arguments, and every interrupt line. The values come from the stock file the consumer pins (`stm32h7.repl` L316–325 for `timer1`).
+2. **With `as "<stock name>"` (n3), the listing and name are unchanged.** But **every untyped update the consumer emits for that name must move to the new variable.** Otherwise it silently reaches the cancelled stock entry. Aethelgard emits exactly such updates for 14 timers and 8 USARTs (`sentinel-02-own.repl`, `AET-WO-4400g`).
+3. **With a second description (n5), the name and the updates stay where they are.** But the consumer's monitor commands gain a second `machine LoadPlatformDescription` per run, and its sealed-platform hashing covers two files.
+4. **Not determined:** whether the cancelled stock object is still constructed and connected. It is off the bus and receives no writes.
+5. **The interrupt endpoints read back unnamed** (`?@1`…) in `n1` and `n3`, where `n5` and the stock entry show `sysbus.nvic@24` and so on. Only IRQ 25 was checked functionally (pending in all three). Why the read-back differs was not determined.
+
+**Ruling: refines (i).** No `.repl` form re-types. Cancelling and restating in the consumer's own platform does serve stock instances, and the n3 form keeps the stock name. `RUL-09`'s class map is therefore buildable for instances the consumer emits or restates, with the update hazard in item 2.
+
 ---
 
-## (iii)–(vi)
+## (iii) The release constant (`RUL-10`)
+
+**The scheme prototyped** (`release/`):
+- `make-release.sh` copies the model files and writes `MANIFEST`. That holds a format line, the Renode build string, a line naming `TviburiRelease.cs` as excluded, and `sha256  file` for each model file.
+- The release hash is the sha256 of `MANIFEST`'s bytes. It is written into `TviburiRelease.cs`, which holds only the constant: the fixed template (`TviburiRelease.cs.template`) filled with that hash. The constant therefore never hashes itself.
+- `consumer-check.sh` is what a consumer that hashes its sealed copies checks:
+  - `MANIFEST` is the pinned hash;
+  - every listed file matches, and no unlisted file is present;
+  - `TviburiRelease.cs` equals the template filled with the pinned hash, byte for byte;
+  - after the run: one witness, reporting the pinned hash and `mode: "enforcing"`, no refusal or `would-refuse`, and an `end`.
+
+The guard is a spike copy (`overlay/Records1150.cs`, `overlay/GuardedSpi1150.cs`) that takes its version from `TviburiRelease.ManifestSha256`. No environment variable or path enters. Runs used `harness/run-cases.sh`: Aethelgard's configuration, invocation, empty environment, seed and quantum, on the Nucleo board with `modeled` firmware. The three overlay files were included in order: `TviburiRelease.cs`, `Records1150.cs`, `GuardedSpi1150.cs`.
+
+| Case | Sealed copy | Witness's version | Consumer (pin = A `a4a12a17…`) | A consumer that checks only the witness |
+|---|---|---|---|---|
+| A clean | release A | `a4a12a17…` | **PASS** | PASS |
+| B edited model file | A, with `GuardedSpi1150.cs` changed after release | `a4a12a17…` | **FAIL**: the file's sha256 is not the manifest's | **PASS: the constant matches while a model file differs** |
+| C swapped constant | A, with release V2's `TviburiRelease.cs` | `0423ce0b…` | **FAIL**: the release file is not the template filled with the pin; no witness reports the pin | FAIL |
+| E stale constant | release V2's files and manifest, with A's constant | `a4a12a17…` | **FAIL**: the manifest is not the pinned one (pinned V2: the release file is not the template filled with the pin) | **PASS** (pinned A) |
+| D stock run | the platform's stock `SPI.STM32H7_SPI`, no overlay | no witness | **FAIL**: no witness, no end | FAIL |
+
+- **A constant in one `include @` file reaches a class compiled from another.** `Records1150.cs` reads `TviburiRelease.ManifestSha256` from the earlier include. Each include compiles separately, but the earlier assembly is referenced.
+- **With `compiler-cache-enabled = False` (Aethelgard's), the constant is fresh every boot.** A boot of release A, then one of C in the same home directory, reported `a4a12a17…` and then `0423ce0b…`.
+- **With the cache on, a `const` goes stale silently.** The same pair reported `a4a12a17…` both times. C# inlines a `const` into `Records1150`'s assembly, and `Records1150.cs` is byte-identical between the releases, so the cached assembly is reused. A `static readonly` field (`release/TviburiRelease.readonly.cs.template`) with the cache on crashed the second boot instead: `FileNotFoundException`, the cached assembly's reference to the earlier `TviburiRelease` assembly by GUID, exit 134, no witness. That fails closed. With the cache off, `static readonly` was fresh as well.
+
+**Ruling: confirms `RUL-10` as amended, with two conditions.**
+1. **The constant alone proves nothing about the code** (B and E pass a witness-only consumer). Part (a), the consumer hashing its sealed copies against the manifest, carries the identity. Part (b), the constant, ties the run's witness to the pinned release and catches a swapped constant.
+2. **The constant should be `static readonly`, not `const`,** and the consumer keeps the compiler cache off. A `const` under a cache goes stale silently.
+
+---
+
+## (iv) Recorded mode (`RUL-19`)
+
+**The prototype:**
+- **The mode is a constructor argument from the platform description:** `mode: "recorded"` (`overlay/nucleo-recorded.repl`). The default is `"enforcing"`, and any other value (`"Recorded"`, in `nucleo-badmode.repl`) is a `TVI-LOAD` refusal on every access. No environment variable is read.
+- **The witness carries `mode`.**
+- **A would-be refusal** is logged as `{"tviburi":"would-refuse",…,"kind":…}` at Error, the run is not paused, and the access goes on to the stock model as if passed. The kinds are a spike mapping, not `RUL-18`'s table: `predicted-fault` for `MODF`'s `SSI` = 0 branch, `IOLOCK` and `CFG2-SPE`, and `unmodeled` otherwise.
+
+| Run (Aethelgard's configuration) | Records |
+|---|---|
+| recorded, `modeled` | witness (`mode: "recorded"`), end |
+| recorded, `modf` | witness, `would-refuse` `TVI-SPI-MODF` `predicted-fault`, end. The firmware reaches its after-marker |
+| recorded, `iolock` | witness, `would-refuse` `TVI-SPI-IOLOCK` `predicted-fault`, end |
+| enforcing, `modf` / `iolock` | witness (`mode: "enforcing"`), `refusal`, end |
+| `mode: "Recorded"` | `TVI-LOAD` refusal in place of the witness, then a refusal at each access |
+
+**`0100a`'s unchanged check.** It cannot read Aethelgard's framing at all (ii, item 3). So the same four runs were repeated in its own runner's framing (no `--config`, `logFile`), using the check built from `tools/` at `dc55f98`:
+
+| Run | Check |
+|---|---|
+| enforcing, `modeled` | **PASS** |
+| enforcing, `modf` | **REFUSED** |
+| recorded, `modf` | **FAIL**: `unknown record kind "would-refuse"` |
+| **recorded, `modeled`** | **PASS** |
+
+**Why.** The check fails a recorded run only when the run holds a `would-refuse`, and then only because the kind is unknown to it. It never reads `mode`, because its witness rule checks only that `model_version` is a well-formed sha256 (`tools/tviburi-check/src/main.rs`, the `witness` arm). **A recorded run in which nothing would have refused is indistinguishable from an enforcing pass to the unchanged check.** Prediction: confirmed (medium-high).
+
+**Ruling: confirms `RUL-19`'s need for the check to fail closed on a missing or non-enforcing `mode`. As the check stands, it is not met.** That clause must land in `0100b`'s check before any witness carries a mode. The consumer check prototyped in (iii) does it: recorded `modeled` gives "the witness does not say mode enforcing", CONSUMER FAIL.
+
+---
+
+## (v)–(vi)
 
 Being measured, in order.
+
+---
+
+## (vii) How a guard can cover the sealed `STM32H7_RCC` (architect, 11:00Z; measured only, no guard built)
+
+The harness was `harness/run-retype.sh`, with each form's `.monitor` commands applied right after the load. The forms are `retype/forms/vii-*`. Each had the poke firmware's CPU writes (RCC `APB2ENR`, `D2CCIP1R`), a monitor write (`D2CCIP2R`), and `TIM1RST` with `PSC` read back.
+
+| Candidate | Loads | The 58 registrations | Firmware writes reach it, with PC | A monitor command displaces it |
+|---|---|---|---|---|
+| **(a) a wrapper that owns an unregistered stock RCC and forwards** (`retype/SpikeRcc.cs`). `rcc: @none`, the wrapper at `0x58024400`, and **all 58 stock registrations restated onto it** (generated by `rcc/restate.awk`) | yes | **resolve, on the wrapper** (58). `TIM1RST` resets `timer1` | yes (`pc=0x0800001A`, `0x0800001E`); a monitor write shows `pc=none` | **no**: a hook and access logging set on it leave its writes intact (`a2`) |
+| (a) without the restatement (`n2`, §(i)) | **no**: E39 on `adc3` | — | — | — |
+| **(b1) a guard beside the stock RCC, stock moved** (`rcc/RccGuard.cs`). `rcc: @ sysbus 0x58027000` (an untyped update), and the guard at `0x58024400` with `stock: rcc` | yes | **resolve, on the stock RCC**, which stays declared and registered. `TIM1RST` through the guard resets `timer1` | yes | **no** (`b3`) |
+| **(b2) beside, stock narrowed.** `rcc: @ sysbus <0x58024400, +0x50>`, and the guard on `<0x58024450, +0x3B0>` forwarding at offset + 0x50 | yes | resolve, on the stock RCC | yes, for `0x50` and above | not tested beyond (b1) |
+| **(c) a bus hook on the stock RCC,** set from the monitor | yes (the stock platform) | unchanged | **yes:** the hook reads the PC through `sysbus.TryGetCurrentCPU()` (`pc=0x0800001A`), and a monitor write shows `pc=none` | **yes:** a second `SetHookBeforePeripheralWrite` on `rcc` silently replaced it (`c3`: 0 hook lines). `LogPeripheralAccess` set *after* the hook did not displace it (`c2`: the hook still fired) |
+
+**What each costs, measured:**
+- **(a)** needs the consumer to restate the RCC registration of 58 stock entries in its own platform. That is a large consumer change, mechanical and generated from the pinned stock file. **The owned stock RCC is unregistered, so its own log lines lose their source name** (`[WARNING] Unhandled write to offset 0x50 …` with no `rcc:`). A consumer that cites or filters RCC lines by name loses them.
+- **(b1) leaves a bypass.** The stock RCC stays on the bus at its new address, and a write there reaches it with no guard line: the monitor write to `0x58027050` landed on `rcc` directly. On silicon that address is unused, so firmware has no reason to write it, but the twin would answer it.
+- **(b2)** has no second address, but **the stock RCC answers `0x00`–`0x4F` unguarded**: `CR`, `CFGR`, the domain prescalers, `PLLCKSELR`, `PLLCFGR` and the PLL dividers. Those are clock-tree registers too (RM0433 Rev 9 §8.7, offsets from the register map). The narrowed registration was accepted for a peripheral whose size is 0x400.
+- **(c)** is displaceable by one monitor command, as architecture §2.0a recorded for SPI, and cannot be set from a `.repl`.
+
+**The ruling this leaves open (the architect's):** (a) and (b) each work. (a) is closest to `RUL-07`'s "guard owns the access", at the price of 58 restated registrations. (b1) is the smallest consumer change, with a bypass address. (b2) splits the RCC at a register boundary.

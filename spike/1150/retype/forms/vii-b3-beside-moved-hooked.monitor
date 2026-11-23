@@ -1,0 +1,2 @@
+sysbus SetHookBeforePeripheralWrite sysbus.rccguard "1"
+sysbus LogPeripheralAccess sysbus.rccguard true
