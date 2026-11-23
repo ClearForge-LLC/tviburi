@@ -48,7 +48,7 @@ So analog-mode `IDR` is cited (0, p539), not `unmodeled`.
 
 ## 1. Results, M1 and M2 (measured 2026-11-23, after §0 was committed at `0b7d9d5`)
 
-**Image:** `aethelgard-tools@sha256:1e0ab105…`, the digest Aethelgard `main` `ee239949` pins (`container/IMAGE`, fetched 23:1xZ). Renode `1.17.0+20260907gitf1dd1b4af.aet1605`. One container at a time, under `~/bin/capped-run`, `nice -n 10`, `--network none`.
+**Image:** `aethelgard-tools@sha256:1e0ab105…`, the digest Aethelgard `main` `ee239949` pins (`container/IMAGE`, fetched in this session before the first run). Renode `1.17.0+20260907gitf1dd1b4af.aet1605`. One container at a time, under `~/bin/capped-run`, `nice -n 10`, `--network none`.
 **Evidence:** `~/.cache/tvi-1301a/{m1,m3}` (scripts, monitor scripts, consoles), kept until the architect says.
 
 ### 1.1 M1: the stock paths, by probe
@@ -103,6 +103,7 @@ With the property `shadowApply` (`idr`, `drive` or `all`) it also **applies** th
 **The runs:** `tests/1301/replay-1301.sh`'s `accept` mode (copied as `m3/replay.sh`, `collapse-repeated-log-entries` off), every port recorded on LQFP144:
 - ArduPilot's 5 s foreign boot: `1300`'s capture, ELF `a799dfb6…`, platform `3927f28a…`;
 - 14 generated boots: `1300`'s captures of 12 boards (`sentinel-02-bench-hse8` included), and `1100`'s captures 16 and 18 for `driver-judges-nothing` and `d1-drv8876`, the boards `1300` did not capture.
+- **The captures' Aethelgard:** `1300`'s at `75da8053`, `1100`'s at `f42a0c88` (`spike/1100/queue.md` L20). Aethelgard `main` is now `ee239949`, not re-captured. The control below holds each GPIO sequence to the committed tables.
 
 **Controls:**
 - The shadow-only ArduPilot boot executed `0x53EABA5` instructions, exactly `1301`'s recorded count, and 4,741 `AETHELGARD-CFG2` lines, as `1301`. A second shadow-only run was byte-identical (console minus timestamps), so the run is deterministic and the instrument does not perturb it.
@@ -127,11 +128,12 @@ With the property `shadowApply` (`idr`, `drive` or `all`) it also **applies** th
 - **The pin:** PB7, `I2C1_SDA`. The board's hwdef says "`PB7 I2C1_SDA I2C1 SPEED_VERYLOW OPENDRAIN FLOATING` … open-drain, pulled up off-chip" (`tests/1301/fixtures/aet-1c32c8ea-ardupilot/boards/sentinel-02.hwdef.dat` L25). The consumer's platform models no pull-up.
 - **The run:** ArduPilot's 5 s foreign boot on `sentinel-02-own`. `read_sda` switches PB7 from AF to input (`PUPDR` 00), reads `IDR`, and switches it back, 58 times.
 - **Stock:** PB7 reads **1**, only because `gpio_init`'s `ODR` = `0xFFFF` (written while PB7 was analog) is what `IDR` returns (P1.1, P13). On silicon it reads 1 because of the off-chip pull-up. **The stock twin is right by accident.**
-- **Under the rule:** a floating input with no pull and no sender reads 0 under every candidate (0; `PUPDR`'s pull, which is none; and "hold", since nothing ever drove PB7). **Applied** (`idr`, `drive` and `all` give the same run, because each leaves PB7 at 0 when `read_sda` reads it):
+- **Under the rule:** a floating input with no pull and no sender reads 0 under every candidate (0; `PUPDR`'s pull, which is none; and "hold", since nothing ever drove PB7). **Applied** (`idr`, `drive` and `all` give the same instruction count, final PC and CFG2 count, because each leaves PB7 at 0 when `read_sda` reads it; `idr`'s console differs from the other two by the prototype's 7 mux-glitch lines):
   - ArduPilot takes `ChibiOS::I2CBus::clear_bus` after each read: **1,160 extra `GPIOB_ODR` writes** at PC `0x080F7D14`, inside `clear_bus` (20 SCL toggles × 58);
   - **1,828,656 fewer instructions** in the 5 s (`0x53EABA5` → `0x522C475`), and the final PC differs;
   - **`AETHELGARD-CFG2` lines 4,741 → 4,549**, ICM-42688 (`u5`) lines 2,355 → 2,259, BMP581 (`u7`) 487 → 483;
   - Aethelgard's register boot block, its flash hashes and the run's end are unchanged.
+- **PB7 is the whole dependency, measured:** the rule applied (`all`) with **only PB7** given an external high level (a measurement property seeding the instrument's external level for GPIOB bit 7) reproduces the shadow-only run exactly: `0x53EABA5` instructions, final PC `0x8061886`, 4,741 CFG2 lines, `u5` 2,355, `u7` 487, no `clear_bus` write, the boot block identical. Its console differs from shadow-only's only by the prototype's 7 mux-glitch lines. Its 58 reads returned `0x0080`, so the other 15 bits read 0 where stock gave 1, and nothing changed.
 - **So WO §7 fires:** "A consumer run relies on the defect. Stop with the run and the pin." The run is ArduPilot's foreign boot; the pin is PB7. Building (2) as written would move ArduPilot onto a bus-recovery path silicon does not take, because the twin does not know about the board's pull-up.
 
 ## 3. Predictions, marked
@@ -153,11 +155,12 @@ With the property `shadowApply` (`idr`, `drive` or `all`) it also **applies** th
 
 1. **The stop (§2.3).** A floating input has no level the twin can state, and ArduPilot's boot depends on PB7's off-board pull-up. Candidates:
    - **(a)** The consumer declares a board's external levels (here PB6 and PB7 pulled up) as a property of the guard (for example `externalPulls`), in its platform, never by name or environment (`RUL-10`). Tviburi's own replay harness can add it for its tests, as it already moves the consumer's port references, standing in for an Aethelgard Phase 2 row.
-   - **(b)** An `IDR` read of a floating input bit (input, `PUPDR` 00, no sender, nothing declared) refuses `unmodeled`, naming the pin (invariant 1). Without (a), ArduPilot's boot refuses at `read_sda`.
+   - **(b)** An `IDR` read of a floating input bit (input, `PUPDR` 00, no sender, nothing declared) refuses `unmodeled`, naming the pin (invariant 1). **But a read returns the whole port, and the guard cannot see the firmware's mask.** At each of ArduPilot's 58 reads, 12 bits are floating inputs (`0x1FBF`, PB7 among them) and 4 are AF pins with no Renode source (PB6, PB13–PB15; item 3). With PB7 declared, 15 of 16 bits stay unstated, so (b) as worded still refuses ArduPilot at `read_sda`, though the measurement shows only PB7 matters. This is `RUL-17`'s "per field, not per register" problem, met on a read.
+   - **(d)** A floating bit reads 0 (silicon gives no defined level; 0 is the Schmitt trigger's level with nothing driving, an assumption), with a ledger row saying so, and the consumer's declared levels win. Measured: ArduPilot with PB7 declared high and every other bit 0 runs exactly as today.
    - **(c)** Keep the stock's `ODR` → `IDR` path for input pins as an acknowledged `stock-wrong` row, and model only (1), (3) and the analog read. The ledger row then stays partly `stock-wrong`.
-   - **My recommendation: (a) with (b).** It answers silicon's level from data the board owns and refuses where none is given. ArduPilot then stays on its path only when the pull-up is declared, so WO §2's "ArduPilot's boot unchanged" needs the declaration in the replay. That is a ruling, not a build step.
+   - **My recommendation: (a) with (d),** not (b). (a) answers silicon's level from data the board owns. (b) cannot be made to refuse only the bit a firmware uses. ArduPilot stays on its path only when PB7's pull-up is declared, so WO §2's "ArduPilot's boot unchanged" needs the declaration in the replay (or in Aethelgard's platform). That is a ruling, not a build step.
 2. **The level an undriven connection carries** (input or analog, nothing declared): low, hold, or the pull. **No consumer run consumes the difference** (§2.2: every window closes at the next write, with no SPI access in it). The prototype holds. I recommend hold, with a declared external level or pull winning when present.
-3. **An AF pin with no Renode source.** Only the 102 timer routes drive pins; the SPI, USART and I2C models drive none. The rule's "the peripheral's signal" is then nothing. I propose: the connection holds, and an `IDR` read of such a pin is `unmodeled`. **No consumer run reads one.**
+3. **An AF pin with no Renode source.** Only the 102 timer routes drive pins; the SPI, USART and I2C models drive none. The rule's "the peripheral's signal" is then nothing. I propose the connection holds. **A consumer run does read such pins:** every one of ArduPilot's 58 `GPIOB_IDR` reads returns PB6 and PB13–PB15 (I2C1 and SPI2, AF). Nothing shows ArduPilot uses those bits: the `idr` variant served them as 1, the `drive` and PB7-high variants as 0, and the instruction count followed PB7 alone. A per-bit refusal for them has item 1's problem.
 4. **Entering AF mode takes the peripheral's current level** (P11). The stock AF receiver keeps no level, and Renode's GPIO connections are one-way, so the guard would supply its own AF receivers (`ILocalGPIOReceiver`, re-implemented as `RUL-07` does the bus interfaces), each remembering its last level per AF. Ruled before the build, because it changes how the timers' 102 routes bind.
 5. **The memory ceiling.** WO §1.2 and §7 say 1,048,576 KiB with 32 MiB to spare. The kickoff's goal and the roadmap (L66, Scotty 2026-11-23 evening) say 1,572,864 KiB, judged by `TVI-WO-1201`'s budget once it lands. I will build to the latter unless told otherwise.
 6. **Rows, outside this WO:**
