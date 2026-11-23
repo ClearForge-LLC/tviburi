@@ -158,6 +158,8 @@ Each finding was verified in the code or the manual before acting.
 ## 7. Close
 
 **Suites, each run from an export of HEAD:**
+- **`1449153`, the combined tree after `main` with TVI-WO-1300a (#21) was merged:** `tests/spike.sh` gave **ALL PASS (137 checks**, 1300a's cases and all 32 GPIO cases among them). `tests/adversarial.sh` gave **ALL PASS (33 checks)**.
+  - Since 1300a's lock, a monitor-driven case must enable the ports' clocks first. Eight GPIO cases did not: their accesses were "Tried to write a locked peripheral", and they failed. They now write `RCC_AHB4ENR` = `0x7FF` first, as the firmware does.
 - **`bfc1594`:** `tests/spike.sh` gave **144 of 145 checks**, with all 32 GPIO cases among them. The one failure was `rcc-resetfwd`: the teardown flake (§5 item 5). Its answers were all correct, and 11 of 13 end records were written before Renode exited. It passed on rerun. `tests/adversarial.sh`: **ALL PASS**.
 - **`ec04588`,** after the reduction pass: `rcc-resetfwd`, `afcheck`, `unit`, `gpio-valid`, `-ledger`, `-fields` and `-registrations` give **ALL PASS**. `tests/1301/ci-memory.sh` (one run, the trimmed fixture) gives the ELF `a799dfb6` and a peak of 991,676 KiB: **ALL PASS**.
 
