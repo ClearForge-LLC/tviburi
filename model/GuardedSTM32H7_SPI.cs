@@ -14,7 +14,8 @@
 // Reads (modeled, so that firmware that reads a register, changes a field and writes it back computes
 // the word silicon would; adversarial pass, TVI-WO-0100a): a CFG2 read returns the guard's copy
 // (every CFG2 field is software-written, rw, reset 0: RM0433 Rev 9 §50.11.4 p2221-2222; the guard
-// refuses every CFG2 write silicon would drop, and any mode fault refuses before it could clear MASTER).
+// refuses every CFG2 write silicon would drop). While the master-state history of TVI-SPI-MODF is
+// set, silicon may already have cleared MASTER by a mode fault, so a CFG2 read then refuses.
 // A CR1 read returns the stock value with SSI taken from the copy (SSI is rw, p2215). A CR1 read while
 // the IOLOCK latch is set refuses: silicon reads IOLOCK=1 until SPE goes from 1 to 0, which is not
 // modeled. A sub-word or unaligned read overlapping a guarded register refuses.
@@ -147,6 +148,13 @@ namespace Antmicro.Renode.Peripherals.Tviburi
                 }
                 return (value & ~Cr1Ssi) | (cr1 & Cr1Ssi);
             case Cfg2Offset:
+                if(history != null)
+                {
+                    records.Refuse(Modf, "SPI_CFG2", "CFG2 read after a master state other than the passing one, since reset: " + history,
+                        "CFG2 read after the SPI was configured as a master in a state where a mode fault was possible: if silicon raised MODF there it cleared CFG2.MASTER, which the guard's copy still holds. RM0433 does not settle whether MODF is evaluated while SPE=0 (see the enable's history refusal), so the value cannot be given",
+                        "RM0433 Rev 9 §50.5.2 p2184; §50.11.1 p2217; §50.4.9 p2171", State(), offset, value, 32);
+                    return value;
+                }
                 return cfg2;
             }
             return value;

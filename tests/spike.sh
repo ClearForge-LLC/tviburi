@@ -173,6 +173,7 @@ t_conditions() {
  (\"TVI-SPI-MODF\", \"CFG2.SSM (bit 26) = 0, CFG2.SSOE (bit 29) = 1\", \"0x0\", 32),
  (\"TVI-SPI-MODF\", \"CFG2.SSIOP (bit 28) = 1\", \"0x0\", 32),
  (\"TVI-SPI-MODF\", \"CR1.SSI (bit 12) = 0\", \"0x0\", 32),
+ (\"TVI-SPI-MODF\", \"CFG2 read after a master state other than the passing one, since reset: CR1=0x00000000, CFG2=0x04400000\", \"0xC\", 32),
  (\"TVI-SPI-MODF\", \"a master state other than the passing one, since reset: CR1=0x00000000, CFG2=0x04400000\", \"0x0\", 32),
  (\"TVI-SPI-CFG2-SPE\", \"CR1.SPE (bit 0) = 1\", \"0xC\", 32),
  (\"TVI-SPI-IOLOCK\", \"CR1.IOLOCK (bit 16) = 1\", \"0xC\", 32),
@@ -210,9 +211,9 @@ t_crash() {
     for i in $(seq 600); do grep -q "spi1: {\"tviburi\":\"witness\"" /out/renode-log.txt 2>/dev/null && break; sleep 0.1; done
     kill -9 $pid; wait $pid; echo renode-exit=$?
     /check/debug/tviburi-check /out/renode-log.txt spi1'
-  check "a simulator killed after its witness does not PASS (1, no end record)" \
+  check "a simulator killed after its witness does not PASS (1, no end record, the witness seen)" \
     "grep -qx 'renode-exit=137' '$work/crash.stdout' && grep -qx 'CHECK FAIL' '$work/crash.stdout' \
-     && grep -q '^PROBLEM spi1: no end record' '$work/crash.stdout'"
+     && grep -q '^PROBLEM spi1: no end record' '$work/crash.stdout' && ! grep -q '^PROBLEM spi1: no load witness' '$work/crash.stdout'"
 }
 
 # --- Adversarial (WO §5): a refusal or a missing witness that still passes; a firmware-written

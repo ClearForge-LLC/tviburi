@@ -29,9 +29,11 @@ machine Reset
 sysbus WriteDoubleWord 0x4001300C 0x04400000
 sysbus WriteDoubleWord 0x40013000 0x00000001
 machine Reset
-# 7. CFG2 master before SSI=1 (an earlier master state with SSI=0): SPE refuses on history
+# 7. CFG2 master before SSI=1 (an earlier master state with SSI=0): a CFG2 read refuses (7a), and
+# SPE refuses on history
 sysbus WriteDoubleWord 0x4001300C 0x04400000
 sysbus WriteDoubleWord 0x40013000 0x1000
+sysbus ReadDoubleWord 0x4001300C
 sysbus WriteDoubleWord 0x40013000 0x1001
 machine Reset
 # pass: SSI=1 before CFG2, then SPE
@@ -76,7 +78,7 @@ echo "READ-CR1"
 sysbus ReadDoubleWord 0x40013000
 echo "READ-CFG2"
 sysbus ReadDoubleWord 0x4001300C
-# 15. an RCC reset of SPI1 (RCC_APB2RSTR SPI1RST, RM0433 Rev 9 §8.7.35 p442) resets the guard's
+# 15. an RCC reset of SPI1 (RCC_APB2RSTR at 0x098, SPI1RST bit 12: RM0433 Rev 9 §8.7.35 p442-443) resets the guard's
 # copies with the model: after enabling, SPI1RST, then SPE refuses as slave
 sysbus WriteDoubleWord 0x4001300C 0x04400000
 sysbus WriteDoubleWord 0x40013000 0x1001

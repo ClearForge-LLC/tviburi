@@ -26,7 +26,7 @@ M21-end	model/Refusal.cs	if(named)	if(false)	modeled
 M22-refusalAtError	model/Refusal.cs	Emit(LogLevel.Error, "refusal"	Emit(LogLevel.Info, "refusal"	adv-loglevel
 M23-seq	model/Refusal.cs	seq++;	(empty)	modeled
 M24-readCr1Ssi	model/GuardedSTM32H7_SPI.cs	return (value & ~Cr1Ssi) | (cr1 & Cr1Ssi);	return value;	modeled
-M25-readCfg2Copy	model/GuardedSTM32H7_SPI.cs	            case Cfg2Offset:\n                return cfg2;\n	(empty)	rmw
+M25-readCfg2Copy	model/GuardedSTM32H7_SPI.cs	return cfg2;	return value;	rmw
 M26-readIolock	model/GuardedSTM32H7_SPI.cs	if(ioLock)\n                {\n                    records.Refuse("TVI-SPI-IOLOCK", "SPI_CR1"	if(false)\n                {\n                    records.Refuse("TVI-SPI-IOLOCK", "SPI_CR1"	conditions
 M27-subwordAtRegister	model/GuardedSTM32H7_SPI.cs	!(width == 32 && Guarded.Any(r => r.Offset == offset))	!Guarded.Any(r => r.Offset == offset)	conditions
 M28-unaligned	model/GuardedSTM32H7_SPI.cs	if(Guarded.Any(r => Overlaps(offset, width / 8, r.Offset)) && 	if(width != 32 && Guarded.Any(r => Overlaps(offset, width / 8, r.Offset)) && 	conditions
@@ -47,3 +47,6 @@ S03-oneArgument	scripts/tviburi-spike	[ $# -eq 1 ] ||	true ||	adv-extra-arg
 S04-scriptEnd	scripts/tviburi-spike	grep -qx 'TVIBURI-END' <<<"$console" && 	(empty)	adv-noend
 S05-afterMarker	scripts/tviburi-spike	 && [ "$after" = "0xAF7E0002" ]	(empty)	nomark
 S06-variantMustMatch	scripts/tviburi-spike	[ -n "$variant" ] ||	true ||	adv-bad-variant
+M31-cfg2ReadAfterHistory	model/GuardedSTM32H7_SPI.cs	                if(history != null)\n                {\n                    records.Refuse(Modf, "SPI_CFG2"	                if(false)\n                {\n                    records.Refuse(Modf, "SPI_CFG2"	conditions
+M32-loadRefusalAtNaming	model/Refusal.cs	                Refuse("TVI-LOAD", "none", "none"	                if(false) Refuse("TVI-LOAD", "none", "none"	load
+S07-modelDirOverride	scripts/tviburi-spike	export TVIBURI_MODEL_DIR=$root/model\n	(empty)	adv-env
