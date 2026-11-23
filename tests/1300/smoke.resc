@@ -1,0 +1,53 @@
+# TVI-WO-1300 §1.1 smoke (scratch): the prototype wrapper as "rcc" on the Nucleo board, with the 58 registrations
+# restated; then the stock behaviours the subagents read from source, measured on the binary.
+logFile @/out/renode-log.txt
+include @/ovl/Overlay1300.cs
+emulation SetSeed 1
+mach create
+machine LoadPlatformDescription @/ovl/nucleo-1300.repl
+peripherals
+python "rcc = self.Machine['sysbus.rcc']; print('SMOKE rcc class ' + rcc.GetType().FullName)"
+python "import clr; f = self.Machine['sysbus.rcc'].GetType().GetField('inner', __import__('System').Reflection.BindingFlags.NonPublic | __import__('System').Reflection.BindingFlags.Instance); inner = f.GetValue(self.Machine['sysbus.rcc']); print('SMOKE registered ' + str(inner.RegisteredPeripherals.Count))"
+echo "SMOKE reset reads"
+sysbus ReadDoubleWord 0x58024400
+sysbus ReadDoubleWord 0x5802442C
+sysbus ReadDoubleWord 0x580244F0
+sysbus ReadDoubleWord 0x58024118
+echo "SMOKE tag write: PLLCFGR = 0 (DIVxyEN tags), read back"
+sysbus WriteDoubleWord 0x5802442C 0x0
+sysbus ReadDoubleWord 0x5802442C
+echo "SMOKE selector write: D2CCIP1R = 0x4000, read back"
+sysbus WriteDoubleWord 0x58024450 0x4000
+sysbus ReadDoubleWord 0x58024450
+echo "SMOKE PLL1RDY without a source: PLLCKSELR PLLSRC=11 (no clock), PLL1ON"
+sysbus WriteDoubleWord 0x58024428 0x02020203
+sysbus WriteDoubleWord 0x58024400 0x01000025
+sysbus ReadDoubleWord 0x58024400
+echo "SMOKE ENR: APB2ENR = 0, read; = SPI1EN, read; SPI1 write while disabled"
+sysbus WriteDoubleWord 0x580244F0 0x0
+sysbus ReadDoubleWord 0x580244F0
+sysbus WriteDoubleWord 0x40013010 0x40
+sysbus WriteDoubleWord 0x580244F0 0x1000
+sysbus ReadDoubleWord 0x580244F0
+echo "SMOKE C1 alias: C1_APB2ENR = 0x1001, read alias and base"
+sysbus WriteDoubleWord 0x58024550 0x1001
+sysbus ReadDoubleWord 0x58024550
+sysbus ReadDoubleWord 0x580244F0
+echo "SMOKE TIM1RST: PSC=5, APB2RSTR TIM1RST 1 then 0, PSC"
+sysbus WriteDoubleWord 0x580244F0 0x1001
+sysbus WriteDoubleWord 0x40010028 0x5
+sysbus ReadDoubleWord 0x40010028
+sysbus WriteDoubleWord 0x58024498 0x1
+sysbus WriteDoubleWord 0x58024498 0x0
+sysbus ReadDoubleWord 0x40010028
+echo "SMOKE hook on the guard, then logging, then a write"
+sysbus SetHookBeforePeripheralWrite sysbus.rcc "print('SMOKE-HOOK ' + hex(offset))"
+sysbus LogPeripheralAccess sysbus.rcc true
+sysbus WriteDoubleWord 0x58024454 0x0
+echo "SMOKE hook on spi1 reaching rcc"
+sysbus SetHookBeforePeripheralWrite sysbus.spi1 "print('SMOKE-SPIHOOK ' + str(machine) + ' ' + str(self))"
+sysbus WriteDoubleWord 0x40013010 0x40
+echo "SMOKE the 0x17C alias read (stock recursion), last"
+sysbus ReadDoubleWord 0x5802457C
+echo "SMOKE-END"
+quit
