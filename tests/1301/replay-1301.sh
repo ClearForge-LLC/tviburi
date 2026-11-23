@@ -54,11 +54,13 @@ env -i HOME="$d" TMPDIR="$d" DOTNET_EnableDiagnostics=0 DOTNET_EnableWriteXorExe
 sleep 0.05
 peak=0; hwm=0
 while kill -0 $! 2>/dev/null; do
-  s=0; for p in $(pgrep -f 'enode'); do r=$(awk '/^VmRSS:/{print $2}' /proc/$p/status 2>/dev/null); s=$((s + ${r:-0})); h=$(awk '/^VmHWM:/{print $2}' /proc/$p/status 2>/dev/null); [ "${h:-0}" -gt $hwm ] && hwm=$h; done
-  # At each new peak, the Renode process's own breakdown (TVI-WO-1201 (4)): status and smaps_rollup, the last one kept.
+  s=0; k=0; top=0; topr=0
+  for p in $(pgrep -f 'enode'); do r=$(awk '/^VmRSS:/{print $2}' /proc/$p/status 2>/dev/null); s=$((s + ${r:-0})); k=$((k + 1)); [ "${r:-0}" -gt $topr ] && { topr=$r; top=$p; }; h=$(awk '/^VmHWM:/{print $2}' /proc/$p/status 2>/dev/null); [ "${h:-0}" -gt $hwm ] && hwm=$h; done
+  # At each new peak, the breakdown of the largest matched process, Renode (TVI-WO-1201 (4)): its status and
+  # smaps_rollup, the last peak's kept. A transient second match (seen in CI run 45286469273) is counted, not read.
   if [ $s -gt $peak ]; then
     peak=$s
-    for p in $(pgrep -f 'enode'); do echo "pid $p rss_sum_kib $s"; cat /proc/$p/status /proc/$p/smaps_rollup 2>/dev/null; done > /tmp/peak-proc.txt
+    { echo "pid $top of $k matched; rss_sum_kib $s"; cat /proc/$top/status /proc/$top/smaps_rollup 2>/dev/null; } > /tmp/peak-proc.txt
   fi
   sleep 0.1
 done
