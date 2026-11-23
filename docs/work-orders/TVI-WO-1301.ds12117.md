@@ -43,7 +43,7 @@
 - **The GPIO IP file:** `GPIO-STM32H747_gpio_v1_0_Modes.xml` (sha256 `49f51ae2…`). `STM32H753ZITx.xml` (`d167c088…`) names this IP version itself (line 112, `Version="STM32H747_gpio_v1_0"`).
 - **Read-only:** nothing in Aethelgard was changed.
 
-**Method** (`tests/1301/compare-st.py`; the full output is `TVI-WO-1301.st-compare.tsv`).
+**Method** (first `tests/1301/compare-st.py`, whose full output is `TVI-WO-1301.st-compare.tsv`; since the 17:52Z ruling, `tools/tviburi-afcheck`, the same classes in Rust, run in CI against the ruled list `tests/1301/st-ruled.tsv`).
 - For each pin and AF, DS's set is the cell split at `/`. ST's set is every `PinSignal` of that pin whose `GPIO_AF` value is `GPIO_AF<n>_*`.
 - A pair of sets that differ is a disagreement, printed with both sources. It is classed, never resolved:
   - **af-number:** a signal named by both sources on this pin, at different AF numbers;

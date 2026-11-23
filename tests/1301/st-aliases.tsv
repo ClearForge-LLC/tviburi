@@ -1,4 +1,4 @@
-# TVI-WO-1301 (1): explicit name aliases, DS12117 Rev 10 Table 9 signal -> ST open pin data signal(s), for tests/1301/compare-st.py.
+# TVI-WO-1301 (1): explicit name aliases, DS12117 Rev 10 Table 9 signal -> ST open pin data signal(s), for tools/tviburi-afcheck.
 # A cell counts as an alias difference only when these pairs explain every difference in it. Not an alias, by decision:
 # SPDIFRX1_INn (DS) against SPDIFRX1_IN(n-1) (ST), an off-by-one, which stays a finding.
 ds_signal	st_signals	rule

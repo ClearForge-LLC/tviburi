@@ -593,7 +593,6 @@ namespace Antmicro.Renode.Peripherals.Tviburi
                 Msb = msb;
                 Lsb = lsb;
                 Allowed = allowed;
-                Class = cls;
                 BehavesAs = behavesAs;
                 Page = page;
             }
@@ -618,7 +617,6 @@ namespace Antmicro.Renode.Peripherals.Tviburi
             public int Msb { get; }
             public int Lsb { get; }
             public uint[] Allowed { get; }
-            public string Class { get; }
             public string BehavesAs { get; }
             public int Page { get; }
         }
