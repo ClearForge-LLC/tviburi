@@ -14,6 +14,11 @@
 #   cost       as trace, with /ovl/gpio-restate-cost.repl (trace off): the one file's cost with the GPIO guard
 #   traceclk   as trace, with `sysbus LogPeripheralAccess sysbus.rcc true` before RunFor: the GPIO accesses in order with the
 #              RCC's (RCC_AHB4ENR's GPIOxEN, for TVI-WO-1300a's lock)
+#   accept     the built guard (WO §2): the release built from /repo, its one file included before `mach create`; spi1/spi2
+#              re-typed and recorded, the RCC restated and recorded, as base; the committed model/stm32h7-gpio-restate.repl
+#              appended, each port recorded on LQFP144 (`ACCEPT_MODE=enforcing`: the ports alone enforcing; spi1, spi2 and the
+#              RCC stay recorded, so their known records do not hide the GPIO verdict); the consumer's own
+#              references to a port moved onto the guard's variable, as trace
 #   tracesi    as trace, with /ovl/gpio-restate-tracesi.repl: the ports reset to silicon's values (gpio-restate.awk resets=1)
 set -u
 # RUL-09 (a)'s one compilation, as tests/1300/onefile.sh: every `using` hoisted (sorted, unique), then each file's body.
@@ -31,7 +36,7 @@ for mode in "$@"; do
     c=${args[$((i + 1))]}
     case $mode in
       pure) ;;
-      base|trace|cost|tracesi|traceclk)
+      base|trace|cost|tracesi|traceclk|accept)
         [ -s /tmp/release/Tviburi.cs ] || /repo/scripts/build-release /repo /tmp/release > /out/$n-$mode.release.txt 2>&1 || { echo "replay-1301: release build failed" >&2; exit 3; }
         sed -i 's/^\(spi[0-9]*\): SPI\.STM32H7_SPI @ {/\1: Tviburi.GuardedSTM32H7_SPI @ {/' "$plat"
         sed -i '/RegistrationPeripheralAlias\.SPI[0-9]*$/{n;s/^    }$/    }\n    mode: "recorded"/}' "$plat"
@@ -46,9 +51,15 @@ for mode in "$@"; do
           awk '/^gpioPort[A-K]:$/{f=1; next} f && /^ /{next} {f=0; print}' "$plat" > "$plat.new" && cat "$plat.new" > "$plat" && rm "$plat.new"
           grep -n '@ gpioPort[A-K]\|-> gpioPort[A-K]' "$plat" > /out/$n-$mode.repointed-gpio.txt
           sed -i 's/@ gpioPort\([A-K]\)/@ tviburiGpio\1/; s/-> gpioPort\([A-K]\)/-> tviburiGpio\1/g' "$plat"
-          { echo; cat /ovl/gpio-restate-${mode/traceclk/trace}.repl; echo; cat /out/$n-$mode.moved-gpio.txt; } >> "$plat"
-          [ -s /tmp/onefile-$mode.cs ] || onefile /tmp/onefile-$mode.cs /tmp/release/Tviburi.cs /ovl/GpioProto1301.cs
-          one=/tmp/onefile-$mode.cs
+          if [ $mode = accept ]; then
+            { echo; cat /repo/model/stm32h7-gpio-restate.repl; echo
+              for x in A B C D E F G H I J K; do printf 'tviburiGpio%s:\n    mode: "%s"\n    package: "LQFP144"\n\n' $x "${ACCEPT_MODE:-recorded}"; done
+              cat /out/$n-$mode.moved-gpio.txt; } >> "$plat"
+          else
+            { echo; cat /ovl/gpio-restate-${mode/traceclk/trace}.repl; echo; cat /out/$n-$mode.moved-gpio.txt; } >> "$plat"
+            [ -s /tmp/onefile-$mode.cs ] || onefile /tmp/onefile-$mode.cs /tmp/release/Tviburi.cs /ovl/GpioProto1301.cs
+            one=/tmp/onefile-$mode.cs
+          fi
         fi
         c=${c/'mach create; '/"include @$one; mach create; "}
         [ $mode = traceclk ] && c=${c/'; emulation RunFor '/'; sysbus LogPeripheralAccess sysbus.rcc true; emulation RunFor '}
