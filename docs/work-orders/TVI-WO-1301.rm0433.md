@@ -216,3 +216,58 @@ Each consumer platform refers to the ports in up to three ways, and each must na
 | Records | One record source for the family if it fits the existing grammar; a new field is a stop; otherwise per port | see §8 |
 | AFRH | The "errata" was from the architect's research note, from memory. Record RM0433 p546 ("x = A to J") against p548 ("A to K") as a finding, and close the row | closed (`TVI-WO-1301.ds12117.md` §4) |
 | 1300a's lock | The GPIO guard adds no rule for an unclocked port | none added |
+
+## 8. The reductions on the combined one file, as ruled — **stopped again**
+
+**Method** (`tests/1301/memory-1301.sh`, 18:02–18:38Z):
+- **The base is 1300a's latest tree.** A read-only copy of its `git archive` export at `~/.cache/tvi-1300a/m3src` (17:44Z): `GuardedSTM32H7_RCC.cs` `b8f89469…`, `GuardedSTM32H7_SPI.cs` `69809b7e…`, `Refusal.cs` `bb1ab829…`. Its release was built in the image, and to that one file each variant's GPIO C# was appended, `using` lines hoisted.
+- **The variants** (`tests/1301/proto1301.py`):
+
+| Variant | What it adds |
+|---|---|
+| `base` | nothing: 1300a's file alone |
+| `R` | the 11 ports restated as the stock class, no new C# |
+| `Vmin` | the guard subclass alone (three widths, the records) |
+| `V0` | the §1.1 prototype (2,688 object initialisers, 161 rows) |
+| `V1` | V0 with the table as one string, parsed at the first lookup |
+| `V2` | V1 with the allow-list as 10 per-register rules |
+
+- **Each restated with silicon's reset values** (A5, as ruled).
+- **The runs:** 20 rounds of the six, interleaved, 120 runs. Each replay was pinned to 4 CPUs (`taskset -c 0-3`, a GitHub runner's 4 vCPUs) on Furnace, which other builders shared at host load 4 to 31.
+- **Every run booted to `AETHELGARD-BOOT-END`.** Every GPIO run emitted 14 witnesses and loaded with no error.
+
+**Results** (peak tree `VmRSS`, KiB; the bound is 1,048,576):
+
+| Variant | All 20: median | All 20: max | Over the bound | The runs the host did not slow (wall ≤ 11.5 s): n, median, max, margin |
+|---|---|---|---|---|
+| `base` | 964,216 | 1,910,576 | 4 | 16; 960,486; 986,688; 60.4 MiB |
+| `R` | 978,650 | 2,196,616 | 6 | 11; 965,316; 981,140; 65.9 MiB |
+| `Vmin` | 975,706 | 1,716,308 | 3 | 15; 972,160; 1,027,656; 20.4 MiB |
+| `V0` | 987,852 | 2,105,876 | 4 | 14; 985,580; **1,052,820**; −4.1 MiB |
+| `V1` | 979,668 | 1,984,084 | 2 | 17; 979,320; 1,036,448; 11.8 MiB |
+| `V2` | 971,240 | 1,740,464 | 6 | 13; 970,784; 1,006,616; **41.0 MiB** |
+
+**What the runs show:**
+1. **The peak follows contention, not only the code.**
+   - Peak against wall time: correlation 0.978. A peak is one process's (`VmHWM` ≈ the tree's).
+   - Of the 34 runs the host slowed (wall over 11.5 s, against about 10 s), **24 went over the bound**, `base` included: 1,910,576 KiB at 30 s wall, with no GPIO code. Of the 86 it did not slow, 1 went over (`V0`).
+   - So **no variant, and not 1300a's file alone, stays under 1,048,576 KiB in every run on a contended host.** By the ruling, that is a stop.
+2. **What each reduction buys,** at the median of the unslowed runs, over `base` (960,486):
+
+| Variant | Over `base` | What it adds |
+|---|---|---|
+| `R` | +4.7 MiB | the restatement |
+| `Vmin` | +11.4 MiB | a guard class at all |
+| `V2` | +10.1 MiB | the string table and per-register rules |
+| `V1` | +18.4 MiB | |
+| `V0` | +24.5 MiB | |
+
+   The 2,688 object initialisers cost about 14 MiB more than the string. The 161 rows cost about 8 MiB more than 10 rules. **`V2` is the only GPIO variant whose unslowed runs keep 32 MiB** (41.0 MiB, n = 13).
+3. **Contention here is heavier than CI's.** The 4 pinned CPUs were shared with the rest of the host. A GitHub runner's 4 vCPUs are not shared, so the unslowed runs are the closer proxy for CI. A faithful "CI-like" peak needs an unshared 4-CPU host, or the measurement run in CI itself.
+
+**For the architect and Scotty (northstar §6):**
+- the bound against host contention, which reaches 1300a's file without GPIO;
+- whether `V2`'s unslowed margin (41.0 MiB) is the measure to build on;
+- where a CI-like peak is measured.
+
+**My lean:** build with `V2`'s shape, and measure the peak in CI or on an unshared 4-CPU host before READY.
