@@ -97,6 +97,9 @@ The rule is `predictions.md` §2: class by function, then within a class:
 - **R1, boards are counted within the row's class.** The committed text did not say which boards count when one field has different functions on different boards. Counted over all boards, `GPIOA.OTYPER.OT0` ranked first in the motor class "on 13 boards", because PA0 is a motor pin on one board. Meanwhile `TIM1.BDTR.MOE`, dropped on all 9 boards that write it, ranked 24th. That is exactly the WO §5 case of a rank that hides a flight-critical path. Under R1 a row counts only the boards on which it has that class (`queue.tsv` column 4 shows `in class/all`).
 - **R2, a read-only model field is not a drop.** At first the classifier called any write to a field with no write mode "dropped". That flagged `RCC.CR.HSERDY`, `PLL1RDY` and `CFGR.SWS`, which are read-only status bits on silicon too, and produced three false "judged-class" findings. Such writes are now `no (a read-only field in the model…)`.
 - **R3, a correction to the reader rather than to the rule: a drop is judged over every write, not the last.** `d1-drv8876` writes `ADC_CR.ADCAL` = 1 to start calibration (write #72, `0x90010100`) and 0 later. The first classifier compared only the last value, so it missed that drop. The model's own warning exposed it in the 13-board check above. The cut is unchanged by R3: the same 172 rows.
+- **R4, two further reader corrections, both found by the independent review; the queue is byte-identical after both.**
+  - ST's header writes `ADC_Common_TypeDef`'s offsets as "ADC1/3 base address + 0x308". `cmsis-regs.awk` skipped them, so the 8 `ADC3_COMMON.CCR` rows on `d1-drv8876` looked unwritten. They are written (write #62, `CKMODE` = 3) and stored. They are `silicon-only`, so not in the queue.
+  - A field Renode declares with `WithIgnoredBits` (named `ignored`) is stored but never acted on. It is now classed so: drop `yes` if written non-zero. One ledger row lands on one: `I2Cn.CR1.ERRIE`, `STM32F7_I2C.cs` L129, written 0 on every board.
 
 ## 4. Predictions against the measurement
 
@@ -151,7 +154,8 @@ Every one-sided row has a reason from the closed set committed before the join (
   - The firmware only initialises I2C2 (`CR1`, `TIMINGR`, `PE`), because no device is declared on the EXT bus.
   - On `sentinel-01-ext-bmp581`, where the BMP581 sits on I2C2, the same fields are written 5 times each. So this is "the path is not executed", in the specific form "no device on the bus".
 - **R-never-issued:** none observed, because nothing in any generated firmware uses DMA (§7).
-- **R-not-in-ledger:** none. Every firmware write the executed model drops lands on a field the ledger has a row for.
+- **R-not-in-ledger:** none. Every firmware write the executed model drops lands on a field the ledger has a row for. Every `written` ledger row with no firmware write is one of the 16 I2C2 `R-window` rows (42 board-rows).
+- **Behavioural ignores.** No board's console holds a model's conditional ignore ("Cannot modify … Ignoring write", `STM32H7_RCC.cs` L154, L193, L271, L280, or any "ignor", "cannot" or "not supported" line). So the warning-based control is not missing a logged ignore on these runs.
 - **R-judged-class:** none after R2. No judged row without an "also ignored-by-model" note is dropped on any board (WO §5, first case). Four judged rows sit partly on a tag or undefined bits. Each passes today only because the written value fits; they are listed in FEEDBACK.
 - **One correction to a recorded gap.** `SCB.CPACR.CP10`/`CP11` (same-source; "whether Renode's core faults a float … is not held") are not dropped. The write lands outside NVIC's register collection, in its own switch (`NVIC.cs` L610–620). That code stores `CPACR` into the CPU and enables the FPU, and no warning is logged.
 
@@ -176,9 +180,9 @@ Every one-sided row has a reason from the closed set committed before the join (
 **Proposed: the prefix through rank 172.** That is the whole motor-output class (ranks 1–157) and the kernel-clock selector block (ranks 158–172).
 
 **Why it falls there:**
-- **Rank 172 is where breadth ends.** Everything above it is on all 9 motor boards (`TIM1`), on all 4 two-timer boards (`TIM2`), or on all 13 boards (the selectors). From rank 173 every row is on 3 boards or fewer: `I2C2EN`, then the two HSE fixtures' PLL rows.
+- **Rank 172 is where breadth ends within the clocks class.** Everything above it is on all 9 motor boards (`TIM1`), on all 4 two-timer boards (`TIM2`), or on all 13 boards (the selectors). From rank 173, every clocks row is on 3 boards or fewer: `I2C2EN`, then the two HSE fixtures' PLL rows. This is a statement within a class, not across the queue: by the rule's class order, sensor-bus rows on 11 boards (`GPIOB.OTYPER.OT6`/`OT7`, `I2C1.TIMINGR`, dropped on all 11) rank after it.
 - **It covers both measured flight paths.**
-  - **The motor path.** `TIM1.BDTR.MOE` is a tag (`STM32_Timer.cs` L385), dropped on 9 of 9 boards. The timer drives its outputs at L76–82 (update) and L113–128 (compare) whatever `MOE`, `CCxP` and the break/off-state bits say: only `CCxS` gates them (`IsOutputMode`, L859). RM0433 Rev 9 §38.4.20, p. 1614: with `MOE` = 0, "OC and OCN outputs are disabled or forced to idle state". So a firmware that never sets `MOE` flies in the twin and is dead on silicon.
+  - **The motor path.** `TIM1.BDTR.MOE` is a tag (`STM32_Timer.cs` L385), dropped on 9 of 9 boards. The timer drives its outputs at L76–82 (update) and L113–128 (compare) whatever `MOE`, `CCxP` and the break/off-state bits say: only `CCxS` (`IsOutputMode`, L859) and `CCxE` (the channel timer's enable, L847, L861) gate them. RM0433 Rev 9 §38.4.20, p. 1614: with `MOE` = 0, "OC and OCN outputs are disabled or forced to idle state". So a firmware that never sets `MOE` flies in the twin and is dead on silicon.
   - **The clock path.** It is the recorded A1 scar, SPI1 with no kernel clock: `SPI123SEL` is a tag (`STM32H7_RCC.cs` L408), dropped on 9 of 9 boards that write it.
 - **It holds without the doubtful boards.** Re-ranked without the five boards `verify` does not pass cleanly, ranks 1–172 hold the same rows.
 - **Bounded, not measured:** the 14 HSI non-motor fixtures could raise only HSI RCC rows already inside the cut, or peripheral-enable rows that are at 3 boards or fewer today.
@@ -193,6 +197,12 @@ Every one-sided row has a reason from the closed set committed before the join (
   - **DMA:** no row exists (§7).
   - **BOR:** the firmware writes no BOR field. Its only row is `silicon-only`, and the factory step sets it (§7).
   - **HSE/PLL:** on 2 boards today; 3 if `sentinel-02-bench-hse8`, skipped at 32G, counts. They are next in line after the cut.
+
+**The strongest case against this boundary**, from the independent review, put to Scotty as the alternative:
+- The HSE/PLL rows are dropped on every board that uses them: `RCC.CR.HSEBYP`, and the `PLLCFGR` set `DIVP2EN`, `DIVP3EN`, `DIVQ2EN`, `DIVQ3EN`, `DIVR1EN`, `DIVR2EN`, `DIVR3EN`, plus `PLL1RGE` and `PLL1VCOSEL` on one board each.
+- They rank low only because two fixtures use an HSE. That is R1's own failure mode, a board count hiding a flight-critical path.
+- **The alternative cut adds those 10 dropped rows** (ranks 174–215) to the refusal set, which then has 128 rows.
+- I keep the prefix as proposed because no committed example that ran uses an HSE. The one that does, `sentinel-02-bench-hse8`, was skipped at 32G. If Scotty weights the HSE fixtures as flight-representative, the alternative is the better cut.
 
 ## 9. Files
 

@@ -15,6 +15,13 @@ inside && /^} *[A-Za-z0-9_]+_TypeDef;/ {
   for (i = 1; i <= ncur; i++) regs[ty] = regs[ty] cur[i] "\n"
   inside = 0; next
 }
+# ADC_Common_TypeDef writes "Address offset: ADC1/3 base address + 0x308"; ADCx_COMMON_BASE already adds 0x300.
+inside && /Address offset: *ADC1\/3 base address \+ *0x/ {
+  decl = $0; sub(/\/\*.*/, "", decl); gsub(/;/, "", decl); sub(/[ \t]+$/, "", decl); m = split(decl, w, /[ \t]+/)
+  off = $0; sub(/.*base address \+ */, "", off); sub(/[^0-9A-Fa-fx].*/, "", off)
+  if (w[m] !~ /^RESERVED/) cur[++ncur] = w[m] "\t" (hex(off) - 0x300)
+  next
+}
 inside && /Address offset: *0x/ {
   line = $0; decl = line; sub(/\/\*.*/, "", decl); gsub(/;/, "", decl); sub(/[ \t]+$/, "", decl)
   m = split(decl, w, /[ \t]+/); name = w[m]

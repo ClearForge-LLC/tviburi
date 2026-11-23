@@ -63,6 +63,10 @@ $1 != board { next }
       } else {
         cover = cover (cover ? "; " : "") "field " en[k, e] " [" ep[k, e] "+" ew[k, e] "] " em[k, e]
         if (n && !writable(em[k, e]) && drop == "no") drop = "no (a read-only field in the model: the write is ignored, as for a status bit on silicon; check RM0433's access)"
+        if (n && en[k, e] == "ignored") {   # WithIgnoredBits: stored, never acted on
+          if (and(orv[k], and(em2, fm))) drop = "yes"
+          else if (drop == "no") drop = "no (WithIgnoredBits: stored, never acted on; written 0)"
+        }
       }
     }
     und = and(fm, compl(defined[k]) % 4294967296)
