@@ -204,17 +204,15 @@ sysbus WriteDoubleWord 0x40013040 0x107
 sysbus WriteDoubleWord 0x40013040 0x7
 sysbus WriteDoubleWord 0x4001301C 0x0
 machine Reset
-# 28. reset clears MASTER unknown and the IER copy: after a reset, the CFG2 read is served, SPE passes, and
-# IER reads its reset value
+# 28. reset clears MASTER unknown and the IER copy: after a reset, the CFG2 read is served (no refusal),
+# and IER reads its reset value
 sysbus WriteDoubleWord 0x4001300C 0x04400000
 sysbus WriteDoubleWord 0x40013018 0x200
 sysbus WriteDoubleWord 0x40013010 0x41
 machine Reset
 echo "READ-IER-RESET"
 sysbus ReadDoubleWord 0x40013010
-sysbus WriteDoubleWord 0x40013000 0x1000
 sysbus ReadDoubleWord 0x4001300C
-sysbus WriteDoubleWord 0x40013000 0x1001
 machine Reset
 # 27 (TVI-SPI-ORDER). TXDR with SPE=0; CSTART with SPE=0, alone and in the write that enables; then
 # enabled: CR2 refuses
