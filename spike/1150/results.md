@@ -265,7 +265,7 @@ The guard is a spike copy (`overlay/Records1150.cs`, `overlay/GuardedSpi1150.cs`
 - **The peripherals written:** `nvic`, `timer5`, `spi2`, `dma1`, `gpioPortB`, `rcc`, `i2c1`, `gpioPortA`, `dmamux1`, `spi1`, `usart1`, `flashController`, `dma2`, `pwr`, GPIO ports C–K (7 each), `watchdog`, `rng`, `dwt`.
 - **No `spi4`,** so the recorded guard below covered every SPI instance ArduPilot uses.
 - **No timer but TIM5,** ArduPilot's system tick: ArduPilot does not arm in 5 s, so **TIM1 and TIM2 are never written** and no DShot or motor output runs.
-- Deduplicated writes are in `data/writes-ap.tsv` (peripheral, width, offset, register, value, count, first sequence, first PC). The models' warnings are in `data/warnings-ap.txt`.
+- Per register, `data/writes-ap.tsv` holds: writes, distinct values, first and last value, and the PCs (all of them when there are at most eight). It sums to the 386,068. The models' warnings are in `data/warnings-ap.txt`. The full log regenerates from `harness/replay-ap.sh 2 logged`.
 
 **Writes the log misses or misattributes (WO §5).** **DMA writes are logged, but under a CPU's PC.** All 25,073 writes to `spi2`'s `TXDR` carry `pc 0x810107E` or `0x81010CC`. Those are the PCs of the CPU's writes to `dma1` offset `0x58` (stream 3's `CR`, the enable). The transfer runs inside that CPU write, as (vi) shows. Nothing after the window is logged, because nothing runs after it.
 
