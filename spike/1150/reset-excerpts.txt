@@ -1,0 +1,96 @@
+# TVI-WO-1150 (vi): records across machine Reset and the DMA write, from harness/run-reset.sh, 2026-11-23, image e5fc7ddb…, Aethelgard 7dec1d7b's renode.config, the one-file overlay (release A) in enforcing mode on the Nucleo spike platform. Lines: records (condition, citation and state elided), markers and the value after each, bus-lock warnings, and the access log where enabled.
+
+## reset-modeled
+commands: emulation SetSeed 2100; emulation SetGlobalQuantum "0.000100000"; include @/ovl/Overlay1150.cs; mach create; machine LoadPlatformDescription @/repo/spike/1150/overlay/nucleo-default.repl; sysbus LoadELF @/out/fw-modeled.elf; sysbus WriteDoubleWord 0x580244d4 0x0; sysbus WriteDoubleWord 0x580244d8 0x0; sysbus WriteDoubleWord 0x580244dc 0x0; sysbus WriteDoubleWord 0x580244e0 0x0; sysbus WriteDoubleWord 0x580244e4 0x0; sysbus WriteDoubleWord 0x580244e8 0x0; sysbus WriteDoubleWord 0x580244ec 0x0; sysbus WriteDoubleWord 0x580244f0 0x0; sysbus WriteDoubleWord 0x580244f4 0x10000; cpu VectorTableOffse
+[00:00:00.000000000] [INFO] spi1: {"tviburi":"witness","seq":0,"guard":"GuardedSpi1150","model_version":"sha256:a4a12a17599117cb22c681f7b97ea7587b0f7f218c1792a22c720f08805d5461","mode":"enforcing"}
+TVI1150-MARK
+0xAF7E0002
+TVI1150-RESET
+TVI1150-MONITOR-WRITE
+[00:00:00.001000000] [WARNING] sysbus: Tried to write a locked peripheral: machine-0.spi1. Address 0x40013000, value 0x1
+TVI1150-RELEASE
+TVI1150-MARK2
+0xAF7E0002
+[00:00:00.002000000] [INFO] spi1: {"tviburi":"end","seq":1,"guard":"GuardedSpi1150","model_version":"sha256:a4a12a17599117cb22c681f7b97ea7587b0f7f218c1792a22c720f08805d5461"}
+
+## reset-modeled-clocked
+commands: emulation SetSeed 2100; emulation SetGlobalQuantum "0.000100000"; include @/ovl/Overlay1150.cs; mach create; machine LoadPlatformDescription @/repo/spike/1150/overlay/nucleo-default.repl; sysbus LoadELF @/out/fw-modeled.elf; sysbus WriteDoubleWord 0x580244d4 0x0; sysbus WriteDoubleWord 0x580244d8 0x0; sysbus WriteDoubleWord 0x580244dc 0x0; sysbus WriteDoubleWord 0x580244e0 0x0; sysbus WriteDoubleWord 0x580244e4 0x0; sysbus WriteDoubleWord 0x580244e8 0x0; sysbus WriteDoubleWord 0x580244ec 0x0; sysbus WriteDoubleWord 0x580244f0 0x0; sysbus WriteDoubleWord 0x580244f4 0x10000; cpu VectorTableOffse
+[00:00:00.000000000] [INFO] spi1: {"tviburi":"witness","seq":0,"guard":"GuardedSpi1150","model_version":"sha256:a4a12a17599117cb22c681f7b97ea7587b0f7f218c1792a22c720f08805d5461","mode":"enforcing"}
+TVI1150-MARK
+0xAF7E0002
+TVI1150-RESET
+TVI1150-MONITOR-WRITE
+[00:00:00.001000000] [ERROR] spi1: {"tviburi":"refusal","seq":1,"rule":"TVI-SPI-MODF","kind":"unmodeled","peripheral":"sysbus.spi1","register":"SPI_CR1 / SPI_CFG2","bit":"CFG2.MASTER (bit 22) = 0","model_version":"sha256:a4a12a17599117cb22c681f7b97ea7587b0f7f218c1792a22c720f08805d5461","access":{"offset":"0x0","value":"0x1","width":32,"pc":"none","virtual_time":"00:00:00.001000000"}}
+TVI1150-RELEASE
+TVI1150-MARK2
+0xAF7E0002
+[00:00:00.002000000] [INFO] spi1: {"tviburi":"end","seq":2,"guard":"GuardedSpi1150","model_version":"sha256:a4a12a17599117cb22c681f7b97ea7587b0f7f218c1792a22c720f08805d5461"}
+
+## reset-modf
+commands: emulation SetSeed 2100; emulation SetGlobalQuantum "0.000100000"; include @/ovl/Overlay1150.cs; mach create; machine LoadPlatformDescription @/repo/spike/1150/overlay/nucleo-default.repl; sysbus LoadELF @/out/fw-modf.elf; sysbus WriteDoubleWord 0x580244d4 0x0; sysbus WriteDoubleWord 0x580244d8 0x0; sysbus WriteDoubleWord 0x580244dc 0x0; sysbus WriteDoubleWord 0x580244e0 0x0; sysbus WriteDoubleWord 0x580244e4 0x0; sysbus WriteDoubleWord 0x580244e8 0x0; sysbus WriteDoubleWord 0x580244ec 0x0; sysbus WriteDoubleWord 0x580244f0 0x0; sysbus WriteDoubleWord 0x580244f4 0x10000; cpu VectorTableOffset 0
+[00:00:00.000000000] [INFO] spi1: {"tviburi":"witness","seq":0,"guard":"GuardedSpi1150","model_version":"sha256:a4a12a17599117cb22c681f7b97ea7587b0f7f218c1792a22c720f08805d5461","mode":"enforcing"}
+[00:00:00.000000000] [ERROR] spi1: {"tviburi":"refusal","seq":1,"rule":"TVI-SPI-MODF","kind":"predicted-fault","peripheral":"sysbus.spi1","register":"SPI_CR1 / SPI_CFG2","bit":"CR1.SSI (bit 12) = 0","model_version":"sha256:a4a12a17599117cb22c681f7b97ea7587b0f7f218c1792a22c720f08805d5461","access":{"offset":"0x0","value":"0x1","width":32,"pc":"0x0800002A","virtual_time":"00:00:00.000000000"}}
+TVI1150-MARK
+0xAF7E0002
+TVI1150-RESET
+TVI1150-RELEASE
+[00:00:00.001000000] [ERROR] spi1: {"tviburi":"refusal","seq":2,"rule":"TVI-SPI-MODF","kind":"predicted-fault","peripheral":"sysbus.spi1","register":"SPI_CR1 / SPI_CFG2","bit":"CR1.SSI (bit 12) = 0","model_version":"sha256:a4a12a17599117cb22c681f7b97ea7587b0f7f218c1792a22c720f08805d5461","access":{"offset":"0x0","value":"0x1","width":32,"pc":"0x0800002A","virtual_time":"00:00:00.001000000"}}
+TVI1150-MARK2
+0xAF7E0002
+[00:00:00.002000000] [INFO] spi1: {"tviburi":"end","seq":3,"guard":"GuardedSpi1150","model_version":"sha256:a4a12a17599117cb22c681f7b97ea7587b0f7f218c1792a22c720f08805d5461"}
+
+## reset-iolock
+commands: emulation SetSeed 2100; emulation SetGlobalQuantum "0.000100000"; include @/ovl/Overlay1150.cs; mach create; machine LoadPlatformDescription @/repo/spike/1150/overlay/nucleo-default.repl; sysbus LoadELF @/out/fw-iolock.elf; sysbus WriteDoubleWord 0x580244d4 0x0; sysbus WriteDoubleWord 0x580244d8 0x0; sysbus WriteDoubleWord 0x580244dc 0x0; sysbus WriteDoubleWord 0x580244e0 0x0; sysbus WriteDoubleWord 0x580244e4 0x0; sysbus WriteDoubleWord 0x580244e8 0x0; sysbus WriteDoubleWord 0x580244ec 0x0; sysbus WriteDoubleWord 0x580244f0 0x0; sysbus WriteDoubleWord 0x580244f4 0x10000; cpu VectorTableOffset
+[00:00:00.000000000] [INFO] spi1: {"tviburi":"witness","seq":0,"guard":"GuardedSpi1150","model_version":"sha256:a4a12a17599117cb22c681f7b97ea7587b0f7f218c1792a22c720f08805d5461","mode":"enforcing"}
+[00:00:00.000000000] [ERROR] spi1: {"tviburi":"refusal","seq":1,"rule":"TVI-SPI-IOLOCK","kind":"predicted-fault","peripheral":"sysbus.spi1","register":"SPI_CFG2","bit":"CR1.IOLOCK (bit 16) = 1","model_version":"sha256:a4a12a17599117cb22c681f7b97ea7587b0f7f218c1792a22c720f08805d5461","access":{"offset":"0xC","value":"0x4400000","width":32,"pc":"0x08000032","virtual_time":"00:00:00.000000000"}}
+TVI1150-MARK
+0xAF7E0002
+TVI1150-RESET
+TVI1150-MONITOR-CFG2
+[00:00:00.001000000] [WARNING] sysbus: Tried to write a locked peripheral: machine-0.spi1. Address 0x4001300C, value 0x4400000
+TVI1150-RELEASE
+[00:00:00.001000000] [ERROR] spi1: {"tviburi":"refusal","seq":2,"rule":"TVI-SPI-IOLOCK","kind":"predicted-fault","peripheral":"sysbus.spi1","register":"SPI_CFG2","bit":"CR1.IOLOCK (bit 16) = 1","model_version":"sha256:a4a12a17599117cb22c681f7b97ea7587b0f7f218c1792a22c720f08805d5461","access":{"offset":"0xC","value":"0x4400000","width":32,"pc":"0x08000032","virtual_time":"00:00:00.001000000"}}
+TVI1150-MARK2
+0xAF7E0002
+[00:00:00.002000000] [INFO] spi1: {"tviburi":"end","seq":3,"guard":"GuardedSpi1150","model_version":"sha256:a4a12a17599117cb22c681f7b97ea7587b0f7f218c1792a22c720f08805d5461"}
+
+## reset-iolock-clocked
+commands: emulation SetSeed 2100; emulation SetGlobalQuantum "0.000100000"; include @/ovl/Overlay1150.cs; mach create; machine LoadPlatformDescription @/repo/spike/1150/overlay/nucleo-default.repl; sysbus LoadELF @/out/fw-iolock.elf; sysbus WriteDoubleWord 0x580244d4 0x0; sysbus WriteDoubleWord 0x580244d8 0x0; sysbus WriteDoubleWord 0x580244dc 0x0; sysbus WriteDoubleWord 0x580244e0 0x0; sysbus WriteDoubleWord 0x580244e4 0x0; sysbus WriteDoubleWord 0x580244e8 0x0; sysbus WriteDoubleWord 0x580244ec 0x0; sysbus WriteDoubleWord 0x580244f0 0x0; sysbus WriteDoubleWord 0x580244f4 0x10000; cpu VectorTableOffset
+[00:00:00.000000000] [INFO] spi1: {"tviburi":"witness","seq":0,"guard":"GuardedSpi1150","model_version":"sha256:a4a12a17599117cb22c681f7b97ea7587b0f7f218c1792a22c720f08805d5461","mode":"enforcing"}
+[00:00:00.000000000] [ERROR] spi1: {"tviburi":"refusal","seq":1,"rule":"TVI-SPI-IOLOCK","kind":"predicted-fault","peripheral":"sysbus.spi1","register":"SPI_CFG2","bit":"CR1.IOLOCK (bit 16) = 1","model_version":"sha256:a4a12a17599117cb22c681f7b97ea7587b0f7f218c1792a22c720f08805d5461","access":{"offset":"0xC","value":"0x4400000","width":32,"pc":"0x08000032","virtual_time":"00:00:00.000000000"}}
+TVI1150-MARK
+0xAF7E0002
+TVI1150-RESET
+TVI1150-MONITOR-CFG2
+TVI1150-RELEASE
+[00:00:00.001000000] [ERROR] spi1: {"tviburi":"refusal","seq":2,"rule":"TVI-SPI-IOLOCK","kind":"predicted-fault","peripheral":"sysbus.spi1","register":"SPI_CFG2","bit":"CR1.IOLOCK (bit 16) = 1","model_version":"sha256:a4a12a17599117cb22c681f7b97ea7587b0f7f218c1792a22c720f08805d5461","access":{"offset":"0xC","value":"0x4400000","width":32,"pc":"0x08000032","virtual_time":"00:00:00.001000000"}}
+TVI1150-MARK2
+0xAF7E0002
+[00:00:00.002000000] [INFO] spi1: {"tviburi":"end","seq":3,"guard":"GuardedSpi1150","model_version":"sha256:a4a12a17599117cb22c681f7b97ea7587b0f7f218c1792a22c720f08805d5461"}
+
+## dma
+commands: emulation SetSeed 2100; emulation SetGlobalQuantum "0.000100000"; include @/ovl/Overlay1150.cs; mach create; machine LoadPlatformDescription @/repo/spike/1150/overlay/nucleo-default.repl; sysbus LoadELF @/out/fw-dma.elf; sysbus WriteDoubleWord 0x580244d4 0x0; sysbus WriteDoubleWord 0x580244d8 0x0; sysbus WriteDoubleWord 0x580244dc 0x0; sysbus WriteDoubleWord 0x580244e0 0x0; sysbus WriteDoubleWord 0x580244e4 0x0; sysbus WriteDoubleWord 0x580244e8 0x0; sysbus WriteDoubleWord 0x580244ec 0x0; sysbus WriteDoubleWord 0x580244f0 0x0; sysbus WriteDoubleWord 0x580244f4 0x10000; cpu VectorTableOffset 0x
+[00:00:00.000000000] [INFO] spi1: {"tviburi":"witness","seq":0,"guard":"GuardedSpi1150","model_version":"sha256:a4a12a17599117cb22c681f7b97ea7587b0f7f218c1792a22c720f08805d5461","mode":"enforcing"}
+[00:00:00.000000000] [INFO] spi1: [cpu: 0x8000036] WriteUInt32 to 0x0 (Control1), value 0x10000
+[00:00:00.000000000] [INFO] dma1: [cpu: 0x800004C] WriteUInt32 to 0x10 (StreamConfiguration), value 0x0
+[00:00:00.000000000] [INFO] dma1: [cpu: 0x800004E] WriteUInt32 to 0x18 (StreamPeripheralAddress), value 0x20000200
+[00:00:00.000000000] [INFO] dma1: [cpu: 0x8000050] WriteUInt32 to 0x1C (StreamMemory0Address), value 0x4001300C
+[00:00:00.000000000] [INFO] dma1: [cpu: 0x8000056] WriteUInt32 to 0x14 (StreamNumberOfData), value 0x1
+[00:00:00.000000000] [INFO] dma1: [cpu: 0x800005A] WriteUInt32 to 0x10 (StreamConfiguration), value 0x5081
+[00:00:00.000000000] [INFO] spi1: [cpu: 0x800005A] WriteUInt32 to 0xC (Configuration2), value 0x4400000
+[00:00:00.000000000] [ERROR] spi1: {"tviburi":"refusal","seq":1,"rule":"TVI-SPI-IOLOCK","kind":"predicted-fault","peripheral":"sysbus.spi1","register":"SPI_CFG2","bit":"CR1.IOLOCK (bit 16) = 1","model_version":"sha256:a4a12a17599117cb22c681f7b97ea7587b0f7f218c1792a22c720f08805d5461","access":{"offset":"0xC","value":"0x4400000","width":32,"pc":"0x0800005A","virtual_time":"00:00:00.000000000"}}
+TVI1150-MARK
+0xAF7ED3A0
+TVI1150-RESET
+TVI1150-RELEASE
+[00:00:00.001000000] [INFO] spi1: [cpu: 0x8000036] WriteUInt32 to 0x0 (Control1), value 0x10000
+[00:00:00.001000000] [INFO] dma1: [cpu: 0x800004C] WriteUInt32 to 0x10 (StreamConfiguration), value 0x0
+[00:00:00.001000000] [INFO] dma1: [cpu: 0x800004E] WriteUInt32 to 0x18 (StreamPeripheralAddress), value 0x20000200
+[00:00:00.001000000] [INFO] dma1: [cpu: 0x8000050] WriteUInt32 to 0x1C (StreamMemory0Address), value 0x4001300C
+[00:00:00.001000000] [INFO] dma1: [cpu: 0x8000056] WriteUInt32 to 0x14 (StreamNumberOfData), value 0x1
+[00:00:00.001000000] [INFO] dma1: [cpu: 0x800005A] WriteUInt32 to 0x10 (StreamConfiguration), value 0x5081
+[00:00:00.001000000] [INFO] spi1: [cpu: 0x800005A] WriteUInt32 to 0xC (Configuration2), value 0x4400000
+[00:00:00.001000000] [ERROR] spi1: {"tviburi":"refusal","seq":2,"rule":"TVI-SPI-IOLOCK","kind":"predicted-fault","peripheral":"sysbus.spi1","register":"SPI_CFG2","bit":"CR1.IOLOCK (bit 16) = 1","model_version":"sha256:a4a12a17599117cb22c681f7b97ea7587b0f7f218c1792a22c720f08805d5461","access":{"offset":"0xC","value":"0x4400000","width":32,"pc":"0x0800005A","virtual_time":"00:00:00.001000000"}}
+TVI1150-MARK2
+0xAF7ED3A0
+[00:00:00.002000000] [INFO] spi1: {"tviburi":"end","seq":3,"guard":"GuardedSpi1150","model_version":"sha256:a4a12a17599117cb22c681f7b97ea7587b0f7f218c1792a22c720f08805d5461"}

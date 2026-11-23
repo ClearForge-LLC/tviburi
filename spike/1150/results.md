@@ -1,6 +1,6 @@
 # TVI-WO-1150 — the seam spike: results
 
-**Status:** (i)–(iv) and (vii) measured; (vi)'s cost measured, **and WO §7's third stop fired there** (the three-file overlay exceeds 1 GiB on ArduPilot); (v)'s recorded run done; the rest of (v) and (vi) waits on a ruling. **WO §7's first stop fired at (i):** no `.repl` form re-types a stock instance. The architect ruled at 11:00Z to continue, and added (vii).
+**Status:** (i)–(vii) measured. Two of WO §7's stops fired and were ruled on by the architect: at (i), no `.repl` form re-types (ruled 11:00Z: continue; (vii) added); and at (vi), the three-file overlay exceeds 1 GiB on ArduPilot (ruled 11:45Z: ship one file; continue). **WO §7's first stop fired at (i):** no `.repl` form re-types a stock instance. The architect ruled at 11:00Z to continue, and added (vii).
 **Predictions:** `predictions.md`, commit `f26ed6c`, before any run.
 **Setup, for every item:**
 - **Aethelgard:** `main` at `7dec1d7b`, cloned read-only to `~/tvi-1150-aet` with its push URL disabled. Its CLI and `aethelgard-bridge` were built from that clone (`cargo build --locked`) into this worktree's untracked `target-aet/`.
@@ -120,6 +120,8 @@ The same harness was used. The forms are `n3` and `n5` in `retype/forms/`, and t
 4. **Not determined:** whether the cancelled stock object is still constructed and connected. It is off the bus and receives no writes.
 5. **The interrupt endpoints read back unnamed** (`?@1`…) in `n1` and `n3`, where `n5` and the stock entry show `sysbus.nvic@24` and so on. Only IRQ 25 was checked functionally (pending in all three). Why the read-back differs was not determined.
 
+**A consumer trap, for Aethelgard's Phase 2 (architect, 11:45Z):** with `as "timer1"`, the guarded instance answers to `timer1` on the bus and in `peripherals`. But a later untyped `timer1:` update in the same description still binds to the cancelled stock *variable*, with no error and no warning. The guard then runs with the stock constructor values the consumer believed it had replaced. That was measured: `Frequency` 250000000, not the emitted 200000000.
+
 **Ruling: refines (i).** No `.repl` form re-types. Cancelling and restating in the consumer's own platform does serve stock instances, and the n3 form keeps the stock name. `RUL-09`'s class map is therefore buildable for instances the consumer emits or restates, with the update hazard in item 2.
 
 ---
@@ -181,11 +183,13 @@ The guard is a spike copy (`overlay/Records1150.cs`, `overlay/GuardedSpi1150.cs`
 
 **Why.** The check fails a recorded run only when the run holds a `would-refuse`, and then only because the kind is unknown to it. It never reads `mode`, because its witness rule checks only that `model_version` is a well-formed sha256 (`tools/tviburi-check/src/main.rs`, the `witness` arm). **A recorded run in which nothing would have refused is indistinguishable from an enforcing pass to the unchanged check.** Prediction: confirmed (medium-high).
 
+**A defect, recorded as the architect ruled (11:45Z):** `0100a`'s check passes a recorded run that holds no `would-refuse`. `0100b` fixes it.
+
 **Ruling: confirms `RUL-19`'s need for the check to fail closed on a missing or non-enforcing `mode`. As the check stands, it is not met.** That clause must land in `0100b`'s check before any witness carries a mode. The consumer check prototyped in (iii) does it: recorded `modeled` gives "the witness does not say mode enforcing", CONSUMER FAIL.
 
 ---
 
-## (vi), cost: measured early, and **WO §7's third stop fired**
+## (vi), cost: measured before (v)'s access log, and **WO §7's third stop fired**
 
 **Order.** The cost runs were made right after (v)'s recorded run, because they share its replay, and before (v)'s access log. (v)'s access log and (vi)'s reset half wait on the architect (end of this section).
 
@@ -210,7 +214,114 @@ The guard is a spike copy (`overlay/Records1150.cs`, `overlay/GuardedSpi1150.cs`
 - **Wall time is not the constraint here:** 9.1–10.4 s per ArduPilot boot with or without the overlay, and +0.3–0.6 s to the listing. **The stock outlier is:** at host load 16, one stock boot took 26.4 s and peaked at 1,379,148 KiB, over the bound with no overlay at all. That matches `AET-WO-4400f` F1 ("RSS grows with wall time under load").
 - **(iii)'s scheme puts the constant in its own file,** so a release is at least two compilations. That shape stays under the bound with a 25–34 MiB margin, at this host load.
 
-**Stop (WO §7):** the overlay, shipped as `0100a` ships it (one `include @` per file) plus (iii)'s constant file, **takes ArduPilot's foreign boot past the 1 GiB bound in all five runs.** That is northstar §6's "so slow or heavy" failure. Reported to the architect. (v)'s access log, its join, and (vi)'s reset and DMA measurements wait for a ruling.
+**Stop (WO §7):** the overlay, shipped as `0100a` ships it (one `include @` per file) plus (iii)'s constant file, **takes ArduPilot's foreign boot past the 1 GiB bound in all five runs.** That is northstar §6's "so slow or heavy" failure.
+
+**The architect's ruling (bus, 11:45Z):**
+- The overlay ships as one C# file: the models and the release constant, concatenated at release. `RUL-09` will say so. Raising Aethelgard's bound is Aethelgard's decision and is not assumed.
+- (iii)'s compiler cache becomes a consumer requirement in `RUL-10`.
+- (iv)'s check defect goes to `0100b`.
+- Continue (v) and (vi).
+
+**What one file means for (iii):** the shipped file holds the constant, so it cannot be listed in the manifest by its own hash. The consumer instead checks it byte for byte against the concatenation of the manifest-listed model files and the template filled with the pinned hash, in the release's order. That is the same check as `consumer-check.sh`'s, applied to one file. It was not prototyped; the one-file overlay used in (vi) was concatenated by hand (`cases/A1`).
+
+## (vi), the records across a reset, and DMA
+
+**Method** (`harness/run-reset.sh`; `reset-excerpts.txt`):
+- the one-file overlay (release A), enforcing, on the Nucleo spike platform, under Aethelgard's configuration and invocation;
+- run 1 ms, then **Aethelgard's brown-out rendering** (`renode.rs` L697–725, `assert_reset`): `machine Reset`; the cold RCC enable writes, taken from the captured boot; `cpu VectorTableOffset 0x08000000`; `cpu IsHalted true`;
+- then probes while the core is held, release, and 1 ms more.
+
+| Question | Measured |
+|---|---|
+| Is the witness re-emitted? | **No.** One witness per process. The witness is emitted when the peripheral is named, and a reset does not rename it |
+| Does `seq` restart? | **No.** It continues across the reset (for example 0, 1 before it; 2 and 3 after it in `reset-modf`) |
+| Does a latched refusal stay latched? | **The record does.** The pre-reset refusal stays in the log with its `seq`, so the consumer's verdict is still "refused" (`RUL-08`). **The guard's own `IOLOCK` latch does not:** after the reset, a monitor `CFG2` write with `SPI1EN` set passed with no record (`reset-iolock-clocked`), because `Reset()` clears the copies. That is what silicon does (`IOLOCK` resets to 0; RM0433 Rev 9 §50.11.1 p2215). After the release the firmware ran again and refused again |
+| One `end` or two? | **One,** from `Dispose` at teardown |
+| Does emulation continue after an enforcing refusal and a reset? | **Yes.** `cpu IsHalted false` and `RunFor` ran the firmware again, and it refused again (`reset-modf`: refusals at `seq` 1 and 2) |
+| `pc` of a refusal caused by a monitor write | **`"none"`** (`reset-modeled-clocked`: `CR1.SPE` written by the monitor while held, refused `MASTER` = 0) |
+| `pc` of a refusal caused by a DMA write | **The PC of the CPU store that enabled the DMA stream.** `fw/dma.rs` sets `CR1.IOLOCK`, then a memory-to-memory DMA1 stream-0 copy writes `SPI1_CFG2`. The refusal carries `pc 0x0800005A`, which the access log gives as the CPU's `WriteUInt32 to 0x10 (StreamConfiguration), value 0x5081`. The DMA's own write to `CFG2` is logged with that same `[cpu: 0x800005A]`. The transfer runs inside the CPU's write |
+| Can either be told from a CPU write? | **A monitor write can,** by `pc: "none"`, because no CPU is executing (a write made while the core is halted). **A DMA write cannot,** by `pc` or by the access log. ArduPilot shows the same at scale (v) |
+
+**A finding found by accident: after the cold writes, the bus locks the unclocked peripheral.** The first probes, without `SPI1EN`, never reached the guard: "`sysbus: Tried to write a locked peripheral: machine-0.spi1`", at WARNING. Renode gates a peripheral on its RCC enable. Aethelgard's log filter already keeps those lines (`LOCKED`, `renode.rs` L240).
+
+**Ruling.**
+- **Confirms `RUL-12`'s "one witness, one end" under a reset.** The consumer must not expect a second witness after a brown-out.
+- **`seq` is per process, not per boot.**
+- **Contradicts response §4.7's "`pc: none` is a harness access" as a sufficient rule:** a DMA write carries a real PC, the enabling store's. So "`pc` is a CPU address" does not mean the CPU wrote the register. Today it cannot be told apart. `pc: none` does still mean "no CPU was executing", which is the harness or the monitor.
+
+---
+
+## (v) ArduPilot's queue (`RUL-13`, `OQ-03`)
+
+**Run.**
+- The access log of unmodified ArduPilot: `a799dfb6…`, CI's `generated-sentinel-02` Copter-4.7.2, 2,502,044 B, the held `~/.cache/aet-4240v/ardupilot/arducopter.elf`.
+- **The platform:** `sentinel-02-own`, which `simulate --foreign` emits. **The spec** is `crates/aethelgard-cli/tests/fixtures/sentinel-02-own.json` at Aethelgard `7dec1d7b`. Its emitted `platform-booted.repl` has sha256 `3927f28a…`, per the verdict's `input`.
+- **The window:** `--foreign 5000ms`, CI's window since `AET-WO-4400g`, not the 4000 ms of Aethelgard architecture §2.27.
+- `harness/replay-ap.sh logged` adds `sysbus LogAllPeripheralsAccess true` just before `RunFor`, after the CLI's own write hooks: a later hook would displace the log for its peripheral ((vii) `c2`). It also turns off `collapse-repeated-log-entries`, and reads the executed register map with `1100`'s `regmap.py`.
+- **Control, as `1100`'s:** the boot block (instructions executed 88,058,789, PC, `ICSR`, the GPIO, RCC and NVIC words) is **byte-identical** with and without the log. The models' own lines match one for one: `AETHELGARD-CFG2` 4,740, `u5` 2,355, `u7` 487.
+
+**The log.**
+- 386,068 writes, every one carrying a `[cpu: …]` PC, in the PC range `0x8000DA6`–`0x8103E40`.
+- **The peripherals written:** `nvic`, `timer5`, `spi2`, `dma1`, `gpioPortB`, `rcc`, `i2c1`, `gpioPortA`, `dmamux1`, `spi1`, `usart1`, `flashController`, `dma2`, `pwr`, GPIO ports C–K (7 each), `watchdog`, `rng`, `dwt`.
+- **No `spi4`,** so the recorded guard below covered every SPI instance ArduPilot uses.
+- **No timer but TIM5,** ArduPilot's system tick: ArduPilot does not arm in 5 s, so **TIM1 and TIM2 are never written** and no DShot or motor output runs.
+- Deduplicated writes are in `data/writes-ap.tsv` (peripheral, width, offset, register, value, count, first sequence, first PC). The models' warnings are in `data/warnings-ap.txt`.
+
+**Writes the log misses or misattributes (WO §5).** **DMA writes are logged, but under a CPU's PC.** All 25,073 writes to `spi2`'s `TXDR` carry `pc 0x810107E` or `0x81010CC`. Those are the PCs of the CPU's writes to `dma1` offset `0x58` (stream 3's `CR`, the enable). The transfer runs inside that CPU write, as (vi) shows. Nothing after the window is logged, because nothing runs after it.
+
+**The recorded guard on `spi1` and `spi2`** (`mode: "recorded"`, the same replay):
+- **7,115 `would-refuse` records, all one path:** `TVI-SPI-MODF`, `kind: unmodeled`, `CFG2.SSM (bit 26) = 0, CFG2.SSOE (bit 29) = 1` (review A6, `0100b`'s), at every `CR1` write that sets `SPE`.
+- **`spi1`:** 17–19 each for `CR1` values `0x1`, `0x201` and `0x601`.
+- **`spi2`:** 2,354 for each of the same three values, once per IMU transaction.
+- **First PCs:** `0x08100EBC`, `0x08101088`, `0x08100CC0`.
+- **No other rule fired.** In recorded mode the run continued to the end, and both guards emitted an `end`.
+- **The volume matters for the consumer:** the records are 5,873,423 B. The stock console is already 8,312,549 B against Aethelgard's 8 MiB log budget (`renode.rs` L228–250, which keeps only the first line of each kind past it; read, not run through the CLI). So through Aethelgard's CLI most of them would be counted and dropped.
+
+**The join** (`reader/rank-ap.awk`; `data/queue-ap.tsv`, 844 rows; `data/view2-only-ap.tsv`):
+- **View (1) for ArduPilot does not exist:** there is no ledger. So each of the 1,026 field ids in `1100`'s 13 boards' ledgers (`spike/1100/data/joined.tsv`) was given to `1100`'s own `view2-join.awk`, unchanged, as board `ardupilot`. Positions and addresses came from those rows. It judged ArduPilot's writes with the same drop rule (R2–R4).
+- **The join's `out2`** collected the writes the stock model drops that no board's ledger has a field for: 166 entries, of which 121 became rows (named from Renode's map and CMSIS). One further row is a ledger field on some board that `1100` did not queue. **122 rows are ArduPilot's alone.**
+- **The ranking rule** was written into `rank-ap.awk` before it ran, from `RUL-13`'s amended order. Tier 1 is the RCC enables (`*ENR`, `*LPENR`) and kernel-clock selectors (`*CCIP*R`). Tier 2 is GPIO alternate-function routing (`AFRL`, `AFRH`, `MODER`). Tier 3 is timers and DMA. Tier 4 is the rest: 4a other clock-tree registers (other RCC, `FLASH.ACR`), 4b everything else. Within a tier: (a) ArduPilot writes it and the stock model drops what it wrote; (b) ArduPilot writes it; (c) ArduPilot does not; then `1100`'s rank.
+- **Both views are cited as `1100`'s are:** `1100`'s columns (its rank, its ledger class, the executed model's cover) next to ArduPilot's (writes at the register, the field's last value, the drop, the first PC for ArduPilot-only rows). The Renode lines are `1100`'s `queue.tsv` columns 16–18 for its rows; the ArduPilot-only rows name the executed tag or bits.
+
+| Tier | (a) ArduPilot writes, stock drops | (b) ArduPilot writes, stock holds | (c) ArduPilot does not write |
+|---|---|---|---|
+| 1 RCC enables and kernel-clock selectors | 17 | 15 | 0 |
+| 2 GPIO AF routing | 0 | 53 | 0 |
+| 3 timers and DMA | 29 | 0 | 120 |
+| 4a other clock tree | 22 | 32 | 0 |
+| 4b the rest | 99 | 329 | 128 |
+
+- **The head is the kernel-clock selectors ArduPilot sets and Renode drops:**
+  - `RCC.D2CCIP1R.SPI45SEL` and `FDCANSEL`;
+  - `D2CCIP2R.I2C123SEL`, `USART16SEL` and `USART28SEL` (written 1, tag);
+  - `D3CCIPR.ADCSEL`, `I2C4SEL` and `SPI6SEL`;
+  - `D1CCIPR.QSPISEL`;
+  - `D2CCIP2R.CECSEL` and `USBSEL`;
+  - the `*LPEN` sleep-clock bits (`DMA2LPEN`, `SPI1LPEN`, `SPI2LPEN`, `RNGLPEN`).
+
+  **`D2CCIP1R.SPI123SEL`, the scar's own selector, is written 0 by ArduPilot,** which equals the tag's reset, so it is (b): not dropped on this firmware.
+- **GPIO routing:** all 53 rows are written by ArduPilot and held by the stock model. Renode stores `AFR` and `MODER`, so a routing guard would be a check of the values, not a recovery of dropped bits.
+- **Timers and DMA:** the 120 (c) rows are TIM1 and TIM2, the motor class `1100` ranked 1–157, and ArduPilot does not reach them in 5 s. The 29 (a) rows are DMA `LIFCR`/`HIFCR` clear-flag bits, plus TIM5 `SR` written 1 in `rc_w0` flags and reserved bits (5 rows).
+- **Clock tree, other (4a):** `PLLCFGR` `PLLxRGE`, `PLLxFRACEN`, `PLL3VCOSEL` and `DIVP3EN`; `CFGR` `MCOxPRE` and `RTCPRE`; and the `*RSTR` reserved and undefined bits.
+- **The rest (4b, class (a)), the ones that change behaviour:**
+  - `I2C1.CR1.ERRIE` = 1: stored by `WithIgnoredBits`, never acted on (`1100` finding 2.4's latent row, now taken: ArduPilot's I2C error interrupt never fires in the twin);
+  - `I2C1.TIMINGR` `SCLDEL`, `SCLH` and `SCLL`;
+  - `SPI1/2.CFG1.MBR` and `CFG2.SSOE`;
+  - `GPIOB.OTYPER.OT6`/`OT7` (I2C open drain);
+  - `USART1.CR1`/`CR2` tags;
+  - `FLASH.CR2.PSIZE2`;
+  - `PWR.CR1`–`CR3` (classed by source: no register collection).
+- **Read with care:** 58 of the 167 (a) rows are write-to-clear or status registers (`SR`, `LIFCR`, `HIFCR`, `ICR`, `FLASH.SR2`/`CCR1`/`CCR2`). There "dropped" means the twin has no such flag at all. Whether that is a gap depends on whether silicon could have set the flag, which the access log cannot say.
+- **Against `1100`'s proposed cut (ranks 1–172):** ArduPilot writes 52 of its rows (6 dropped, 46 held), and does not write 120 (TIM1 and TIM2).
+
+**Sentinel-03:** `crates/aethelgard-cli/tests/fixtures/sentinel-03.json` is unchanged between `f42a0c88` and `7dec1d7b` (`git diff --stat` is empty), so `1100`'s rows stand and were not re-measured.
+
+**Against the predictions.**
+- **Confirmed:** RCC selectors, GPIO and DMA writes; `would-refuse` at every SPI start (A6); no `BDTR.MOE` in 5 s; Sentinel-03 unchanged.
+- **DMA was wrong:** "DMA writes do not appear as CPU accesses" was predicted; they appear under a CPU's PC.
+- **`SPI123SEL` held on this firmware:** ArduPilot writes it 0, so it is not dropped.
+
+**Ruling: confirms `RUL-13`'s amended order on what flies, and leaves `OQ-03` to Scotty** (no cut is proposed). In ArduPilot's first 5 s, the RCC kernel-clock selectors and sleep enables are the dropped writes that rank first. GPIO routing is written but held. The motor timers are not reached at all. **The window limits this:** an armed flight is outside it, so the motor rows' (c) means "not reached in 5 s", not "never".
 
 ---
 
