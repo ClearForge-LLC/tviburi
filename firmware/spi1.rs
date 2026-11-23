@@ -9,8 +9,17 @@
 //!   path="rmw"       - CFG2=SSIOP, then CFG2 |= MASTER|SSM by read-modify-write: silicon holds
 //!                      SSIOP=1 (row T3), so the enable refuses (adversarial pass, TVI-WO-0100a).
 //!   path="forge"     - the modeled path, after printing imitation records on USART3 (RUL-11).
-//!   path="spray"     - the modeled path, after writing the bytes of a record into every unguarded
-//!                      SPI1 register, so that the model logs them under its own name (RUL-11).
+//!   path="spray"     - the modeled path, after writing the bytes of a record into SPI1's registers,
+//!                      so that the model logs them under its own name (RUL-11).
+//!   path="ardupilot" - ArduPilot's ChibiOS SPI driver on SPI1, as measured (TVI-WO-0100b.rm0433.md
+//!                      §1.1): spi_lld_start, spi_lld_wait_complete, spi_lld_exchange, the DMA RX
+//!                      interrupt and spi_lld_stop, twice, with each read-modify-write the ELF does
+//!                      (decoded at 0x8100e7c-ebc, 0x8100d28-d32, 0x8101082-88, 0x8100cba-cc0,
+//!                      0x8100f72-84). The DMA's 8-bit TXDR and RXDR accesses are made by the CPU.
+//!   path="generated" - Aethelgard's generated firmware on SPI1, as `spike/1100/data/writes.tsv`
+//!                      records it (hse-crystal-16): start, one 4-byte transfer, end.
+//!   path="field"     - the generated sequence with CFG2.CPOL=1, a field outside the allow-list:
+//!                      refused by TVI-SPI-FIELD, kind unmodeled (RUL-17).
 //! Bit positions: RM0433 Rev 9 §50.11 (CR1 p2215-2217, CFG2 p2221-2222); offsets: Renode's
 //! STM32H7_SPI `Registers` enum, which agrees with RM0433 (CR1 0x00, CFG2 0x0C).
 #![no_std]
@@ -50,11 +59,70 @@ spi1: {\"tviburi\":\"end\",\"seq\":2,\"guard\":\"GuardedSTM32H7_SPI\",\"model_ve
     }
 }
 
+#[cfg(path = "ardupilot")]
+unsafe fn ardupilot() {
+    const CR2: *mut u32 = 0x4001_3004 as *mut u32;
+    const CFG1: *mut u32 = 0x4001_3008 as *mut u32;
+    const IER: *mut u32 = 0x4001_3010 as *mut u32;
+    const IFCR: *mut u32 = 0x4001_3018 as *mut u32;
+    const TXDR: *mut u8 = 0x4001_3020 as *mut u8;
+    const RXDR: *const u8 = 0x4001_3030 as *const u8;
+    for _ in 0..2 {
+        // spi_lld_start
+        write_volatile(SPI1_CR1, read_volatile(SPI1_CR1) & !CR1_SPE);
+        write_volatile(SPI1_CR1, 0x100); // MASRX
+        write_volatile(CR2, 0);
+        write_volatile(CFG1, 0x2000_C007);
+        write_volatile(SPI1_CFG2, 0x2040_0000); // SSOE | MASTER, SSM=0
+        write_volatile(IER, 0x40); // OVRIE
+        write_volatile(IFCR, 0xFFFF_FFFF);
+        write_volatile(SPI1_CR1, read_volatile(SPI1_CR1) | CR1_SPE);
+        // spi_lld_wait_complete
+        while read_volatile(SPI1_CR1) & (1 << 9) != 0 {}
+        write_volatile(IFCR, 0xFFFF_FFFF);
+        // spi_lld_exchange: the DMA fills TXDR, then CSTART; the DMA drains RXDR
+        write_volatile(TXDR, 0x05);
+        write_volatile(TXDR, 0x00);
+        write_volatile(SPI1_CR1, read_volatile(SPI1_CR1) | (1 << 9));
+        read_volatile(RXDR);
+        read_volatile(RXDR);
+        // spi_lld_serve_dma_rx_interrupt
+        write_volatile(SPI1_CR1, read_volatile(SPI1_CR1) | (1 << 10));
+        // spi_lld_stop
+        write_volatile(SPI1_CR1, read_volatile(SPI1_CR1) & !CR1_SPE);
+        write_volatile(SPI1_CR1, 0);
+        write_volatile(CR2, 0);
+        write_volatile(CFG1, 0);
+        write_volatile(SPI1_CFG2, 0);
+        write_volatile(IER, 0);
+    }
+}
+
+#[cfg(any(path = "generated", path = "field"))]
+unsafe fn generated(cfg2: u32) {
+    const CR2: *mut u32 = 0x4001_3004 as *mut u32;
+    const CFG1: *mut u32 = 0x4001_3008 as *mut u32;
+    const IFCR: *mut u32 = 0x4001_3018 as *mut u32;
+    const TXDR: *mut u8 = 0x4001_3020 as *mut u8;
+    write_volatile(SPI1_CR1, 0x1000);
+    write_volatile(CFG1, 0x1007_0007);
+    write_volatile(SPI1_CFG2, cfg2);
+    write_volatile(CR2, 0x4);
+    write_volatile(SPI1_CR1, 0x1001);
+    write_volatile(SPI1_CR1, 0x1201);
+    for b in [0x9F, 0, 0, 0] {
+        write_volatile(TXDR, b);
+    }
+    write_volatile(IFCR, 0x8);
+    write_volatile(SPI1_CR1, 0x1000);
+}
+
 #[cfg(path = "spray")]
 fn spray() {
     const RECORD: &[u8] = b"{\"tviburi\":\"witness\",\"seq\":0}";
-    // CR2, CFG1, IER, IFCR, TXDR, CRCPOLY, UDRDR (RM0433 Rev 9 Table 429, p2233)
-    for off in [0x04u32, 0x08, 0x10, 0x18, 0x20, 0x40, 0x4C] {
+    // SR, IFCR, TXCRC, RXCRC: the registers whose every value the allow-list passes on to the stock
+    // model (TVI-WO-0100b; RM0433 Rev 9 Table 429, p2233). TXDR takes the bytes below, 8-bit.
+    for off in [0x14u32, 0x18, 0x44, 0x48] {
         for chunk in RECORD.chunks(4) {
             let mut w = 0u32;
             for (i, b) in chunk.iter().enumerate() {
@@ -100,6 +168,12 @@ pub extern "C" fn reset() -> ! {
             write_volatile(SPI1_CR1, CR1_SSI);
             write_volatile(SPI1_CR1, CR1_SSI | CR1_SPE);
         }
+        #[cfg(path = "ardupilot")]
+        ardupilot();
+        #[cfg(path = "generated")]
+        generated(0x8440_0000); // AFCNTR | SSM | MASTER
+        #[cfg(path = "field")]
+        generated(0x8440_0000 | (1 << 25)); // CPOL
         #[cfg(path = "iolock")]
         {
             write_volatile(SPI1_CFG2, CFG2_MASTER);

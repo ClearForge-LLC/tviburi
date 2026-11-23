@@ -3,8 +3,9 @@
 // Every guarded model owns one Records channel. It emits three kinds of record, each one JSON
 // object on one line, through Renode's logger under the guarded peripheral's own name:
 //   witness - once, when the peripheral is named on the bus: the guard is loaded, with its model
-//             version. A run with no witness is not a pass.
-//   refusal - a path the model does not model (northstar invariants 1 and 5). Logged at Error,
+//             version and its mode, always "enforcing" here (RUL-19). A run with no witness is not a pass.
+//   refusal - a path the model does not model (northstar invariants 1 and 5), with its kind (RUL-18):
+//             predicted-fault or unmodeled. Logged at Error,
 //             which `logLevel` cannot suppress (measured: `logLevel 4` is rejected). Latches
 //             (RUL-08): after it, nothing the run does is claimed.
 //   end     - from Dispose, when Renode tears the machine down cleanly. A crash (an unhandled
@@ -53,10 +54,14 @@ namespace Antmicro.Renode.Peripherals.Tviburi
 
         public const string LoadCitation = "Tviburi records contract (RUL-12); northstar invariant 5";
 
+        // RUL-19: this runtime has no recorded mode (TVI-WO-1150 (iv) prototypes it), so every witness says
+        // so, and every refusal fails the run.
+        private const string Mode = "enforcing";
+
         // True when the model version could not be computed: the guard must refuse every access.
         public bool LoadFailed => loadFailure != null;
 
-        public void Refuse(string rule, string register, string bit, string condition, string citation,
+        public void Refuse(string rule, string kind, string register, string bit, string condition, string citation,
             string state, long offset, ulong value, int width)
         {
             var pc = "none";
@@ -65,6 +70,7 @@ namespace Antmicro.Renode.Peripherals.Tviburi
                 pc = "0x" + cpu.PC.RawValue.ToString("X8");
             }
             Emit(LogLevel.Error, "refusal", ",\"rule\":" + Json(rule)
+                + ",\"kind\":" + Json(kind)
                 + ",\"peripheral\":" + Json(machine.GetAnyNameOrTypeName(owner))
                 + ",\"register\":" + Json(register)
                 + ",\"bit\":" + Json(bit)
@@ -98,11 +104,11 @@ namespace Antmicro.Renode.Peripherals.Tviburi
             named = true;
             if(loadFailure == null)
             {
-                Emit(LogLevel.Info, "witness", ",\"guard\":" + Json(guard) + ",\"model_version\":" + Json(version));
+                Emit(LogLevel.Info, "witness", ",\"guard\":" + Json(guard) + ",\"model_version\":" + Json(version) + ",\"mode\":" + Json(Mode));
             }
             else
             {
-                Refuse("TVI-LOAD", "none", "none", "the guard's model version could not be computed at load: " + loadFailure
+                Refuse("TVI-LOAD", "unmodeled", "none", "none", "the guard's model version could not be computed at load: " + loadFailure
                     + "; the guard refuses every access to this peripheral", LoadCitation,
                     "no witness emitted", 0, 0, 0);
             }
