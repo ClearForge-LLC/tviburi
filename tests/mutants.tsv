@@ -10,10 +10,10 @@ M05-ssiop	model/GuardedSTM32H7_SPI.cs	if((cfg2 & Cfg2Ssiop) != 0)	if(false)	cond
 M06-ssi	model/GuardedSTM32H7_SPI.cs	if((cr1 & Cr1Ssi) == 0)	if(false)	modf
 M07-historyCheck	model/GuardedSTM32H7_SPI.cs	if(failure == null && history != null)	if(false)	cfg2first
 M08-historyNote	model/GuardedSTM32H7_SPI.cs	if(history == null && (cfg2 & Cfg2Master) != 0 && FirstFailingBranch(cfg2, cr1) != null)	if(false)	cfg2first
-M09-speGate	model/GuardedSTM32H7_SPI.cs	return offset == Cr1Offset && (value & Cr1Spe) != 0 && !EnablePasses(value);	return false;	modf
+M09-speGate	model/GuardedSTM32H7_SPI.cs	if(!EnablePasses(value))	if(false)	modf
 M10-iolockCheck	model/GuardedSTM32H7_SPI.cs	if(ioLock)\n                {\n                    // Certain only if	if(false)\n                {\n                    // Certain only if	iolock
 M11-iolockLatch	model/GuardedSTM32H7_SPI.cs	                    ioLock = true;\n	(empty)	iolock
-M12-cfg2WhileEnabled	model/GuardedSTM32H7_SPI.cs	if((cr1 & Cr1Spe) != 0)	if(false)	conditions
+M12-cfg2WhileEnabled	model/GuardedSTM32H7_SPI.cs	if((cr1 & Cr1Spe) != 0 && value != cfg2)	if(false)	conditions
 M13-i2smod	model/GuardedSTM32H7_SPI.cs	if((value & I2sMod) != 0)	if(false)	conditions
 M15-resetIolock	model/GuardedSTM32H7_SPI.cs	ioLock = false;	(empty)	conditions
 M16-resetHistory	model/GuardedSTM32H7_SPI.cs	            history = null;\n            masterUnknown = false;	            masterUnknown = false;	conditions
@@ -113,7 +113,7 @@ U10-ledgerRowsBound	tools/tviburi-release/src/main.rs	(Ok(n), Some(h)) if t.spli
 # One mutant per rule TVI-WO-1300 adds (model/GuardedSTM32H7_RCC.cs), killed by the tests/1300/rcc.sh cases named (rcc-<case>).
 C01-muxSwitch	model/GuardedSTM32H7_RCC.cs	if(m.Current != m.Selector && Running(m.Def.Sources[m.Current]) && Running(m.Def.Sources[m.Selector]))	if(m.Current != m.Selector)	rcc-stuck rcc-switch
 C02-muxPending	model/GuardedSTM32H7_RCC.cs	if(mux.Current != mux.Selector)	if(false)	rcc-stuck
-C03-muxKeptOnReset	model/GuardedSTM32H7_RCC.cs	copies[off] = ResetValue(off);\n            }\n            Settle();	copies[off] = ResetValue(off);\n            }\n            foreach(var m in muxes) { m.Current = 0; }\n            Settle();	rcc-resetfwd
+C03-muxKeptOnReset	model/GuardedSTM32H7_RCC.cs	divr[off] = DivrReset;\n            }\n            Settle();	divr[off] = DivrReset;\n            }\n            foreach(var m in muxes) { m.Current = 0; }\n            Settle();	rcc-resetfwd
 C04-enableGates	model/GuardedSTM32H7_RCC.cs	if(!enabled)	if(false)	rcc-registrations
 C05-pllOutputEnable	model/GuardedSTM32H7_RCC.cs	return PllOn(n) && en && PllReference(n, cr);	return PllOn(n) && PllReference(n, cr);	rcc-divq
 C06-perCk	model/GuardedSTM32H7_RCC.cs	return per.Current == per.Selector && Running(PerMux.Sources[per.Current]);	return false;	rcc-switched
