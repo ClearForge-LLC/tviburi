@@ -1,0 +1,17 @@
+#!/bin/sh
+# model-version <model-dir>: the model version a consumer expects, for the reference check's first
+# argument (RUL-10 (a), (d); TVI-WO-0100b). It hashes the same inputs model/Refusal.cs hashes at load:
+# each file under the directory, by its relative path in byte order, with its sha256, then the
+# Renode.dll and Infrastructure.dll build strings of the pinned image. The consumer pins those (as
+# architecture.md §2.0 records), so they are constants here, read from the image's assemblies
+# (TVI-WO-0100b FEEDBACK). Until TVI-WO-1200, this is TVI-WO-0100a's version, not the manifest's.
+set -eu
+renode_build=1.17.0+20260907gitf1dd1b4af.aet1605
+infrastructure_build=1.0.0+cd4b002aac2398994c4a61a34a8b31b5700facf2
+cd "$1"
+{
+  find . -type f | sed 's#^\./##' | LC_ALL=C sort | while IFS= read -r f; do
+    printf '%s\000%s\n' "$f" "$(sha256sum <"$f" | cut -c1-64)"
+  done
+  printf 'renode\000%s\ninfrastructure\000%s\n' "$renode_build" "$infrastructure_build"
+} | sha256sum | sed 's/^\([0-9a-f]*\).*/sha256:\1/'

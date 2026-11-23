@@ -1,0 +1,181 @@
+# TVI-WO-0100b gate clause 6 (RUL-17): every field outside SPI's allow-list, written with a value the
+# model does not implement, one per case, from reset; each must refuse with TVI-SPI-FIELD, kind
+# unmodeled, naming the field. Generated from the RM0433 Rev 9 field list and the ruled allow-list
+# (TVI-WO-0100b.rm0433.md §2, §4); the `# FIELD` lines are the expected refusals, in order.
+include @/repo/scripts/prelude.resc
+# FIELD SPI_CR1.Res31_17
+sysbus WriteDoubleWord 0x40013000 0x00020000
+machine Reset
+# FIELD SPI_CR1.TCRCINI
+sysbus WriteDoubleWord 0x40013000 0x00008000
+machine Reset
+# FIELD SPI_CR1.RCRCINI
+sysbus WriteDoubleWord 0x40013000 0x00004000
+machine Reset
+# FIELD SPI_CR1.CRC33_17
+sysbus WriteDoubleWord 0x40013000 0x00002000
+machine Reset
+# FIELD SPI_CR1.HDDIR
+sysbus WriteDoubleWord 0x40013000 0x00000800
+machine Reset
+# FIELD SPI_CR1.Res7_1
+sysbus WriteDoubleWord 0x40013000 0x00000002
+machine Reset
+# FIELD SPI_CR2.TSER
+sysbus WriteDoubleWord 0x40013004 0x00010000
+machine Reset
+# FIELD SPI_CFG1.Res31
+sysbus WriteDoubleWord 0x40013008 0x80070007
+machine Reset
+# FIELD SPI_CFG1.Res27_23
+sysbus WriteDoubleWord 0x40013008 0x00870007
+machine Reset
+# FIELD SPI_CFG1.CRCEN
+sysbus WriteDoubleWord 0x40013008 0x00470007
+machine Reset
+# FIELD SPI_CFG1.Res21
+sysbus WriteDoubleWord 0x40013008 0x00270007
+machine Reset
+# FIELD SPI_CFG1.CRCSIZE
+sysbus WriteDoubleWord 0x40013008 0x00030007
+machine Reset
+# FIELD SPI_CFG1.Res13
+sysbus WriteDoubleWord 0x40013008 0x00072007
+machine Reset
+# FIELD SPI_CFG1.UDRDET
+sysbus WriteDoubleWord 0x40013008 0x00070807
+machine Reset
+# FIELD SPI_CFG1.UDRCFG
+sysbus WriteDoubleWord 0x40013008 0x00070207
+machine Reset
+# FIELD SPI_CFG1.FTHLV
+sysbus WriteDoubleWord 0x40013008 0x00070027
+machine Reset
+# FIELD SPI_CFG1.DSIZE
+sysbus WriteDoubleWord 0x40013008 0x0007000f
+machine Reset
+# FIELD SPI_CFG2.SSOM
+sysbus WriteDoubleWord 0x4001300c 0x40000000
+machine Reset
+# FIELD SPI_CFG2.Res27
+sysbus WriteDoubleWord 0x4001300c 0x08000000
+machine Reset
+# FIELD SPI_CFG2.CPOL
+sysbus WriteDoubleWord 0x4001300c 0x02000000
+machine Reset
+# FIELD SPI_CFG2.CPHA
+sysbus WriteDoubleWord 0x4001300c 0x01000000
+machine Reset
+# FIELD SPI_CFG2.LSBFRST
+sysbus WriteDoubleWord 0x4001300c 0x00800000
+machine Reset
+# FIELD SPI_CFG2.COMM
+sysbus WriteDoubleWord 0x4001300c 0x00020000
+machine Reset
+# FIELD SPI_CFG2.Res16
+sysbus WriteDoubleWord 0x4001300c 0x00010000
+machine Reset
+# FIELD SPI_CFG2.IOSWP
+sysbus WriteDoubleWord 0x4001300c 0x00008000
+machine Reset
+# FIELD SPI_CFG2.Res14_8
+sysbus WriteDoubleWord 0x4001300c 0x00000100
+machine Reset
+# FIELD SPI_CFG2.MIDI
+sysbus WriteDoubleWord 0x4001300c 0x00000010
+machine Reset
+# FIELD SPI_CFG2.MSSI
+sysbus WriteDoubleWord 0x4001300c 0x00000001
+machine Reset
+# FIELD SPI_IER.Res31_11
+sysbus WriteDoubleWord 0x40013010 0x00000800
+machine Reset
+# FIELD SPI_IER.TSERFIE
+sysbus WriteDoubleWord 0x40013010 0x00000400
+machine Reset
+# FIELD SPI_IER.MODFIE
+sysbus WriteDoubleWord 0x40013010 0x00000200
+machine Reset
+# FIELD SPI_IER.TIFREIE
+sysbus WriteDoubleWord 0x40013010 0x00000100
+machine Reset
+# FIELD SPI_IER.CRCEIE
+sysbus WriteDoubleWord 0x40013010 0x00000080
+machine Reset
+# FIELD SPI_IER.UDRIE
+sysbus WriteDoubleWord 0x40013010 0x00000020
+machine Reset
+# FIELD SPI_IER.TXTFIE
+sysbus WriteDoubleWord 0x40013010 0x00000010
+machine Reset
+# FIELD SPI_IER.DXPIE
+sysbus WriteDoubleWord 0x40013010 0x00000004
+machine Reset
+# FIELD SPI_CRCPOLY.CRCPOLY
+sysbus WriteDoubleWord 0x40013040 0x00000007
+machine Reset
+# FIELD SPI_UDRDR.UDRDR
+sysbus WriteDoubleWord 0x4001304c 0x00000001
+machine Reset
+# FIELD SPI_I2SCFGR.Res31_26
+sysbus WriteDoubleWord 0x40013050 0x04000000
+machine Reset
+# FIELD SPI_I2SCFGR.MCKOE
+sysbus WriteDoubleWord 0x40013050 0x02000000
+machine Reset
+# FIELD SPI_I2SCFGR.ODD
+sysbus WriteDoubleWord 0x40013050 0x01000000
+machine Reset
+# FIELD SPI_I2SCFGR.I2SDIV
+sysbus WriteDoubleWord 0x40013050 0x00010000
+machine Reset
+# FIELD SPI_I2SCFGR.Res15
+sysbus WriteDoubleWord 0x40013050 0x00008000
+machine Reset
+# FIELD SPI_I2SCFGR.DATFMT
+sysbus WriteDoubleWord 0x40013050 0x00004000
+machine Reset
+# FIELD SPI_I2SCFGR.WSINV
+sysbus WriteDoubleWord 0x40013050 0x00002000
+machine Reset
+# FIELD SPI_I2SCFGR.FIXCH
+sysbus WriteDoubleWord 0x40013050 0x00001000
+machine Reset
+# FIELD SPI_I2SCFGR.CKPOL
+sysbus WriteDoubleWord 0x40013050 0x00000800
+machine Reset
+# FIELD SPI_I2SCFGR.CHLEN
+sysbus WriteDoubleWord 0x40013050 0x00000400
+machine Reset
+# FIELD SPI_I2SCFGR.DATLEN
+sysbus WriteDoubleWord 0x40013050 0x00000100
+machine Reset
+# FIELD SPI_I2SCFGR.PCMSYNC
+sysbus WriteDoubleWord 0x40013050 0x00000080
+machine Reset
+# FIELD SPI_I2SCFGR.Res6
+sysbus WriteDoubleWord 0x40013050 0x00000040
+machine Reset
+# FIELD SPI_I2SCFGR.I2SSTD
+sysbus WriteDoubleWord 0x40013050 0x00000010
+machine Reset
+# FIELD SPI_I2SCFGR.I2SCFG
+sysbus WriteDoubleWord 0x40013050 0x00000002
+machine Reset
+# FIELD SPI offset 0x1C
+sysbus WriteDoubleWord 0x4001301c 0x00000000
+machine Reset
+# FIELD SPI offset 0x24
+sysbus WriteDoubleWord 0x40013024 0x00000000
+machine Reset
+# FIELD SPI offset 0x34
+sysbus WriteDoubleWord 0x40013034 0x00000000
+machine Reset
+# FIELD SPI offset 0x54
+sysbus WriteDoubleWord 0x40013054 0x00000000
+machine Reset
+# FIELD SPI offset 0x3FC
+sysbus WriteDoubleWord 0x400133fc 0x00000000
+machine Reset
+echo "TVIBURI-END"
+quit

@@ -11,9 +11,9 @@
 # Exit 0 only if every selected test passed.
 set -euo pipefail
 
-IMAGE=ghcr.io/clearforge-llc/aethelgard-tools@sha256:e5fc7ddbe36c050e78763ad1d203ec8d176408a3e534bed5563c424d8d9a1b58
-ACCEPTANCE="unit modf modeled stable cfg2first iolock rmw forge stock-forge stock-modf nomark conditions load crash"
-ADVERSARIAL="adv-removed adv-extra-arg adv-bad-variant adv-env adv-hook adv-loglevel adv-spray adv-noend"
+IMAGE=ghcr.io/clearforge-llc/aethelgard-tools@sha256:1e0ab105ec42bdba66b773464f0b6679d622e4afdafef30ec4931e4326f49c63
+ACCEPTANCE="unit modf modeled ardupilot generated field stable cfg2first iolock rmw forge stock-forge stock-modf nomark conditions fields load crash"
+ADVERSARIAL="adv-removed adv-extra-arg adv-bad-variant adv-env adv-hook adv-loglevel adv-spray adv-noend adv-version adv-recorded"
 ALL="$ACCEPTANCE $ADVERSARIAL"
 here=$(cd "$(dirname "$0")/.." && pwd)
 scratch=${TVIBURI_SCRATCH:-$HOME/.cache/tviburi}
@@ -57,7 +57,7 @@ run() { # run <name> <variant> [tree]: the runner on <tree> (default: the source
 renode_in() { # renode_in <name> <resc> [podman args...]: Renode on a monitor script, then the check
   local name=$1 resc=$2; shift 2
   pod "$name" "$src" -v "$work/check-build:/check:ro,Z" "$@" -- sh -c "timeout 120 renode --disable-gui --console --plain $resc </dev/null >/out/renode.out 2>&1; \
-    echo renode-exit=\$?; /check/debug/tviburi-check /out/renode-log.txt spi1"
+    echo renode-exit=\$?; /check/debug/tviburi-check \$(/repo/tests/model-version /repo/model) /out/renode-log.txt spi1"
 }
 
 fixture() { # fixture <name> <file> <old> <new>: a copy of the source with one exact edit
@@ -97,6 +97,8 @@ t_modf() {
     "records '$work/modf.stdout' 'recs[0][\"rule\"] == \"TVI-SPI-MODF\" and recs[0][\"bit\"] == \"CR1.SSI (bit 12) = 0\" and recs[0][\"seq\"] == 1'"
   check "the trace still records the refused access" \
     "grep -q 'spi1: \[cpu: 0x[0-9A-F]*\] WriteUInt32 to 0x0 (Control1), value 0x1\$' '$work/modf/renode-log.txt'"
+  check "the MODF scar is a predicted-fault, citing RM0433 Rev 9 p2184 (gate clause 4; RUL-18)" \
+    "records '$work/modf.stdout' 'recs[0][\"kind\"] == \"predicted-fault\" and \"RM0433 Rev 9 §50.5.2 p2184\" in recs[0][\"citation\"]'"
 }
 
 t_modeled() {
@@ -110,6 +112,26 @@ t_stable() {
   run modf-2 modf
   check "same invocation, same refusal record" \
     "cmp -s <(grep '^REFUSAL' '$work/modf.stdout') <(grep '^REFUSAL' '$work/modf-2.stdout')"
+}
+
+t_ardupilot() {
+  run ardupilot ardupilot
+  check "ArduPilot's SPI start, exchange and stop, as measured, PASS (0) in enforcing mode" '[ $rc -eq 0 ]'
+  check "...and its enable carries MASRX by read-modify-write, as on silicon (CR1 0x101)" \
+    "grep -q 'spi1: \[cpu: 0x[0-9A-F]*\] WriteUInt32 to 0x0 (Control1), value 0x101\$' '$work/ardupilot/renode-log.txt'"
+}
+
+t_generated() {
+  run generated generated
+  check "the generated firmware's SPI1 sequence PASSes (0) in enforcing mode" '[ $rc -eq 0 ]'
+}
+
+t_field() {
+  run field field
+  check "a planted field outside the allow-list (CFG2.CPOL=1) is REFUSED (3), TVI-SPI-FIELD, unmodeled" \
+    "[ \$rc -eq 3 ] && records '$work/field.stdout' 'recs[0][\"seq\"] == 1 and recs[0][\"rule\"] == \"TVI-SPI-FIELD\" and recs[0][\"kind\"] == \"unmodeled\" and recs[0][\"bit\"] == \"SPI_CFG2.CPOL (bit 25) = 1\"'"
+  # The halt lands at the end of the translation block (RUL-08), so the firmware's later SPI writes
+  # also refuse; the first refusal is the verdict.
 }
 
 t_cfg2first() {
@@ -165,33 +187,71 @@ need_check() { # build the reference check once, into $work/check-build, for the
 t_conditions() {
   need_check
   renode_in conditions /repo/tests/conditions.resc -e TVIBURI_MODEL_DIR=/repo/model
-  check "every rule branch refuses as declared, in order, and the pass cases do not" "records '$work/conditions.stdout' '
-[(r[\"rule\"], r[\"bit\"], r[\"access\"][\"offset\"], r[\"access\"][\"width\"]) for r in recs] == [
- (\"TVI-SPI-MODF\", \"CFG2.MASTER (bit 22) = 0\", \"0x0\", 32),
- (\"TVI-SPI-MODF\", \"CFG2.SP[2:0] (bits 21:19) != 000\", \"0x0\", 32),
- (\"TVI-SPI-MODF\", \"CFG2.SSM (bit 26) = 0, CFG2.SSOE (bit 29) = 0\", \"0x0\", 32),
- (\"TVI-SPI-MODF\", \"CFG2.SSM (bit 26) = 0, CFG2.SSOE (bit 29) = 1\", \"0x0\", 32),
- (\"TVI-SPI-MODF\", \"CFG2.SSIOP (bit 28) = 1\", \"0x0\", 32),
- (\"TVI-SPI-MODF\", \"CR1.SSI (bit 12) = 0\", \"0x0\", 32),
- (\"TVI-SPI-MODF\", \"CFG2 read after a master state other than the passing one, since reset: CR1=0x00000000, CFG2=0x04400000\", \"0xC\", 32),
- (\"TVI-SPI-MODF\", \"a master state other than the passing one, since reset: CR1=0x00000000, CFG2=0x04400000\", \"0x0\", 32),
- (\"TVI-SPI-CFG2-SPE\", \"CR1.SPE (bit 0) = 1\", \"0xC\", 32),
- (\"TVI-SPI-IOLOCK\", \"CR1.IOLOCK (bit 16) = 1\", \"0xC\", 32),
- (\"TVI-SPI-IOLOCK\", \"CR1.IOLOCK (bit 16), read\", \"0x0\", 32),
- (\"TVI-SPI-I2SMOD\", \"I2SCFGR.I2SMOD (bit 0) = 1\", \"0x50\", 32),
- (\"TVI-SPI-WIDTH\", \"sub-word or unaligned write\", \"0x2\", 16),
- (\"TVI-SPI-WIDTH\", \"sub-word or unaligned write\", \"0xE\", 8),
- (\"TVI-SPI-WIDTH\", \"sub-word or unaligned write\", \"0x51\", 8),
- (\"TVI-SPI-WIDTH\", \"sub-word or unaligned write\", \"0xD\", 32),
- (\"TVI-SPI-WIDTH\", \"sub-word or unaligned read\", \"0x0\", 16),
- (\"TVI-SPI-WIDTH\", \"sub-word or unaligned read\", \"0xD\", 32),
- (\"TVI-SPI-MODF\", \"CFG2.MASTER (bit 22) = 0\", \"0x0\", 32),
- (\"TVI-SPI-MODF\", \"CFG2.MASTER (bit 22) = 0\", \"0x0\", 32)]' \
+  check "every rule branch refuses as declared, with its kind, in order, and the pass cases do not" "records '$work/conditions.stdout' '
+[(r[\"rule\"], r[\"kind\"], r[\"bit\"], r[\"access\"][\"offset\"], r[\"access\"][\"width\"]) for r in recs] == [
+ (\"TVI-SPI-MODF\", \"unmodeled\", \"CFG2.MASTER (bit 22) = 0\", \"0x0\", 32),
+ (\"TVI-SPI-MODF\", \"unmodeled\", \"CFG2.SP[2:0] (bits 21:19) != 000\", \"0x0\", 32),
+ (\"TVI-SPI-MODF\", \"unmodeled\", \"CFG2.SSM (bit 26) = 0, CFG2.SSOE (bit 29) = 0\", \"0x0\", 32),
+ (\"TVI-SPI-MODF\", \"unmodeled\", \"CFG2.SSIOP (bit 28) = 1\", \"0x0\", 32),
+ (\"TVI-SPI-MODF\", \"predicted-fault\", \"CR1.SSI (bit 12) = 0\", \"0x0\", 32),
+ (\"TVI-SPI-MODF\", \"unmodeled\", \"CFG2 read after a master state other than the passing one, since reset: CR1=0x00000000, CFG2=0x04400000\", \"0xC\", 32),
+ (\"TVI-SPI-MODF\", \"unmodeled\", \"a master state other than the passing one, since reset: CR1=0x00000000, CFG2=0x04400000\", \"0x0\", 32),
+ (\"TVI-SPI-CFG2-SPE\", \"predicted-fault\", \"CR1.SPE (bit 0) = 1\", \"0xC\", 32),
+ (\"TVI-SPI-IOLOCK\", \"predicted-fault\", \"CR1.IOLOCK (bit 16) = 1\", \"0xC\", 32),
+ (\"TVI-SPI-IOLOCK\", \"unmodeled\", \"CR1.IOLOCK (bit 16), read\", \"0x0\", 32),
+ (\"TVI-SPI-I2SMOD\", \"unmodeled\", \"I2SCFGR.I2SMOD (bit 0) = 1\", \"0x50\", 32),
+ (\"TVI-SPI-WIDTH\", \"unmodeled\", \"sub-word or unaligned write\", \"0x2\", 16),
+ (\"TVI-SPI-WIDTH\", \"unmodeled\", \"sub-word or unaligned write\", \"0xE\", 8),
+ (\"TVI-SPI-WIDTH\", \"unmodeled\", \"sub-word or unaligned write\", \"0x51\", 8),
+ (\"TVI-SPI-WIDTH\", \"unmodeled\", \"sub-word or unaligned write\", \"0xD\", 32),
+ (\"TVI-SPI-WIDTH\", \"unmodeled\", \"sub-word or unaligned read\", \"0x0\", 16),
+ (\"TVI-SPI-WIDTH\", \"unmodeled\", \"sub-word or unaligned read\", \"0xD\", 32),
+ (\"TVI-SPI-MODF\", \"unmodeled\", \"CFG2.MASTER (bit 22) = 0\", \"0x0\", 32),
+ (\"TVI-SPI-MODF\", \"unmodeled\", \"CFG2.MASTER (bit 22) = 0\", \"0x0\", 32),
+ (\"TVI-SPI-IOLOCK\", \"unmodeled\", \"CR1.IOLOCK (bit 16) = 1\", \"0xC\", 32),
+ (\"TVI-SPI-IOLOCK\", \"unmodeled\", \"CR1.IOLOCK (bit 16) = 1\", \"0xC\", 32),
+ (\"TVI-SPI-IOLOCK\", \"unmodeled\", \"CR1.IOLOCK (bit 16) = 1\", \"0xC\", 32),
+ (\"TVI-SPI-IOLOCK\", \"unmodeled\", \"CR1.IOLOCK (bit 16) = 1\", \"0xC\", 32),
+ (\"TVI-SPI-IOLOCK\", \"unmodeled\", \"CR1.IOLOCK (bit 16) = 1\", \"0xC\", 32),
+ (\"TVI-SPI-MODF\", \"unmodeled\", \"CFG2 read after IFCR.MODFC written after such a state, and CFG2 not written since\", \"0xC\", 32),
+ (\"TVI-SPI-MODF\", \"unmodeled\", \"CFG2.MASTER unknown: IFCR.MODFC written after a master state other than the passing one, and CFG2 not written since\", \"0x0\", 32),
+ (\"TVI-SPI-MODF\", \"unmodeled\", \"a master state other than the passing one, since reset: CR1=0x00000000, CFG2=0x04400000\", \"0x0\", 32),
+ (\"TVI-SPI-CFG1-SPE\", \"unmodeled\", \"CR1.SPE (bit 0) = 1\", \"0x8\", 32),
+ (\"TVI-SPI-CFG1-SPE\", \"predicted-fault\", \"CR1.SPE (bit 0) = 1\", \"0x8\", 32),
+ (\"TVI-SPI-FIELD\", \"unmodeled\", \"SPI_CFG1.DSIZE (4:0) = 00000 at the enable\", \"0x0\", 32),
+ (\"TVI-SPI-WIDTH\", \"unmodeled\", \"32-bit write, frame 8 bits\", \"0x20\", 32),
+ (\"TVI-SPI-WIDTH\", \"unmodeled\", \"16-bit read, frame 8 bits\", \"0x30\", 16),
+ (\"TVI-SPI-WIDTH\", \"unmodeled\", \"sub-word or unaligned write\", \"0x4\", 16),
+ (\"TVI-SPI-ORDER\", \"unmodeled\", \"CR1.SPE (bit 0) = 0, TXDR written\", \"0x20\", 8),
+ (\"TVI-SPI-ORDER\", \"unmodeled\", \"CR1.CSTART (bit 9) = 1 with SPE = 0\", \"0x0\", 32),
+ (\"TVI-SPI-ORDER\", \"unmodeled\", \"CR1.CSTART (bit 9) = 1 with SPE = 0\", \"0x0\", 32),
+ (\"TVI-SPI-ORDER\", \"unmodeled\", \"CR1.SPE (bit 0) = 1, CR2 written\", \"0x4\", 32),
+ (\"TVI-SPI-MODF\", \"unmodeled\", \"CFG2.MASTER unknown: IFCR.MODFC written after a master state other than the passing one, and CFG2 not written since\", \"0x0\", 32),
+ (\"TVI-SPI-READ\", \"unmodeled\", \"no register at offset 0x1C\", \"0x1C\", 32),
+ (\"TVI-SPI-READ\", \"unmodeled\", \"write-only register\", \"0x18\", 32),
+ (\"TVI-SPI-READ\", \"unmodeled\", \"write-only register\", \"0x20\", 8),
+ (\"TVI-SPI-READ\", \"unmodeled\", \"SR.RXP (bit 0) = 0, RXDR read\", \"0x30\", 8),
+ (\"TVI-SPI-READ\", \"unmodeled\", \"SR.EOT (bit 3) set by the stock model at CSUSP\", \"0x14\", 32),
+ (\"TVI-SPI-ORDER\", \"unmodeled\", \"CR1.CSUSP (bit 10) = 1 with SPE = 0\", \"0x0\", 32)]' \
       && grep -qx 'CHECK REFUSED' '$work/conditions.stdout'"
   local console; console=$("$src/scripts/monitor-output" "$work/conditions/renode.out")
   check "the conditions script reached its end" 'grep -qx TVIBURI-END <<<"$console"'
   check "reads return silicon's value: CR1.SSI from the copy, CFG2 from the copy" \
     "[ \"\$(grep -A1 -x READ-CR1 <<<\"\$console\" | tail -n1)\" = 0x00001000 ] && [ \"\$(grep -A1 -x READ-CFG2 <<<\"\$console\" | tail -n1)\" = 0x10000000 ]"
+  local r; r() { grep -A1 -x "$1" <<<"$console" | tail -n1; }
+  check "reads from the copies: IOLOCK from the latch (L2), CFG1 and CRCPOLY at reset, MASRX, IER.OVRIE (C2, C4)" \
+    '[ "$(r READ-CR1-L2)" = 0x00001001 ] && [ "$(r READ-CFG1)" = 0x00070007 ] && [ "$(r READ-CRCPOLY)" = 0x00000107 ] && [ "$(r READ-CR1-MASRX)" = 0x00000100 ] && [ "$(r READ-IER)" = 0x00000041 ] && [ "$(r READ-IER-RESET)" = 0x00000000 ]'
+}
+
+t_fields() {
+  need_check
+  renode_in fields /repo/tests/fields.resc -e TVIBURI_MODEL_DIR=/repo/model
+  check "every field outside the allow-list refuses by name, TVI-SPI-FIELD, kind unmodeled (gate clause 6)" "records '$work/fields.stdout' '
+[(r[\"rule\"], r[\"kind\"], r[\"bit\"].split(\" (\")[0]) for r in recs] == [(\"TVI-SPI-FIELD\", \"unmodeled\", f if not f.startswith(\"SPI offset\") else \"no register at offset \" + f.split()[-1])
+  for f in [l[8:].strip() for l in open(\"$src/tests/fields.resc\") if l.startswith(\"# FIELD \")]] and len(recs) == $(grep -c '^# FIELD ' "$src/tests/fields.resc")' \
+      && grep -qx 'CHECK REFUSED' '$work/fields.stdout'"
+  local console; console=$("$src/scripts/monitor-output" "$work/fields/renode.out")
+  check "the field sweep reached its end" 'grep -qx TVIBURI-END <<<"$console"'
 }
 
 t_load() {
@@ -210,7 +270,7 @@ t_crash() {
     renode --disable-gui --console --plain /out/long.resc </dev/null >/out/renode.out 2>&1 & pid=$!
     for i in $(seq 600); do grep -q "spi1: {\"tviburi\":\"witness\"" /out/renode-log.txt 2>/dev/null && break; sleep 0.1; done
     kill -9 $pid; wait $pid; echo renode-exit=$?
-    /check/debug/tviburi-check /out/renode-log.txt spi1'
+    /check/debug/tviburi-check $(/repo/tests/model-version /repo/model) /out/renode-log.txt spi1'
   check "a simulator killed after its witness does not PASS (1, no end record, the witness seen)" \
     "grep -qx 'renode-exit=137' '$work/crash.stdout' && grep -qx 'CHECK FAIL' '$work/crash.stdout' \
      && grep -q '^PROBLEM spi1: no end record' '$work/crash.stdout' && ! grep -q '^PROBLEM spi1: no load witness' '$work/crash.stdout'"
@@ -254,8 +314,10 @@ t_adv-hook() {
   fixture hook scripts/prelude.resc "$prelude_line" "$prelude_line
 sysbus SetHookBeforePeripheralWrite spi1 \"value = value | 0x100\""
   run adv-hook modf "$work/hook.tree"
+  # The hook ORs 0x100 into every spi1 write; in CFG2 that is a reserved bit, so the first refusal is the
+  # allow-list's, at the CFG2 write, carrying the hooked value.
   check "a monitor write hook on spi1 is installed (it changed the value) and does not displace the guard: REFUSED (3)" \
-    "[ \$rc -eq 3 ] && records '$work/adv-hook.stdout' 'len(recs) == 1 and recs[0][\"access\"][\"value\"] == \"0x101\"'"
+    "[ \$rc -eq 3 ] && records '$work/adv-hook.stdout' 'recs[0][\"rule\"] == \"TVI-SPI-FIELD\" and recs[0][\"access\"][\"value\"] == \"0x4400100\"'"
 }
 
 t_adv-loglevel() {
@@ -275,19 +337,49 @@ emulation SetSeed 1'
 t_adv-spray() {
   run adv-spray spray
   check "record bytes written to SPI1 reach the log under spi1 (the test is not vacuous)" \
-    "grep -q 'spi1: \[cpu: 0x[0-9A-F]*\] WriteUInt32 to 0x20 (TransmitData), value 0x7674227B' '$work/adv-spray/renode-log.txt'"
+    "grep -q 'spi1: \[cpu: 0x[0-9A-F]*\] WriteUInt32 to 0x18 (InterruptStatusFlagsClear), value 0x7674227B' '$work/adv-spray/renode-log.txt'"
   check "...and none is taken as a record: the modeled path PASSes (0) with no PROBLEM" \
     "[ \$rc -eq 0 ] && ! grep -q '^PROBLEM' '$work/adv-spray.stdout'"
 }
 
+t_adv-version() {
+  [ -d "$work/modeled" ] || run modeled modeled
+  need_check
+  pod adv-version "$src" -v "$work/check-build:/check:ro,Z" -v "$work/modeled:/run:ro,Z" -- sh -c '
+    v=$(/repo/tests/model-version /repo/model); w=sha256:$(printf %064d 0)
+    /check/debug/tviburi-check "$v" /run/renode-log.txt spi1 >/dev/null; echo right=$?
+    /check/debug/tviburi-check "$w" /run/renode-log.txt spi1 >/dev/null; echo wrong=$?
+    /check/debug/tviburi-check /run/renode-log.txt spi1 >/dev/null; echo none=$?
+    /check/debug/tviburi-check "$v" /run/renode-log.txt spi2 >/run-unnamed.txt; echo unnamed=$?; grep -c "not named" /run-unnamed.txt'
+  check "the check passes the modeled run only with its expected version: wrong (1) and none (1) fail (gate clause 7)" \
+    "grep -qx right=0 '$work/adv-version.stdout' && grep -qx wrong=1 '$work/adv-version.stdout' && grep -qx none=1 '$work/adv-version.stdout'"
+  check "spi1's records, with spi2 named instead, are records from an unnamed source: FAIL (1)" \
+    "grep -qx unnamed=1 '$work/adv-version.stdout' && grep -qxE '[1-9][0-9]*' '$work/adv-version.stdout'"
+}
+
+t_adv-recorded() {
+  fixture recorded model/Refusal.cs 'private const string Mode = "enforcing";' 'private const string Mode = "recorded";'
+  run adv-recorded modeled "$work/recorded.tree"
+  check "a recorded-mode witness is never a pass: the modeled path FAILs (1) (gate clause 7; RUL-19)" \
+    "[ \$rc -eq 1 ] && grep -q '^PROBLEM .*not in enforcing mode' '$work/adv-recorded.stdout'"
+}
+
 t_adv-noend() {
+  # The script quits cleanly without its end marker: Renode disposes (an end record), so the check
+  # passes, and only the runner's own end-of-script evidence can fail the run.
   fixture noend scripts/tviburi-spike 'echo "TVIBURI-END"
+quit' 'quit'
+  run adv-noend modeled "$work/noend.tree"
+  check "a script that ends before its end marker (Renode disposes cleanly) does not PASS (1)" \
+    "[ \$rc -eq 1 ] && grep -qx 'CHECK PASS' '$work/adv-noend.stdout'"
+  # A monitor error stops the script; Renode then exits on EOF, sometimes before it disposes (measured,
+  # TVI-WO-0100b FEEDBACK), so the check may pass or fail; the run must not PASS either way.
+  fixture noend-error scripts/tviburi-spike 'echo "TVIBURI-END"
 quit' 'no_such_monitor_command
 echo "TVIBURI-END"
 quit'
-  run adv-noend modeled "$work/noend.tree"
-  check "a script that stops before its end (Renode still disposes cleanly) does not PASS (1)" \
-    "[ \$rc -eq 1 ] && grep -qx 'CHECK PASS' '$work/adv-noend.stdout'"
+  run adv-noend-error modeled "$work/noend-error.tree"
+  check "a script stopped by a monitor error does not PASS (1)" '[ $rc -eq 1 ]'
 }
 
 for t in ${TVIBURI_TESTS:-acceptance}; do
