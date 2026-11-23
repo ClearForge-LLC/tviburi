@@ -26,6 +26,9 @@
 //   TVI-RCC-PLL-REF a write that sets PLLxON while the PLL has no reference clock: PLLSRC = 11 ("No clock send to
 //                   DIVMx divider and PLLs", p399), its source off, or DIVMx = 0 ("prescaler disabled", p398-399). The
 //                   stock model would report PLLxRDY = 1 at once; silicon cannot lock. unmodeled (ruled 14:35Z).
+//   TVI-RCC-SW      a CFGR write that switches SW to a source that is not running: silicon switches "only if the target
+//                   clock source is ready" (p350; SW p393), while the stock model switches at once (and, for PLL1 with
+//                   DIVM1 = 0, divides by zero). unmodeled.
 //   TVI-RCC-FIELD   the allow-list (`Fields`): a write that gives any field a value the model does not implement,
 //                   or a write to an offset with no register. unmodeled.
 //   TVI-RCC-KERNEL  (RequireKernelClock) a peripheral started with no kernel clock: predicted-fault, naming the selector,
@@ -274,7 +277,7 @@ namespace Antmicro.Renode.Peripherals.Tviburi
                 return true;
             }
             var b = Base(offset);
-            return RefusedPll(b, value) || RefusedPllReference(b, value) || RefusedField(offset, b, value);
+            return RefusedPll(b, value) || RefusedPllReference(b, value) || RefusedSwitch(b, value) || RefusedField(offset, b, value);
         }
 
         private void Pass(long b, uint value)
@@ -346,6 +349,31 @@ namespace Antmicro.Renode.Peripherals.Tviburi
                 }
             }
             return false;
+        }
+
+        private bool RefusedSwitch(long b, uint value)
+        {
+            if(b != CfgrOffset)
+            {
+                return false;
+            }
+            var sw = value & 0x7;
+            if(sw == (inner.ReadDoubleWord(CfgrOffset) & 0x7) || sw > 3)
+            {
+                return false;   // no switch; or a reserved value, which the allow-list's SW row decides
+            }
+            var cr = inner.ReadDoubleWord(CrOffset);
+            var ready = sw == 0 ? (cr & CrHsion) != 0 : sw == 1 ? (cr & CrCsion) != 0 : sw == 2 ? (cr & CrHseon) != 0
+                : PllOn(1) && PllReference(1, cr) && (Copy(PllcfgrOffset) >> 16 & 1) != 0;
+            if(ready)
+            {
+                return false;
+            }
+            var target = new[] { "hsi_ck (HSION = 0)", "csi_ck (CSION = 0)", "hse_ck (HSEON = 0)", "pll1_p_ck (" + Condition("pll1_p_ck") + ")" }[sw];
+            records.Refuse("TVI-RCC-SW", Unmodeled, "RCC_CFGR", "SW (2:0) = " + Bin(sw, 3),
+                "the system clock switched to " + target + ", which is not running: silicon switches \"only if the target clock source is ready\" and keeps the old sys_ck until then, while the stock model switches at once",
+                "RM0433 Rev 9 §8.5.6 p350 (system clock switch); §8.7.7 p393 (SW, SWS)", State(), b, value, 32);
+            return true;
         }
 
         private bool RefusePll(long b, uint value, string field, string condition, string citation)
@@ -660,6 +688,7 @@ namespace Antmicro.Renode.Peripherals.Tviburi
             0x0D4, 0x0D8, 0x0DC, 0x0E0, 0x0E4, 0x0E8, 0x0EC, 0x0F0, 0x0F4 };
 
         private const long CrOffset = 0x000;
+        private const long CfgrOffset = 0x010;
         private const long PllckselrOffset = 0x028;
         private const long PllcfgrOffset = 0x02C;
         private const uint CrHsion = 1u << 0;

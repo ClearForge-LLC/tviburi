@@ -110,3 +110,23 @@ U08-stockPin	tools/tviburi-release/src/stock.rs	if got != pin.sha256 {	if false 
 U09-runnerRenodeBuild	scripts/tviburi-spike	renode --version 2>/dev/null | grep -qxF "  build: $build" ||	true ||	adv-release
 F01-allowedList	tools/tviburi-release/src/fields.rs	return list.split(',').map(	return list.split(',').take(1).map(	unit
 U10-ledgerRowsBound	tools/tviburi-release/src/main.rs	(Ok(n), Some(h)) if t.split_once('\\n')	(Ok(n), Some(h)) if true || t.split_once('\\n')	verify
+# One mutant per rule TVI-WO-1300 adds (model/GuardedSTM32H7_RCC.cs), killed by the tests/1300/rcc.sh cases named (rcc-<case>).
+C01-muxSwitch	model/GuardedSTM32H7_RCC.cs	if(m.Current != m.Selector && Running(m.Def.Sources[m.Current]) && Running(m.Def.Sources[m.Selector]))	if(m.Current != m.Selector)	rcc-stuck rcc-switch
+C02-muxPending	model/GuardedSTM32H7_RCC.cs	if(mux.Current != mux.Selector)	if(false)	rcc-stuck
+C03-muxKeptOnReset	model/GuardedSTM32H7_RCC.cs	copies[off] = ResetValue(off);\n            }\n            Settle();	copies[off] = ResetValue(off);\n            }\n            foreach(var m in muxes) { m.Current = 0; }\n            Settle();	rcc-resetfwd
+C04-enableGates	model/GuardedSTM32H7_RCC.cs	if(!enabled)	if(false)	rcc-registrations
+C05-pllOutputEnable	model/GuardedSTM32H7_RCC.cs	return PllOn(n) && en && PllReference(n, cr);	return PllOn(n) && PllReference(n, cr);	rcc-divq
+C06-perCk	model/GuardedSTM32H7_RCC.cs	return per.Current == per.Selector && Running(PerMux.Sources[per.Current]);	return false;	rcc-switched
+C07-kernelKind	model/GuardedSTM32H7_RCC.cs	records.Refuse("TVI-RCC-KERNEL", PredictedFault,	records.Refuse("TVI-RCC-KERNEL", Unmodeled,	rcc-scar
+C08-pllLocked	model/GuardedSTM32H7_RCC.cs	if((old & mask) != (value & mask) && PllOn(n))	if(false)	rcc-pll
+C09-pllReference	model/GuardedSTM32H7_RCC.cs	if((value & on) != 0 && (old & on) == 0 && !PllReference(n, value))	if(false)	rcc-pllref
+C10-divmZero	model/GuardedSTM32H7_RCC.cs	return false;   // "000000: prescaler disabled" (p398-399)	return true;   // mutant	rcc-divm0
+C11-switch	model/GuardedSTM32H7_RCC.cs	if(ready)	if(true)	rcc-sw
+C12-allowList	model/GuardedSTM32H7_RCC.cs	if(f.Allowed != null && !f.Allowed.Contains(v))	if(false)	rcc-field rcc-fields
+C13-alias	model/GuardedSTM32H7_RCC.cs	return offset >= 0x130 && offset <= 0x17C ? offset - 0x60 : offset;	return offset;	rcc-alias rcc-alias17c
+C14-width	model/GuardedSTM32H7_RCC.cs	Width(offset, value, 16, "write");	(empty)	rcc-width
+C15-noRegisterRead	model/GuardedSTM32H7_RCC.cs	if(!Fields.Any(f => f.Offset == b))	if(false)	rcc-read
+C16-servedFromCopy	model/GuardedSTM32H7_RCC.cs	return (c & mask) | (inner.ReadDoubleWord(b) & ~mask);	return inner.ReadDoubleWord(b);	rcc-resetfwd
+C17-copiesTakeWrites	model/GuardedSTM32H7_RCC.cs	if(copies.ContainsKey(b))	if(false)	rcc-clocked
+C18-recordedPassesOn	model/GuardedSTM32H7_RCC.cs	if(Refused(offset, value) && !records.Recorded)	if(Refused(offset, value))	rcc-recordedfield
+C19-apb4enrReset	model/GuardedSTM32H7_RCC.cs	case 0x0F4: return 0x00010000;	case 0x0F4: return 0;	rcc-registrations

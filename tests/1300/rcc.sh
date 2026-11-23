@@ -13,7 +13,7 @@ set -euo pipefail
 
 here=$(cd "$(dirname "$0")/../.." && pwd)
 IMAGE=$(sed -n 's/^IMAGE=//p' "$here/tests/spike.sh")
-CASES="scar switch stuck clocked switched alias field pll fields reset width read alias17c registrations hse16"
+CASES="scar switch stuck clocked switched alias field pll divq pllref divm0 sw width read usart2 uncovered fields reset resetfwd spi1rst alias17c registrations hse16 recorded recordedfield"
 scratch=${TVIBURI_SCRATCH:-$HOME/.cache/tviburi}
 mkdir -p "$scratch"
 work=$(mktemp -d "$scratch/rcc.XXXXXX")
@@ -59,7 +59,7 @@ run_case() { # run_case <name> <firmware path or -> <monitor lines...>
     cargo build --quiet --offline --locked --manifest-path /repo/tools/tviburi-check/Cargo.toml --target-dir /out/target || exit 90
     if [ "$1" != - ]; then
       rustc --edition 2021 --target thumbv7em-none-eabihf -C opt-level=s -C panic=abort -C debuginfo=0 --cfg "path=\"$1\"" \
-        --check-cfg "cfg(path, values(\"clocked\",\"scar\",\"switch\",\"stuck\",\"switched\",\"alias\",\"field\",\"pll\"))" \
+        --check-cfg "cfg(path, values(\"clocked\",\"scar\",\"switch\",\"stuck\",\"switched\",\"alias\",\"field\",\"pll\",\"divq\",\"pllref\",\"divm0\",\"sw\",\"width\",\"read\",\"usart2\"))" \
         -C link-arg=-T/repo/firmware/link.x -o /out/fw.elf /repo/firmware/rcc.rs || exit 91
     fi
     timeout 120 renode --disable-gui --console --plain /out/run.resc </dev/null >/out/renode.out 2>&1
@@ -136,22 +136,70 @@ for t in ${TVIBURI_TESTS:-$CASES}; do
       'sysbus WriteDoubleWord 0x580244F0 0x0' 'sysbus WriteDoubleWord 0x40013010 0x40'
     check "reset: TIM1RST through the guard resets TIM1 (PSC 5 -> 0; RM0433 Rev 9 §8.7.35 p442); a hook and logging on the guard do not displace it; an unclocked SPI1 locks" \
       "[ \$rc = 0 ] && console reset | grep -A1 -x 'R-TIM1-BEFORE' | tail -n1 | grep -qx '0x00000005' && console reset | grep -A1 -x 'R-TIM1-AFTER' | tail -n1 | grep -qx '0x00000000' && console reset | grep -A1 -x 'R-AFTER-HOOK' | tail -n1 | grep -qx '0x00000100' && grep -q 'R-HOOK' '$work/reset/renode.out' && grep -q 'Tried to write a locked peripheral' '$work/reset/renode.out'" ;;
+  divq)
+    run_case divq divq "$hook" "$run"
+    check "divq: PLL1 started with DIVQ1EN = 0: pll1_q_ck is disabled, SPI1 starts with no kernel clock, predicted-fault (p401)" \
+      "[ \$rc = 3 ] && first_kernel divq 'r[\"kind\"] == \"predicted-fault\" and \"DIVQ1EN = 0\" in r[\"condition\"]'" ;;
+  pllref)
+    run_case pllref pllref "$run"
+    check "pllref: PLL1ON with PLLSRC = 11 (no clock) refuses, TVI-RCC-PLL-REF, unmodeled, at the firmware's store" \
+      "[ \$rc = 3 ] && first_kernel pllref 'r[\"rule\"] == \"TVI-RCC-PLL-REF\" and r[\"kind\"] == \"unmodeled\" and r[\"access\"][\"pc\"] != \"none\"'" ;;
+  divm0)
+    run_case divm0 divm0 "$run"
+    check "divm0: PLL1ON with DIVM1 = 0 (prescaler disabled, p398-399) refuses, TVI-RCC-PLL-REF, unmodeled" \
+      "[ \$rc = 3 ] && first_kernel divm0 'r[\"rule\"] == \"TVI-RCC-PLL-REF\" and \"DIVM1 = 0\" in r[\"condition\"]'" ;;
+  sw)
+    run_case sw sw "$run"
+    check "sw: SW = PLL1 with PLL1 off refuses, TVI-RCC-SW, unmodeled (p350)" \
+      "[ \$rc = 3 ] && first_kernel sw 'r[\"rule\"] == \"TVI-RCC-SW\" and r[\"kind\"] == \"unmodeled\" and \"p350\" in r[\"citation\"]'" ;;
   width)
-    run_case width - 'sysbus WriteWord 0x580244F0 0x1000'
-    check "width: a 16-bit RCC write refuses, TVI-RCC-WIDTH, unmodeled" \
-      "[ \$rc = 3 ] && first_kernel width 'r[\"rule\"] == \"TVI-RCC-WIDTH\" and r[\"kind\"] == \"unmodeled\"'" ;;
+    run_case width width "$run"
+    check "width: a 16-bit RCC store refuses, TVI-RCC-WIDTH, unmodeled, at the firmware's store" \
+      "[ \$rc = 3 ] && first_kernel width 'r[\"rule\"] == \"TVI-RCC-WIDTH\" and r[\"kind\"] == \"unmodeled\" and r[\"access\"][\"width\"] == 16 and r[\"access\"][\"pc\"] != \"none\"'" ;;
   read)
-    run_case read - 'sysbus ReadDoubleWord 0x58024414'
+    run_case read read "$run"
     check "read: a read at an RCC offset with no register (0x014; Table 84 p496) refuses, TVI-RCC-READ, unmodeled" \
-      "[ \$rc = 3 ] && first_kernel read 'r[\"rule\"] == \"TVI-RCC-READ\" and r[\"kind\"] == \"unmodeled\"'" ;;
+      "[ \$rc = 3 ] && first_kernel read 'r[\"rule\"] == \"TVI-RCC-READ\" and r[\"kind\"] == \"unmodeled\" and r[\"access\"][\"pc\"] != \"none\"'" ;;
+  usart2)
+    run_case usart2 usart2 'sysbus SetHookBeforePeripheralWrite sysbus.usart2 "offset == 0 and (value & 1) and machine[\"sysbus.rcc\"].RequireKernelClock(\"usart2\", \"CR1.UE\")"' "$run"
+    check "usart2: USART234578SEL to pll2_q_ck with PLL2 off: USART2 starts with no kernel clock, predicted-fault (p417; F7)" \
+      "[ \$rc = 3 ] && first_kernel usart2 'r[\"rule\"] == \"TVI-RCC-KERNEL\" and r[\"kind\"] == \"predicted-fault\" and \"USART234578SEL\" in r[\"bit\"] and \"p417\" in r[\"citation\"]'" ;;
+  uncovered)
+    run_case uncovered - 'python "self.Machine[\"sysbus.rcc\"].RequireKernelClock(\"spi4\", \"CR1.SPE\")"'
+    check "uncovered: the query asked for a peripheral it does not cover (spi4) refuses, TVI-RCC-KERNEL, unmodeled" \
+      "[ \$rc = 3 ] && first_kernel uncovered 'r[\"rule\"] == \"TVI-RCC-KERNEL\" and r[\"kind\"] == \"unmodeled\"'" ;;
+  resetfwd)
+    q='python "print(\"Q \" + str(self.Machine[\"sysbus.rcc\"].QueryKernelClock(\"spi1\")))"'
+    run_case resetfwd - \
+      'sysbus WriteDoubleWord 0x58024430 0x0103038F' 'sysbus WriteDoubleWord 0x58024400 0x01000001' \
+      'sysbus WriteDoubleWord 0x58024450 0x00004000' 'sysbus WriteDoubleWord 0x580244F0 0x00001000' "$q" 'echo "R-COPY"' 'sysbus ReadDoubleWord 0x58024450' \
+      'machine Reset' 'echo "R-AFTER-RESET"' 'sysbus ReadDoubleWord 0x58024450' 'sysbus ReadDoubleWord 0x58024400' \
+      'sysbus WriteDoubleWord 0x580244F0 0x00001000' "$q"
+    check "resetfwd: passed writes, then machine Reset: the copies and the stock RCC return to reset (D2CCIP1R 0, PLL1 off), and the mux keeps its input per_ck, so with SPI123SEL back at 000 and PLL1 off SPI1 has no clock (p371-372)" \
+      "[ \$rc = 0 ] && console resetfwd | grep -A1 -x 'R-COPY' | tail -n1 | grep -qx '0x00004000' && grep -q '^Q spi1: running; per_ck: CKPERSEL = 00' '$work/resetfwd/renode.out' && console resetfwd | grep -A2 -x 'R-AFTER-RESET' | sed -n 2p | grep -qx '0x00000000' && grep -q '^Q spi1: NOT running; the mux has not switched from per_ck' '$work/resetfwd/renode.out'" ;;
+  spi1rst)
+    run_case spi1rst - 'sysbus WriteDoubleWord 0x580244F0 0x00001000' 'sysbus WriteDoubleWord 0x40013004 0x00000004' 'echo "R-CR2-BEFORE"' 'sysbus ReadDoubleWord 0x40013004' \
+      'sysbus WriteDoubleWord 0x58024498 0x00001000' 'sysbus WriteDoubleWord 0x58024498 0x0' 'echo "R-CR2-AFTER"' 'sysbus ReadDoubleWord 0x40013004'
+    check "spi1rst: SPI1RST through the guard resets SPI1 (CR2.TSIZE 4 -> 0; RM0433 Rev 9 §8.7.35 p443)" \
+      "[ \$rc = 0 ] && console spi1rst | grep -A1 -x 'R-CR2-BEFORE' | tail -n1 | grep -qx '0x00000004' && console spi1rst | grep -A1 -x 'R-CR2-AFTER' | tail -n1 | grep -qx '0x00000000'" ;;
+  recorded)
+    PLATFORM=/repo/tests/1300/recorded.repl run_case recorded scar "$hook" "$run" 'echo "TVIBURI-MARK-AFTER"' "$after"
+    check "recorded: the guard in recorded mode logs the scar as a would-refuse, the firmware runs on to its marker, and the check never passes it (RUL-19)" \
+      "[ \$rc = 1 ] && grep -q '\"tviburi\":\"would-refuse\".*TVI-RCC-KERNEL' '$work/recorded/renode-log.txt' && console recorded | grep -A1 -x 'TVIBURI-MARK-AFTER' | tail -n1 | grep -qx '0xAF7E0002'" ;;
+  recordedfield)
+    PLATFORM=/repo/tests/1300/recorded.repl run_case recordedfield field "$run" 'echo "R-SEL"' 'sysbus ReadDoubleWord 0x58024450' 'echo "TVIBURI-MARK-AFTER"' "$after"
+    check "recordedfield: in recorded mode, SPI123SEL = 011 is a would-refuse and the write still reaches the copy (reads 0x3000), as if no rule fired (RUL-19)" \
+      "[ \$rc = 1 ] && grep -q '\"tviburi\":\"would-refuse\".*TVI-RCC-FIELD' '$work/recordedfield/renode-log.txt' && console recordedfield | grep -A1 -x 'R-SEL' | tail -n1 | grep -qx '0x00003000'" ;;
   alias17c)
     run_case alias17c - 'echo "R-17C"' 'sysbus ReadDoubleWord 0x5802457C'
     check "alias17c: RCC_C1_APB4LPENR (0x17C) reads RCC_APB4LPENR's reset 0x0421DEAA, where the stock model overflows its stack (p382; p493)" \
       "[ \$rc = 0 ] && grep -qx 'CHECK PASS' '$work/alias17c.stdout' && console alias17c | grep -A1 -x 'R-17C' | tail -n1 | grep -qx '0x0421DEAA'" ;;
   registrations)
-    run_case registrations - 'python "import System; B = System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance; g = self.Machine[\"sysbus.rcc\"]; i = g.GetType().GetField(\"inner\", B).GetValue(g); print(\"REGISTERED \" + str(i.GetType().GetField(\"RegisteredPeripherals\", B).GetValue(i).Count))"' 'peripherals'
+    run_case registrations - 'echo "R-APB4ENR"' 'sysbus ReadDoubleWord 0x580244F4' 'python "print(\"Q \" + str(self.Machine[\"sysbus.rcc\"].QueryKernelClock(\"spi1\")))"' 'python "import System; B = System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance; g = self.Machine[\"sysbus.rcc\"]; i = g.GetType().GetField(\"inner\", B).GetValue(g); print(\"REGISTERED \" + str(i.GetType().GetField(\"RegisteredPeripherals\", B).GetValue(i).Count))"' 'peripherals'
     check "the 58 restated registrations, and the board's spi1, resolve on the guard; peripherals lists rcc as the guard" \
-      "grep -q 'REGISTERED 59' '$work/registrations/renode.out' && grep -q 'rcc (GuardedSTM32H7_RCC)' '$work/registrations/renode.out'" ;;
+      "grep -q 'REGISTERED 59' '$work/registrations/renode.out' && grep -q 'rcc (GuardedSTM32H7_RCC)' '$work/registrations/renode.out'"
+    check "registrations: at reset APB4ENR reads 0x00010000 (RTCAPBEN, p471), and SPI1 has no kernel clock because SPI1EN = 0 (Table 62 p376)" \
+      "console registrations | grep -A1 -x 'R-APB4ENR' | tail -n1 | grep -qx '0x00010000' && grep -q '^Q spi1: NOT running; RCC_APB2ENR.SPI1EN = 0' '$work/registrations/renode.out'" ;;
   hse16)
     hse='python "import System; B = System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance; g = self.Machine[\"sysbus.rcc\"]; i = g.GetType().GetField(\"inner\", B).GetValue(g); print(\"HSE guard=\" + str(g.HseFrequency) + \" stock=\" + str(i.GetType().GetField(\"hseFrequency\", B).GetValue(i)))"'
     PLATFORM=/repo/tests/1300/hse16.repl run_case hse16 - "$hse"

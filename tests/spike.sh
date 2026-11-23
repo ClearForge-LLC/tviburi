@@ -14,6 +14,10 @@ set -euo pipefail
 IMAGE=ghcr.io/clearforge-llc/aethelgard-tools@sha256:1e0ab105ec42bdba66b773464f0b6679d622e4afdafef30ec4931e4326f49c63
 ACCEPTANCE="unit modf modeled ardupilot generated field stable cfg2first iolock rmw forge stock-forge stock-modf nomark conditions fields load crash identity verify reproducible recorded"
 ADVERSARIAL="adv-removed adv-extra-arg adv-bad-variant adv-hook adv-loglevel adv-spray adv-noend adv-version adv-recorded adv-noname adv-release adv-cache"
+# TVI-WO-1300: the RCC guard's cases live in tests/1300/rcc.sh; each is a test here, rcc-<case>, run as part of the
+# acceptance group, so CI and tests/mutants.sh reach them.
+RCC_CASES=$(sed -n 's/^CASES="\(.*\)"$/\1/p' "$(dirname "$0")/1300/rcc.sh")
+ACCEPTANCE="$ACCEPTANCE $(for c in $RCC_CASES; do printf 'rcc-%s ' "$c"; done)"
 ALL="$ACCEPTANCE $ADVERSARIAL"
 here=$(cd "$(dirname "$0")/.." && pwd)
 scratch=${TVIBURI_SCRATCH:-$HOME/.cache/tviburi}
@@ -331,7 +335,7 @@ t_load() {
   renode_in load "$work/badmode.tree" /repo/tests/conditions.resc
   local accesses; accesses=$(grep -cE '^sysbus (Write|Read)[A-Za-z]* 0x4001' "$src/tests/conditions.resc")
   check "mode \"Recorded\" in the platform: a TVI-LOAD refusal at seq 0, no witness, every SPI1 access refused (3) (gate clause 7)" \
-    "grep -qx 'CHECK REFUSED' '$work/load.stdout' && ! grep -q 'tviburi\":\"witness' '$work/load/renode-log.txt' \
+    "grep -qx 'CHECK REFUSED' '$work/load.stdout' && ! grep -q 'spi1: {\"tviburi\":\"witness' '$work/load/renode-log.txt' \
      && records '$work/load.stdout' 'recs[0][\"seq\"] == 0 and recs[0][\"bit\"] == \"none\" and len(recs) == $((accesses + 1)) and all(r[\"rule\"] == \"TVI-LOAD\" for r in recs)'"
 }
 
@@ -606,6 +610,18 @@ t_adv-cache() {
   # cache holds nothing to reuse, and the second boot reports its own release.
   check "...and it in fact reports its own release" "grep -q \"spi1: {.tviburi.:.witness.*\$(sed -n 's/^b=//p' '$work/adv-cache.stdout')\" '$work/adv-cache/b-log.txt'"
 }
+
+t_rcc() { # t_rcc <case>: one case of tests/1300/rcc.sh on this source, its ok/FAIL lines counted here
+  local out rrc=0
+  out=$(TVIBURI_TESTS="$1" TVIBURI_SCRATCH="$work" "$src/tests/1300/rcc.sh" "$src" 2>&1) || rrc=$?
+  grep -E '^(ok|FAIL) ' <<<"$out" || true
+  local f; f=$(grep -c '^FAIL ' <<<"$out" || true)
+  if [ "$rrc" -ne 0 ] && [ "$f" -eq 0 ]; then
+    echo "FAIL rcc-$1: tests/1300/rcc.sh exited $rrc with no verdict"; f=1
+  fi
+  fails=$((fails + f))
+}
+for c in $RCC_CASES; do eval "t_rcc-$c() { t_rcc $c; }"; done
 
 for t in ${TVIBURI_TESTS:-acceptance}; do
   case "$t" in

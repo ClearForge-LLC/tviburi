@@ -1,0 +1,5 @@
+// TVI-WO-1300: the board with the RCC guard in recorded mode (RUL-19); spi1 stays enforcing.
+using "/repo/model/tviburi-nucleo-h753zi.repl"
+
+tviburiRcc:
+    mode: "recorded"
