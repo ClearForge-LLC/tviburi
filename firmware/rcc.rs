@@ -22,9 +22,27 @@
 //!   path="read"      - a read of RCC offset 0x014, where RM0433 has no register: refused by TVI-RCC-READ, unmodeled.
 //!   path="usart2"    - USART234578SEL written 001 (pll2_q_ck) with PLL2 off, USART2EN, then USART2 CR1.UE: the test asks
 //!                      for USART2's kernel clock there; predicted-fault (p417, p371).
-//!   path="ardupilot", "gen-s03", "gen-hc16" - the RCC write sequences of ArduPilot and of two generated boards, as
-//!                      measured (SEQ below), with no SPI start: each passes, enforcing (WO §2).
+//!   path="ardupilot" - ArduPilot's RCC write sequence, as measured (SEQ below), with no SPI start: it passes, enforcing.
+//!   path="gen-s03", "gen-hc16" - the RCC write sequences of two generated boards (SEQ below), then SPI1's start, as the
+//!                      generated firmware starts it (TVI-WO-1300a): sentinel-03 starts with no kernel clock (the per_ck
+//!                      scar, refused at SPI1, TVI-SPI-KERNEL); hse-crystal-16 starts on pll1_q_ck and passes.
 //! These end at their own access, with no SPI start.
+//! TVI-WO-1300a. Each path below starts SPI1 on its kernel clock first ("clocked", or per_ck), unless it says otherwise.
+//!   path="unenabled" - PLL1 started, then SPI1 configured with SPI1EN never set: TVI-SPI-ENABLE, predicted-fault (p373).
+//!   path="lost-pll"  - then PLL1ON cleared (PLL1 is not the system clock): TVI-RCC-CLOCK, predicted-fault (p383, p371).
+//!   path="lost-sel"  - then SPI123SEL written 001 (pll2_p_ck, PLL2 off): the mux waits, TVI-RCC-CLOCK (p414, p371).
+//!   path="lost-en"   - then SPI1EN cleared: TVI-RCC-CLOCK (Table 62, p376).
+//!   path="lost-osc"  - per_ck on hse_ck (HSE on, CKPERSEL = 10), then HSEON cleared (HSE neither the system clock nor
+//!                      PLL1's source): TVI-RCC-CLOCK (p384, p412, p371).
+//!   path="lost-ckper" - per_ck on hsi_ker_ck, then CKPERSEL written 01 (csi_ker_ck, CSI off): TVI-RCC-CLOCK (p412, p371).
+//!   path="stopped"   - then SPE cleared, then SPI123SEL written 001: nothing runs, a valid order; passes.
+//!   path="ckper-live" - per_ck on hsi_ker_ck with HSE on, then CKPERSEL written 10 (hse_ck): both inputs run, the mux
+//!                      switches; passes.
+//!   path="blocked"   - per_ck on hsi_ker_ck, then HSION cleared while HSI is the system clock: silicon blocks it
+//!                      ("cannot be cleared", p386) and so does the model; passes.
+//!   path="cfg2same"  - then CFG2 written with the value it holds, SPE = 1: nothing changes (TVI-WO-1300a (4), p2221); passes.
+//!   path="sel5"      - SPI123SEL written 101 (reserved, "the kernel clock is disabled", p414): TVI-RCC-FIELD, unmodeled.
+//!   path="divr"      - PLL1 started, then RCC_PLL1DIVR changed (DIVQ1 3 -> 4): silicon ignores it (p404); TVI-RCC-PLL.
 //! Bits: RM0433 Rev 9 §8.7 (RCC_CR p383-386, PLLCFGR p400-401, PLL1DIVR p403-404, D2CCIP1R p414, APB2ENR p469).
 #![no_std]
 #![no_main]
@@ -55,6 +73,20 @@ const CR_PLL1ON: u32 = 1 << 24;
 const CR_PLL1RDY: u32 = 1 << 25;
 const SPI1EN: u32 = 1 << 12;
 const SPI123SEL_SHIFT: u32 = 12;
+const RCC_D1CCIPR: *mut u32 = (RCC + 0x04C) as *mut u32;
+const CR_HSION: u32 = 1 << 0;
+const CR_HSEON: u32 = 1 << 16;
+const CR_HSERDY: u32 = 1 << 17;
+const CKPERSEL_SHIFT: u32 = 28;
+
+unsafe fn ckpersel(v: u32) {
+    write_volatile(RCC_D1CCIPR, (read_volatile(RCC_D1CCIPR) & !(3 << CKPERSEL_SHIFT)) | (v << CKPERSEL_SHIFT));
+}
+
+unsafe fn hse_on() {
+    write_volatile(RCC_CR, read_volatile(RCC_CR) | CR_HSEON);
+    while read_volatile(RCC_CR) & CR_HSERDY == 0 {}
+}
 
 unsafe fn pll1_on() {
     // DIVM1 stays at its reset 32 (hsi_ck 64 MHz / 32 = 2 MHz, PLL1RGE's reset range 1-2 MHz); DIVN1 = 399 (x400,
@@ -165,14 +197,52 @@ pub unsafe extern "C" fn reset() -> ! {
     write_volatile(RCC_PLLCFGR, read_volatile(RCC_PLLCFGR) & !(1 << 17));
     #[cfg(path = "alias")]
     write_volatile(RCC_C1_APB2ENR, read_volatile(RCC_C1_APB2ENR) | SPI1EN);
-    // Every path but the nine that end at their own access enables SPI1 and starts it.
-    #[cfg(not(any(path = "ardupilot", path = "gen-s03", path = "gen-hc16", path = "pllref", path = "divm0", path = "sw", path = "width", path = "read", path = "usart2")))]
+    #[cfg(any(path = "unenabled", path = "lost-pll", path = "lost-sel", path = "lost-en", path = "stopped", path = "cfg2same", path = "divr",
+        path = "lost-osc", path = "lost-ckper", path = "ckper-live", path = "blocked"))]
+    pll1_on();
+    #[cfg(any(path = "lost-osc", path = "ckper-live"))]
+    hse_on();
+    #[cfg(path = "lost-osc")]
+    ckpersel(0b10);
+    #[cfg(any(path = "lost-osc", path = "lost-ckper", path = "ckper-live", path = "blocked"))]
+    spi123sel(0b100); // per_ck: both inputs run, so the mux switches
+    #[cfg(path = "sel5")]
+    spi123sel(0b101);
+    #[cfg(path = "divr")]
+    write_volatile(RCC_PLL1DIVR, (1 << 24) | (4 << 16) | (1 << 9) | 399);
+    #[cfg(path = "unenabled")]
+    spi1_start(); // SPI1EN never set: the first SPI1 access refuses
+    // Every path but those that end at their own access enables SPI1 and starts it.
+    #[cfg(not(any(path = "ardupilot", path = "pllref", path = "divm0", path = "sw", path = "width", path = "read", path = "usart2",
+        path = "unenabled", path = "sel5", path = "divr")))]
     {
         #[cfg(not(path = "alias"))]
         write_volatile(RCC_APB2ENR, read_volatile(RCC_APB2ENR) | SPI1EN);
         let _ = read_volatile(RCC_APB2ENR); // RM0433 p372 b): read back the enable before using the peripheral
         spi1_start();
     }
+    // After the start, with SPI1 running (SPE = 1).
+    #[cfg(path = "lost-pll")]
+    write_volatile(RCC_CR, read_volatile(RCC_CR) & !CR_PLL1ON);
+    #[cfg(path = "lost-sel")]
+    spi123sel(0b001);
+    #[cfg(path = "lost-en")]
+    write_volatile(RCC_APB2ENR, read_volatile(RCC_APB2ENR) & !SPI1EN);
+    #[cfg(path = "lost-osc")]
+    write_volatile(RCC_CR, read_volatile(RCC_CR) & !CR_HSEON);
+    #[cfg(path = "lost-ckper")]
+    ckpersel(0b01);
+    #[cfg(path = "stopped")]
+    {
+        write_volatile(SPI1_CR1, read_volatile(SPI1_CR1) & !1); // SPE = 0
+        spi123sel(0b001);
+    }
+    #[cfg(path = "ckper-live")]
+    ckpersel(0b10);
+    #[cfg(path = "blocked")]
+    write_volatile(RCC_CR, read_volatile(RCC_CR) & !CR_HSION);
+    #[cfg(path = "cfg2same")]
+    write_volatile(SPI1_CFG2, read_volatile(SPI1_CFG2));
     write_volatile(MARK_AFTER, 0xAF7E_0002);
     loop {}
 }

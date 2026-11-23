@@ -16,6 +16,14 @@
 // current and its new input; until then no clock reaches the peripheral, and a system reset changes the selector
 // back to its reset value but not the mux's input.
 //
+// Enables at reset (TVI-WO-1300a (1)): the *ENR copies start at 0, as silicon, and are written into the owned stock RCC
+// after each registration and at reset. Its write callbacks lock every registered peripheral whose enable is 0 on the bus:
+// a write is dropped and a read returns 0, as p373 says for the write ("A write access will be ignored"). The stock model
+// starts every peripheral enabled, and the bus's lock survives a reset; neither stands (measured, TVI-WO-1300a.measure.md
+// §1.1). A guarded peripheral registered here (an SPI guard) stays unlocked on the bus: its own guard asks this guard for
+// its enable at every access and refuses by name (TVI-SPI-ENABLE). `rtc` locks only through RCC_BDCR.RTCEN, which the
+// guard does not copy (a row).
+//
 // Rules, in the order they are evaluated. A refused access is not passed to the stock model.
 //   TVI-LOAD        (Records) the model version could not be computed: every access refuses.
 //   TVI-RCC-WIDTH   a misaligned access; and a half-word or byte access to any register but RCC_BDCR, RCC_CSR and RCC_RSR,
@@ -23,7 +31,8 @@
 //                   sub-word accesses, each checked as the 32-bit word it makes. Both firmwares use only 32-bit (§4).
 //   TVI-RCC-READ    a read of an offset with no register (Table 84, p496-505).
 //   TVI-RCC-PLL     a write silicon ignores because a PLL is on: PLLSRC with any PLL on (p399), DIVMx with PLLx on
-//                   (p398-399), DIVPx/DIVQx/DIVRxEN with PLLx on (p400-401). predicted-fault.
+//                   (p398-399), DIVPx/DIVQx/DIVRxEN with PLLx on (p400-401), RCC_PLLxDIVR changed with PLLx on (p403-410;
+//                   TVI-WO-1300a). predicted-fault. Silicon blocks these writes, so no clock is lost by them.
 //   TVI-RCC-PLL-REF a CR write after which an enabled PLL has no reference clock: PLLxON set while PLLSRC = 11 ("No clock
 //                   send to DIVMx divider and PLLs", p399), its source off, or DIVMx = 0 ("prescaler disabled",
 //                   p398-399); or the source of an enabled PLL cleared. The stock model reports PLLxRDY = PLLxON
@@ -37,12 +46,19 @@
 //                   DIVM1 = 0, divides by zero). unmodeled.
 //   TVI-RCC-FIELD   the allow-list (`Fields`): a write that gives any field a value the model does not implement,
 //                   or a write to an offset with no register. unmodeled.
+//   TVI-RCC-CLOCK   (TVI-WO-1300a (3)) a write after which a guarded peripheral that runs (an SPI with SPE = 1) loses the
+//                   kernel clock it had, by the query on the state the write leaves: a source oscillator or PLLxON cleared,
+//                   a selector or CKPERSEL changed so that its mux waits (p371-372), or the peripheral's own PERxEN cleared
+//                   (Table 62, p376). predicted-fault (p371: "no clock will be provided to the peripheral"). A clear silicon
+//                   blocks (an oscillator or PLL1ON on the system clock's path, p383-386) is modeled as the block: the stock
+//                   model keeps the bit, and nothing is lost. PLL1's source cleared with PLL1 on is TVI-RCC-PLL-REF's (above).
 //   TVI-RCC-KERNEL  (RequireKernelClock) a peripheral started with no kernel clock: predicted-fault, naming the selector,
 //                   its source and the pages; unmodeled for a peripheral the query does not cover.
 // Recorded mode (RUL-19): after a rule fires and is recorded, the access goes on to the stock model and the copies as
 // if no rule had fired, and no further rule is evaluated for it (model/Refusal.cs).
 // Enabling a bus clock before its kernel source runs is valid and never refused (architect, 2026-11-23). Whether
-// a peripheral's start finds its kernel clock is that peripheral's guard's rule, through the query.
+// a peripheral's start finds its kernel clock is that peripheral's guard's rule, through the query (TVI-SPI-KERNEL);
+// RequireKernelClock asks the same question from the monitor, recorded under rcc, for a peripheral with no guard yet.
 
 using System;
 using System.Collections.Generic;
@@ -67,6 +83,7 @@ namespace Antmicro.Renode.Peripherals.Tviburi
             HseFrequency = hseFrequency;
             CsiFrequency = csiFrequency;
             inner = new STM32H7_RCC(machine, systick, hseFrequency, csiFrequency);
+            host = machine;
             records = new Records(machine, this, nameof(GuardedSTM32H7_RCC), mode);
             muxes = new[] { PerMux, SpiMux, I2cMux, UsartMux, Usart2Mux, RngMux }.Select(m => new MuxState(m)).ToArray();
             ResetCopies();
@@ -82,6 +99,7 @@ namespace Antmicro.Renode.Peripherals.Tviburi
         {
             inner.Reset();
             ResetCopies();
+            SyncEnables();
         }
 
         public void Dispose()
@@ -92,11 +110,44 @@ namespace Antmicro.Renode.Peripherals.Tviburi
         public void Register(IPeripheral peripheral, EnumRegistrationPoint<STM32H7_RCC.RegistrationPeripheralAlias> registrationPoint)
         {
             inner.Register(peripheral, registrationPoint);
+            if(peripheral is GuardedSTM32H7_SPI spi)
+            {
+                guarded[registrationPoint.Name.ToString().ToLowerInvariant()] = spi;
+            }
+            SyncEnables();
         }
 
         public void Unregister(IPeripheral peripheral)
         {
             inner.Unregister(peripheral);
+            foreach(var key in guarded.Where(g => g.Value == peripheral).Select(g => g.Key).ToArray())
+            {
+                guarded.Remove(key);
+                host.SystemBus.SetPeripheralEnabled(peripheral, true);
+            }
+        }
+
+        // Whether this guard holds `spi` registered under `name`: only then does it keep it unlocked and watch its clock
+        // (TVI-RCC-CLOCK), so an SPI guard that is not held refuses rather than run unwatched.
+        public bool Holds(string name, IPeripheral spi)
+        {
+            return name != null && guarded.TryGetValue(name, out var g) && g == spi;
+        }
+
+        // Whether P's bus-clock enable is set in the guard's copy, for P's own guard (TVI-SPI-ENABLE). False when the
+        // query has no rule for P. Allocates nothing: it is asked at every access to a guarded peripheral.
+        public bool TryGetEnable(string peripheral, out bool enabled, out string enableName, out string enablePage)
+        {
+            if(peripheral == null || !Clocked.TryGetValue(peripheral, out var p))
+            {
+                enabled = false;
+                enableName = enablePage = null;
+                return false;
+            }
+            enabled = Enabled(p);
+            enableName = p.EnableName;
+            enablePage = p.EnablePage;
+            return true;
         }
 
         // ---- the query -----------------------------------------------------------------------------------------
@@ -111,7 +162,7 @@ namespace Antmicro.Renode.Peripherals.Tviburi
                     "TVI-WO-1300 (4): the query covers spi1, spi2, i2c1, i2c2, usart1, usart2, usart3 and rng");
             }
             var mux = muxes.Single(m => m.Def == p.Mux);
-            var enabled = (Copy(p.EnableOffset) >> p.EnableBit & 1) != 0;
+            var enabled = Enabled(p);
             var selector = p.Mux.Register + "." + p.Mux.Field + " = " + Bin(mux.Selector, p.Mux.Width);
             var citation = "RM0433 Rev 9 " + p.EnablePage + " (" + p.EnableName + "); p" + p.Mux.Page + " (" + p.Mux.Field + "); "
                 + "p371-372 (a kernel clock switch needs a clock on both inputs); p376-377 Table 62 (PERxEN gates the kernel clock)";
@@ -129,7 +180,7 @@ namespace Antmicro.Renode.Peripherals.Tviburi
             var source = p.Mux.Sources[mux.Current];
             var running = Running(source);
             return new KernelClock(peripheral, true, running, source + ": " + Condition(source), selector,
-                citation + "; " + SourceCitation(source));
+                citation + "; " + SourceCitation(source) + (source == "per_ck" ? "; " + SourceCitation(PerMux.Sources[muxes[0].Current]) : ""));
         }
 
         // Monitor- and test-facing: refuse (predicted-fault) unless P's kernel clock runs. The start that needs it is
@@ -323,7 +374,8 @@ namespace Antmicro.Renode.Peripherals.Tviburi
                 return true;
             }
             var b = Base(offset);
-            return RefusedPll(b, value) || RefusedPllReference(b, value) || RefusedSwitch(b, value) || RefusedField(offset, b, value);
+            return RefusedPll(b, value) || RefusedPllReference(b, value) || RefusedSwitch(b, value) || RefusedField(offset, b, value)
+                || RefusedClockLoss(offset, b, value);
         }
 
         private void Pass(long b, uint value)
@@ -332,8 +384,40 @@ namespace Antmicro.Renode.Peripherals.Tviburi
             {
                 copies[b] = value;
             }
+            if(divr.ContainsKey(b))
+            {
+                divr[b] = value;
+            }
             inner.WriteDoubleWord(b, value);
+            if(EnableOffsets.Contains(b))
+            {
+                UnlockGuarded();
+            }
             Settle();
+        }
+
+        // ---- enables at reset (TVI-WO-1300a (1)) ---------------------------------------------------------------
+
+        // The copies of the nine *ENR into the owned stock RCC, whose write callbacks lock every registered peripheral whose
+        // enable is 0 on the bus, as silicon ignores it (p373; measured, TVI-WO-1300a.measure.md §1.1): after a registration and
+        // at reset. The stock model's own *ENR start at 1 and the bus's lock survives a reset, so neither may stand.
+        private void SyncEnables()
+        {
+            foreach(var off in EnableOffsets)
+            {
+                inner.WriteDoubleWord(off, Copy(off));
+            }
+            UnlockGuarded();
+        }
+
+        // A guarded peripheral stays unlocked on the bus: a lock would hide the access from its own guard, which refuses it by
+        // name instead (TVI-SPI-ENABLE; ruled 17:16Z).
+        private void UnlockGuarded()
+        {
+            foreach(var g in guarded.Values)
+            {
+                host.SystemBus.SetPeripheralEnabled(g, true);
+            }
         }
 
         // ---- rules ---------------------------------------------------------------------------------------------
@@ -356,6 +440,15 @@ namespace Antmicro.Renode.Peripherals.Tviburi
                         return RefusePll(b, value, "DIVM" + n, "RCC_PLLCKSELR.DIVM" + n + " changed while PLL" + n + " is on: \"The hardware does not allow any modification of this prescaler when PLLx is enabled\"",
                             "RM0433 Rev 9 §8.7.11 p398-399 (DIVM" + n + "); §8.5.5 p347");
                     }
+                }
+            }
+            if(divr.TryGetValue(b, out var oldDivr) && value != oldDivr && value != inner.ReadDoubleWord(b))
+            {
+                var n = (int)(b - Pll1divrOffset) / 8 + 1;
+                if(PllOn(n))
+                {
+                    return RefusePll(b, value, "DIVN" + n + "/DIVP" + n + "/DIVQ" + n + "/DIVR" + n, "RCC_PLL" + n + "DIVR changed while PLL" + n + " is on: \"These bits can be written only when the PLL" + n + " is disabled\"",
+                        "RM0433 Rev 9 " + (n == 1 ? "§8.7.13 p403-404" : n == 2 ? "§8.7.15 p406-407" : "§8.7.17 p409-410") + " (DIVN" + n + ", DIVP" + n + ", DIVQ" + n + ", DIVR" + n + "); §8.5.5 p347");
                 }
             }
             if(b == PllcfgrOffset)
@@ -479,6 +572,71 @@ namespace Antmicro.Renode.Peripherals.Tviburi
             return false;
         }
 
+        // TVI-RCC-CLOCK (TVI-WO-1300a (3); ruled 17:16Z): a write after which a guarded peripheral that runs (an SPI with SPE = 1)
+        // loses the kernel clock it had. Evaluated on the state the write leaves: the copies take it, RCC_CR keeps what the
+        // stock model keeps (the oscillator and PLL1ON clears silicon blocks, p383-386, which therefore lose nothing), and the
+        // muxes settle (p371). A transition only: a peripheral that runs without a clock was refused at its start.
+        private bool RefusedClockLoss(long offset, long b, uint value)
+        {
+            var running = guarded.Where(g => g.Value.Started && QueryKernelClock(g.Key).Running).Select(g => g.Key).ToArray();
+            if(running.Length == 0)
+            {
+                return false;
+            }
+            string lost = null;
+            KernelClock after = null;
+            var savedCopy = copies.TryGetValue(b, out var c) ? c : (uint?)null;
+            var savedMux = muxes.Select(m => m.Current).ToArray();
+            try
+            {
+                if(savedCopy != null)
+                {
+                    copies[b] = value;
+                }
+                if(b == CrOffset)
+                {
+                    crAfter = KeptCr(value);
+                }
+                Settle();
+                foreach(var p in running)
+                {
+                    var k = QueryKernelClock(p);
+                    if(!k.Running)
+                    {
+                        lost = p;
+                        after = k;
+                        break;
+                    }
+                }
+            }
+            finally
+            {
+                if(savedCopy != null)
+                {
+                    copies[b] = savedCopy.Value;
+                }
+                crAfter = null;
+                for(var i = 0; i < muxes.Length; i++)
+                {
+                    muxes[i].Current = savedMux[i];
+                }
+                Settle();
+            }
+            if(lost == null)
+            {
+                return false;
+            }
+            var old = b == CrOffset ? inner.ReadDoubleWord(CrOffset) : Served(b);
+            var written = b == CrOffset ? KeptCr(value) : value;
+            var changed = Fields.Where(f => f.Offset == b && f.Class != "read-only" && f.Class != "reserved" && f.Of(old) != f.Of(written)).Select(f => f.Register + "." + f.Name + " (" + f.Bits + ") = " + f.Format(f.Of(written)));
+            records.Refuse("TVI-RCC-CLOCK", PredictedFault, RegisterAt(offset), string.Join(", ", changed),
+                lost + " is enabled (SPE = 1) and this write stops its kernel clock: " + after.Condition,
+                (after.Condition.Contains("has not switched") ? "RM0433 Rev 9 §8.5.10 p371 (\"no clock will be provided to the peripheral\"); " : "RM0433 Rev 9 ")
+                    + after.Citation.Substring("RM0433 Rev 9 ".Length),
+                State(), offset, value, 32);
+            return true;
+        }
+
         // ---- the clock tree ------------------------------------------------------------------------------------
 
         // After every passed write and every reset: each mux whose selector differs from its input switches when a
@@ -497,7 +655,7 @@ namespace Antmicro.Renode.Peripherals.Tviburi
 
         private bool Running(string source)
         {
-            var cr = inner.ReadDoubleWord(CrOffset);
+            var cr = Cr();
             switch(source)
             {
             case "rcc_pclk1":
@@ -527,7 +685,7 @@ namespace Antmicro.Renode.Peripherals.Tviburi
 
         private string Condition(string source)
         {
-            var cr = inner.ReadDoubleWord(CrOffset);
+            var cr = Cr();
             switch(source)
             {
             case "rcc_pclk1":
@@ -579,7 +737,13 @@ namespace Antmicro.Renode.Peripherals.Tviburi
 
         private bool PllOn(int n)
         {
-            return (inner.ReadDoubleWord(CrOffset) >> (24 + 2 * (n - 1)) & 1) != 0;
+            return (Cr() >> (24 + 2 * (n - 1)) & 1) != 0;
+        }
+
+        // RCC_CR as the clock tree reads it: the stock model's, or during TVI-RCC-CLOCK's trial the value a write leaves.
+        private uint Cr()
+        {
+            return crAfter ?? inner.ReadDoubleWord(CrOffset);
         }
 
         private bool AnyPllOn()
@@ -616,12 +780,21 @@ namespace Antmicro.Renode.Peripherals.Tviburi
             {
                 copies[off] = ResetValue(off);
             }
+            foreach(var off in divr.Keys.ToArray())
+            {
+                divr[off] = DivrReset;
+            }
             Settle();
         }
 
         private uint Copy(long offset)
         {
             return copies[offset];
+        }
+
+        private bool Enabled(ClockedPeripheral p)
+        {
+            return (Copy(p.EnableOffset) >> p.EnableBit & 1) != 0;
         }
 
         private static uint ResetValue(long offset)
@@ -754,8 +927,8 @@ namespace Antmicro.Renode.Peripherals.Tviburi
 
         private static readonly int[] DivmShift = { 0, 4, 12, 20 };
         private static readonly string[] PllSourceName = { "hsi_ck", "csi_ck", "hse_ck", "no clock" };
-        private static readonly long[] CopiedOffsets = { PllckselrOffset, PllcfgrOffset, 0x04C, 0x050, 0x054, 0x058,
-            0x0D4, 0x0D8, 0x0DC, 0x0E0, 0x0E4, 0x0E8, 0x0EC, 0x0F0, 0x0F4 };
+        private static readonly long[] EnableOffsets = { 0x0D4, 0x0D8, 0x0DC, 0x0E0, 0x0E4, 0x0E8, 0x0EC, 0x0F0, 0x0F4 };
+        private static readonly long[] CopiedOffsets = new[] { PllckselrOffset, PllcfgrOffset, 0x04C, 0x050, 0x054, 0x058 }.Concat(EnableOffsets).ToArray();
 
         private const long CrOffset = 0x000;
         private const long CfgrOffset = 0x010;
@@ -764,6 +937,8 @@ namespace Antmicro.Renode.Peripherals.Tviburi
         private const long RsrOffset = 0x0D0;
         private const long PllckselrOffset = 0x028;
         private const long PllcfgrOffset = 0x02C;
+        private const long Pll1divrOffset = 0x030;
+        private const uint DivrReset = 0x01010280;
         private const uint CrHsion = 1u << 0;
         private const uint CrCsion = 1u << 7;
         private const uint CrHsi48on = 1u << 12;
@@ -772,6 +947,13 @@ namespace Antmicro.Renode.Peripherals.Tviburi
         private const string PredictedFault = "predicted-fault";
 
         private readonly STM32H7_RCC inner;
+        private readonly IMachine host;
+        // The guarded peripherals registered here, by their alias's name (spi1): kept unlocked; asked whether they run.
+        private readonly Dictionary<string, GuardedSTM32H7_SPI> guarded = new Dictionary<string, GuardedSTM32H7_SPI>();
+        // RCC_PLLxDIVR as last written, at the reset value p403-410 give: TVI-RCC-PLL refuses a write that differs from it and
+        // from what the stock model reads back, which drops the top bit of each PLL2/3 field (a read-modify-write is no change).
+        private readonly Dictionary<long, uint> divr = new Dictionary<long, uint> { [Pll1divrOffset] = DivrReset, [Pll1divrOffset + 8] = DivrReset, [Pll1divrOffset + 16] = DivrReset };
+        private uint? crAfter;
         private readonly Records records;
         private readonly MuxState[] muxes;
         private Dictionary<long, uint> copies;
@@ -968,7 +1150,7 @@ namespace Antmicro.Renode.Peripherals.Tviburi
             R("RCC_D2CCIP1R", 0x050, "§8.7.20", "Res19", 19, 19, Zero, "reserved", "reserved: dropped, reads its reset value", 413),
             R("RCC_D2CCIP1R", 0x050, "§8.7.20", "SPI45SEL", 18, 16, Any, "modeled by the guard", "the guard's copy, served on read; this mux's peripherals are not modeled, and their enable refuses", 414),
             R("RCC_D2CCIP1R", 0x050, "§8.7.20", "Res15", 15, 15, Zero, "reserved", "reserved: dropped, reads its reset value", 414),
-            R("RCC_D2CCIP1R", 0x050, "§8.7.20", "SPI123SEL", 14, 12, new uint[] { 0, 1, 2, 4, 5, 6, 7 }, "modeled by the guard", "the guard's copy and its mux (p371)", 414),
+            R("RCC_D2CCIP1R", 0x050, "§8.7.20", "SPI123SEL", 14, 12, new uint[] { 0, 1, 2, 4 }, "modeled by the guard", "the guard's copy and its mux (p371)", 414),
             R("RCC_D2CCIP1R", 0x050, "§8.7.20", "Res11_9", 11, 9, Zero, "reserved", "reserved: dropped, reads its reset value", 414),
             R("RCC_D2CCIP1R", 0x050, "§8.7.20", "SAI23SEL", 8, 6, Any, "modeled by the guard", "the guard's copy, served on read; this mux's peripherals are not modeled, and their enable refuses", 415),
             R("RCC_D2CCIP1R", 0x050, "§8.7.20", "Res5_3", 5, 3, Zero, "reserved", "reserved: dropped, reads its reset value", 415),
@@ -1244,7 +1426,7 @@ namespace Antmicro.Renode.Peripherals.Tviburi
             R("RCC_AHB1ENR", 0x0D8, "§8.7.41", "ETH1TXEN", 16, 16, Any, "inherited, unaudited (acknowledged by name)", "the guard's copy; the stock bus enable (computed-read)", 455),
             R("RCC_AHB1ENR", 0x0D8, "§8.7.41", "ETH1MACEN", 15, 15, Any, "inherited, unaudited (acknowledged by name)", "the guard's copy; the stock bus enable (computed-read)", 455),
             R("RCC_AHB1ENR", 0x0D8, "§8.7.41", "Res14_6", 14, 6, Zero, "reserved", "reserved: dropped, reads its reset value", 455),
-            R("RCC_AHB1ENR", 0x0D8, "§8.7.41", "ADC12EN", 5, 5, Zero, "inherited, unaudited (acknowledged by name)", "disabled: a kernel-clocked peripheral the query does not cover (TVI-WO-1300 (4))", 455),
+            R("RCC_AHB1ENR", 0x0D8, "§8.7.41", "ADC12EN", 5, 5, Zero, "inherited, unaudited (acknowledged by name)", "disabled: the ADC clock is chosen by ADCx_CCR.CKMODE[1:0] (p920), an ADC register the RCC guard cannot see: adc_sclk unless CKMODE = 00, else the kernel clock ADCSEL selects (p419); unmodeled until an ADC guard reads CKMODE", 455),
             R("RCC_AHB1ENR", 0x0D8, "§8.7.41", "Res4_2", 4, 2, Zero, "reserved", "reserved: dropped, reads its reset value", 455),
             R("RCC_AHB1ENR", 0x0D8, "§8.7.41", "DMA2EN", 1, 1, Any, "inherited, unaudited (acknowledged by name)", "the guard's copy; the stock bus enable (computed-read)", 455),
             R("RCC_AHB1ENR", 0x0D8, "§8.7.41", "DMA1EN", 0, 0, Any, "inherited, unaudited (acknowledged by name)", "the guard's copy; the stock bus enable (computed-read)", 455),
@@ -1263,7 +1445,7 @@ namespace Antmicro.Renode.Peripherals.Tviburi
             R("RCC_AHB4ENR", 0x0E0, "§8.7.43", "BKPRAMEN", 28, 28, Any, "inherited, unaudited (acknowledged by name)", "the guard's copy; the stock bus enable (computed-read)", 458),
             R("RCC_AHB4ENR", 0x0E0, "§8.7.43", "Res27_26", 27, 26, Zero, "reserved", "reserved: dropped, reads its reset value", 458),
             R("RCC_AHB4ENR", 0x0E0, "§8.7.43", "HSEMEN", 25, 25, Any, "inherited, unaudited (acknowledged by name)", "the guard's copy; the stock bus enable (computed-read)", 458),
-            R("RCC_AHB4ENR", 0x0E0, "§8.7.43", "ADC3EN", 24, 24, Zero, "inherited, unaudited (acknowledged by name)", "disabled: a kernel-clocked peripheral the query does not cover (TVI-WO-1300 (4))", 458),
+            R("RCC_AHB4ENR", 0x0E0, "§8.7.43", "ADC3EN", 24, 24, Zero, "inherited, unaudited (acknowledged by name)", "disabled: the ADC clock is chosen by ADCx_CCR.CKMODE[1:0] (p920), an ADC register the RCC guard cannot see: adc_sclk unless CKMODE = 00, else the kernel clock ADCSEL selects (p419); unmodeled until an ADC guard reads CKMODE", 458),
             R("RCC_AHB4ENR", 0x0E0, "§8.7.43", "Res23_22", 23, 22, Zero, "reserved", "reserved: dropped, reads its reset value", 458),
             R("RCC_AHB4ENR", 0x0E0, "§8.7.43", "BDMAEN", 21, 21, Any, "inherited, unaudited (acknowledged by name)", "the guard's copy; the stock bus enable (computed-read)", 458),
             R("RCC_AHB4ENR", 0x0E0, "§8.7.43", "Res20", 20, 20, Zero, "reserved", "reserved: dropped, reads its reset value", 458),

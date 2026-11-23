@@ -23,6 +23,10 @@
 // (RUL-19) the first rule that fires is logged as `would-refuse`, no later rule is evaluated for that access,
 // and the access goes on to the model and the copies as if no rule had fired. TVI-LOAD always refuses.
 //   TVI-LOAD          (Records) the guard failed to load (a mode other than the two): every access refuses.
+//   TVI-SPI-ENABLE    (TVI-WO-1300a (1)) any access while the RCC guard's copy of this SPI's bus-clock enable is 0: silicon
+//                     ignores the write and returns invalid data for the read (p373). predicted-fault. With no RCC guard at
+//                     "sysbus.rcc", or none that covers this instance's name, unmodeled. The RCC guard keeps this SPI unlocked
+//                     on the bus, so the access reaches this rule.
 //   TVI-SPI-WIDTH     any access other than an aligned 32-bit one, except at TXDR and RXDR, where the
 //                     access must be as wide as the frame (whole bytes of DSIZE+1 bits).
 //   TVI-SPI-ORDER     a write the manual orders against SPE, where it does not say what silicon does:
@@ -37,7 +41,8 @@
 //   TVI-SPI-IOLOCK    a CFG2 write while the IOLOCK latch is set. The latch is taken only from a CR1
 //                     write made with SPE=0, as silicon accepts it (p2217). predicted-fault while the
 //                     latch is certain, otherwise unmodeled (ruling C7).
-//   TVI-SPI-CFG2-SPE  a CFG2 write while the last CR1 passed had SPE=1 (write-protected).
+//   TVI-SPI-CFG2-SPE  a CFG2 write that changes it while the last CR1 passed had SPE=1 (write-protected, p2221); the value
+//                     CFG2 already holds changes nothing and passes (TVI-WO-1300a (4); RUL-18 as amended).
 //   TVI-SPI-CFG1-SPE  a CFG1 write while SPE=1 that changes it (ruling C3).
 //   TVI-SPI-I2SMOD    an I2SCFGR write with I2SMOD=1 (I2S/PCM mode is not modeled).
 //   TVI-SPI-FIELD     the allow-list above; and at a CR1 write with SPE=1, CFG1.DSIZE must be 00111.
@@ -47,6 +52,11 @@
 //                     history), and MASTER known. IFCR.MODFC clears the history (p2227), but MASTER is
 //                     then unknown until CFG2 is written again (ruling C6). Anything else refuses, by
 //                     the first failing branch.
+//   TVI-SPI-KERNEL    (TVI-WO-1300a (2)) a start (SPE rising, or CSTART rising with SPE) with no kernel clock, by the RCC
+//                     guard's query: predicted-fault, naming the selector, its source and the pages (p371-372, p414; p2159).
+//                     unmodeled when the query has no rule for this instance. The RCC guard is found by its name,
+//                     "sysbus.rcc" (RUL-09 (b)), and this instance's own name keys the query (spi1; spi2 on the consumer's
+//                     platform), at each use: never a static, a global or a stale reference.
 // Every refusal carries a kind (RUL-18): predicted-fault only where RM0433 says by page that silicon
 // faults or ignores the write; otherwise unmodeled.
 
@@ -64,7 +74,12 @@ namespace Antmicro.Renode.Peripherals.Tviburi
         public GuardedSTM32H7_SPI(IMachine machine, string mode = Records.Enforcing) : base(machine)
         {
             records = new Records(machine, this, nameof(GuardedSTM32H7_SPI), mode);
+            host = machine;
         }
+
+        // Whether this SPI is enabled (the last CR1 passed has SPE = 1): the RCC guard asks it at every RCC write, for
+        // TVI-RCC-CLOCK (TVI-WO-1300a (3)).
+        public bool Started => (cr1 & Cr1Spe) != 0;
 
         // The base constructor calls this before `records` exists (measured): touch only the copies.
         public override void Reset()
@@ -257,7 +272,7 @@ namespace Antmicro.Renode.Peripherals.Tviburi
             return true;
         }
 
-        // TVI-LOAD, then TVI-SPI-WIDTH: true if the access was refused.
+        // TVI-LOAD, then TVI-SPI-ENABLE, then TVI-SPI-WIDTH: true if the access was refused.
         private bool RefusedAccess(long offset, ulong value, int width, string access)
         {
             if(records.LoadFailed)
@@ -265,6 +280,10 @@ namespace Antmicro.Renode.Peripherals.Tviburi
                 records.Refuse("TVI-LOAD", Unmodeled, RegisterAt(offset), "none",
                     "access to a guarded peripheral that failed to load", Records.LoadCitation,
                     State(), offset, value, width);
+                return true;
+            }
+            if(RefusedEnable(offset, value, width, access))
+            {
                 return true;
             }
             if(offset == TxdrOffset || offset == RxdrOffset)
@@ -345,7 +364,7 @@ namespace Antmicro.Renode.Peripherals.Tviburi
                         State(), offset, value, 32);
                     return true;
                 }
-                if((cr1 & Cr1Spe) != 0)
+                if((cr1 & Cr1Spe) != 0 && value != cfg2)
                 {
                     records.Refuse("TVI-SPI-CFG2-SPE", PredictedFault, "SPI_CFG2", "CR1.SPE (bit 0) = 1",
                         "CFG2 written while the SPI is enabled: silicon write-protects CFG2 when SPE=1 and keeps the old value; the guard's copy would take it",
@@ -382,7 +401,90 @@ namespace Antmicro.Renode.Peripherals.Tviburi
             {
                 return true;
             }
-            return offset == Cr1Offset && (value & Cr1Spe) != 0 && !EnablePasses(value);
+            if(offset != Cr1Offset || (value & Cr1Spe) == 0)
+            {
+                return false;
+            }
+            if(!EnablePasses(value))
+            {
+                return true;
+            }
+            // A start: SPE rising, or CSTART rising with SPE (TVI-WO-1300a (2); CSTART with SPE = 0 is TVI-SPI-ORDER's).
+            var starts = (cr1 & Cr1Spe) == 0 || ((value & Cr1Cstart) != 0 && (base.ReadDoubleWord(Cr1Offset) & Cr1Cstart) == 0);
+            return starts && RefusedKernel(value);
+        }
+
+        // TVI-SPI-ENABLE (TVI-WO-1300a (1)): any access while the RCC guard's copy of this SPI's bus-clock enable is 0.
+        // Silicon ignores the write and returns invalid data for the read (p373). The RCC guard leaves its guarded
+        // peripherals unlocked on the bus, so this guard sees the access and refuses it by name.
+        private bool RefusedEnable(long offset, ulong value, int width, string access)
+        {
+            var rcc = Rcc(out var name);
+            string kind, bit, condition, citation;
+            if(rcc == null)
+            {
+                kind = Unmodeled;
+                bit = "none";
+                condition = access + " of " + (name ?? "an SPI") + " with " + NoRcc + ": the twin cannot say whether its bus clock is enabled, nor watch its kernel clock";
+                citation = "TVI-WO-1300a (1), (2): the SPI guard asks the RCC guard, found by name (RUL-09 (b))";
+            }
+            else if(!rcc.TryGetEnable(name, out var enabled, out var enableName, out var enablePage))
+            {
+                kind = Unmodeled;
+                bit = "none";
+                condition = access + " of " + name + ", for which the RCC guard has no enable rule: the twin cannot say whether its bus clock is enabled";
+                citation = "TVI-WO-1300 (4): the RCC guard's query covers spi1, spi2, i2c1, i2c2, usart1, usart2, usart3 and rng";
+            }
+            else if(enabled)
+            {
+                return false;
+            }
+            else
+            {
+                kind = PredictedFault;
+                bit = enableName + " = 0";
+                condition = width + "-bit " + access + " of " + name + " while its bus clock is not enabled: silicon " + (access == "write" ? "ignores the write" : "returns invalid data")
+                    + " (\"When the bus interface clock is not active, read or write accesses to the peripheral registers are not supported\")";
+                citation = "RM0433 Rev 9 §8.5.10 p373 (an access with the bus interface clock off); " + enablePage + " (" + enableName + ")";
+            }
+            records.Refuse("TVI-SPI-ENABLE", kind, RegisterAt(offset), bit, condition, citation, State(), offset, value, width);
+            return true;
+        }
+
+        // TVI-SPI-KERNEL (TVI-WO-1300a (2); RUL-18): a start with no kernel clock, by the RCC guard's query, recorded here, at
+        // this SPI's own start (the architect, 2026-11-23).
+        private bool RefusedKernel(uint newCr1)
+        {
+            var rcc = Rcc(out var name);
+            var k = rcc?.QueryKernelClock(name);
+            if(k != null && k.Modeled && k.Running)
+            {
+                return false;
+            }
+            var start = (cr1 & Cr1Spe) == 0 ? "CR1.SPE" : "CR1.CSTART";
+            if(k == null || !k.Modeled)
+            {
+                records.Refuse("TVI-SPI-KERNEL", Unmodeled, "SPI_CR1", start + " = 1",
+                    (name ?? "an SPI") + " started with no kernel-clock rule: " + (k == null ? NoRcc : k.Condition),
+                    k == null ? "TVI-WO-1300a (2): the SPI guard asks the RCC guard, found by name (RUL-09 (b))" : k.Citation,
+                    State(), Cr1Offset, newCr1, 32);
+                return true;
+            }
+            records.Refuse("TVI-SPI-KERNEL", PredictedFault, "SPI_CR1", k.Selector,
+                name + " started (" + start + ") with no kernel clock: " + k.Condition + "; the master \"needs the spi_ker_ck kernel clock coming from RCC active during communication\"",
+                k.Citation + "; §50.4.1 p2159 (spi_ker_ck)", State(), Cr1Offset, newCr1, 32);
+            return true;
+        }
+
+        // The RCC guard, by its name in the platform, and this instance's own name, both looked up at each use: never a
+        // static, a global or a stale reference (TVI-WO-1300a (2)).
+        private GuardedSTM32H7_RCC Rcc(out string name)
+        {
+            if(!host.TryGetLocalName(this, out name))
+            {
+                name = null;
+            }
+            return name != null && host.TryGetByName<GuardedSTM32H7_RCC>(RccName, out var rcc) && rcc.Holds(name, this) ? rcc : null;
         }
 
         // TVI-SPI-FIELD: the first field, in the table's order, whose written value is not allowed.
@@ -693,6 +795,9 @@ namespace Antmicro.Renode.Peripherals.Tviburi
         private bool masterUnknown;
         private bool eotBySuspend;
         private readonly Records records;
+        private readonly IMachine host;
+        private const string RccName = "sysbus.rcc";
+        private const string NoRcc = "no RCC guard at " + RccName + " that holds it registered under that name";
 
         private const string Modf = "TVI-SPI-MODF";
         private const string Field = "TVI-SPI-FIELD";

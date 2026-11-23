@@ -1,0 +1,11 @@
+// TVI-WO-1300a (adversarial, F1): the guarded SPI1 declared on the bus but not registered on the RCC guard. Its guard must not
+// run unwatched: every access refuses, unmodeled.
+using "platforms/boards/nucleo_h753zi.repl"
+using "/repo/model/stm32h7-rcc-restate.repl"
+
+tviburiRcc:
+    hseFrequency: 8000000
+    mode: "enforcing"
+
+spi1: Tviburi.GuardedSTM32H7_SPI @ sysbus 0x40013000
+    mode: "enforcing"
