@@ -6,6 +6,7 @@
 // this file fails to load.
 using "platforms/boards/nucleo_h753zi.repl"
 using "./stm32h7-rcc-restate.repl"
+using "./stm32h7-gpio-restate.repl"
 
 // The guard's mode (RUL-19), and the stock board's `rcc: hseFrequency: 8_000_000` restated on the guard: that update
 // lands on the cancelled stock entry (TVI-WO-1300.rm0433.md §6.4).
@@ -18,3 +19,68 @@ spi1: Tviburi.GuardedSTM32H7_SPI @ {
         tviburiRcc RegistrationPeripheralAlias.SPI1
     }
     mode: "enforcing"
+
+// TVI-WO-1301: the GPIO ports are guarded (stm32h7-gpio-restate.repl cancels each stock port and declares the guard as
+// "gpioPortX"). Each port's mode (RUL-19) and the package the board's part is in, as the guard's property, never a
+// variable or a path (RUL-10): the NUCLEO-H753ZI carries an STM32H753ZIT6 (from memory: its user manual, UM2407, is not
+// held), and in DS12117 Rev 10's ordering scheme "Z = 144 pins" and "T = LQFP" (§9 p346), so LQFP144, whose bonding is
+// model/ds12117-rev10-lqfp144.tsv (Table 8 p64-88, Figure 6 p57).
+tviburiGpioA:
+    mode: "enforcing"
+    package: "LQFP144"
+
+tviburiGpioB:
+    mode: "enforcing"
+    package: "LQFP144"
+
+tviburiGpioC:
+    mode: "enforcing"
+    package: "LQFP144"
+
+tviburiGpioD:
+    mode: "enforcing"
+    package: "LQFP144"
+
+tviburiGpioE:
+    mode: "enforcing"
+    package: "LQFP144"
+
+tviburiGpioF:
+    mode: "enforcing"
+    package: "LQFP144"
+
+tviburiGpioG:
+    mode: "enforcing"
+    package: "LQFP144"
+
+tviburiGpioH:
+    mode: "enforcing"
+    package: "LQFP144"
+
+tviburiGpioI:
+    mode: "enforcing"
+    package: "LQFP144"
+
+tviburiGpioJ:
+    mode: "enforcing"
+    package: "LQFP144"
+
+tviburiGpioK:
+    mode: "enforcing"
+    package: "LQFP144"
+
+// The stock board's LEDs and button are registered on, and connected to, the cancelled ports: restated onto the guards
+// (without this the load fails, E39, and Renode exits 0: TVI-WO-1301.rm0433.md §6.5).
+GreenLED: @ tviburiGpioB 0
+YellowLED: @ tviburiGpioE 1
+RedLED: @ tviburiGpioB 14
+
+UserButton1: @ tviburiGpioC 13
+    -> tviburiGpioC@13
+
+tviburiGpioB:
+    0 -> GreenLED@0
+    14 -> RedLED@0
+
+tviburiGpioE:
+    1 -> YellowLED@0

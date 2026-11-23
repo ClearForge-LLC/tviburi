@@ -12,3 +12,4 @@ stock	86b2c2c5f524a3f2b65da8ce20101c7a83690b1fb8c98a8cff96d399c15f231c	platforms
 stock	b85cb4af7a7e98f784ed822941ddc2ec4ddc0c3928c3efe7ef7bb4702764251e	platforms/cpus/stm32h7.repl
 class	SPI.STM32H7_SPI	Tviburi.GuardedSTM32H7_SPI
 class	Miscellaneous.STM32H7_RCC	Tviburi.GuardedSTM32H7_RCC
+class	GPIOPort.STM32_GPIOPort	Tviburi.GuardedSTM32_GPIOPort

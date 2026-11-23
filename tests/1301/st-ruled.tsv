@@ -1,0 +1,189 @@
+# TVI-WO-1301 (1): the disagreements with ST open pin data the architect ruled (bus, 2026-11-23T17:52Z): DS12117 is the guard's
+# authority, and each is a finding. tools/tviburi-afcheck fails on any disagreement not listed here, and on any listed row
+# that no longer disagrees. D4 (names only) is ruled through tests/1301/st-aliases.tsv. An af-number disagreement is never ruled.
+class	pin	af	ds_cell	st_signals	ruling
+presence	PA0	15	EVENTOUT	-	D1 AF15 EVENTOUT: ST lists it as an I/O mode
+presence	PA1	15	EVENTOUT	-	D1 AF15 EVENTOUT: ST lists it as an I/O mode
+presence	PA2	15	EVENTOUT	-	D1 AF15 EVENTOUT: ST lists it as an I/O mode
+presence	PA3	15	EVENTOUT	-	D1 AF15 EVENTOUT: ST lists it as an I/O mode
+presence	PA4	0	D1PWREN	-	D2 an AF0 system function in DS only
+presence	PA4	15	EVENTOUT	-	D1 AF15 EVENTOUT: ST lists it as an I/O mode
+presence	PA5	0	D2PWREN	-	D2 an AF0 system function in DS only
+presence	PA5	15	EVENTOUT	-	D1 AF15 EVENTOUT: ST lists it as an I/O mode
+presence	PA6	15	EVENTOUT	-	D1 AF15 EVENTOUT: ST lists it as an I/O mode
+presence	PA7	15	EVENTOUT	-	D1 AF15 EVENTOUT: ST lists it as an I/O mode
+presence	PA8	15	EVENTOUT	-	D1 AF15 EVENTOUT: ST lists it as an I/O mode
+presence	PA9	15	EVENTOUT	-	D1 AF15 EVENTOUT: ST lists it as an I/O mode
+presence	PA10	15	EVENTOUT	-	D1 AF15 EVENTOUT: ST lists it as an I/O mode
+presence	PA11	15	EVENTOUT	-	D1 AF15 EVENTOUT: ST lists it as an I/O mode
+presence	PA12	15	EVENTOUT	-	D1 AF15 EVENTOUT: ST lists it as an I/O mode
+presence	PA13	15	EVENTOUT	-	D1 AF15 EVENTOUT: ST lists it as an I/O mode
+presence	PA14	15	EVENTOUT	-	D1 AF15 EVENTOUT: ST lists it as an I/O mode
+presence	PA15	13	-	DSIHOST_TE	D3 DSIHOST_TE from ST's shared H747 GPIO file; no DSI on the H753
+presence	PA15	15	EVENTOUT	-	D1 AF15 EVENTOUT: ST lists it as an I/O mode
+presence	PB0	15	EVENTOUT	-	D1 AF15 EVENTOUT: ST lists it as an I/O mode
+presence	PB1	15	EVENTOUT	-	D1 AF15 EVENTOUT: ST lists it as an I/O mode
+presence	PB2	15	EVENTOUT	-	D1 AF15 EVENTOUT: ST lists it as an I/O mode
+presence	PB3	15	EVENTOUT	-	D1 AF15 EVENTOUT: ST lists it as an I/O mode
+presence	PB4	15	EVENTOUT	-	D1 AF15 EVENTOUT: ST lists it as an I/O mode
+presence	PB5	15	EVENTOUT	-	D1 AF15 EVENTOUT: ST lists it as an I/O mode
+presence	PB6	15	EVENTOUT	-	D1 AF15 EVENTOUT: ST lists it as an I/O mode
+presence	PB7	15	EVENTOUT	-	D1 AF15 EVENTOUT: ST lists it as an I/O mode
+presence	PB8	15	EVENTOUT	-	D1 AF15 EVENTOUT: ST lists it as an I/O mode
+presence	PB9	15	EVENTOUT	-	D1 AF15 EVENTOUT: ST lists it as an I/O mode
+presence	PB10	15	EVENTOUT	-	D1 AF15 EVENTOUT: ST lists it as an I/O mode
+presence	PB11	13	-	DSIHOST_TE	D3 DSIHOST_TE from ST's shared H747 GPIO file; no DSI on the H753
+presence	PB11	15	EVENTOUT	-	D1 AF15 EVENTOUT: ST lists it as an I/O mode
+presence	PB12	15	EVENTOUT	-	D1 AF15 EVENTOUT: ST lists it as an I/O mode
+presence	PB13	15	EVENTOUT	-	D1 AF15 EVENTOUT: ST lists it as an I/O mode
+presence	PB14	15	EVENTOUT	-	D1 AF15 EVENTOUT: ST lists it as an I/O mode
+presence	PB15	15	EVENTOUT	-	D1 AF15 EVENTOUT: ST lists it as an I/O mode
+presence	PC0	15	EVENTOUT	-	D1 AF15 EVENTOUT: ST lists it as an I/O mode
+presence	PC1	15	EVENTOUT	-	D1 AF15 EVENTOUT: ST lists it as an I/O mode
+presence	PC2	0	C1DSLEEP	-	D2 an AF0 system function in DS only
+presence	PC2	15	EVENTOUT	-	D1 AF15 EVENTOUT: ST lists it as an I/O mode
+presence	PC3	0	C1SLEEP	-	D2 an AF0 system function in DS only
+presence	PC3	15	EVENTOUT	-	D1 AF15 EVENTOUT: ST lists it as an I/O mode
+presence	PC4	0	C2DSLEEP	-	D2 an AF0 system function in DS only
+name	PC4	9	SPDIFRX1_IN3	SPDIFRX1_IN2	D5 SPDIFRX1_INn: DS numbers from 1, ST from 0
+presence	PC4	15	EVENTOUT	-	D1 AF15 EVENTOUT: ST lists it as an I/O mode
+presence	PC5	0	C2SLEEP	-	D2 an AF0 system function in DS only
+name	PC5	9	SPDIFRX1_IN4	SPDIFRX1_IN3	D5 SPDIFRX1_INn: DS numbers from 1, ST from 0
+presence	PC5	15	EVENTOUT	-	D1 AF15 EVENTOUT: ST lists it as an I/O mode
+presence	PC6	15	EVENTOUT	-	D1 AF15 EVENTOUT: ST lists it as an I/O mode
+presence	PC7	15	EVENTOUT	-	D1 AF15 EVENTOUT: ST lists it as an I/O mode
+presence	PC8	15	EVENTOUT	-	D1 AF15 EVENTOUT: ST lists it as an I/O mode
+presence	PC9	15	EVENTOUT	-	D1 AF15 EVENTOUT: ST lists it as an I/O mode
+presence	PC10	15	EVENTOUT	-	D1 AF15 EVENTOUT: ST lists it as an I/O mode
+presence	PC11	15	EVENTOUT	-	D1 AF15 EVENTOUT: ST lists it as an I/O mode
+presence	PC12	15	EVENTOUT	-	D1 AF15 EVENTOUT: ST lists it as an I/O mode
+presence	PC13	15	EVENTOUT	-	D1 AF15 EVENTOUT: ST lists it as an I/O mode
+presence	PC14	15	EVENTOUT	-	D1 AF15 EVENTOUT: ST lists it as an I/O mode
+presence	PC15	15	EVENTOUT	-	D1 AF15 EVENTOUT: ST lists it as an I/O mode
+presence	PD0	15	EVENTOUT	-	D1 AF15 EVENTOUT: ST lists it as an I/O mode
+presence	PD1	15	EVENTOUT	-	D1 AF15 EVENTOUT: ST lists it as an I/O mode
+presence	PD2	15	EVENTOUT	-	D1 AF15 EVENTOUT: ST lists it as an I/O mode
+presence	PD3	15	EVENTOUT	-	D1 AF15 EVENTOUT: ST lists it as an I/O mode
+presence	PD4	15	EVENTOUT	-	D1 AF15 EVENTOUT: ST lists it as an I/O mode
+presence	PD5	15	EVENTOUT	-	D1 AF15 EVENTOUT: ST lists it as an I/O mode
+presence	PD6	15	EVENTOUT	-	D1 AF15 EVENTOUT: ST lists it as an I/O mode
+name	PD7	9	SPDIFRX1_IN1	SPDIFRX1_IN0	D5 SPDIFRX1_INn: DS numbers from 1, ST from 0
+presence	PD7	15	EVENTOUT	-	D1 AF15 EVENTOUT: ST lists it as an I/O mode
+name	PD8	9	SPDIFRX1_IN2	SPDIFRX1_IN1	D5 SPDIFRX1_INn: DS numbers from 1, ST from 0
+presence	PD8	15	EVENTOUT	-	D1 AF15 EVENTOUT: ST lists it as an I/O mode
+presence	PD9	15	EVENTOUT	-	D1 AF15 EVENTOUT: ST lists it as an I/O mode
+presence	PD10	15	EVENTOUT	-	D1 AF15 EVENTOUT: ST lists it as an I/O mode
+presence	PD11	15	EVENTOUT	-	D1 AF15 EVENTOUT: ST lists it as an I/O mode
+presence	PD12	15	EVENTOUT	-	D1 AF15 EVENTOUT: ST lists it as an I/O mode
+presence	PD13	15	EVENTOUT	-	D1 AF15 EVENTOUT: ST lists it as an I/O mode
+presence	PD14	15	EVENTOUT	-	D1 AF15 EVENTOUT: ST lists it as an I/O mode
+presence	PD15	15	EVENTOUT	-	D1 AF15 EVENTOUT: ST lists it as an I/O mode
+presence	PE0	15	EVENTOUT	-	D1 AF15 EVENTOUT: ST lists it as an I/O mode
+presence	PE1	15	EVENTOUT	-	D1 AF15 EVENTOUT: ST lists it as an I/O mode
+presence	PE2	15	EVENTOUT	-	D1 AF15 EVENTOUT: ST lists it as an I/O mode
+presence	PE3	15	EVENTOUT	-	D1 AF15 EVENTOUT: ST lists it as an I/O mode
+presence	PE4	15	EVENTOUT	-	D1 AF15 EVENTOUT: ST lists it as an I/O mode
+presence	PE5	15	EVENTOUT	-	D1 AF15 EVENTOUT: ST lists it as an I/O mode
+presence	PE6	15	EVENTOUT	-	D1 AF15 EVENTOUT: ST lists it as an I/O mode
+presence	PE7	15	EVENTOUT	-	D1 AF15 EVENTOUT: ST lists it as an I/O mode
+presence	PE8	15	EVENTOUT	-	D1 AF15 EVENTOUT: ST lists it as an I/O mode
+presence	PE9	15	EVENTOUT	-	D1 AF15 EVENTOUT: ST lists it as an I/O mode
+presence	PE10	15	EVENTOUT	-	D1 AF15 EVENTOUT: ST lists it as an I/O mode
+presence	PE11	15	EVENTOUT	-	D1 AF15 EVENTOUT: ST lists it as an I/O mode
+presence	PE12	15	EVENTOUT	-	D1 AF15 EVENTOUT: ST lists it as an I/O mode
+presence	PE13	15	EVENTOUT	-	D1 AF15 EVENTOUT: ST lists it as an I/O mode
+presence	PE14	15	EVENTOUT	-	D1 AF15 EVENTOUT: ST lists it as an I/O mode
+presence	PE15	15	EVENTOUT	-	D1 AF15 EVENTOUT: ST lists it as an I/O mode
+presence	PF0	15	EVENTOUT	-	D1 AF15 EVENTOUT: ST lists it as an I/O mode
+presence	PF1	15	EVENTOUT	-	D1 AF15 EVENTOUT: ST lists it as an I/O mode
+presence	PF2	15	EVENTOUT	-	D1 AF15 EVENTOUT: ST lists it as an I/O mode
+presence	PF3	15	EVENTOUT	-	D1 AF15 EVENTOUT: ST lists it as an I/O mode
+presence	PF4	15	EVENTOUT	-	D1 AF15 EVENTOUT: ST lists it as an I/O mode
+presence	PF5	15	EVENTOUT	-	D1 AF15 EVENTOUT: ST lists it as an I/O mode
+presence	PF6	15	EVENTOUT	-	D1 AF15 EVENTOUT: ST lists it as an I/O mode
+presence	PF7	15	EVENTOUT	-	D1 AF15 EVENTOUT: ST lists it as an I/O mode
+presence	PF8	15	EVENTOUT	-	D1 AF15 EVENTOUT: ST lists it as an I/O mode
+presence	PF9	15	EVENTOUT	-	D1 AF15 EVENTOUT: ST lists it as an I/O mode
+presence	PF10	15	EVENTOUT	-	D1 AF15 EVENTOUT: ST lists it as an I/O mode
+presence	PF11	15	EVENTOUT	-	D1 AF15 EVENTOUT: ST lists it as an I/O mode
+presence	PF12	15	EVENTOUT	-	D1 AF15 EVENTOUT: ST lists it as an I/O mode
+presence	PF13	15	EVENTOUT	-	D1 AF15 EVENTOUT: ST lists it as an I/O mode
+presence	PF14	15	EVENTOUT	-	D1 AF15 EVENTOUT: ST lists it as an I/O mode
+presence	PF15	15	EVENTOUT	-	D1 AF15 EVENTOUT: ST lists it as an I/O mode
+presence	PG0	15	EVENTOUT	-	D1 AF15 EVENTOUT: ST lists it as an I/O mode
+presence	PG1	15	EVENTOUT	-	D1 AF15 EVENTOUT: ST lists it as an I/O mode
+presence	PG2	15	EVENTOUT	-	D1 AF15 EVENTOUT: ST lists it as an I/O mode
+presence	PG3	15	EVENTOUT	-	D1 AF15 EVENTOUT: ST lists it as an I/O mode
+presence	PG4	15	EVENTOUT	-	D1 AF15 EVENTOUT: ST lists it as an I/O mode
+presence	PG5	15	EVENTOUT	-	D1 AF15 EVENTOUT: ST lists it as an I/O mode
+presence	PG6	15	EVENTOUT	-	D1 AF15 EVENTOUT: ST lists it as an I/O mode
+presence	PG7	15	EVENTOUT	-	D1 AF15 EVENTOUT: ST lists it as an I/O mode
+name	PG8	8	SPDIFRX1_IN3	SPDIFRX1_IN2	D5 SPDIFRX1_INn: DS numbers from 1, ST from 0
+presence	PG8	15	EVENTOUT	-	D1 AF15 EVENTOUT: ST lists it as an I/O mode
+name	PG9	8	SPDIFRX1_IN4	SPDIFRX1_IN3	D5 SPDIFRX1_INn: DS numbers from 1, ST from 0
+presence	PG9	15	EVENTOUT	-	D1 AF15 EVENTOUT: ST lists it as an I/O mode
+presence	PG10	15	EVENTOUT	-	D1 AF15 EVENTOUT: ST lists it as an I/O mode
+name	PG11	8	SPDIFRX1_IN1	SPDIFRX1_IN0	D5 SPDIFRX1_INn: DS numbers from 1, ST from 0
+presence	PG11	15	EVENTOUT	-	D1 AF15 EVENTOUT: ST lists it as an I/O mode
+name	PG12	8	SPDIFRX1_IN2	SPDIFRX1_IN1	D5 SPDIFRX1_INn: DS numbers from 1, ST from 0
+presence	PG12	15	EVENTOUT	-	D1 AF15 EVENTOUT: ST lists it as an I/O mode
+presence	PG13	15	EVENTOUT	-	D1 AF15 EVENTOUT: ST lists it as an I/O mode
+presence	PG14	15	EVENTOUT	-	D1 AF15 EVENTOUT: ST lists it as an I/O mode
+presence	PG15	15	EVENTOUT	-	D1 AF15 EVENTOUT: ST lists it as an I/O mode
+presence	PH0	15	EVENTOUT	-	D1 AF15 EVENTOUT: ST lists it as an I/O mode
+presence	PH1	15	EVENTOUT	-	D1 AF15 EVENTOUT: ST lists it as an I/O mode
+presence	PH2	15	EVENTOUT	-	D1 AF15 EVENTOUT: ST lists it as an I/O mode
+presence	PH3	15	EVENTOUT	-	D1 AF15 EVENTOUT: ST lists it as an I/O mode
+presence	PH4	15	EVENTOUT	-	D1 AF15 EVENTOUT: ST lists it as an I/O mode
+presence	PH5	15	EVENTOUT	-	D1 AF15 EVENTOUT: ST lists it as an I/O mode
+presence	PH6	15	EVENTOUT	-	D1 AF15 EVENTOUT: ST lists it as an I/O mode
+presence	PH7	15	EVENTOUT	-	D1 AF15 EVENTOUT: ST lists it as an I/O mode
+presence	PH8	15	EVENTOUT	-	D1 AF15 EVENTOUT: ST lists it as an I/O mode
+presence	PH9	15	EVENTOUT	-	D1 AF15 EVENTOUT: ST lists it as an I/O mode
+presence	PH10	15	EVENTOUT	-	D1 AF15 EVENTOUT: ST lists it as an I/O mode
+presence	PH11	15	EVENTOUT	-	D1 AF15 EVENTOUT: ST lists it as an I/O mode
+presence	PH12	15	EVENTOUT	-	D1 AF15 EVENTOUT: ST lists it as an I/O mode
+presence	PH13	15	EVENTOUT	-	D1 AF15 EVENTOUT: ST lists it as an I/O mode
+presence	PH14	15	EVENTOUT	-	D1 AF15 EVENTOUT: ST lists it as an I/O mode
+presence	PH15	15	EVENTOUT	-	D1 AF15 EVENTOUT: ST lists it as an I/O mode
+presence	PI0	15	EVENTOUT	-	D1 AF15 EVENTOUT: ST lists it as an I/O mode
+presence	PI1	15	EVENTOUT	-	D1 AF15 EVENTOUT: ST lists it as an I/O mode
+presence	PI2	15	EVENTOUT	-	D1 AF15 EVENTOUT: ST lists it as an I/O mode
+presence	PI3	15	EVENTOUT	-	D1 AF15 EVENTOUT: ST lists it as an I/O mode
+presence	PI4	15	EVENTOUT	-	D1 AF15 EVENTOUT: ST lists it as an I/O mode
+presence	PI5	15	EVENTOUT	-	D1 AF15 EVENTOUT: ST lists it as an I/O mode
+presence	PI6	15	EVENTOUT	-	D1 AF15 EVENTOUT: ST lists it as an I/O mode
+presence	PI7	15	EVENTOUT	-	D1 AF15 EVENTOUT: ST lists it as an I/O mode
+presence	PI8	15	EVENTOUT	-	D1 AF15 EVENTOUT: ST lists it as an I/O mode
+presence	PI9	15	EVENTOUT	-	D1 AF15 EVENTOUT: ST lists it as an I/O mode
+presence	PI10	15	EVENTOUT	-	D1 AF15 EVENTOUT: ST lists it as an I/O mode
+presence	PI11	15	EVENTOUT	-	D1 AF15 EVENTOUT: ST lists it as an I/O mode
+presence	PI12	15	EVENTOUT	-	D1 AF15 EVENTOUT: ST lists it as an I/O mode
+presence	PI13	15	EVENTOUT	-	D1 AF15 EVENTOUT: ST lists it as an I/O mode
+presence	PI14	15	EVENTOUT	-	D1 AF15 EVENTOUT: ST lists it as an I/O mode
+presence	PI15	15	EVENTOUT	-	D1 AF15 EVENTOUT: ST lists it as an I/O mode
+presence	PJ0	15	EVENTOUT	-	D1 AF15 EVENTOUT: ST lists it as an I/O mode
+presence	PJ1	15	EVENTOUT	-	D1 AF15 EVENTOUT: ST lists it as an I/O mode
+presence	PJ2	13	-	DSIHOST_TE	D3 DSIHOST_TE from ST's shared H747 GPIO file; no DSI on the H753
+presence	PJ2	15	EVENTOUT	-	D1 AF15 EVENTOUT: ST lists it as an I/O mode
+presence	PJ3	15	EVENTOUT	-	D1 AF15 EVENTOUT: ST lists it as an I/O mode
+presence	PJ4	15	EVENTOUT	-	D1 AF15 EVENTOUT: ST lists it as an I/O mode
+presence	PJ5	15	EVENTOUT	-	D1 AF15 EVENTOUT: ST lists it as an I/O mode
+presence	PJ6	15	EVENTOUT	-	D1 AF15 EVENTOUT: ST lists it as an I/O mode
+presence	PJ7	15	EVENTOUT	-	D1 AF15 EVENTOUT: ST lists it as an I/O mode
+presence	PJ8	15	EVENTOUT	-	D1 AF15 EVENTOUT: ST lists it as an I/O mode
+presence	PJ9	15	EVENTOUT	-	D1 AF15 EVENTOUT: ST lists it as an I/O mode
+presence	PJ10	15	EVENTOUT	-	D1 AF15 EVENTOUT: ST lists it as an I/O mode
+presence	PJ11	15	EVENTOUT	-	D1 AF15 EVENTOUT: ST lists it as an I/O mode
+presence	PJ12	15	EVENTOUT	-	D1 AF15 EVENTOUT: ST lists it as an I/O mode
+presence	PJ13	15	EVENTOUT	-	D1 AF15 EVENTOUT: ST lists it as an I/O mode
+presence	PJ14	15	EVENTOUT	-	D1 AF15 EVENTOUT: ST lists it as an I/O mode
+presence	PJ15	15	EVENTOUT	-	D1 AF15 EVENTOUT: ST lists it as an I/O mode
+presence	PK0	15	EVENTOUT	-	D1 AF15 EVENTOUT: ST lists it as an I/O mode
+presence	PK1	15	EVENTOUT	-	D1 AF15 EVENTOUT: ST lists it as an I/O mode
+presence	PK2	15	EVENTOUT	-	D1 AF15 EVENTOUT: ST lists it as an I/O mode
+presence	PK3	15	EVENTOUT	-	D1 AF15 EVENTOUT: ST lists it as an I/O mode
+presence	PK4	15	EVENTOUT	-	D1 AF15 EVENTOUT: ST lists it as an I/O mode
+presence	PK5	15	EVENTOUT	-	D1 AF15 EVENTOUT: ST lists it as an I/O mode
+presence	PK6	15	EVENTOUT	-	D1 AF15 EVENTOUT: ST lists it as an I/O mode
+presence	PK7	15	EVENTOUT	-	D1 AF15 EVENTOUT: ST lists it as an I/O mode

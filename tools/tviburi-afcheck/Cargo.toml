@@ -1,0 +1,9 @@
+[package]
+name = "tviburi-afcheck"
+version = "0.1.0"
+edition = "2021"
+license = "MIT OR Apache-2.0"
+description = "DS12117 Rev 10's alternate-function table against ST's open pin data, every disagreement ruled (TVI-WO-1301)"
+publish = false
+
+[dependencies]

@@ -18,6 +18,11 @@ ADVERSARIAL="adv-removed adv-extra-arg adv-bad-variant adv-hook adv-loglevel adv
 # acceptance group, so CI and tests/mutants.sh reach them.
 RCC_CASES=$(sed -n 's/^CASES="\(.*\)"$/\1/p' "$(dirname "$0")/1300/rcc.sh")
 ACCEPTANCE="$ACCEPTANCE $(for c in $RCC_CASES; do printf 'rcc-%s ' "$c"; done)"
+# TVI-WO-1301: DS12117 Rev 10's AF table against ST's open pin data, every disagreement ruled (tools/tviburi-afcheck).
+ACCEPTANCE="$ACCEPTANCE afcheck"
+# TVI-WO-1301: the GPIO guard's cases live in tests/1301/gpio.sh; each is a test here, gpio-<case>, in the acceptance group.
+GPIO_CASES=$(sed -n 's/^CASES="\(.*\)"$/\1/p' "$(dirname "$0")/1301/gpio.sh")
+ACCEPTANCE="$ACCEPTANCE $(for c in $GPIO_CASES; do printf 'gpio-%s ' "$c"; done)"
 ALL="$ACCEPTANCE $ADVERSARIAL"
 here=$(cd "$(dirname "$0")/.." && pwd)
 scratch=${TVIBURI_SCRATCH:-$HOME/.cache/tviburi}
@@ -62,7 +67,7 @@ renode_in() { # renode_in <name> <tree> <resc> [podman args...]: the release, Re
   local name=$1 tree=$2 resc=$3; shift 3
   pod "$name" "$tree" -v "$work/check-build:/check:ro,Z" "$@" -- sh -c "v=\$(/repo/scripts/build-release) || exit 9; \
     timeout 120 renode --disable-gui --console --plain $resc </dev/null >/out/renode.out 2>&1; \
-    echo renode-exit=\$?; /check/debug/tviburi-check \$v /out/renode-log.txt spi1 rcc"
+    echo renode-exit=\$?; /check/debug/tviburi-check \$v /out/renode-log.txt spi1 rcc gpioPortA gpioPortB gpioPortC gpioPortD gpioPortE gpioPortF gpioPortG gpioPortH gpioPortI gpioPortJ gpioPortK"
 }
 
 version_of() { # version_of <name>: the release hash of the release a run built, sha256:<hex>
@@ -118,6 +123,15 @@ t_unit() {
     cargo test --offline --locked --manifest-path /repo/tools/tviburi-check/Cargo.toml --target-dir /out/target &&
     cargo test --offline --locked --manifest-path /repo/tools/tviburi-release/Cargo.toml --target-dir /out/target'
   check "reference check and release program: unit tests pass" '[ $rc -eq 0 ]'
+}
+
+t_afcheck() { # TVI-WO-1301 (1): its unit tests (each a planted change it must catch), then the committed data
+  pod afcheck "$src" -- sh -c 'export PATH=/opt/cargo/bin:$PATH RUSTUP_HOME=/opt/rustup CARGO_HOME=/out/cargo-home;
+    cargo test --offline --locked --manifest-path /repo/tools/tviburi-afcheck/Cargo.toml --target-dir /out/target &&
+    cargo run --quiet --offline --locked --manifest-path /repo/tools/tviburi-afcheck/Cargo.toml --target-dir /out/target -- \
+      /repo/model/ds12117-rev10-table9.tsv /repo/tests/1301/fixtures/st-open-pin-data/GPIO-STM32H747_gpio_v1_0_Modes.xml \
+      /repo/tests/1301/st-aliases.tsv /repo/tests/1301/st-ruled.tsv'
+  check "afcheck: the AF table agrees with ST's open pin data but for the ruled disagreements" '[ $rc -eq 0 ]'
 }
 
 t_modf() {
@@ -357,7 +371,7 @@ t_crash() {
     renode --disable-gui --console --plain /out/long.resc </dev/null >/out/renode.out 2>&1 & pid=$!
     for i in $(seq 600); do grep -q "spi1: {\"tviburi\":\"witness\"" /out/renode-log.txt 2>/dev/null && break; sleep 0.1; done
     kill -9 $pid; wait $pid; echo renode-exit=$?
-    /check/debug/tviburi-check $v /out/renode-log.txt spi1 rcc'
+    /check/debug/tviburi-check $v /out/renode-log.txt spi1 rcc gpioPortA gpioPortB gpioPortC gpioPortD gpioPortE gpioPortF gpioPortG gpioPortH gpioPortI gpioPortJ gpioPortK'
   check "a simulator killed after its witness does not PASS (1, no end record, the witness seen)" \
     "grep -qx 'renode-exit=137' '$work/crash.stdout' && grep -qx 'CHECK FAIL' '$work/crash.stdout' \
      && grep -q '^PROBLEM spi1: no end record' '$work/crash.stdout' && ! grep -q '^PROBLEM spi1: no load witness' '$work/crash.stdout'"
@@ -375,7 +389,7 @@ t_identity() {
   pod id-empty "$src" -v "$work/check-build:/check:ro,Z" -- sh -c 'v=$(/repo/scripts/build-release) || exit 9
     printf "include @/repo/scripts/prelude.resc\nquit\n" >/out/empty.resc; cd /out
     env -i /opt/renode/renode --disable-gui --console --plain /out/empty.resc </dev/null >/out/renode.out 2>&1
-    /check/debug/tviburi-check $v /out/renode-log.txt spi1 rcc'
+    /check/debug/tviburi-check $v /out/renode-log.txt spi1 rcc gpioPortA gpioPortB gpioPortC gpioPortD gpioPortE gpioPortF gpioPortG gpioPortH gpioPortI gpioPortJ gpioPortK'
   check "the witness's version is the same with TVIBURI_MODEL_DIR at another directory (and the run PASSes), and with an empty environment" \
     "grep -qx 'VERDICT PASS' '$work/id-otherdir.stdout' && [ \$(version_of id-otherdir) = $v ] && spi1_records id-otherdir 'recs[0][\"model_version\"] == \"$v\"' \
      && [ \$(version_of id-empty) = $v ] && spi1_records id-empty 'recs[0][\"tviburi\"] == \"witness\" and recs[0][\"model_version\"] == \"$v\"'"
@@ -520,9 +534,9 @@ t_adv-version() {
   need_check
   pod adv-version "$src" -v "$work/check-build:/check:ro,Z" -v "$work/modeled:/run:ro,Z" -- sh -c '
     v=sha256:$(sha256sum </run/release/MANIFEST | cut -c1-64); w=sha256:$(printf %064d 0)
-    /check/debug/tviburi-check "$v" /run/renode-log.txt spi1 rcc >/dev/null; echo right=$?
-    /check/debug/tviburi-check "$w" /run/renode-log.txt spi1 rcc >/dev/null; echo wrong=$?
-    /check/debug/tviburi-check /run/renode-log.txt spi1 rcc >/dev/null; echo none=$?
+    /check/debug/tviburi-check "$v" /run/renode-log.txt spi1 rcc gpioPortA gpioPortB gpioPortC gpioPortD gpioPortE gpioPortF gpioPortG gpioPortH gpioPortI gpioPortJ gpioPortK >/dev/null; echo right=$?
+    /check/debug/tviburi-check "$w" /run/renode-log.txt spi1 rcc gpioPortA gpioPortB gpioPortC gpioPortD gpioPortE gpioPortF gpioPortG gpioPortH gpioPortI gpioPortJ gpioPortK >/dev/null; echo wrong=$?
+    /check/debug/tviburi-check /run/renode-log.txt spi1 rcc gpioPortA gpioPortB gpioPortC gpioPortD gpioPortE gpioPortF gpioPortG gpioPortH gpioPortI gpioPortJ gpioPortK >/dev/null; echo none=$?
     /check/debug/tviburi-check "$v" /run/renode-log.txt spi2 >/run-unnamed.txt; echo unnamed=$?; grep -c "not named" /run-unnamed.txt'
   check "the check passes the modeled run only with its expected version: wrong (1) and none (1) fail (gate clause 7)" \
     "grep -qx right=0 '$work/adv-version.stdout' && grep -qx wrong=1 '$work/adv-version.stdout' && grep -qx none=1 '$work/adv-version.stdout'"
@@ -632,6 +646,17 @@ t_rcc() { # t_rcc <case>: one case of tests/1300/rcc.sh on this source, its ok/F
   fails=$((fails + f))
 }
 for c in $RCC_CASES; do eval "t_rcc-$c() { t_rcc $c; }"; done
+t_gpio() { # t_gpio <case>: one case of tests/1301/gpio.sh on this source, its ok/FAIL lines counted here (TVI-WO-1301)
+  local out grc=0
+  out=$(TVIBURI_TESTS="$1" TVIBURI_SCRATCH="$work" "$src/tests/1301/gpio.sh" "$src" 2>&1) || grc=$?
+  grep -E '^(ok|FAIL) ' <<<"$out" || true
+  local f; f=$(grep -c '^FAIL ' <<<"$out" || true)
+  if [ "$grc" -ne 0 ] && [ "$f" -eq 0 ]; then
+    echo "FAIL gpio-$1: tests/1301/gpio.sh exited $grc with no verdict"; f=1
+  fi
+  fails=$((fails + f))
+}
+for c in $GPIO_CASES; do eval "t_gpio-$c() { t_gpio $c; }"; done
 
 for t in ${TVIBURI_TESTS:-acceptance}; do
   case "$t" in

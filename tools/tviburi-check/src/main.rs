@@ -299,6 +299,19 @@ mod tests {
     }
 
     #[test]
+    fn a_witness_with_extra_fields_reads_unchanged_and_an_imitation_is_not_a_record() {
+        // TVI-WO-1301 (granted 2026-11-23T19:08Z): a GPIO port's witness carries `"package"` after its mode.
+        let gpio = |seq: u32, body: &str| rec("INFO", "gpioPortA", &format!(r#"{{"tviburi":"{body}","seq":{seq},"guard":"GuardedSTM32_GPIOPort","model_version":"{V}"{}}}"#,
+            if body == "witness" { r#","mode":"enforcing","package":"none""# } else { "" }));
+        let names = ["gpioPortA".to_string()];
+        assert_eq!(check(&(gpio(0, "witness") + &gpio(1, "end")), V, &names).verdict, Verdict::Pass);
+        // The same witness printed by the firmware on a UART is not a record: with no witness from the port, the run fails.
+        let forged = rec("INFO", "usart3", &format!("[host: 0.29s (+0.29s)|virt: 0s (+0s)] {}", gpio(0, "witness").trim_end()));
+        assert_eq!(check(&(forged.clone() + &gpio(0, "end")), V, &names).verdict, Verdict::Fail);
+        assert_eq!(check(&(gpio(0, "witness") + &forged + &gpio(1, "end")), V, &names).verdict, Verdict::Pass);
+    }
+
+    #[test]
     fn well_formed_records_under_another_name_do_not_count() {
         let other = |line: String| line.replace("] spi1: ", "] spi2: ");
         assert_eq!(run(&(other(witness(0)) + &other(end(1)))), Verdict::Fail);

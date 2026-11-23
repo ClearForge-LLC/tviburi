@@ -20,7 +20,7 @@ M16-resetHistory	model/GuardedSTM32H7_SPI.cs	            history = null;\n      
 M17-resetCfg2	model/GuardedSTM32H7_SPI.cs	            cfg2 = 0;\n	(empty)	conditions
 M18-resetCr1	model/GuardedSTM32H7_SPI.cs	            cr1 = 0;\n	(empty)	conditions
 M19-loadRefuses	model/GuardedSTM32H7_SPI.cs	            if(records.LoadFailed)\n            {\n                records.Refuse("TVI-LOAD"	            if(false)\n            {\n                records.Refuse("TVI-LOAD"	load
-M20-witness	model/Refusal.cs	                Emit(LogLevel.Info, "witness", ",\\"guard\\":" + Json(guard) + ",\\"model_version\\":" + Json(version) + ",\\"mode\\":" + Json(mode));\n	(empty)	modeled
+M20-witness	model/Refusal.cs	                Emit(LogLevel.Info, "witness", ",\\"guard\\":" + Json(guard) + ",\\"model_version\\":" + Json(version) + ",\\"mode\\":" + Json(mode) + witness);\n	(empty)	modeled
 M21-end	model/Refusal.cs	if(named)	if(false)	modeled
 M22-refusalAtError	model/Refusal.cs	Emit(LogLevel.Error, Recorded ? "would-refuse" : "refusal"	Emit(LogLevel.Info, Recorded ? "would-refuse" : "refusal"	adv-loglevel
 M23-seq	model/Refusal.cs	seq++;	(empty)	modeled
@@ -95,7 +95,7 @@ R19-unframedRecord	tools/tviburi-check/src/main.rs	if line.contains("{\\"tviburi
 M35-resetEotBySuspend	model/GuardedSTM32H7_SPI.cs	            eotBySuspend = false;\n        }	        }	conditions
 T01-modeChecked	model/Refusal.cs	if(mode != Enforcing && mode != RecordedMode)	if(false)	load
 T02-recordedKind	model/Refusal.cs	Recorded ? "would-refuse" : "refusal"	"refusal"	recorded
-T03-witnessMode	model/Refusal.cs	+ ",\\"mode\\":" + Json(mode));	+ ",\\"mode\\":" + Json(Enforcing));	recorded
+T03-witnessMode	model/Refusal.cs	+ ",\\"mode\\":" + Json(mode) + witness);	+ ",\\"mode\\":" + Json(Enforcing) + witness);	recorded
 T05-recordedPassesWrite	model/GuardedSTM32H7_SPI.cs	|| RefusedWrite(offset, value)) && !records.Recorded)	|| RefusedWrite(offset, value)))	recorded
 T06-recordedPassesRead	model/GuardedSTM32H7_SPI.cs	if(fired && !records.Recorded)	if(fired)	recorded
 T07-versionIsTheConstant	model/Refusal.cs	private readonly string version = TviburiRelease.ManifestSha256;	private readonly string version = "sha256:0000000000000000000000000000000000000000000000000000000000000000";	modeled
@@ -156,3 +156,27 @@ C33-trialRestoresCopy	model/GuardedSTM32H7_RCC.cs	                    copies[b] 
 C34-trialRestoresCr	model/GuardedSTM32H7_RCC.cs	                crAfter = null;	(empty)	rcc-relost-pll
 C35-divrReadBack	model/GuardedSTM32H7_RCC.cs	 && value != inner.ReadDoubleWord(b))	)	rcc-divr2rmw
 S06-heldByRcc	model/GuardedSTM32H7_SPI.cs	 && rcc.Holds(name, this) ? rcc : null;	 ? rcc : null;	rcc-unheld
+G01-afRule	model/GuardedSTM32_GPIOPort.cs	var entering = AfFaults(moder, afrl, afrh) & ~afFaulted;	var entering = 0;	gpio-blank
+G02-afOnce	model/GuardedSTM32_GPIOPort.cs	afFaulted &= AfFaults(moder, base.ReadDoubleWord(AfrlOffset), base.ReadDoubleWord(AfrhOffset));	afFaulted = 0;	gpio-recorded
+G03-package	model/GuardedSTM32_GPIOPort.cs	var entering = PackageFaults(word) & ~packageFaulted;	var entering = 0;	gpio-package
+G04-pc2Switch	model/GuardedSTM32_GPIOPort.cs	if(name == "PC2" || name == "PC3")	if(false)	gpio-pc2
+G05-bsrrPriority	model/GuardedSTM32_GPIOPort.cs	value &= ~((value & 0xFFFFu) << 16);	;	gpio-bsrr
+G06-otyperCopy	model/GuardedSTM32_GPIOPort.cs	return b == OtyperOffset ? otyper : base.ReadDoubleWord(b);	return base.ReadDoubleWord(b);	gpio-otyper
+G07-fieldRow	model/GuardedSTM32_GPIOPort.cs	if(f.Allowed != null && !f.Allowed.Contains(v))	if(false)	gpio-pupdr gpio-fields
+G08-noRegister	model/GuardedSTM32_GPIOPort.cs	if(rows.Length == 0)	if(false)	gpio-brr
+G09-readNoRegister	model/GuardedSTM32_GPIOPort.cs	if(b > AfrhOffset)	if(false)	gpio-read
+G10-misaligned	model/GuardedSTM32_GPIOPort.cs	if((offset & (width / 8 - 1)) == 0)	if(true)	gpio-misaligned
+G11-resetCheck	model/GuardedSTM32_GPIOPort.cs	if(resets[i] != want[i])	if(false)	gpio-config
+G12-subWordMerge	model/GuardedSTM32_GPIOPort.cs	var word = width == 32 ? value : (Served(b) & ~(mask << shift)) | ((value & mask) << shift);	var word = width == 32 ? value : (value & mask);	gpio-bsrrhalf gpio-afrh
+G13-portFromAddress	model/GuardedSTM32_GPIOPort.cs	port = (char)('A' + (int)((start - PortsBase) / 0x400));	port = 'A';	gpio-package
+G14-tableData	model/GuardedSTM32_GPIOPort.cs	PA5:89:	PA5:90:	afcheck
+G15-restatedRoute	model/stm32h7-gpio-restate.repl	timer1:\n    0 -> tviburiGpioA#07@01 | tviburiGpioA#08@01 |	timer1:\n    0 -> tviburiGpioA#07@01 |	gpio-registrations
+G16-boardPackage	model/tviburi-nucleo-h753zi.repl	tviburiGpioH:\n    mode: "enforcing"\n    package: "LQFP144"	tviburiGpioH:\n    mode: "enforcing"	gpio-package
+G17-namesLine	scripts/tviburi-spike	gpioPortJ gpioPortK >	gpioPortJ >	modeled
+G18-unlistedPinAf	model/GuardedSTM32_GPIOPort.cs	if(cell == null || cell.Text == "-")	if(cell != null && cell.Text == "-")	gpio-pk8af
+G19-unlistedPinPackage	model/GuardedSTM32_GPIOPort.cs	(!bonding.TryGetValue("P" + port + pin, out var b) || b.Pin == null)	(bonding.TryGetValue("P" + port + pin, out var b) && b.Pin == null)	gpio-pk8out
+G20-staleRefresh	model/GuardedSTM32_GPIOPort.cs	base.ReadDoubleWord(b);\n            }\n            base.WriteDoubleWord(b, value);	}\n            base.WriteDoubleWord(b, value);	gpio-resetwrite
+G21-recordEveryRule	model/GuardedSTM32_GPIOPort.cs	RefusedAf(offset, b, word, width);\n                RefusedPackage(offset, b, word, width);	RefusedAf(offset, b, word, width);	gpio-recordedtwo
+G22-witnessPackage	model/GuardedSTM32_GPIOPort.cs	("package", package ?? "none")	("package", "LQFP144")	gpio-nopackage
+G23-registrationCount	model/GuardedSTM32_GPIOPort.cs	if(points.Length != 1)	if(false)	gpio-twoaddr
+G24-latchRecorded	model/GuardedSTM32_GPIOPort.cs	afFaulted |= entering;	;	gpio-recorded
