@@ -5,13 +5,13 @@
 **How it was read:**
 - The held text extract (`rm0433-rev9.txt`, sha256 `8e02c0c0…`) was used only to find pages.
 - Every page cited below was then extracted from the PDF itself with Ghostscript 10.05.1 `txtwrite`. That ran in the tools image `ghcr.io/clearforge-llc/aethelgard-tools@sha256:e5fc7ddb…8d1b58`, with `--network none`.
-- Each quote was matched mechanically against its page. All 36 matched once the SR reset value was placed on p2224.
+- Each quote in this file was then matched mechanically against the page it cites, after whitespace was normalised. The quote list was regenerated from this file. All 32 quotes taken from the manual were found on a page their own line cites. The other quoted strings in this file are code text, work-order text or search terms.
 - The PDF's page index equals the printed footer (`2165/3329` is PDF page 2165).
 - Figure 618 (p2167) was rendered to PNG and read by eye, because its truth table is a layout, not running text.
 
 Reproduce one page:
 `gs -q -dNOPAUSE -dBATCH -sDEVICE=txtwrite -dFirstPage=N -dLastPage=N -sOutputFile=- rm0433-rev9.pdf`.
-In the image, run it on a copy under `/tmp`: Ghostscript refuses a file on a read-only bind mount with "Permission denied", even though `head` can read it.
+In the image, Ghostscript failed with "Permission denied" on the PDF as mounted, even though `head` could read it. It worked on a copy under `/tmp`. The cause was not isolated.
 
 All references are to RM0433 Rev 9, chapter 50 "Serial peripheral interface (SPI)".
 
@@ -21,12 +21,13 @@ The rule is evaluated on every 32-bit CR1 write with `SPE=1`. The "Build" column
 
 | # | CFG2 copy and CR1 written | Build | What RM0433 Rev 9 says | Pages | Verdict |
 |---|---|---|---|---|---|
-| T1 | `MASTER=1, SSM=1, SSIOP=0, SSI=1` | **pass** | With `SSM=1` the SS input is the SSI bit. The SS level "is considered as active if it is equal to SSIOP". In Figure 618, `SS(SSI) <> SSIOP` gives "OK" in master mode. `SSIOP=0` means "low level is active". So `SSI=1` is inactive, and no mode fault occurs. | §50.4.7 p2165, Fig. 618 p2167; §50.11.4 p2221 (SSM, SSIOP); §50.5.2 p2184 | **Agrees, if `SPE=1` is the only time MODF is evaluated. The manual does not say that it is. See D1.** |
+| T1 | `MASTER=1, SSM=1, SSIOP=0, SSI=1` (the guard does not look at `SP[2:0]` or `I2SMOD`) | **pass** | With `SSM=1` the SS input is the SSI bit. The SS level "is considered as active if it is equal to SSIOP". In Figure 618, `SS(SSI) <> SSIOP` gives "OK" in master mode. `SSIOP=0` means "low level is active". So `SSI=1` is inactive, and no mode fault occurs. | §50.4.7 p2165, Fig. 618 p2167; §50.11.4 p2221 (SSM, SSIOP); §50.5.2 p2184 | **Agrees, on two premises the guard does not check.** The first is that MODF is evaluated only at `SPE=1`, which the manual does not say (D1). The second is Motorola SPI mode, `SP=000` and `I2SMOD=0` (D6). |
 | T2 | `MASTER=1, SSM=1, SSIOP=0, SSI=0` | refuse: mode fault | "Mode fault occurs when the master device has its internal slave select logic input (… SSI bit in slave select software mode) pulled low". The effects are: MODF is set, "The SPE bit is forced to zero", and "The MASTER bit is cleared". | §50.5.2 p2184; §50.11.6 p2225 (MODF is SR bit 9) | **Agrees.** The condition text's three effects are each on p2184. |
 | T3 | `MASTER=1, SSM=1, SSIOP=1` (either SSI) | refuse: polarity not handled | The manual is **inconsistent**. p2165 and Figure 618 (p2167) make "active" mean equal to SSIOP, so with `SSIOP=1` it is `SSI=1` that faults. p2184 says the fault is the input "pulled low", whatever SSIOP is. | p2165, p2167 vs p2184 | **Agrees, as a refusal.** The manual itself does not decide this case, so the refusal stays. Its citation should name the inconsistency. |
 | T4a | `MASTER=1, SSM=0, SSOE=0` | refuse: SS is a pin level | With hardware SS and `SSOE=0`, "If the NSS pin is pulled into an active level in this mode, the SPI enters master mode fault state" and becomes a slave. The twin does not model the pin level. | §50.4.7 p2166; §50.11.4 p2221 (SSM=0: "NSS input value is determined by the NSS pad") | **Agrees.** |
 | T4b | `MASTER=1, SSM=0, SSOE=1` | refuse: "a mode fault (SR.MODF) cannot be ruled out" | "When master uses hardware NSS output (SSM=0 and SSOE=1), the NSS signal input is forced to non active state internally to prevent master mode fault error." p2166 says the same: SSOE=1 prevents "any mode fault evaluation". | §50.11.4 p2221; §50.4.7 p2166 | **Disagrees, in the refusing direction.** The manual does rule out the mode fault here. The refusal is still defensible on other grounds: SSOE is a tag that the stock model drops, so NSS output is unmodeled. But the condition text is wrong. See D4. |
 | T5 | `MASTER=0` | refuse: slave mode not modeled | MASTER is CFG2 bit 22 (p2222). The refusal rests on the stock model, which is master-only (measured on the blind branch). It makes no claim about the manual. | p2222 | **Agrees** (a twin limitation). |
+| T7 | `SP[2:0]=001` (TI mode), with the T1 bits | **pass** (SP is not read) | In TI mode "the setting of CPOL, CPHA, LSBFRST, SSOM, SSOE, SSIOP and SSM is not required", and NSS is driven by the protocol. Configuration step 2(d) repeats this. The manual says nothing about mode fault in a TI-mode master. | §50.5.1 p2181; §50.4.9 p2171; §50.11.4 p2222 (SP is CFG2 bits 21:19) | **Unsupported in the passing direction.** T1's reasoning ("SSM=1 makes SSI the SS input") is not what the manual says for TI mode. See D6. |
 | T6 | A 16- or 8-bit write overlapping CR1 or CFG2 | refuse | §50.11 gives no access-width rule for CR1 or CFG2; this was searched for and is a search result, not a citation. The refusal rests on the guard, which evaluates 32-bit writes only. | none | **Agrees** (a twin limitation, with no claim about the manual). |
 
 ## 2. Bits, offsets and reset values the build uses
@@ -67,10 +68,19 @@ All of these agree. The register map (Table 429, p2233) is consistent with them,
 - **What the twin does:** the guard passes, because its rule looks only at the `SPE=1` write.
 - **Why it may be fine:** the manual's own procedure (p2171) is in the same order as the firmware, which implies MODF is not evaluated while the SPI is disabled. But that is an implication, not a statement.
 - **Lean:** treat it as undecided, which means refuse (invariant 1).
-  - The guard would also refuse when its copies show a master with its software SS input active, (`MASTER=1, SSM=1`, SSI equal to the polarity), at any write since the last reset, not only at the `SPE=1` write.
+  - The guard would refuse the enable if any master state since the last reset was one T1 would not pass. "The lean, made wider" below gives the exact rule.
   - The control firmware would set SSI before writing CFG2. From memory, not verified: ST's H7 HAL sets SSI in CR1 before it writes CFG2.
   - Alternatively, the architect accepts p2171 as sufficient. The rule's citation would then name p2171 as the basis for the gate.
 - **Either way this changes the rule the build passes on,** so it needs a ruling before I build.
+- **Evidence on each side, all from pages cited above:**
+  - **Against an SPE gate:**
+    - p2184's multimaster procedure is "Switch into master mode while SSOE=0 (… MODF is raised in this case which prevents any next node switching into master mode)".
+    - MASTER is in CFG2, which can be written only at `SPE=0` (p2217, p2221). So "switching into master mode" (p2184) happens while disabled, and the manual says MODF can be raised then.
+  - **For an SPE gate:**
+    - p2217: "When SPE=0 any SPI operation is stopped and disabled … internal state machine is reseted".
+    - The order of the p2171 procedure, as above.
+  - **Searched and found silent:** a whitespace-normalised search of the whole of chapter 50 for "mode fault", "MODF" and "fault evaluation" finds no statement that ties MODF to SPE. Table 423's footnotes (p2189) do not mention MODF.
+- **The lean, made wider:** on the literal reading, *any* master state since reset other than the pass configuration could latch MODF before a later enable that passes. That includes a transient `SSM=0, SSOE=0`, or `SSIOP=1` with SSI equal to it. So the lean is: refuse the enable if, at any CFG2 or CR1 write since the last reset, the guard's copies showed `MASTER=1` in any configuration T1 would not pass.
 
 **D2. IOLOCK: a confirmed false pass. This is fix (1), now cited.**
 - **Measured facts** (blind branch FEEDBACK R8): the stock model drops IOLOCK, while the guard's copy follows every CFG2 write.
@@ -100,6 +110,13 @@ All of these agree. The register map (Table 429, p2233) is consistent with them,
   - For `SSOE=1`, the text becomes "NSS output (SSOE) is not modeled by the stock model; RM0433 Rev 9 p2221 rules out MODF here". It still refuses, because invariant 1 covers the unmodeled output.
   - Turning it into a pass is R7, which is not in this WO.
 
+**D6. TI mode and I2S mode: the pass row's other premise. This is in the passing direction, and it is undecided by the manual.**
+- **What the guard does:** it never reads `CFG2.SP[2:0]` (bits 21:19, p2222), and it never sees `SPI_I2SCFGR.I2SMOD` (offset `0x50`, bit 0, p2230).
+- **What the manual says:** in TI mode, SSM, SSIOP and SSOE are "not required" (p2181, p2171). Mode fault in a TI master is not described anywhere in chapter 50. I2SMOD "needs to be kept at 0 in SPI mode" (p2230, and p2171 step 2(f)).
+- **So:** T1's argument holds only for Motorola SPI with `I2SMOD=0`.
+- **Lean:** the pass row also requires `SP=000` in the guard's CFG2 copy. Any write to `SPI_I2SCFGR` with `I2SMOD=1` refuses, as unmodeled. `SPI_I2SCFGR` is a third guarded register, but it is still SPI, not another peripheral.
+- **This changes the rule the build passes on, so it needs the same ruling as D1.**
+
 **D5. The citation constant is false today.** It says "Section number and revision not verified", and it cites the same text for every branch. The build will replace it with a per-branch citation from §1 above: revision, section and page. This is item (7), and it is not a disagreement.
 
 **Inconsistencies inside the manual,** recorded so that no one "fixes" the guard toward them:
@@ -108,10 +125,10 @@ All of these agree. The register map (Table 429, p2233) is consistent with them,
 
 ## 5. Stop status
 
-- **The §7 stop "RM0433 contradicts the rule the build passes on": D1.**
+- **The §7 stop "RM0433 contradicts the rule the build passes on": D1, with D6 beside it.**
   - The literal text (p2184) contradicts the pass on the control path.
   - The procedure (p2171) implies there is no contradiction.
   - I stop here for a ruling.
-- **No row of the static table (T1–T6) contradicts the manual in the passing direction.**
+- **Apart from D1 and D6, which are T1's unchecked premises, and T7, which is D6 in the table, no row contradicts the manual in the passing direction.**
 - **D2 is the known false pass that fix (1) closes.**
 - **D3 and D4 refuse where silicon would not**, so they are false refusals, not false passes.
