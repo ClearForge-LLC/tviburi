@@ -68,4 +68,4 @@ Run twice: by me, and by an independent reviewer on Opus who had the code and no
   - the console fixtures byte-for-byte (provenance);
   - the explicit `would-refuse` arm and its test (the architect asked for them by name);
   - two cuts that were taste, not reduction.
-- **Not built, and reported:** the `CRCPOLY` copy, which could only ever hold `0x107`, was removed in favour of the constant, before this pass.
+- **Made earlier, at the advisor's suggestion:** the `CRCPOLY` copy, which could only ever hold `0x107`, became the constant.
