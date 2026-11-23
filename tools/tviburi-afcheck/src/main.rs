@@ -238,6 +238,34 @@ mod tests {
         assert!(f.iter().any(|x| x.contains("stale ruling presence PA0 AF15")), "{:?}", f);
     }
 
+    /// model/ds12117-rev10-lqfp144.tsv against its two sources: Figure 6 read mechanically (tests/1301/ds12117-fig6.tsv)
+    /// and Table 8's LQFP144 column read by eye (tests/1301/visual/table8-lqfp144.tsv). Every failure, by line.
+    fn package_disagreements(model: &str, fig6: &str, table8: &str) -> Vec<String> {
+        let base = |n: &str| n.split(['(', '-']).next().unwrap_or("").to_string();
+        let fig: BTreeMap<String, String> = fig6.lines().skip(1).map(|l| { let f: Vec<&str> = l.split('\t').collect(); (base(f[1]), f[0].to_string()) }).collect();
+        let t8: BTreeMap<String, String> = table8.lines().skip(1).map(|l| { let f: Vec<&str> = l.split('\t').collect(); (base(f[0]), f[2].to_string()) }).collect();
+        let mut out = Vec::new();
+        for l in model.lines().skip(1) {
+            let f: Vec<&str> = l.split('\t').collect();
+            let (pin, num) = (f[1], f[2]);
+            if t8.get(pin).map(String::as_str) != Some(num) { out.push(format!("{pin}: model {num}, Table 8 {:?}", t8.get(pin))); }
+            let want = if num == "-" { None } else { Some(num.to_string()) };
+            if fig.get(pin) != want.as_ref() { out.push(format!("{pin}: model {num}, Figure 6 {:?}", fig.get(pin))); }
+        }
+        out
+    }
+
+    #[test]
+    fn the_package_bonding_agrees_with_figure_6_and_table_8_and_a_change_is_caught() {
+        let r = |p: &str| std::fs::read_to_string(format!("{}/{}", ROOT, p)).unwrap();
+        let (m, f, t) = (r("model/ds12117-rev10-lqfp144.tsv"), r("tests/1301/ds12117-fig6.tsv"), r("tests/1301/visual/table8-lqfp144.tsv"));
+        assert_eq!(m.lines().count(), 169);
+        assert_eq!(package_disagreements(&m, &f, &t), Vec::<String>::new());
+        let planted = m.replace("\tPK0\t-\t", "\tPK0\t145\t");
+        assert_ne!(planted, m);
+        assert!(package_disagreements(&planted, &f, &t).iter().any(|x| x.starts_with("PK0:")));
+    }
+
     #[test]
     fn st_pins_read_by_their_first_token() {
         let s = read_st(r#"<GPIO_Pin PortName="PA" Name="PA13 (JTMS/SWDIO)"><PinSignal Name="X"><SpecificParameter Name="GPIO_AF"><PossibleValue>GPIO_AF3_Y</PossibleValue></SpecificParameter></PinSignal></GPIO_Pin><GPIO_Pin Name="PC14-OSC32_IN (OSC32_IN)"><PinSignal Name="Z"><SpecificParameter Name="GPIO_Mode"><PossibleValue>GPIO_AF9_W</PossibleValue></SpecificParameter></PinSignal></GPIO_Pin>"#).unwrap();
