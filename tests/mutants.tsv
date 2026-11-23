@@ -135,3 +135,20 @@ C21-misalignedWrite	model/GuardedSTM32H7_RCC.cs	Width(offset, value, 32, "write"
 C22-sourceCleared	model/GuardedSTM32H7_RCC.cs	if((cr & on) != 0 && !PllReference(n, cr))	if((cr & on) != 0 && (inner.ReadDoubleWord(CrOffset) & on) == 0 && !PllReference(n, cr))	rcc-oscclear
 C23-keptCr	model/GuardedSTM32H7_RCC.cs	kept |= bit;	;	rcc-oscsys
 F02-ack1300	tools/tviburi-release/src/main.rs	("(TVI-WO-1300 A", "TVI-WO-1300.rm0433.md	("(TVI-WO-1300 A", "TVI-WO-0100b.rm0433.md	unit rcc-ledger
+G01-afRule	model/GuardedSTM32_GPIOPort.cs	var entering = AfFaults(moder, afrl, afrh) & ~afFaulted;	var entering = 0;	gpio-blank
+G02-afOnce	model/GuardedSTM32_GPIOPort.cs	afFaulted = AfFaults(moder, base.ReadDoubleWord(AfrlOffset), base.ReadDoubleWord(AfrhOffset));	afFaulted = 0;	gpio-recorded
+G03-package	model/GuardedSTM32_GPIOPort.cs	var entering = PackageFaults(word) & ~packageFaulted;	var entering = 0;	gpio-package
+G04-pc2Switch	model/GuardedSTM32_GPIOPort.cs	if(name == "PC2" || name == "PC3")	if(false)	gpio-pc2
+G05-bsrrPriority	model/GuardedSTM32_GPIOPort.cs	value &= ~((value & 0xFFFFu) << 16);	;	gpio-bsrr
+G06-otyperCopy	model/GuardedSTM32_GPIOPort.cs	return b == OtyperOffset ? otyper : base.ReadDoubleWord(b);	return base.ReadDoubleWord(b);	gpio-otyper
+G07-fieldRow	model/GuardedSTM32_GPIOPort.cs	if(f.Allowed != null && !f.Allowed.Contains(v))	if(false)	gpio-pupdr gpio-fields
+G08-noRegister	model/GuardedSTM32_GPIOPort.cs	if(rows.Length == 0)	if(false)	gpio-brr
+G09-readNoRegister	model/GuardedSTM32_GPIOPort.cs	if(b > AfrhOffset)	if(false)	gpio-read
+G10-misaligned	model/GuardedSTM32_GPIOPort.cs	if((offset & (width / 8 - 1)) == 0)	if(true)	gpio-misaligned
+G11-resetCheck	model/GuardedSTM32_GPIOPort.cs	if(resets[i] != want[i])	if(false)	gpio-config
+G12-subWordMerge	model/GuardedSTM32_GPIOPort.cs	var word = width == 32 ? value : (Served(b) & ~(mask << shift)) | ((value & mask) << shift);	var word = width == 32 ? value : (value & mask);	gpio-bsrrhalf gpio-afrh
+G13-portFromAddress	model/GuardedSTM32_GPIOPort.cs	port = (char)('A' + (int)((start - PortsBase) / 0x400));	port = 'A';	gpio-package
+G14-tableData	model/GuardedSTM32_GPIOPort.cs	PA5:89:	PA5:90:	afcheck
+G15-restatedRoute	model/stm32h7-gpio-restate.repl	timer1:\n    0 -> tviburiGpioA#07@01 | tviburiGpioA#08@01 |	timer1:\n    0 -> tviburiGpioA#07@01 |	gpio-registrations
+G16-boardPackage	model/tviburi-nucleo-h753zi.repl	tviburiGpioH:\n    mode: "enforcing"\n    package: "LQFP144"	tviburiGpioH:\n    mode: "enforcing"	gpio-package
+G17-namesLine	scripts/tviburi-spike	gpioPortJ gpioPortK >	gpioPortJ >	modeled

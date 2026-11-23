@@ -11,7 +11,7 @@ here=$(cd "$(dirname "$0")/../.." && pwd)
 IMAGE=$(sed -n 's/^IMAGE=//p' "$here/tests/spike.sh")
 CASES="valid blank blankfirst afterwards afrh package packageinput pc2 nopackage pupdr lckr brr read bsrr bsrrhalf otyper ardupilot gen-s03 recorded config query registrations reset misaligned fields ledger adv-monitor"
 GUARDS="spi1 rcc gpioPortA gpioPortB gpioPortC gpioPortD gpioPortE gpioPortF gpioPortG gpioPortH gpioPortI gpioPortJ gpioPortK"
-PATHS='"valid","blank","blankfirst","afterwards","afrh","package","packageinput","pc2","pupdr","lckr","brr","read","bsrr","bsrrhalf","otyper","ardupilot","gen-s03"'
+PATHS='"valid","blank","blankfirst","afterwards","twice","afrh","package","packageinput","pc2","pupdr","lckr","brr","read","bsrr","bsrrhalf","otyper","ardupilot","gen-s03"'
 scratch=${TVIBURI_SCRATCH:-$HOME/.cache/tviburi}
 mkdir -p "$scratch"
 work=$(mktemp -d "$scratch/gpio.XXXXXX")
@@ -155,9 +155,9 @@ for t in ${TVIBURI_TESTS:-$CASES}; do
     run_case "$t" "$t" "$run" "${marks[@]}"
     check "$t: the measured GPIO write sequence passes, enforcing (WO §2)" "passes $t" ;;
   recorded)
-    PLATFORM_SED='s/^    mode: "enforcing"$/    mode: "recorded"/' run_case recorded blank "$run" "${marks[@]}"
-    check "recorded: in recorded mode the blank AF is a would-refuse, the firmware runs on to its marker, and the check never passes it (RUL-19)" \
-      "[ \$rc = 1 ] && grep -q '\"tviburi\":\"would-refuse\".*TVI-GPIO-AF' '$work/recorded/renode-log.txt' && after recorded" ;;
+    PLATFORM_SED='s/^    mode: "enforcing"$/    mode: "recorded"/' run_case recorded twice "$run" "${marks[@]}"
+    check "recorded: in recorded mode the blank AF is one would-refuse (not one per later write), the firmware runs on to its marker, and the check never passes it (RUL-19)" \
+      "[ \$rc = 1 ] && [ \$(grep -c '\"tviburi\":\"would-refuse\".*TVI-GPIO-AF' '$work/recorded/renode-log.txt') = 1 ] && after recorded" ;;
   config)
     PLATFORM_SED='$a\
 tviburiGpioA:\

@@ -6,6 +6,7 @@
 //!   path="blank"        - PA5 AFSEL = 6 (blank on p89), then MODER5 = 10: TVI-GPIO-AF, predicted-fault, at the MODER store.
 //!   path="blankfirst"   - PA6 put in AF mode with its AFSEL at reset (AF0, blank on p89): TVI-GPIO-AF at the MODER store.
 //!   path="afterwards"   - PA5 in AF mode on AF5, then AFSEL changed to 6: TVI-GPIO-AF at the AFRL store.
+//!   path="twice"        - "blank", then MODER written again with PA5 still in AF mode: in recorded mode, one would-refuse.
 //!   path="afrh"         - PA9 AFSEL (AFRH) = 0 with MODER9 = 10 (PA9 AF0: blank on p89), the AFRH store a half-word:
 //!                         TVI-GPIO-AF at the MODER store (a sub-word AFRH write merged, then judged).
 //!   path="package"      - PH2 (not bonded on LQFP144, Table 8 p68) set to output: TVI-GPIO-PACKAGE, predicted-fault.
@@ -1071,6 +1072,12 @@ pub unsafe extern "C" fn reset() -> ! {
     #[cfg(path = "blankfirst")]
     {
         mode(GPIOA, 6, 2);
+    }
+    #[cfg(path = "twice")]
+    {
+        afsel(GPIOA, 5, 6);
+        mode(GPIOA, 5, 2);
+        mode(GPIOA, 6, 1);
     }
     #[cfg(path = "afterwards")]
     {
