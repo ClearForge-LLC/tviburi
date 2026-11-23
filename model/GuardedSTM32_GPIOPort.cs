@@ -101,7 +101,7 @@ namespace Antmicro.Renode.Peripherals.Tviburi
             {
                 return mode == 0 ? "input" : mode == 1 ? "output" : "analog";
             }
-            return Cell(pin, Af(base.ReadDoubleWord(AfrlOffset), base.ReadDoubleWord(AfrhOffset), pin))?.Text;
+            return CellAt(pin, Af(base.ReadDoubleWord(AfrlOffset), base.ReadDoubleWord(AfrhOffset), pin))?.Text;
         }
 
         // The citation for WhichSignal's answer on `pin`: the table and page, or RM0433's MODER.
@@ -114,7 +114,7 @@ namespace Antmicro.Renode.Peripherals.Tviburi
             }
             var mode = (base.ReadDoubleWord(ModerOffset) >> (2 * pin)) & 3;
             return mode != 2 ? "RM0433 Rev 9 §11.4.1 p541"
-                : "DS12117 Rev 10 Table 9 p" + Cell(pin, Af(base.ReadDoubleWord(AfrlOffset), base.ReadDoubleWord(AfrhOffset), pin)).Page
+                : "DS12117 Rev 10 Table 9 p" + CellAt(pin, Af(base.ReadDoubleWord(AfrlOffset), base.ReadDoubleWord(AfrhOffset), pin)).Page
                     + "; RM0433 Rev 9 §11.4.9-11.4.10 p545-546";
         }
 
@@ -286,7 +286,7 @@ namespace Antmicro.Renode.Peripherals.Tviburi
             }
             var pin = Lowest(entering);
             var af = Af(afrl, afrh, pin);
-            var cell = Cell(pin, af);
+            var cell = CellAt(pin, af);
             records.Refuse("TVI-GPIO-AF", PredictedFault, Register(b), "P" + port + pin + " AF" + af,
                 "pin P" + port + pin + " in alternate-function mode (MODER = 10) selects AF" + af + ", which has no function on that pin in DS12117's alternate-function table: on silicon the pin carries no peripheral's signal",
                 "DS12117 Rev 10 Table 9 p" + cell.Page + " (P" + port + pin + " AF" + af + ": -); RM0433 Rev 9 §11.4.1 p541 (MODER), §11.4.9-11.4.10 p545-546 (AFSEL)",
@@ -329,7 +329,7 @@ namespace Antmicro.Renode.Peripherals.Tviburi
             var m = 0;
             for(var pin = 0; pin < 16; pin++)
             {
-                var cell = ((moder >> (2 * pin)) & 3) == 2 ? Cell(pin, Af(afrl, afrh, pin)) : null;
+                var cell = ((moder >> (2 * pin)) & 3) == 2 ? CellAt(pin, Af(afrl, afrh, pin)) : null;
                 if(cell != null && cell.Text == "-")
                 {
                     m |= 1 << pin;
@@ -422,7 +422,7 @@ namespace Antmicro.Renode.Peripherals.Tviburi
             return "";
         }
 
-        private Cell Cell(int pin, int af)
+        private Cell CellAt(int pin, int af)
         {
             return Table().TryGetValue("P" + port + pin, out var cells) ? cells[af] : null;
         }
