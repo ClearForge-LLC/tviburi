@@ -11,7 +11,7 @@
 # Exit 0 only if every selected test passed.
 set -euo pipefail
 
-IMAGE=ghcr.io/clearforge-llc/aethelgard-tools@sha256:e5fc7ddbe36c050e78763ad1d203ec8d176408a3e534bed5563c424d8d9a1b58
+IMAGE=ghcr.io/clearforge-llc/aethelgard-tools@sha256:1e0ab105ec42bdba66b773464f0b6679d622e4afdafef30ec4931e4326f49c63
 ACCEPTANCE="unit modf modeled ardupilot generated field stable cfg2first iolock rmw forge stock-forge stock-modf nomark conditions fields load crash"
 ADVERSARIAL="adv-removed adv-extra-arg adv-bad-variant adv-env adv-hook adv-loglevel adv-spray adv-noend adv-version adv-recorded"
 ALL="$ACCEPTANCE $ADVERSARIAL"

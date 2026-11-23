@@ -81,3 +81,4 @@ N25-orderCr2	model/GuardedSTM32H7_SPI.cs	else if(offset == Cr2Offset && enabled)
 N26-orderCstart	model/GuardedSTM32H7_SPI.cs	else if(offset == Cr1Offset && !enabled && (value & Cr1Cstart) != 0)	else if(false)	conditions
 R16-consoleCr	tools/tviburi-check/src/main.rs	let line = line.trim_matches('\\r');	let line = line.trim_end_matches('\\r');	unit
 R17-virtualStamp	tools/tviburi-check/src/main.rs	&& (close == 14 || close == 19)	&& close == 14	unit
+R18-wouldRefuse	tools/tviburi-check/src/main.rs	"would-refuse" => problems.push(fail("a would-refuse record: a recorded-mode run is never a pass (RUL-19)")),	"would-refuse" => {}	unit

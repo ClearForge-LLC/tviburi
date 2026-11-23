@@ -13,7 +13,7 @@
 # Renode's own exit status is not trusted: a failed monitor command still exits 0 (measured).
 set -uo pipefail
 
-variants="modeled modf cfg2first iolock forge spray rmw"  # the firmware's --cfg path values
+variants="modeled modf cfg2first iolock forge spray rmw ardupilot generated field"  # the firmware's --cfg path values
 variant=
 for v in $variants; do [ "${1:-}" = "$v" ] && variant=$v; done
 [ -n "$variant" ] || { echo "usage: tviburi-spike <${variants// /|}>" >&2; exit 1; }
@@ -48,7 +48,7 @@ EOF2
 timeout 120 renode --disable-gui --console --plain "$out/run.resc" </dev/null >"$out/renode.out" 2>&1
 rc=$?
 
-"$out/target/debug/tviburi-check" "$out/renode-log.txt" spi1 >"$out/check.txt"
+"$out/target/debug/tviburi-check" "$("$root/tests/model-version" "$root/model")" "$out/renode-log.txt" spi1 >"$out/check.txt"
 crc=$?
 cat "$out/check.txt"
 if [ $crc -eq 3 ]; then

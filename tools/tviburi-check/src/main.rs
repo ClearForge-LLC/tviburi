@@ -150,6 +150,7 @@ pub fn check(log: &str, expected_version: &str, peripherals: &[String]) -> Repor
             }
             "refusal" => {}
             "end" => ch.end = true,
+            "would-refuse" => problems.push(fail("a would-refuse record: a recorded-mode run is never a pass (RUL-19)")),
             other => problems.push(fail(&format!("unknown record kind {other:?}"))),
         }
     }
@@ -323,6 +324,19 @@ mod tests {
         for w in [recorded, modeless, other] {
             assert_eq!(run(&(w.clone() + &end(1))), Verdict::Fail, "{w}");
         }
+    }
+
+    #[test]
+    fn a_recorded_mode_run_is_never_a_pass() {
+        // RUL-19: a would-refuse record fails the run, whatever the witness says; a recorded witness
+        // fails with no would-refuse at all.
+        let would = rec("ERROR", "spi1", r#"{"tviburi":"would-refuse","seq":1,"rule":"TVI-SPI-MODF","kind":"predicted-fault"}"#);
+        let log = witness(0) + &would + &end(2);
+        assert_eq!(run(&log), Verdict::Fail);
+        assert!(problems(&log).iter().any(|p| p.contains("would-refuse")));
+        let recorded = witness(0).replace(r#""mode":"enforcing""#, r#""mode":"recorded""#);
+        assert_eq!(run(&(recorded.clone() + &would + &end(2))), Verdict::Fail);
+        assert_eq!(run(&(recorded + &end(1))), Verdict::Fail);
     }
 
     #[test]
