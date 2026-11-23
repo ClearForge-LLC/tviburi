@@ -65,7 +65,6 @@ namespace Antmicro.Renode.Peripherals.Tviburi
             cfg1 = Cfg1Reset;
             cfg2 = 0;
             ier = 0;
-            crcPoly = CrcPolyReset;
             ioLock = false;
             ioLockCertain = false;
             history = null;
@@ -119,9 +118,6 @@ namespace Antmicro.Renode.Peripherals.Tviburi
                     history = null;
                     masterUnknown = true;
                 }
-                break;
-            case CrcPolyOffset:
-                crcPoly = value;
                 break;
             }
             base.WriteDoubleWord(offset, value);
@@ -177,7 +173,7 @@ namespace Antmicro.Renode.Peripherals.Tviburi
             case IerOffset:
                 return ier;
             case CrcPolyOffset:
-                return crcPoly;
+                return CrcPolyReset; // the only value the allow-list lets CRCPOLY hold
             }
             return value;
         }
@@ -267,8 +263,11 @@ namespace Antmicro.Renode.Peripherals.Tviburi
             case Cfg2Offset:
                 if(ioLock)
                 {
-                    records.Refuse("TVI-SPI-IOLOCK", ioLockCertain ? PredictedFault : Unmodeled, "SPI_CFG2", "CR1.IOLOCK (bit 16) = 1",
-                        ioLockCertain
+                    // Certain only if it was certain when taken, SPE has not gone from 1 to 0 since, and no
+                    // mode fault is possible now (an active MODF clears IOLOCK, p2225): ruling C7.
+                    var certain = ioLockCertain && history == null && !masterUnknown;
+                    records.Refuse("TVI-SPI-IOLOCK", certain ? PredictedFault : Unmodeled, "SPI_CFG2", "CR1.IOLOCK (bit 16) = 1",
+                        certain
                             ? "CFG2 written after IOLOCK was set: silicon keeps the old CFG2 (\"When this bit is set, the SPI_CFG2 register content cannot be modified\"), while the stock model drops IOLOCK and would take the write"
                             : "CFG2 written after IOLOCK was written, where the twin cannot say whether silicon holds the lock: the write that set it also enabled the SPI, or a mode fault was possible (an active MODF blocks IOLOCK), or SPE has since gone from 1 to 0, which clears IOLOCK on silicon and is not modeled",
                         "RM0433 Rev 9 §50.11.1 p2215 (CR1.IOLOCK), p2217 (SPE); §50.11.4 p2221 (CFG2 write protection); §50.11.6 p2225 (MODF)",
@@ -619,7 +618,6 @@ namespace Antmicro.Renode.Peripherals.Tviburi
         private uint cfg1;
         private uint cfg2;
         private uint ier;
-        private uint crcPoly;
         private bool ioLock;
         private bool ioLockCertain;
         private string history;

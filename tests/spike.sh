@@ -210,6 +210,9 @@ t_conditions() {
  (\"TVI-SPI-MODF\", \"unmodeled\", \"CFG2.MASTER (bit 22) = 0\", \"0x0\", 32),
  (\"TVI-SPI-IOLOCK\", \"unmodeled\", \"CR1.IOLOCK (bit 16) = 1\", \"0xC\", 32),
  (\"TVI-SPI-IOLOCK\", \"unmodeled\", \"CR1.IOLOCK (bit 16) = 1\", \"0xC\", 32),
+ (\"TVI-SPI-IOLOCK\", \"unmodeled\", \"CR1.IOLOCK (bit 16) = 1\", \"0xC\", 32),
+ (\"TVI-SPI-IOLOCK\", \"unmodeled\", \"CR1.IOLOCK (bit 16) = 1\", \"0xC\", 32),
+ (\"TVI-SPI-IOLOCK\", \"unmodeled\", \"CR1.IOLOCK (bit 16) = 1\", \"0xC\", 32),
  (\"TVI-SPI-MODF\", \"unmodeled\", \"CFG2 read after IFCR.MODFC written after such a state, and CFG2 not written since\", \"0xC\", 32),
  (\"TVI-SPI-MODF\", \"unmodeled\", \"CFG2.MASTER unknown: IFCR.MODFC written after a master state other than the passing one, and CFG2 not written since\", \"0x0\", 32),
  (\"TVI-SPI-MODF\", \"unmodeled\", \"a master state other than the passing one, since reset: CR1=0x00000000, CFG2=0x04400000\", \"0x0\", 32),
@@ -232,7 +235,7 @@ t_conditions() {
     "[ \"\$(grep -A1 -x READ-CR1 <<<\"\$console\" | tail -n1)\" = 0x00001000 ] && [ \"\$(grep -A1 -x READ-CFG2 <<<\"\$console\" | tail -n1)\" = 0x10000000 ]"
   local r; r() { grep -A1 -x "$1" <<<"$console" | tail -n1; }
   check "reads from the copies: IOLOCK from the latch (L2), CFG1 and CRCPOLY at reset, MASRX, IER.OVRIE (C2, C4)" \
-    '[ "$(r READ-CR1-L2)" = 0x00001001 ] && [ "$(r READ-CFG1)" = 0x00070007 ] && [ "$(r READ-CRCPOLY)" = 0x00000107 ] && [ "$(r READ-CR1-MASRX)" = 0x00000100 ] && [ "$(r READ-IER)" = 0x00000041 ]'
+    '[ "$(r READ-CR1-L2)" = 0x00001001 ] && [ "$(r READ-CFG1)" = 0x00070007 ] && [ "$(r READ-CRCPOLY)" = 0x00000107 ] && [ "$(r READ-CR1-MASRX)" = 0x00000100 ] && [ "$(r READ-IER)" = 0x00000041 ] && [ "$(r READ-IER-RESET)" = 0x00000000 ]'
 }
 
 t_fields() {
@@ -341,9 +344,12 @@ t_adv-version() {
     v=$(/repo/tests/model-version /repo/model); w=sha256:$(printf %064d 0)
     /check/debug/tviburi-check "$v" /run/renode-log.txt spi1 >/dev/null; echo right=$?
     /check/debug/tviburi-check "$w" /run/renode-log.txt spi1 >/dev/null; echo wrong=$?
-    /check/debug/tviburi-check /run/renode-log.txt spi1 >/dev/null; echo none=$?'
+    /check/debug/tviburi-check /run/renode-log.txt spi1 >/dev/null; echo none=$?
+    /check/debug/tviburi-check "$v" /run/renode-log.txt spi2 >/run-unnamed.txt; echo unnamed=$?; grep -c "not named" /run-unnamed.txt'
   check "the check passes the modeled run only with its expected version: wrong (1) and none (1) fail (gate clause 7)" \
     "grep -qx right=0 '$work/adv-version.stdout' && grep -qx wrong=1 '$work/adv-version.stdout' && grep -qx none=1 '$work/adv-version.stdout'"
+  check "spi1's records, with spi2 named instead, are records from an unnamed source: FAIL (1)" \
+    "grep -qx unnamed=1 '$work/adv-version.stdout' && grep -qxE '[1-9][0-9]*' '$work/adv-version.stdout'"
 }
 
 t_adv-recorded() {

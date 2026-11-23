@@ -114,6 +114,26 @@ sysbus WriteDoubleWord 0x40013000 0x11001
 sysbus WriteDoubleWord 0x40013000 0x1000
 sysbus WriteDoubleWord 0x4001300C 0x04400000
 machine Reset
+# 18b (L3, no disable after). IOLOCK in the write that enables; then CFG2 while enabled: IOLOCK is
+# evaluated first, unmodeled
+sysbus WriteDoubleWord 0x40013000 0x1000
+sysbus WriteDoubleWord 0x4001300C 0x04400000
+sysbus WriteDoubleWord 0x40013000 0x11001
+sysbus WriteDoubleWord 0x4001300C 0x04400000
+machine Reset
+# 18c. a certain latch, then SSI cleared while master (the D1 history): CFG2 refuses unmodeled, since
+# a mode fault would have cleared IOLOCK (p2225)
+sysbus WriteDoubleWord 0x40013000 0x1000
+sysbus WriteDoubleWord 0x4001300C 0x04400000
+sysbus WriteDoubleWord 0x40013000 0x11000
+sysbus WriteDoubleWord 0x40013000 0x10000
+sysbus WriteDoubleWord 0x4001300C 0x04400000
+machine Reset
+# 18d (L4). IOLOCK latched while the history is set: CFG2 refuses unmodeled
+sysbus WriteDoubleWord 0x4001300C 0x04400000
+sysbus WriteDoubleWord 0x40013000 0x10000
+sysbus WriteDoubleWord 0x4001300C 0x04400000
+machine Reset
 # 19 (H0). MODFC with no history has no effect: SPE passes, and a CFG2 read is served
 sysbus WriteDoubleWord 0x40013000 0x1000
 sysbus WriteDoubleWord 0x4001300C 0x04400000
@@ -183,6 +203,18 @@ sysbus ReadDoubleWord 0x40013010
 sysbus WriteDoubleWord 0x40013040 0x107
 sysbus WriteDoubleWord 0x40013040 0x7
 sysbus WriteDoubleWord 0x4001301C 0x0
+machine Reset
+# 28. reset clears MASTER unknown and the IER copy: after a reset, the CFG2 read is served, SPE passes, and
+# IER reads its reset value
+sysbus WriteDoubleWord 0x4001300C 0x04400000
+sysbus WriteDoubleWord 0x40013018 0x200
+sysbus WriteDoubleWord 0x40013010 0x41
+machine Reset
+echo "READ-IER-RESET"
+sysbus ReadDoubleWord 0x40013010
+sysbus WriteDoubleWord 0x40013000 0x1000
+sysbus ReadDoubleWord 0x4001300C
+sysbus WriteDoubleWord 0x40013000 0x1001
 machine Reset
 # 27 (TVI-SPI-ORDER). TXDR with SPE=0; CSTART with SPE=0, alone and in the write that enables; then
 # enabled: CR2 refuses

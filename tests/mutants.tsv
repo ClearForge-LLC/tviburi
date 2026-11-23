@@ -11,7 +11,7 @@ M06-ssi	model/GuardedSTM32H7_SPI.cs	if((cr1 & Cr1Ssi) == 0)	if(false)	modf
 M07-historyCheck	model/GuardedSTM32H7_SPI.cs	if(failure == null && history != null)	if(false)	cfg2first
 M08-historyNote	model/GuardedSTM32H7_SPI.cs	if(history == null && (cfg2 & Cfg2Master) != 0 && FirstFailingBranch(cfg2, cr1) != null)	if(false)	cfg2first
 M09-speGate	model/GuardedSTM32H7_SPI.cs	return offset == Cr1Offset && (value & Cr1Spe) != 0 && !EnablePasses(value);	return false;	modf
-M10-iolockCheck	model/GuardedSTM32H7_SPI.cs	if(ioLock)\n                {\n                    records.Refuse("TVI-SPI-IOLOCK", ioLockCertain	if(false)\n                {\n                    records.Refuse("TVI-SPI-IOLOCK", ioLockCertain	iolock
+M10-iolockCheck	model/GuardedSTM32H7_SPI.cs	if(ioLock)\n                {\n                    // Certain only if	if(false)\n                {\n                    // Certain only if	iolock
 M11-iolockLatch	model/GuardedSTM32H7_SPI.cs	                    ioLock = true;\n	(empty)	iolock
 M12-cfg2WhileEnabled	model/GuardedSTM32H7_SPI.cs	if((cr1 & Cr1Spe) != 0)	if(false)	conditions
 M13-i2smod	model/GuardedSTM32H7_SPI.cs	if((value & I2sMod) != 0)	if(false)	conditions
@@ -59,13 +59,13 @@ N07-modfcNeedsHistory	model/GuardedSTM32H7_SPI.cs	if((value & IfcrModfc) != 0 &&
 N08-cfg2KnowsMaster	model/GuardedSTM32H7_SPI.cs	                masterUnknown = false;\n                NoteMasterState();	                NoteMasterState();	conditions
 N09-cfg2ReadMasterUnknown	model/GuardedSTM32H7_SPI.cs	: masterUnknown ? "IFCR.MODFC written after such a state, and CFG2 not written since" : null;	: null;	conditions
 N10-iolockOnlyFromSpe0	model/GuardedSTM32H7_SPI.cs	&& !wasEnabled && !ioLock)	&& !ioLock)	conditions
-N11-iolockKind	model/GuardedSTM32H7_SPI.cs	ioLockCertain ? PredictedFault : Unmodeled, "SPI_CFG2"	PredictedFault, "SPI_CFG2"	conditions
+N11-iolockKind	model/GuardedSTM32H7_SPI.cs	certain ? PredictedFault : Unmodeled, "SPI_CFG2"	PredictedFault, "SPI_CFG2"	conditions
 N12-iolockUncertainAfterDisable	model/GuardedSTM32H7_SPI.cs	                    ioLockCertain = false; // silicon clears IOLOCK on SPE 1->0 (p2215); not modeled\n	(empty)	conditions
 N13-iolockCertainty	model/GuardedSTM32H7_SPI.cs	ioLockCertain = (value & Cr1Spe) == 0 && history == null && !masterUnknown;	ioLockCertain = true;	conditions
 N14-readIolockFromLatch	model/GuardedSTM32H7_SPI.cs	(cr1 & ~Cr1Stock & ~Cr1IoLock)	(cr1 & ~Cr1Stock)	conditions
 N15-readCfg1Copy	model/GuardedSTM32H7_SPI.cs	                return cfg1;	                return value;	conditions
 N16-cfg1Reset	model/GuardedSTM32H7_SPI.cs	            cfg1 = Cfg1Reset;	            cfg1 = 0;	conditions
-N17-readCrcPolyCopy	model/GuardedSTM32H7_SPI.cs	                return crcPoly;	                return value;	conditions
+N17-readCrcPolyReset	model/GuardedSTM32H7_SPI.cs	                return CrcPolyReset; // the only value the allow-list lets CRCPOLY hold	                return value;	conditions
 N18-cfg1WhileEnabled	model/GuardedSTM32H7_SPI.cs	if((cr1 & Cr1Spe) != 0 && value != cfg1)	if(false)	conditions
 N19-cfg1Kind	model/GuardedSTM32H7_SPI.cs	protectedChange ? PredictedFault : Unmodeled, "SPI_CFG1"	Unmodeled, "SPI_CFG1"	conditions
 N20-dataWidth	model/GuardedSTM32H7_SPI.cs	if(width != frame)	if(false)	conditions
@@ -82,3 +82,6 @@ N26-orderCstart	model/GuardedSTM32H7_SPI.cs	else if(offset == Cr1Offset && !enab
 R16-consoleCr	tools/tviburi-check/src/main.rs	let line = line.trim_matches('\\r');	let line = line.trim_end_matches('\\r');	unit
 R17-virtualStamp	tools/tviburi-check/src/main.rs	&& (close == 14 || close == 19)	&& close == 14	unit
 R18-wouldRefuse	tools/tviburi-check/src/main.rs	"would-refuse" => problems.push(fail("a would-refuse record: a recorded-mode run is never a pass (RUL-19)")),	"would-refuse" => {}	unit
+N27-iolockKindAtRefusal	model/GuardedSTM32H7_SPI.cs	var certain = ioLockCertain && history == null && !masterUnknown;	var certain = ioLockCertain;	conditions
+M33-resetMasterUnknown	model/GuardedSTM32H7_SPI.cs	            masterUnknown = false;\n        }\n	        }\n	conditions
+M34-resetIer	model/GuardedSTM32H7_SPI.cs	            ier = 0;\n	(empty)	conditions

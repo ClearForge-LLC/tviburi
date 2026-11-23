@@ -16,8 +16,10 @@
 //!                      interrupt and spi_lld_stop, twice, with each read-modify-write the ELF does
 //!                      (decoded at 0x8100e7c-ebc, 0x8100d28-d32, 0x8101082-88, 0x8100cba-cc0,
 //!                      0x8100f72-84). The DMA's 8-bit TXDR and RXDR accesses are made by the CPU.
-//!   path="generated" - Aethelgard's generated firmware on SPI1, as `spike/1100/data/writes.tsv`
-//!                      records it (hse-crystal-16): start, one 4-byte transfer, end.
+//!   path="generated" - Aethelgard's generated firmware on SPI1: its writes as `spike/1100/data/writes.tsv`
+//!                      records them (hse-crystal-16), and its reads as its board crate makes them
+//!                      (Aethelgard b9d5f4b6, boards/sentinel-01/src/board.rs L255-285, L632-716):
+//!                      start, one 4-byte transfer with SR polled for RXP, EOT and 16 SR reads, end.
 //!   path="field"     - the generated sequence with CFG2.CPOL=1, a field outside the allow-list:
 //!                      refused by TVI-SPI-FIELD, kind unmodeled (RUL-17).
 //! Bit positions: RM0433 Rev 9 §50.11 (CR1 p2215-2217, CFG2 p2221-2222); offsets: Renode's
@@ -104,14 +106,32 @@ unsafe fn generated(cfg2: u32) {
     const CFG1: *mut u32 = 0x4001_3008 as *mut u32;
     const IFCR: *mut u32 = 0x4001_3018 as *mut u32;
     const TXDR: *mut u8 = 0x4001_3020 as *mut u8;
+    const SR: *const u32 = 0x4001_3014 as *const u32;
+    const RXDR: *const u8 = 0x4001_3030 as *const u8;
     write_volatile(SPI1_CR1, 0x1000);
     write_volatile(CFG1, 0x1007_0007);
     write_volatile(SPI1_CFG2, cfg2);
     write_volatile(CR2, 0x4);
     write_volatile(SPI1_CR1, 0x1001);
     write_volatile(SPI1_CR1, 0x1201);
+    // spi_frame: TXDR 8-bit, poll SR (32-bit) for RXP, then RXDR 8-bit
     for b in [0x9F, 0, 0, 0] {
         write_volatile(TXDR, b);
+        for _ in 0..1000 {
+            if read_volatile(SR) & 1 != 0 {
+                read_volatile(RXDR);
+                break;
+            }
+        }
+    }
+    // SR.EOT, then one spi_sr_round of 16 SR reads before the disable
+    for _ in 0..1000 {
+        if read_volatile(SR) & (1 << 3) != 0 {
+            break;
+        }
+    }
+    for _ in 0..16 {
+        read_volatile(SR);
     }
     write_volatile(IFCR, 0x8);
     write_volatile(SPI1_CR1, 0x1000);
