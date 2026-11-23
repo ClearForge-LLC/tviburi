@@ -1,0 +1,713 @@
+register_enum	offset	field	msb	lsb	stock_kind	reset	behaviour	source_lines
+ClockControl(RCC_CR)	0x000	RESERVED	31	30	reserved	0x0	reserved: write discarded (unhandled-write log); read = reset-value bits = 0x0 (not forced to 0; framework read)	203
+ClockControl(RCC_CR)	0x000	(register change callback)	31	0	other	-	any field change -> PropagateClock() (recompute dividers, update peripheral/systick frequencies)	204-207
+ClockControl(RCC_CR)	0x000	PLL3RDY	29	29	computed-read	0x0	PLL3RDY := PLL3ON	202
+ClockControl(RCC_CR)	0x000	PLL3ON	28	28	stored	0x0	stored; only gates PLLSRC/HSIDIV changes	201
+ClockControl(RCC_CR)	0x000	PLL2RDY	27	27	computed-read	0x0	PLL2RDY := PLL2ON	200
+ClockControl(RCC_CR)	0x000	PLL2ON	26	26	stored	0x0	stored; only gates PLLSRC/HSIDIV changes (guard inputs); no frequency use	199
+ClockControl(RCC_CR)	0x000	PLL1RDY	25	25	computed-read	0x0	PLL1RDY := PLL1ON (valueProvider)	197
+ClockControl(RCC_CR)	0x000	PLL1ON	24	24	stored+callback	0x0	stored; write 0 reverted to 1 (Warning) while SW==PLL	189-196
+ClockControl(RCC_CR)	0x000	RESERVED	23	20	reserved	0x0	reserved: write discarded (unhandled-write log); read = reset-value bits = 0x0 (not forced to 0; framework read)	188
+ClockControl(RCC_CR)	0x000	HSECSSON	19	19	stored	0x0	FieldMode Read|Set: write 1 sets, write 0 cannot clear; no CSS behaviour	187
+ClockControl(RCC_CR)	0x000	HSEBYP	18	18	tag	0x0	tag: write discarded (unhandled-write log); read = reset-value bits = 0x0 (not forced to 0; framework read)	186
+ClockControl(RCC_CR)	0x000	HSERDY	17	17	computed-read	0x0	HSERDY reads = hseon	185
+ClockControl(RCC_CR)	0x000	HSEON	16	16	stored+callback	0x0	stored; write 0 reverted if SW==HSE or PLL1 selected with PLLSRC==HSE	176-184
+ClockControl(RCC_CR)	0x000	D2CKRDY	15	15	tag	0x0	tag: write discarded (unhandled-write log); read = reset-value bits = 0x0 (not forced to 0; framework read)	175
+ClockControl(RCC_CR)	0x000	D1CKRDY	14	14	tag	0x0	tag: write discarded (unhandled-write log); read = reset-value bits = 0x0 (not forced to 0; framework read)	174
+ClockControl(RCC_CR)	0x000	HSI48RDY	13	13	computed-read	0x0	HSI48RDY reads = HSI48ON	173
+ClockControl(RCC_CR)	0x000	HSI48ON	12	12	stored	0x0	stored (local var, no callback)	172
+ClockControl(RCC_CR)	0x000	RESERVED	11	10	reserved	0x0	reserved: write discarded (unhandled-write log); read = reset-value bits = 0x0 (not forced to 0; framework read)	171
+ClockControl(RCC_CR)	0x000	CSIKERON	9	9	tag	0x0	tag: write discarded (unhandled-write log); read = reset-value bits = 0x0 (not forced to 0; framework read)	170
+ClockControl(RCC_CR)	0x000	CSIRDY	8	8	computed-read	0x0	CSIRDY reads = csion	169
+ClockControl(RCC_CR)	0x000	CSION	7	7	stored+callback	0x0	stored; write 0 reverted if SW==CSI or PLL1 selected with PLLSRC==CSI	160-168
+ClockControl(RCC_CR)	0x000	RESERVED	6	6	reserved	0x0	reserved: write discarded (unhandled-write log); read = reset-value bits = 0x0 (not forced to 0; framework read)	159
+ClockControl(RCC_CR)	0x000	HSIDIVF	5	5	read-only-constant	0x0	read always 1 (valueProvider=>true); R/W flag, written value never read back	158
+ClockControl(RCC_CR)	0x000	HSIDIV	4	3	stored+callback	0x0	stored enum 64/32/16/8 MHz; change reverted if PLLSRC==HSI and any PLLxON; feeds HsiFrequency -> sys_ck/PLL ref	148-157
+ClockControl(RCC_CR)	0x000	HSIRDY	2	2	computed-read	0x0	HSIRDY reads = hsion (valueProvider; Read-only, cannot be written)	147
+ClockControl(RCC_CR)	0x000	HSIKERON	1	1	tag	0x0	tag: write discarded (unhandled-write log); read = reset-value bits = 0x0 (not forced to 0; framework read)	146
+ClockControl(RCC_CR)	0x000	HSION	0	0	stored+callback	0x1	stored; write 0 reverted (previous restored, Warning) if SW==HSI or PLL1 selected with PLLSRC==HSI (writeCallback)	137-145
+InternalClockSourceCalibration(RCC_ICSCR)	0x004	RESERVED	31	31	reserved	0x0	reserved: write discarded (unhandled-write log); read = reset-value bits = 0x0 (not forced to 0; framework read)	214
+InternalClockSourceCalibration(RCC_ICSCR)	0x004	CSITRIM	30	26	tag	0x10	tag: write discarded (unhandled-write log); read = reset-value bits = 0x10 (not forced to 0; framework read)	213
+InternalClockSourceCalibration(RCC_ICSCR)	0x004	CSICAL	25	18	tag	0x0	tag: write discarded (unhandled-write log); read = reset-value bits = 0x0 (not forced to 0; framework read)	212
+InternalClockSourceCalibration(RCC_ICSCR)	0x004	HSITRIM	17	12	tag	0x0	tag: write discarded (unhandled-write log); read = reset-value bits = 0x0 (not forced to 0; framework read)	211
+InternalClockSourceCalibration(RCC_ICSCR)	0x004	HSICAL	11	0	tag	0x0	tag: write discarded (unhandled-write log); read = reset-value bits = 0x0 (not forced to 0; framework read)	210
+ClockRecoveryRC(RCC_CRRCR)	0x008	RESERVED	31	10	reserved	0x0	reserved: write discarded (unhandled-write log); read = reset-value bits = 0x0 (not forced to 0; framework read)	217
+ClockRecoveryRC(RCC_CRRCR)	0x008	HSI48CAL	9	0	tag	0x0	tag: write discarded (unhandled-write log); read = reset-value bits = 0x0 (not forced to 0; framework read)	216
+ClockConfiguration(RCC_CFGR)	0x010	MCO2	31	29	tag	0x0	tag: write discarded (unhandled-write log); read = reset-value bits = 0x0 (not forced to 0; framework read)	236
+ClockConfiguration(RCC_CFGR)	0x010	(register change callback)	31	0	other	-	any field change -> PropagateClock() (recompute dividers, update peripheral/systick frequencies)	237-240
+ClockConfiguration(RCC_CFGR)	0x010	MCO2PRE	28	25	tag	0x0	tag: write discarded (unhandled-write log); read = reset-value bits = 0x0 (not forced to 0; framework read)	235
+ClockConfiguration(RCC_CFGR)	0x010	MCO1	24	22	tag	0x0	tag: write discarded (unhandled-write log); read = reset-value bits = 0x0 (not forced to 0; framework read)	234
+ClockConfiguration(RCC_CFGR)	0x010	MCO1PRE	21	18	tag	0x0	tag: write discarded (unhandled-write log); read = reset-value bits = 0x0 (not forced to 0; framework read)	233
+ClockConfiguration(RCC_CFGR)	0x010	RESERVED	17	16	reserved	0x0	reserved: write discarded (unhandled-write log); read = reset-value bits = 0x0 (not forced to 0; framework read)	232
+ClockConfiguration(RCC_CFGR)	0x010	TIMPRE	15	15	stored	0x0	stored; selects timer kernel clock divisor (LookupHclkDivisorForTimersKernelClock)	231
+ClockConfiguration(RCC_CFGR)	0x010	HRTIMSEL	14	14	tag	0x0	tag: write discarded (unhandled-write log); read = reset-value bits = 0x0 (not forced to 0; framework read)	230
+ClockConfiguration(RCC_CFGR)	0x010	RTCPRE	13	8	tag	0x0	tag: write discarded (unhandled-write log); read = reset-value bits = 0x0 (not forced to 0; framework read)	229
+ClockConfiguration(RCC_CFGR)	0x010	STOPKERWUCK	7	7	tag	0x0	tag: write discarded (unhandled-write log); read = reset-value bits = 0x0 (not forced to 0; framework read)	228
+ClockConfiguration(RCC_CFGR)	0x010	STOPWUCK	6	6	tag	0x0	tag: write discarded (unhandled-write log); read = reset-value bits = 0x0 (not forced to 0; framework read)	227
+ClockConfiguration(RCC_CFGR)	0x010	SWS	5	3	computed-read	0x0	SWS reads = SW immediately (valueProvider)	226
+ClockConfiguration(RCC_CFGR)	0x010	SW	2	0	stored+callback	0x0	stored enum (Hsi,Csi,Hse,Pll); written values >3 reverted to previous; feeds SysCkBaseFrequency (PropagateClock via register change callback)	219-225
+Domain1ClockConfiguration(RCC_D1CFGR)	0x018	RESERVED	31	12	reserved	0x0	reserved: write discarded (unhandled-write log); read = reset-value bits = 0x0 (not forced to 0; framework read)	246
+Domain1ClockConfiguration(RCC_D1CFGR)	0x018	(register change callback)	31	0	other	-	any field change -> PropagateClock() (recompute dividers, update peripheral/systick frequencies)	247-250
+Domain1ClockConfiguration(RCC_D1CFGR)	0x018	D1CPRE	11	8	stored+callback	0x0	stored; changeCallback derives d1CpreDivider (core/systick divider)	245
+Domain1ClockConfiguration(RCC_D1CFGR)	0x018	RESERVED	7	7	reserved	0x0	reserved: write discarded (unhandled-write log); read = reset-value bits = 0x0 (not forced to 0; framework read)	244
+Domain1ClockConfiguration(RCC_D1CFGR)	0x018	D1PPRE	6	4	stored+callback	0x0	stored; changeCallback derives d1PpreDivider (APB3 divider)	243
+Domain1ClockConfiguration(RCC_D1CFGR)	0x018	HPRE	3	0	stored+callback	0x0	stored; changeCallback derives hpreDivider (bit3 set: 2^((v&7)+1) else 1)	242
+Domain2ClockConfiguration(RCC_D2CFGR)	0x01C	RESERVED	31	11	reserved	0x0	reserved: write discarded (unhandled-write log); read = reset-value bits = 0x0 (not forced to 0; framework read)	257
+Domain2ClockConfiguration(RCC_D2CFGR)	0x01C	(register change callback)	31	0	other	-	any field change -> PropagateClock() (recompute dividers, update peripheral/systick frequencies)	258-261
+Domain2ClockConfiguration(RCC_D2CFGR)	0x01C	D2PPRE2	10	8	stored+callback	0x0	stored; derives d2Ppre2Divider (APB2)	256
+Domain2ClockConfiguration(RCC_D2CFGR)	0x01C	RESERVED	7	7	reserved	0x0	reserved: write discarded (unhandled-write log); read = reset-value bits = 0x0 (not forced to 0; framework read)	255
+Domain2ClockConfiguration(RCC_D2CFGR)	0x01C	D2PPRE1	6	4	stored+callback	0x0	stored; derives d2Ppre1Divider (APB1)	254
+Domain2ClockConfiguration(RCC_D2CFGR)	0x01C	RESERVED	3	0	reserved	0x0	reserved: write discarded (unhandled-write log); read = reset-value bits = 0x0 (not forced to 0; framework read)	252
+Domain3ClockConfiguration(RCC_D3CFGR)	0x020	RESERVED	31	7	reserved	0x0	reserved: write discarded (unhandled-write log); read = reset-value bits = 0x0 (not forced to 0; framework read)	265
+Domain3ClockConfiguration(RCC_D3CFGR)	0x020	D3PPRE	6	4	stored+callback	0x0	stored; derives d3PpreDivider (APB4); NO register-level PropagateClock here	264
+Domain3ClockConfiguration(RCC_D3CFGR)	0x020	RESERVED	3	0	reserved	0x0	reserved: write discarded (unhandled-write log); read = reset-value bits = 0x0 (not forced to 0; framework read)	263
+PLLClockSourceSelect(RCC_PLLCKSELR)	0x028	RESERVED	31	26	reserved	0x0	reserved: write discarded (unhandled-write log); read = reset-value bits = 0x0 (not forced to 0; framework read)	289
+PLLClockSourceSelect(RCC_PLLCKSELR)	0x028	DIVM3	25	20	stored	0x20	stored, no effect	288
+PLLClockSourceSelect(RCC_PLLCKSELR)	0x028	RESERVED	19	18	reserved	0x0	reserved: write discarded (unhandled-write log); read = reset-value bits = 0x0 (not forced to 0; framework read)	287
+PLLClockSourceSelect(RCC_PLLCKSELR)	0x028	DIVM2	17	12	stored	0x20	stored, no effect	286
+PLLClockSourceSelect(RCC_PLLCKSELR)	0x028	RESERVED	11	10	reserved	0x0	reserved: write discarded (unhandled-write log); read = reset-value bits = 0x0 (not forced to 0; framework read)	285
+PLLClockSourceSelect(RCC_PLLCKSELR)	0x028	DIVM1	9	4	stored+callback	0x20	stored; value -> pll1Prescaler unless PLL1ON (then ignored Warning, but stored value still read back)	276-284
+PLLClockSourceSelect(RCC_PLLCKSELR)	0x028	RESERVED	3	2	reserved	0x0	reserved: write discarded (unhandled-write log); read = reset-value bits = 0x0 (not forced to 0; framework read)	275
+PLLClockSourceSelect(RCC_PLLCKSELR)	0x028	PLLSRC	1	0	stored+callback	0x0	stored enum Hsi/Csi/Hse/NoSelection; change reverted if any PLLxON	267-274
+PLLConfiguration(RCC_PLLCFGR)	0x02C	RESERVED	31	25	reserved	0x0	reserved: write discarded (unhandled-write log); read = reset-value bits = 0x0 (not forced to 0; framework read)	310
+PLLConfiguration(RCC_PLLCFGR)	0x02C	DIVR3EN	24	24	tag	0x1	tag: write discarded (unhandled-write log); read = reset-value bits = 0x1 (not forced to 0; framework read)	309
+PLLConfiguration(RCC_PLLCFGR)	0x02C	DIVQ3EN	23	23	tag	0x1	tag: write discarded (unhandled-write log); read = reset-value bits = 0x1 (not forced to 0; framework read)	308
+PLLConfiguration(RCC_PLLCFGR)	0x02C	DIVP3EN	22	22	tag	0x1	tag: write discarded (unhandled-write log); read = reset-value bits = 0x1 (not forced to 0; framework read)	307
+PLLConfiguration(RCC_PLLCFGR)	0x02C	DIVR2EN	21	21	tag	0x1	tag: write discarded (unhandled-write log); read = reset-value bits = 0x1 (not forced to 0; framework read)	306
+PLLConfiguration(RCC_PLLCFGR)	0x02C	DIVQ2EN	20	20	tag	0x1	tag: write discarded (unhandled-write log); read = reset-value bits = 0x1 (not forced to 0; framework read)	305
+PLLConfiguration(RCC_PLLCFGR)	0x02C	DIVP2EN	19	19	tag	0x1	tag: write discarded (unhandled-write log); read = reset-value bits = 0x1 (not forced to 0; framework read)	304
+PLLConfiguration(RCC_PLLCFGR)	0x02C	DIVR1EN	18	18	tag	0x1	tag: write discarded (unhandled-write log); read = reset-value bits = 0x1 (not forced to 0; framework read)	303
+PLLConfiguration(RCC_PLLCFGR)	0x02C	DIVQ1EN	17	17	tag	0x1	tag: write discarded (unhandled-write log); read = reset-value bits = 0x1 (not forced to 0; framework read)	302
+PLLConfiguration(RCC_PLLCFGR)	0x02C	DIVP1EN	16	16	tag	0x1	tag: write discarded (unhandled-write log); read = reset-value bits = 0x1 (not forced to 0; framework read)	301
+PLLConfiguration(RCC_PLLCFGR)	0x02C	RESERVED	15	12	reserved	0x0	reserved: write discarded (unhandled-write log); read = reset-value bits = 0x0 (not forced to 0; framework read)	300
+PLLConfiguration(RCC_PLLCFGR)	0x02C	PLL3RGE	11	10	tag	0x0	tag: write discarded (unhandled-write log); read = reset-value bits = 0x0 (not forced to 0; framework read)	299
+PLLConfiguration(RCC_PLLCFGR)	0x02C	PLL3VCOSEL	9	9	tag	0x0	tag: write discarded (unhandled-write log); read = reset-value bits = 0x0 (not forced to 0; framework read)	298
+PLLConfiguration(RCC_PLLCFGR)	0x02C	PLL3FRACEN	8	8	tag	0x0	tag: write discarded (unhandled-write log); read = reset-value bits = 0x0 (not forced to 0; framework read)	297
+PLLConfiguration(RCC_PLLCFGR)	0x02C	PLL2RGE	7	6	tag	0x0	tag: write discarded (unhandled-write log); read = reset-value bits = 0x0 (not forced to 0; framework read)	296
+PLLConfiguration(RCC_PLLCFGR)	0x02C	PLL2VCOSEL	5	5	stored	0x0	plain stored flag (WithFlag, not tagged)	295
+PLLConfiguration(RCC_PLLCFGR)	0x02C	PLL2FRACEN	4	4	tag	0x0	tag: write discarded (unhandled-write log); read = reset-value bits = 0x0 (not forced to 0; framework read)	294
+PLLConfiguration(RCC_PLLCFGR)	0x02C	PLL1GRE	3	2	tag	0x0	tag: write discarded (unhandled-write log); read = reset-value bits = 0x0 (not forced to 0; framework read)	293
+PLLConfiguration(RCC_PLLCFGR)	0x02C	PLL1VCOSEL	1	1	tag	0x0	tag: write discarded (unhandled-write log); read = reset-value bits = 0x0 (not forced to 0; framework read)	292
+PLLConfiguration(RCC_PLLCFGR)	0x02C	PLL1FRACEN	0	0	tag	0x0	tag: write discarded (unhandled-write log); read = reset-value bits = 0x0 (not forced to 0; framework read)	291
+PLL1DividersConfiguration(RCC_PLL1DIVR)	0x030	RESERVED	31	31	reserved	0x0	reserved: write discarded (unhandled-write log); read = reset-value bits = 0x0 (not forced to 0; framework read)	367
+PLL1DividersConfiguration(RCC_PLL1DIVR)	0x030	DIVR1	30	24	stored+callback	0x1	stored; change reverted if PLL1ON; no frequency use	359-366
+PLL1DividersConfiguration(RCC_PLL1DIVR)	0x030	RESERVED	23	23	reserved	0x0	reserved: write discarded (unhandled-write log); read = reset-value bits = 0x0 (not forced to 0; framework read)	358
+PLL1DividersConfiguration(RCC_PLL1DIVR)	0x030	DIVQ1	22	16	stored+callback	0x1	stored; change reverted if PLL1ON; no frequency use	350-357
+PLL1DividersConfiguration(RCC_PLL1DIVR)	0x030	DIVP1	15	9	computed-read	0x1	read = divp1Divider-1 (computed); write sets divider=v+1 unless odd-and-not-1 or PLL1ON (ignored, Warning)	329-349
+PLL1DividersConfiguration(RCC_PLL1DIVR)	0x030	DIVN1	8	0	computed-read	0x80	read = divn1Multiplier-1 (computed); write updates divn1Multiplier=v+1 unless PLL1ON; warns if v<3 or >0x1FF	312-328
+PLL1FractionalDivider(RCC_PLL1FRACR)	0x034	RESERVED	31	16	reserved	0x0	reserved: write discarded (unhandled-write log); read = reset-value bits = 0x0 (not forced to 0; framework read)	371
+PLL1FractionalDivider(RCC_PLL1FRACR)	0x034	FRACN1	15	3	tag	0x0	tag: write discarded (unhandled-write log); read = reset-value bits = 0x0 (not forced to 0; framework read)	370
+PLL1FractionalDivider(RCC_PLL1FRACR)	0x034	RESERVED	2	0	reserved	0x0	reserved: write discarded (unhandled-write log); read = reset-value bits = 0x0 (not forced to 0; framework read)	369
+PLL2DividersConfiguration(RCC_PLL2DIVR)	0x038	RESERVED	31	31	reserved	0x0	reserved: write discarded (unhandled-write log); read = reset-value bits = 0x0 (not forced to 0; framework read)	378
+PLL2DividersConfiguration(RCC_PLL2DIVR)	0x038	(gap: no field, tag or reserved)	30	30	other	0x0	unhandled bits: write has no effect, no field state; read = reset-value bits 0x0	-
+PLL2DividersConfiguration(RCC_PLL2DIVR)	0x038	DIVR2	29	24	stored	0x1	stored and read back; no side effect	377
+PLL2DividersConfiguration(RCC_PLL2DIVR)	0x038	RESERVED	23	23	reserved	0x0	reserved: write discarded (unhandled-write log); read = reset-value bits = 0x0 (not forced to 0; framework read)	376
+PLL2DividersConfiguration(RCC_PLL2DIVR)	0x038	(gap: no field, tag or reserved)	22	22	other	0x0	unhandled bits: write has no effect, no field state; read = reset-value bits 0x0	-
+PLL2DividersConfiguration(RCC_PLL2DIVR)	0x038	DIVQ2	21	16	stored	0x1	stored and read back; no side effect	375
+PLL2DividersConfiguration(RCC_PLL2DIVR)	0x038	(gap: no field, tag or reserved)	15	15	other	0x0	unhandled bits: write has no effect, no field state; read = reset-value bits 0x0	-
+PLL2DividersConfiguration(RCC_PLL2DIVR)	0x038	DIVP2	14	9	stored	0x1	stored and read back; no side effect	374
+PLL2DividersConfiguration(RCC_PLL2DIVR)	0x038	(gap: no field, tag or reserved)	8	8	other	0x0	unhandled bits: write has no effect, no field state; read = reset-value bits 0x0	-
+PLL2DividersConfiguration(RCC_PLL2DIVR)	0x038	DIVN2	7	0	stored	0x80	stored and read back; no side effect	373
+PLL2FractionalDivider(RCC_PLL2FRACR)	0x03C	RESERVED	31	16	reserved	0x0	reserved: write discarded (unhandled-write log); read = reset-value bits = 0x0 (not forced to 0; framework read)	382
+PLL2FractionalDivider(RCC_PLL2FRACR)	0x03C	FRACN2	15	3	tag	0x0	tag: write discarded (unhandled-write log); read = reset-value bits = 0x0 (not forced to 0; framework read)	381
+PLL2FractionalDivider(RCC_PLL2FRACR)	0x03C	RESERVED	2	0	reserved	0x0	reserved: write discarded (unhandled-write log); read = reset-value bits = 0x0 (not forced to 0; framework read)	380
+PLL3DividersConfiguration(RCC_PLL3DIVR)	0x040	RESERVED	31	31	reserved	0x0	reserved: write discarded (unhandled-write log); read = reset-value bits = 0x0 (not forced to 0; framework read)	389
+PLL3DividersConfiguration(RCC_PLL3DIVR)	0x040	(gap: no field, tag or reserved)	30	30	other	0x0	unhandled bits: write has no effect, no field state; read = reset-value bits 0x0	-
+PLL3DividersConfiguration(RCC_PLL3DIVR)	0x040	DIVR3	29	24	stored	0x1	stored and read back; no side effect	388
+PLL3DividersConfiguration(RCC_PLL3DIVR)	0x040	RESERVED	23	23	reserved	0x0	reserved: write discarded (unhandled-write log); read = reset-value bits = 0x0 (not forced to 0; framework read)	387
+PLL3DividersConfiguration(RCC_PLL3DIVR)	0x040	(gap: no field, tag or reserved)	22	22	other	0x0	unhandled bits: write has no effect, no field state; read = reset-value bits 0x0	-
+PLL3DividersConfiguration(RCC_PLL3DIVR)	0x040	DIVQ3	21	16	stored	0x1	stored and read back; no side effect	386
+PLL3DividersConfiguration(RCC_PLL3DIVR)	0x040	(gap: no field, tag or reserved)	15	15	other	0x0	unhandled bits: write has no effect, no field state; read = reset-value bits 0x0	-
+PLL3DividersConfiguration(RCC_PLL3DIVR)	0x040	DIVP3	14	9	stored	0x1	stored and read back; no side effect	385
+PLL3DividersConfiguration(RCC_PLL3DIVR)	0x040	(gap: no field, tag or reserved)	8	8	other	0x0	unhandled bits: write has no effect, no field state; read = reset-value bits 0x0	-
+PLL3DividersConfiguration(RCC_PLL3DIVR)	0x040	DIVN3	7	0	stored	0x80	stored and read back; no side effect	384
+PLL3FractionalDivider(RCC_PLL3FRACR)	0x044	RESERVED	31	16	reserved	0x0	reserved: write discarded (unhandled-write log); read = reset-value bits = 0x0 (not forced to 0; framework read)	393
+PLL3FractionalDivider(RCC_PLL3FRACR)	0x044	FRACN3	15	3	tag	0x0	tag: write discarded (unhandled-write log); read = reset-value bits = 0x0 (not forced to 0; framework read)	392
+PLL3FractionalDivider(RCC_PLL3FRACR)	0x044	RESERVED	2	0	reserved	0x0	reserved: write discarded (unhandled-write log); read = reset-value bits = 0x0 (not forced to 0; framework read)	391
+Domain1KernelClockConfiguration(RCC_D1CCIPR)	0x04C	RESERVED	31	30	reserved	0x0	reserved: write discarded (unhandled-write log); read = reset-value bits = 0x0 (not forced to 0; framework read)	402
+Domain1KernelClockConfiguration(RCC_D1CCIPR)	0x04C	CKPERSEL	29	28	tag	0x0	tag: write discarded (unhandled-write log); read = reset-value bits = 0x0 (not forced to 0; framework read)	401
+Domain1KernelClockConfiguration(RCC_D1CCIPR)	0x04C	(gap: no field, tag or reserved)	27	27	other	0x0	unhandled bits: write has no effect, no field state; read = reset-value bits 0x0	-
+Domain1KernelClockConfiguration(RCC_D1CCIPR)	0x04C	RESERVED	26	17	reserved	0x0	reserved: write discarded (unhandled-write log); read = reset-value bits = 0x0 (not forced to 0; framework read)	400
+Domain1KernelClockConfiguration(RCC_D1CCIPR)	0x04C	SDMMCSEL	16	16	tag	0x0	tag: write discarded (unhandled-write log); read = reset-value bits = 0x0 (not forced to 0; framework read)	399
+Domain1KernelClockConfiguration(RCC_D1CCIPR)	0x04C	RESERVED	15	6	reserved	0x0	reserved: write discarded (unhandled-write log); read = reset-value bits = 0x0 (not forced to 0; framework read)	398
+Domain1KernelClockConfiguration(RCC_D1CCIPR)	0x04C	QSPISEL	5	4	tag	0x0	tag: write discarded (unhandled-write log); read = reset-value bits = 0x0 (not forced to 0; framework read)	397
+Domain1KernelClockConfiguration(RCC_D1CCIPR)	0x04C	RESERVED	3	2	reserved	0x0	reserved: write discarded (unhandled-write log); read = reset-value bits = 0x0 (not forced to 0; framework read)	396
+Domain1KernelClockConfiguration(RCC_D1CCIPR)	0x04C	FMCSEL	1	0	tag	0x0	tag: write discarded (unhandled-write log); read = reset-value bits = 0x0 (not forced to 0; framework read)	395
+Domain2KernelClockConfigurationLow(RCC_D2CCIP1R)	0x050	SWPSEL	31	31	tag	0x0	tag: write discarded (unhandled-write log); read = reset-value bits = 0x0 (not forced to 0; framework read)	418
+Domain2KernelClockConfigurationLow(RCC_D2CCIP1R)	0x050	RESERVED	30	30	reserved	0x0	reserved: write discarded (unhandled-write log); read = reset-value bits = 0x0 (not forced to 0; framework read)	417
+Domain2KernelClockConfigurationLow(RCC_D2CCIP1R)	0x050	FDCANSEL	29	28	tag	0x0	tag: write discarded (unhandled-write log); read = reset-value bits = 0x0 (not forced to 0; framework read)	416
+Domain2KernelClockConfigurationLow(RCC_D2CCIP1R)	0x050	RESERVED	27	25	reserved	0x0	reserved: write discarded (unhandled-write log); read = reset-value bits = 0x0 (not forced to 0; framework read)	415
+Domain2KernelClockConfigurationLow(RCC_D2CCIP1R)	0x050	DFSDM1SEL	24	24	tag	0x0	tag: write discarded (unhandled-write log); read = reset-value bits = 0x0 (not forced to 0; framework read)	414
+Domain2KernelClockConfigurationLow(RCC_D2CCIP1R)	0x050	RESERVED	23	22	reserved	0x0	reserved: write discarded (unhandled-write log); read = reset-value bits = 0x0 (not forced to 0; framework read)	413
+Domain2KernelClockConfigurationLow(RCC_D2CCIP1R)	0x050	SPDIFSEL	21	20	tag	0x0	tag: write discarded (unhandled-write log); read = reset-value bits = 0x0 (not forced to 0; framework read)	412
+Domain2KernelClockConfigurationLow(RCC_D2CCIP1R)	0x050	RESERVED	19	19	reserved	0x0	reserved: write discarded (unhandled-write log); read = reset-value bits = 0x0 (not forced to 0; framework read)	411
+Domain2KernelClockConfigurationLow(RCC_D2CCIP1R)	0x050	SPI45SEL	18	16	tag	0x0	tag: write discarded (unhandled-write log); read = reset-value bits = 0x0 (not forced to 0; framework read)	410
+Domain2KernelClockConfigurationLow(RCC_D2CCIP1R)	0x050	RESERVED	15	15	reserved	0x0	reserved: write discarded (unhandled-write log); read = reset-value bits = 0x0 (not forced to 0; framework read)	409
+Domain2KernelClockConfigurationLow(RCC_D2CCIP1R)	0x050	SPI123SEL	14	12	tag	0x0	tag: write discarded (unhandled-write log); read = reset-value bits = 0x0 (not forced to 0; framework read)	408
+Domain2KernelClockConfigurationLow(RCC_D2CCIP1R)	0x050	RESERVED	11	9	reserved	0x0	reserved: write discarded (unhandled-write log); read = reset-value bits = 0x0 (not forced to 0; framework read)	407
+Domain2KernelClockConfigurationLow(RCC_D2CCIP1R)	0x050	SAI23SEL	8	6	tag	0x0	tag: write discarded (unhandled-write log); read = reset-value bits = 0x0 (not forced to 0; framework read)	406
+Domain2KernelClockConfigurationLow(RCC_D2CCIP1R)	0x050	RESERVED	5	3	reserved	0x0	reserved: write discarded (unhandled-write log); read = reset-value bits = 0x0 (not forced to 0; framework read)	405
+Domain2KernelClockConfigurationLow(RCC_D2CCIP1R)	0x050	(gap: no field, tag or reserved)	2	2	other	0x0	unhandled bits: write has no effect, no field state; read = reset-value bits 0x0	-
+Domain2KernelClockConfigurationLow(RCC_D2CCIP1R)	0x050	SAI1SEL	1	0	tag	0x0	tag: write discarded (unhandled-write log); read = reset-value bits = 0x0 (not forced to 0; framework read)	404
+Domain2KernelClockConfigurationHigh(RCC_D2CCIP2R)	0x054	RESERVED	31	31	reserved	0x0	reserved: write discarded (unhandled-write log); read = reset-value bits = 0x0 (not forced to 0; framework read)	431
+Domain2KernelClockConfigurationHigh(RCC_D2CCIP2R)	0x054	(gap: no field, tag or reserved)	30	30	other	0x0	unhandled bits: write has no effect, no field state; read = reset-value bits 0x0	-
+Domain2KernelClockConfigurationHigh(RCC_D2CCIP2R)	0x054	LPTIM1SEL	29	28	tag	0x0	tag: write discarded (unhandled-write log); read = reset-value bits = 0x0 (not forced to 0; framework read)	430
+Domain2KernelClockConfigurationHigh(RCC_D2CCIP2R)	0x054	RESERVED	27	24	reserved	0x0	reserved: write discarded (unhandled-write log); read = reset-value bits = 0x0 (not forced to 0; framework read)	429
+Domain2KernelClockConfigurationHigh(RCC_D2CCIP2R)	0x054	CECSEL	23	22	tag	0x0	tag: write discarded (unhandled-write log); read = reset-value bits = 0x0 (not forced to 0; framework read)	428
+Domain2KernelClockConfigurationHigh(RCC_D2CCIP2R)	0x054	USBSEL	21	20	tag	0x0	tag: write discarded (unhandled-write log); read = reset-value bits = 0x0 (not forced to 0; framework read)	427
+Domain2KernelClockConfigurationHigh(RCC_D2CCIP2R)	0x054	RESERVED	19	14	reserved	0x0	reserved: write discarded (unhandled-write log); read = reset-value bits = 0x0 (not forced to 0; framework read)	426
+Domain2KernelClockConfigurationHigh(RCC_D2CCIP2R)	0x054	I2C123SEL	13	12	tag	0x0	tag: write discarded (unhandled-write log); read = reset-value bits = 0x0 (not forced to 0; framework read)	425
+Domain2KernelClockConfigurationHigh(RCC_D2CCIP2R)	0x054	RESERVED	11	10	reserved	0x0	reserved: write discarded (unhandled-write log); read = reset-value bits = 0x0 (not forced to 0; framework read)	424
+Domain2KernelClockConfigurationHigh(RCC_D2CCIP2R)	0x054	RNGSEL	9	8	tag	0x0	tag: write discarded (unhandled-write log); read = reset-value bits = 0x0 (not forced to 0; framework read)	423
+Domain2KernelClockConfigurationHigh(RCC_D2CCIP2R)	0x054	RESERVED	7	6	reserved	0x0	reserved: write discarded (unhandled-write log); read = reset-value bits = 0x0 (not forced to 0; framework read)	422
+Domain2KernelClockConfigurationHigh(RCC_D2CCIP2R)	0x054	USART16SEL	5	3	tag	0x0	tag: write discarded (unhandled-write log); read = reset-value bits = 0x0 (not forced to 0; framework read)	421
+Domain2KernelClockConfigurationHigh(RCC_D2CCIP2R)	0x054	USART234578SEL	2	0	tag	0x0	tag: write discarded (unhandled-write log); read = reset-value bits = 0x0 (not forced to 0; framework read)	420
+Domain3KernelClockConfiguration(RCC_D3CCIPR)	0x058	RESERVED	31	31	reserved	0x0	reserved: write discarded (unhandled-write log); read = reset-value bits = 0x0 (not forced to 0; framework read)	444
+Domain3KernelClockConfiguration(RCC_D3CCIPR)	0x058	(gap: no field, tag or reserved)	30	30	other	0x0	unhandled bits: write has no effect, no field state; read = reset-value bits 0x0	-
+Domain3KernelClockConfiguration(RCC_D3CCIPR)	0x058	SPI6SEL	29	28	tag	0x0	tag: write discarded (unhandled-write log); read = reset-value bits = 0x0 (not forced to 0; framework read)	443
+Domain3KernelClockConfiguration(RCC_D3CCIPR)	0x058	RESERVED	27	27	reserved	0x0	reserved: write discarded (unhandled-write log); read = reset-value bits = 0x0 (not forced to 0; framework read)	442
+Domain3KernelClockConfiguration(RCC_D3CCIPR)	0x058	SAI4BSEL	26	24	tag	0x0	tag: write discarded (unhandled-write log); read = reset-value bits = 0x0 (not forced to 0; framework read)	441
+Domain3KernelClockConfiguration(RCC_D3CCIPR)	0x058	SAI4ASEL	23	21	tag	0x0	tag: write discarded (unhandled-write log); read = reset-value bits = 0x0 (not forced to 0; framework read)	440
+Domain3KernelClockConfiguration(RCC_D3CCIPR)	0x058	RESERVED	20	18	reserved	0x0	reserved: write discarded (unhandled-write log); read = reset-value bits = 0x0 (not forced to 0; framework read)	439
+Domain3KernelClockConfiguration(RCC_D3CCIPR)	0x058	ADCSEL	17	16	tag	0x0	tag: write discarded (unhandled-write log); read = reset-value bits = 0x0 (not forced to 0; framework read)	438
+Domain3KernelClockConfiguration(RCC_D3CCIPR)	0x058	LPTIM345SEL	15	13	tag	0x0	tag: write discarded (unhandled-write log); read = reset-value bits = 0x0 (not forced to 0; framework read)	437
+Domain3KernelClockConfiguration(RCC_D3CCIPR)	0x058	LPTIM2SEL	12	10	tag	0x0	tag: write discarded (unhandled-write log); read = reset-value bits = 0x0 (not forced to 0; framework read)	436
+Domain3KernelClockConfiguration(RCC_D3CCIPR)	0x058	I2C4SEL	9	8	tag	0x0	tag: write discarded (unhandled-write log); read = reset-value bits = 0x0 (not forced to 0; framework read)	435
+Domain3KernelClockConfiguration(RCC_D3CCIPR)	0x058	RESERVED	7	3	reserved	0x0	reserved: write discarded (unhandled-write log); read = reset-value bits = 0x0 (not forced to 0; framework read)	434
+Domain3KernelClockConfiguration(RCC_D3CCIPR)	0x058	LPUART1SEL	2	0	tag	0x0	tag: write discarded (unhandled-write log); read = reset-value bits = 0x0 (not forced to 0; framework read)	433
+ClockSourceInterruptEnable(RCC_CIER)	0x060	RESERVED	31	10	reserved	0x0	reserved: write discarded (unhandled-write log); read = reset-value bits = 0x0 (not forced to 0; framework read)	456
+ClockSourceInterruptEnable(RCC_CIER)	0x060	LSECSSIE	9	9	tag	0x0	tag: write discarded (unhandled-write log); read = reset-value bits = 0x0 (not forced to 0; framework read)	455
+ClockSourceInterruptEnable(RCC_CIER)	0x060	PLL3RDYIE	8	8	tag	0x0	tag: write discarded (unhandled-write log); read = reset-value bits = 0x0 (not forced to 0; framework read)	454
+ClockSourceInterruptEnable(RCC_CIER)	0x060	PLL2RDYIE	7	7	tag	0x0	tag: write discarded (unhandled-write log); read = reset-value bits = 0x0 (not forced to 0; framework read)	453
+ClockSourceInterruptEnable(RCC_CIER)	0x060	PLL1RDYIE	6	6	tag	0x0	tag: write discarded (unhandled-write log); read = reset-value bits = 0x0 (not forced to 0; framework read)	452
+ClockSourceInterruptEnable(RCC_CIER)	0x060	HSI48RDYIE	5	5	tag	0x0	tag: write discarded (unhandled-write log); read = reset-value bits = 0x0 (not forced to 0; framework read)	451
+ClockSourceInterruptEnable(RCC_CIER)	0x060	CSIRDYIE	4	4	tag	0x0	tag: write discarded (unhandled-write log); read = reset-value bits = 0x0 (not forced to 0; framework read)	450
+ClockSourceInterruptEnable(RCC_CIER)	0x060	HSERDYIE	3	3	tag	0x0	tag: write discarded (unhandled-write log); read = reset-value bits = 0x0 (not forced to 0; framework read)	449
+ClockSourceInterruptEnable(RCC_CIER)	0x060	HSIRDYIE	2	2	tag	0x0	tag: write discarded (unhandled-write log); read = reset-value bits = 0x0 (not forced to 0; framework read)	448
+ClockSourceInterruptEnable(RCC_CIER)	0x060	LSERDYIE	1	1	tag	0x0	tag: write discarded (unhandled-write log); read = reset-value bits = 0x0 (not forced to 0; framework read)	447
+ClockSourceInterruptEnable(RCC_CIER)	0x060	LSIRDYIE	0	0	tag	0x0	tag: write discarded (unhandled-write log); read = reset-value bits = 0x0 (not forced to 0; framework read)	446
+ClockSourceInterruptFlag(RCC_CIFR)	0x064	RESERVED	31	11	reserved	0x0	reserved: write discarded (unhandled-write log); read = reset-value bits = 0x0 (not forced to 0; framework read)	469
+ClockSourceInterruptFlag(RCC_CIFR)	0x064	HSECSSF	10	10	tag	0x0	tag: write discarded (unhandled-write log); read = reset-value bits = 0x0 (not forced to 0; framework read)	468
+ClockSourceInterruptFlag(RCC_CIFR)	0x064	LSECSSF	9	9	tag	0x0	tag: write discarded (unhandled-write log); read = reset-value bits = 0x0 (not forced to 0; framework read)	467
+ClockSourceInterruptFlag(RCC_CIFR)	0x064	PLL3RDYF	8	8	tag	0x0	tag: write discarded (unhandled-write log); read = reset-value bits = 0x0 (not forced to 0; framework read)	466
+ClockSourceInterruptFlag(RCC_CIFR)	0x064	PLL2RDYF	7	7	tag	0x0	tag: write discarded (unhandled-write log); read = reset-value bits = 0x0 (not forced to 0; framework read)	465
+ClockSourceInterruptFlag(RCC_CIFR)	0x064	PLL1RDYF	6	6	tag	0x0	tag: write discarded (unhandled-write log); read = reset-value bits = 0x0 (not forced to 0; framework read)	464
+ClockSourceInterruptFlag(RCC_CIFR)	0x064	HSI48RDYF	5	5	tag	0x0	tag: write discarded (unhandled-write log); read = reset-value bits = 0x0 (not forced to 0; framework read)	463
+ClockSourceInterruptFlag(RCC_CIFR)	0x064	CSIRDYF	4	4	tag	0x0	tag: write discarded (unhandled-write log); read = reset-value bits = 0x0 (not forced to 0; framework read)	462
+ClockSourceInterruptFlag(RCC_CIFR)	0x064	HSERDYF	3	3	tag	0x0	tag: write discarded (unhandled-write log); read = reset-value bits = 0x0 (not forced to 0; framework read)	461
+ClockSourceInterruptFlag(RCC_CIFR)	0x064	HSIRDYF	2	2	tag	0x0	tag: write discarded (unhandled-write log); read = reset-value bits = 0x0 (not forced to 0; framework read)	460
+ClockSourceInterruptFlag(RCC_CIFR)	0x064	LSERDYF	1	1	tag	0x0	tag: write discarded (unhandled-write log); read = reset-value bits = 0x0 (not forced to 0; framework read)	459
+ClockSourceInterruptFlag(RCC_CIFR)	0x064	LSIRDYF	0	0	tag	0x0	tag: write discarded (unhandled-write log); read = reset-value bits = 0x0 (not forced to 0; framework read)	458
+ClockSourceInterruptClear(RCC_CICR)	0x068	RESERVED	31	11	reserved	0x0	reserved: write discarded (unhandled-write log); read = reset-value bits = 0x0 (not forced to 0; framework read)	482
+ClockSourceInterruptClear(RCC_CICR)	0x068	HSECSSC	10	10	tag	0x0	tag: write discarded (unhandled-write log); read = reset-value bits = 0x0 (not forced to 0; framework read)	481
+ClockSourceInterruptClear(RCC_CICR)	0x068	LSECSSC	9	9	tag	0x0	tag: write discarded (unhandled-write log); read = reset-value bits = 0x0 (not forced to 0; framework read)	480
+ClockSourceInterruptClear(RCC_CICR)	0x068	PLL3RDYC	8	8	tag	0x0	tag: write discarded (unhandled-write log); read = reset-value bits = 0x0 (not forced to 0; framework read)	479
+ClockSourceInterruptClear(RCC_CICR)	0x068	PLL2RDYC	7	7	tag	0x0	tag: write discarded (unhandled-write log); read = reset-value bits = 0x0 (not forced to 0; framework read)	478
+ClockSourceInterruptClear(RCC_CICR)	0x068	PLL1RDYC	6	6	tag	0x0	tag: write discarded (unhandled-write log); read = reset-value bits = 0x0 (not forced to 0; framework read)	477
+ClockSourceInterruptClear(RCC_CICR)	0x068	HSI48RDYC	5	5	tag	0x0	tag: write discarded (unhandled-write log); read = reset-value bits = 0x0 (not forced to 0; framework read)	476
+ClockSourceInterruptClear(RCC_CICR)	0x068	CSIRDYC	4	4	tag	0x0	tag: write discarded (unhandled-write log); read = reset-value bits = 0x0 (not forced to 0; framework read)	475
+ClockSourceInterruptClear(RCC_CICR)	0x068	HSERDYC	3	3	tag	0x0	tag: write discarded (unhandled-write log); read = reset-value bits = 0x0 (not forced to 0; framework read)	474
+ClockSourceInterruptClear(RCC_CICR)	0x068	HSIRDYC	2	2	tag	0x0	tag: write discarded (unhandled-write log); read = reset-value bits = 0x0 (not forced to 0; framework read)	473
+ClockSourceInterruptClear(RCC_CICR)	0x068	LSERDYC	1	1	tag	0x0	tag: write discarded (unhandled-write log); read = reset-value bits = 0x0 (not forced to 0; framework read)	472
+ClockSourceInterruptClear(RCC_CICR)	0x068	LSIRDYC	0	0	tag	0x0	tag: write discarded (unhandled-write log); read = reset-value bits = 0x0 (not forced to 0; framework read)	471
+BackupDomainControl(RCC_BDCR)	0x070	RESERVED	31	17	reserved	0x0	reserved: write discarded (unhandled-write log); read = reset-value bits = 0x0 (not forced to 0; framework read)	497
+BackupDomainControl(RCC_BDCR)	0x070	BDRST	16	16	stored	0x0	stored 1-bit value field, no effect (no reset of RTC)	496
+BackupDomainControl(RCC_BDCR)	0x070	RTCEN	15	15	computed-read	0x0	write: if RTC registered in RCC -> sysbus.SetPeripheralEnabled(peri,value) (lock/unlock on bus), else no-op (Noisy log); read: IsPeripheralEnabled(RTC) = true iff registered and not locked, NOT a stored bit	493-495
+BackupDomainControl(RCC_BDCR)	0x070	RESERVED	14	10	reserved	0x0	reserved: write discarded (unhandled-write log); read = reset-value bits = 0x0 (not forced to 0; framework read)	492
+BackupDomainControl(RCC_BDCR)	0x070	RTCSEL	9	8	stored	0x0	stored 2-bit, no effect	491
+BackupDomainControl(RCC_BDCR)	0x070	RESERVED	7	7	reserved	0x0	reserved: write discarded (unhandled-write log); read = reset-value bits = 0x0 (not forced to 0; framework read)	490
+BackupDomainControl(RCC_BDCR)	0x070	LSECSSD	6	6	tag	0x0	tag: write discarded (unhandled-write log); read = reset-value bits = 0x0 (not forced to 0; framework read)	489
+BackupDomainControl(RCC_BDCR)	0x070	LSECSSON	5	5	tag	0x0	tag: write discarded (unhandled-write log); read = reset-value bits = 0x0 (not forced to 0; framework read)	488
+BackupDomainControl(RCC_BDCR)	0x070	LSEDRV	4	3	tag	0x0	tag: write discarded (unhandled-write log); read = reset-value bits = 0x0 (not forced to 0; framework read)	487
+BackupDomainControl(RCC_BDCR)	0x070	LSEBYP	2	2	stored	0x0	stored 1-bit value field, no effect	486
+BackupDomainControl(RCC_BDCR)	0x070	LSERDY	1	1	computed-read	0x0	LSERDY reads = LSEON	485
+BackupDomainControl(RCC_BDCR)	0x070	LSEON	0	0	stored	0x0	stored (local var)	484
+ClockControlAndStatus(RCC_CSR)	0x074	RESERVED	31	2	reserved	0x0	reserved: write discarded (unhandled-write log); read = reset-value bits = 0x0 (not forced to 0; framework read)	501
+ClockControlAndStatus(RCC_CSR)	0x074	LSIRDY	1	1	computed-read	0x0	LSIRDY reads = LSION	500
+ClockControlAndStatus(RCC_CSR)	0x074	LSION	0	0	stored	0x0	stored (local var)	499
+AHB3Reset(RCC_AHB3RSTR)	0x07C	RESERVED	31	17	reserved	0x0	reserved: write discarded (unhandled-write log); read = reset-value bits = 0x0 (not forced to 0; framework read)	513
+AHB3Reset(RCC_AHB3RSTR)	0x07C	SDMMC1RST	16	16	stored+callback	0x0	stored (reads back as written, never self-clears); on any write of 1 -> RegisteredPeripherals[SDMMC1].Reset() if registered; writing 0 does nothing	512
+AHB3Reset(RCC_AHB3RSTR)	0x07C	RESERVED	15	15	reserved	0x0	reserved: write discarded (unhandled-write log); read = reset-value bits = 0x0 (not forced to 0; framework read)	511
+AHB3Reset(RCC_AHB3RSTR)	0x07C	QSPIRST	14	14	stored+callback	0x0	stored (reads back as written, never self-clears); on any write of 1 -> RegisteredPeripherals[QSPI].Reset() if registered; writing 0 does nothing	510
+AHB3Reset(RCC_AHB3RSTR)	0x07C	RESERVED	13	13	reserved	0x0	reserved: write discarded (unhandled-write log); read = reset-value bits = 0x0 (not forced to 0; framework read)	509
+AHB3Reset(RCC_AHB3RSTR)	0x07C	FMCRST	12	12	stored+callback	0x0	stored (reads back as written, never self-clears); on any write of 1 -> RegisteredPeripherals[FMC].Reset() if registered; writing 0 does nothing	508
+AHB3Reset(RCC_AHB3RSTR)	0x07C	RESERVED	11	6	reserved	0x0	reserved: write discarded (unhandled-write log); read = reset-value bits = 0x0 (not forced to 0; framework read)	507
+AHB3Reset(RCC_AHB3RSTR)	0x07C	JPGDECRST	5	5	stored+callback	0x0	stored (reads back as written, never self-clears); on any write of 1 -> RegisteredPeripherals[JPGDEC].Reset() if registered; writing 0 does nothing	506
+AHB3Reset(RCC_AHB3RSTR)	0x07C	DMA2DRST	4	4	stored+callback	0x0	stored (reads back as written, never self-clears); on any write of 1 -> RegisteredPeripherals[DMA2D].Reset() if registered; writing 0 does nothing	505
+AHB3Reset(RCC_AHB3RSTR)	0x07C	RESERVED	3	1	reserved	0x0	reserved: write discarded (unhandled-write log); read = reset-value bits = 0x0 (not forced to 0; framework read)	504
+AHB3Reset(RCC_AHB3RSTR)	0x07C	MDMARST	0	0	stored+callback	0x0	stored (reads back as written, never self-clears); on any write of 1 -> RegisteredPeripherals[MDMA].Reset() if registered; writing 0 does nothing	503
+AHB1Reset(RCC_AHB1RSTR)	0x080	(gap: no field, tag or reserved)	31	31	other	0x0	unhandled bits: write has no effect, no field state; read = reset-value bits 0x0	-
+AHB1Reset(RCC_AHB1RSTR)	0x080	RESERVED	30	28	reserved	0x0	reserved: write discarded (unhandled-write log); read = reset-value bits = 0x0 (not forced to 0; framework read)	525
+AHB1Reset(RCC_AHB1RSTR)	0x080	USB2OTGRST	27	27	stored+callback	0x0	stored (reads back as written, never self-clears); on any write of 1 -> RegisteredPeripherals[USB2OTGHS].Reset() if registered; writing 0 does nothing	524
+AHB1Reset(RCC_AHB1RSTR)	0x080	RESERVED	26	26	reserved	0x0	reserved: write discarded (unhandled-write log); read = reset-value bits = 0x0 (not forced to 0; framework read)	523
+AHB1Reset(RCC_AHB1RSTR)	0x080	USB1OTGRST	25	25	stored+callback	0x0	stored (reads back as written, never self-clears); on any write of 1 -> RegisteredPeripherals[USB2OTGHS].Reset() if registered; writing 0 does nothing [BUG: resets alias USB2OTGHS, not USB1OTGHS]	522
+AHB1Reset(RCC_AHB1RSTR)	0x080	(gap: no field, tag or reserved)	24	23	other	0x0	unhandled bits: write has no effect, no field state; read = reset-value bits 0x0	-
+AHB1Reset(RCC_AHB1RSTR)	0x080	RESERVED	22	16	reserved	0x0	reserved: write discarded (unhandled-write log); read = reset-value bits = 0x0 (not forced to 0; framework read)	521
+AHB1Reset(RCC_AHB1RSTR)	0x080	ETH1MACRST	15	15	stored+callback	0x0	stored (reads back as written, never self-clears); on any write of 1 -> RegisteredPeripherals[ETH1MAC].Reset() if registered; writing 0 does nothing	520
+AHB1Reset(RCC_AHB1RSTR)	0x080	RESERVED	14	6	reserved	0x0	reserved: write discarded (unhandled-write log); read = reset-value bits = 0x0 (not forced to 0; framework read)	519
+AHB1Reset(RCC_AHB1RSTR)	0x080	ADC12RST	5	5	stored+callback	0x0	stored (reads back as written, never self-clears); on any write of 1 -> RegisteredPeripherals[ADC12].Reset() if registered; writing 0 does nothing	518
+AHB1Reset(RCC_AHB1RSTR)	0x080	(gap: no field, tag or reserved)	4	4	other	0x0	unhandled bits: write has no effect, no field state; read = reset-value bits 0x0	-
+AHB1Reset(RCC_AHB1RSTR)	0x080	RESERVED	3	2	reserved	0x0	reserved: write discarded (unhandled-write log); read = reset-value bits = 0x0 (not forced to 0; framework read)	517
+AHB1Reset(RCC_AHB1RSTR)	0x080	DMA2RST	1	1	stored+callback	0x0	stored (reads back as written, never self-clears); on any write of 1 -> RegisteredPeripherals[DMA2].Reset() if registered; writing 0 does nothing	516
+AHB1Reset(RCC_AHB1RSTR)	0x080	DMA1RST	0	0	stored+callback	0x0	stored (reads back as written, never self-clears); on any write of 1 -> RegisteredPeripherals[DMA1].Reset() if registered; writing 0 does nothing	515
+AHB2Reset(RCC_AHB2RSTR)	0x084	RESERVED	31	10	reserved	0x0	reserved: write discarded (unhandled-write log); read = reset-value bits = 0x0 (not forced to 0; framework read)	534
+AHB2Reset(RCC_AHB2RSTR)	0x084	SDMMC2RST	9	9	stored+callback	0x0	stored (reads back as written, never self-clears); on any write of 1 -> RegisteredPeripherals[SDMMC2].Reset() if registered; writing 0 does nothing	533
+AHB2Reset(RCC_AHB2RSTR)	0x084	RESERVED	8	7	reserved	0x0	reserved: write discarded (unhandled-write log); read = reset-value bits = 0x0 (not forced to 0; framework read)	532
+AHB2Reset(RCC_AHB2RSTR)	0x084	RNGRST	6	6	stored+callback	0x0	stored (reads back as written, never self-clears); on any write of 1 -> RegisteredPeripherals[RNG].Reset() if registered; writing 0 does nothing	531
+AHB2Reset(RCC_AHB2RSTR)	0x084	HASHRST	5	5	stored+callback	0x0	stored (reads back as written, never self-clears); on any write of 1 -> RegisteredPeripherals[HASH].Reset() if registered; writing 0 does nothing	530
+AHB2Reset(RCC_AHB2RSTR)	0x084	CRYPTRST	4	4	stored+callback	0x0	stored (reads back as written, never self-clears); on any write of 1 -> RegisteredPeripherals[CRYPT].Reset() if registered; writing 0 does nothing	529
+AHB2Reset(RCC_AHB2RSTR)	0x084	RESERVED	3	1	reserved	0x0	reserved: write discarded (unhandled-write log); read = reset-value bits = 0x0 (not forced to 0; framework read)	528
+AHB2Reset(RCC_AHB2RSTR)	0x084	CAMITFRST	0	0	stored+callback	0x0	stored (reads back as written, never self-clears); on any write of 1 -> RegisteredPeripherals[DCMI].Reset() if registered; writing 0 does nothing	527
+AHB4Reset(RCC_AHB4RSTR)	0x088	RESERVED	31	26	reserved	0x0	reserved: write discarded (unhandled-write log); read = reset-value bits = 0x0 (not forced to 0; framework read)	554
+AHB4Reset(RCC_AHB4RSTR)	0x088	HSEMRST	25	25	stored+callback	0x0	stored (reads back as written, never self-clears); on any write of 1 -> RegisteredPeripherals[HSEM].Reset() if registered; writing 0 does nothing	553
+AHB4Reset(RCC_AHB4RSTR)	0x088	ADC3RST	24	24	stored+callback	0x0	stored (reads back as written, never self-clears); on any write of 1 -> RegisteredPeripherals[ADC3].Reset() if registered; writing 0 does nothing	552
+AHB4Reset(RCC_AHB4RSTR)	0x088	RESERVED	23	22	reserved	0x0	reserved: write discarded (unhandled-write log); read = reset-value bits = 0x0 (not forced to 0; framework read)	551
+AHB4Reset(RCC_AHB4RSTR)	0x088	BDMARST	21	21	stored+callback	0x0	stored (reads back as written, never self-clears); on any write of 1 -> RegisteredPeripherals[BDMA].Reset() if registered; writing 0 does nothing	550
+AHB4Reset(RCC_AHB4RSTR)	0x088	RESERVED	20	20	reserved	0x0	reserved: write discarded (unhandled-write log); read = reset-value bits = 0x0 (not forced to 0; framework read)	549
+AHB4Reset(RCC_AHB4RSTR)	0x088	CRCRST	19	19	stored+callback	0x0	stored (reads back as written, never self-clears); on any write of 1 -> RegisteredPeripherals[CRC].Reset() if registered; writing 0 does nothing	548
+AHB4Reset(RCC_AHB4RSTR)	0x088	RESERVED	18	11	reserved	0x0	reserved: write discarded (unhandled-write log); read = reset-value bits = 0x0 (not forced to 0; framework read)	547
+AHB4Reset(RCC_AHB4RSTR)	0x088	GPIOKRST	10	10	stored+callback	0x0	stored (reads back as written, never self-clears); on any write of 1 -> RegisteredPeripherals[GPIOK].Reset() if registered; writing 0 does nothing	546
+AHB4Reset(RCC_AHB4RSTR)	0x088	GPIOJRST	9	9	stored+callback	0x0	stored (reads back as written, never self-clears); on any write of 1 -> RegisteredPeripherals[GPIOJ].Reset() if registered; writing 0 does nothing	545
+AHB4Reset(RCC_AHB4RSTR)	0x088	GPIOIRST	8	8	stored+callback	0x0	stored (reads back as written, never self-clears); on any write of 1 -> RegisteredPeripherals[GPIOI].Reset() if registered; writing 0 does nothing	544
+AHB4Reset(RCC_AHB4RSTR)	0x088	GPIOHRST	7	7	stored+callback	0x0	stored (reads back as written, never self-clears); on any write of 1 -> RegisteredPeripherals[GPIOH].Reset() if registered; writing 0 does nothing	543
+AHB4Reset(RCC_AHB4RSTR)	0x088	GPIOGRST	6	6	stored+callback	0x0	stored (reads back as written, never self-clears); on any write of 1 -> RegisteredPeripherals[GPIOG].Reset() if registered; writing 0 does nothing	542
+AHB4Reset(RCC_AHB4RSTR)	0x088	GPIOFRST	5	5	stored+callback	0x0	stored (reads back as written, never self-clears); on any write of 1 -> RegisteredPeripherals[GPIOF].Reset() if registered; writing 0 does nothing	541
+AHB4Reset(RCC_AHB4RSTR)	0x088	GPIOERST	4	4	stored+callback	0x0	stored (reads back as written, never self-clears); on any write of 1 -> RegisteredPeripherals[GPIOE].Reset() if registered; writing 0 does nothing	540
+AHB4Reset(RCC_AHB4RSTR)	0x088	GPIODRST	3	3	stored+callback	0x0	stored (reads back as written, never self-clears); on any write of 1 -> RegisteredPeripherals[GPIOD].Reset() if registered; writing 0 does nothing	539
+AHB4Reset(RCC_AHB4RSTR)	0x088	GPIOCRST	2	2	stored+callback	0x0	stored (reads back as written, never self-clears); on any write of 1 -> RegisteredPeripherals[GPIOC].Reset() if registered; writing 0 does nothing	538
+AHB4Reset(RCC_AHB4RSTR)	0x088	GPIOBRST	1	1	stored+callback	0x0	stored (reads back as written, never self-clears); on any write of 1 -> RegisteredPeripherals[GPIOB].Reset() if registered; writing 0 does nothing	537
+AHB4Reset(RCC_AHB4RSTR)	0x088	GPIOARST	0	0	stored+callback	0x0	stored (reads back as written, never self-clears); on any write of 1 -> RegisteredPeripherals[GPIOA].Reset() if registered; writing 0 does nothing	536
+APB3Reset(RCC_APB3RSTR)	0x08C	RESERVED	31	4	reserved	0x0	reserved: write discarded (unhandled-write log); read = reset-value bits = 0x0 (not forced to 0; framework read)	558
+APB3Reset(RCC_APB3RSTR)	0x08C	LTDCRST	3	3	stored+callback	0x0	stored (reads back as written, never self-clears); on any write of 1 -> RegisteredPeripherals[LTDC].Reset() if registered; writing 0 does nothing	557
+APB3Reset(RCC_APB3RSTR)	0x08C	RESERVED	2	0	reserved	0x0	reserved: write discarded (unhandled-write log); read = reset-value bits = 0x0 (not forced to 0; framework read)	556
+APB1ResetLow(RCC_APB1LRSTR)	0x090	UART8RST	31	31	stored+callback	0x0	stored (reads back as written, never self-clears); on any write of 1 -> RegisteredPeripherals[UART8].Reset() if registered; writing 0 does nothing	586
+APB1ResetLow(RCC_APB1LRSTR)	0x090	UART7RST	30	30	stored+callback	0x0	stored (reads back as written, never self-clears); on any write of 1 -> RegisteredPeripherals[UART7].Reset() if registered; writing 0 does nothing	585
+APB1ResetLow(RCC_APB1LRSTR)	0x090	DAC12RST	29	29	stored+callback	0x0	stored (reads back as written, never self-clears); on any write of 1 -> RegisteredPeripherals[DAC12].Reset() if registered; writing 0 does nothing	584
+APB1ResetLow(RCC_APB1LRSTR)	0x090	RESERVED	28	28	reserved	0x0	reserved: write discarded (unhandled-write log); read = reset-value bits = 0x0 (not forced to 0; framework read)	583
+APB1ResetLow(RCC_APB1LRSTR)	0x090	CECRST	27	27	stored+callback	0x0	stored (reads back as written, never self-clears); on any write of 1 -> RegisteredPeripherals[CEC].Reset() if registered; writing 0 does nothing	582
+APB1ResetLow(RCC_APB1LRSTR)	0x090	RESERVED	26	24	reserved	0x0	reserved: write discarded (unhandled-write log); read = reset-value bits = 0x0 (not forced to 0; framework read)	581
+APB1ResetLow(RCC_APB1LRSTR)	0x090	I2C3RST	23	23	stored+callback	0x0	stored (reads back as written, never self-clears); on any write of 1 -> RegisteredPeripherals[I2C3].Reset() if registered; writing 0 does nothing	580
+APB1ResetLow(RCC_APB1LRSTR)	0x090	I2C2RST	22	22	stored+callback	0x0	stored (reads back as written, never self-clears); on any write of 1 -> RegisteredPeripherals[I2C2].Reset() if registered; writing 0 does nothing	579
+APB1ResetLow(RCC_APB1LRSTR)	0x090	I2C1RST	21	21	stored+callback	0x0	stored (reads back as written, never self-clears); on any write of 1 -> RegisteredPeripherals[I2C1].Reset() if registered; writing 0 does nothing	578
+APB1ResetLow(RCC_APB1LRSTR)	0x090	UART5RST	20	20	stored+callback	0x0	stored (reads back as written, never self-clears); on any write of 1 -> RegisteredPeripherals[UART5].Reset() if registered; writing 0 does nothing	577
+APB1ResetLow(RCC_APB1LRSTR)	0x090	UART4RST	19	19	stored+callback	0x0	stored (reads back as written, never self-clears); on any write of 1 -> RegisteredPeripherals[UART4].Reset() if registered; writing 0 does nothing	576
+APB1ResetLow(RCC_APB1LRSTR)	0x090	USART3RST	18	18	stored+callback	0x0	stored (reads back as written, never self-clears); on any write of 1 -> RegisteredPeripherals[USART3].Reset() if registered; writing 0 does nothing	575
+APB1ResetLow(RCC_APB1LRSTR)	0x090	USART2RST	17	17	stored+callback	0x0	stored (reads back as written, never self-clears); on any write of 1 -> RegisteredPeripherals[USART2].Reset() if registered; writing 0 does nothing	574
+APB1ResetLow(RCC_APB1LRSTR)	0x090	SPDIFRXRST	16	16	stored+callback	0x0	stored (reads back as written, never self-clears); on any write of 1 -> RegisteredPeripherals[SPDIFRX].Reset() if registered; writing 0 does nothing	573
+APB1ResetLow(RCC_APB1LRSTR)	0x090	SPI3RST	15	15	stored+callback	0x0	stored (reads back as written, never self-clears); on any write of 1 -> RegisteredPeripherals[SPI3].Reset() if registered; writing 0 does nothing	572
+APB1ResetLow(RCC_APB1LRSTR)	0x090	SPI2RST	14	14	stored+callback	0x0	stored (reads back as written, never self-clears); on any write of 1 -> RegisteredPeripherals[SPI2].Reset() if registered; writing 0 does nothing	571
+APB1ResetLow(RCC_APB1LRSTR)	0x090	RESERVED	13	10	reserved	0x0	reserved: write discarded (unhandled-write log); read = reset-value bits = 0x0 (not forced to 0; framework read)	570
+APB1ResetLow(RCC_APB1LRSTR)	0x090	LPTIM1RST	9	9	stored+callback	0x0	stored (reads back as written, never self-clears); on any write of 1 -> RegisteredPeripherals[LPTIM1].Reset() if registered; writing 0 does nothing	569
+APB1ResetLow(RCC_APB1LRSTR)	0x090	TIM14RST	8	8	stored+callback	0x0	stored (reads back as written, never self-clears); on any write of 1 -> RegisteredPeripherals[TIM14].Reset() if registered; writing 0 does nothing	568
+APB1ResetLow(RCC_APB1LRSTR)	0x090	TIM13RST	7	7	stored+callback	0x0	stored (reads back as written, never self-clears); on any write of 1 -> RegisteredPeripherals[TIM13].Reset() if registered; writing 0 does nothing	567
+APB1ResetLow(RCC_APB1LRSTR)	0x090	TIM12RST	6	6	stored+callback	0x0	stored (reads back as written, never self-clears); on any write of 1 -> RegisteredPeripherals[TIM12].Reset() if registered; writing 0 does nothing	566
+APB1ResetLow(RCC_APB1LRSTR)	0x090	TIM7RST	5	5	stored+callback	0x0	stored (reads back as written, never self-clears); on any write of 1 -> RegisteredPeripherals[TIM7].Reset() if registered; writing 0 does nothing	565
+APB1ResetLow(RCC_APB1LRSTR)	0x090	TIM6RST	4	4	stored+callback	0x0	stored (reads back as written, never self-clears); on any write of 1 -> RegisteredPeripherals[TIM6].Reset() if registered; writing 0 does nothing	564
+APB1ResetLow(RCC_APB1LRSTR)	0x090	TIM5RST	3	3	stored+callback	0x0	stored (reads back as written, never self-clears); on any write of 1 -> RegisteredPeripherals[TIM5].Reset() if registered; writing 0 does nothing	563
+APB1ResetLow(RCC_APB1LRSTR)	0x090	TIM4RST	2	2	stored+callback	0x0	stored (reads back as written, never self-clears); on any write of 1 -> RegisteredPeripherals[TIM4].Reset() if registered; writing 0 does nothing	562
+APB1ResetLow(RCC_APB1LRSTR)	0x090	TIM3RST	1	1	stored+callback	0x0	stored (reads back as written, never self-clears); on any write of 1 -> RegisteredPeripherals[TIM3].Reset() if registered; writing 0 does nothing	561
+APB1ResetLow(RCC_APB1LRSTR)	0x090	TIM2RST	0	0	stored+callback	0x0	stored (reads back as written, never self-clears); on any write of 1 -> RegisteredPeripherals[TIM2].Reset() if registered; writing 0 does nothing	560
+APB1ResetHigh(RCC_APB1HRSTR)	0x094	RESERVED	31	9	reserved	0x0	reserved: write discarded (unhandled-write log); read = reset-value bits = 0x0 (not forced to 0; framework read)	596
+APB1ResetHigh(RCC_APB1HRSTR)	0x094	FDCANRST	8	8	stored+callback	0x0	stored (reads back as written, never self-clears); on any write of 1 -> RegisteredPeripherals[FDCAN].Reset() if registered; writing 0 does nothing	595
+APB1ResetHigh(RCC_APB1HRSTR)	0x094	RESERVED	7	6	reserved	0x0	reserved: write discarded (unhandled-write log); read = reset-value bits = 0x0 (not forced to 0; framework read)	594
+APB1ResetHigh(RCC_APB1HRSTR)	0x094	MDIOSRST	5	5	stored+callback	0x0	stored (reads back as written, never self-clears); on any write of 1 -> RegisteredPeripherals[MDIOS].Reset() if registered; writing 0 does nothing	593
+APB1ResetHigh(RCC_APB1HRSTR)	0x094	OPAMPRST	4	4	stored+callback	0x0	stored (reads back as written, never self-clears); on any write of 1 -> RegisteredPeripherals[OPAMP].Reset() if registered; writing 0 does nothing	592
+APB1ResetHigh(RCC_APB1HRSTR)	0x094	RESERVED	3	3	reserved	0x0	reserved: write discarded (unhandled-write log); read = reset-value bits = 0x0 (not forced to 0; framework read)	591
+APB1ResetHigh(RCC_APB1HRSTR)	0x094	SWPRST	2	2	stored+callback	0x0	stored (reads back as written, never self-clears); on any write of 1 -> RegisteredPeripherals[SWP].Reset() if registered; writing 0 does nothing	590
+APB1ResetHigh(RCC_APB1HRSTR)	0x094	CRSRST	1	1	stored+callback	0x0	stored (reads back as written, never self-clears); on any write of 1 -> RegisteredPeripherals[CRS].Reset() if registered; writing 0 does nothing	589
+APB1ResetHigh(RCC_APB1HRSTR)	0x094	RESERVED	0	0	reserved	0x0	reserved: write discarded (unhandled-write log); read = reset-value bits = 0x0 (not forced to 0; framework read)	588
+APB2Reset(RCC_APB2RSTR)	0x098	RESERVED	31	30	reserved	0x0	reserved: write discarded (unhandled-write log); read = reset-value bits = 0x0 (not forced to 0; framework read)	619
+APB2Reset(RCC_APB2RSTR)	0x098	HRTIMRST	29	29	stored+callback	0x0	stored (reads back as written, never self-clears); on any write of 1 -> RegisteredPeripherals[HRTIM].Reset() if registered; writing 0 does nothing	618
+APB2Reset(RCC_APB2RSTR)	0x098	DFSDM1RST	28	28	stored+callback	0x0	stored (reads back as written, never self-clears); on any write of 1 -> RegisteredPeripherals[DFSDM1].Reset() if registered; writing 0 does nothing	617
+APB2Reset(RCC_APB2RSTR)	0x098	RESERVED	27	25	reserved	0x0	reserved: write discarded (unhandled-write log); read = reset-value bits = 0x0 (not forced to 0; framework read)	616
+APB2Reset(RCC_APB2RSTR)	0x098	SAI3RST	24	24	stored+callback	0x0	stored (reads back as written, never self-clears); on any write of 1 -> RegisteredPeripherals[SAI3].Reset() if registered; writing 0 does nothing	615
+APB2Reset(RCC_APB2RSTR)	0x098	SAI2RST	23	23	stored+callback	0x0	stored (reads back as written, never self-clears); on any write of 1 -> RegisteredPeripherals[SAI2].Reset() if registered; writing 0 does nothing	614
+APB2Reset(RCC_APB2RSTR)	0x098	SAI1RST	22	22	stored+callback	0x0	stored (reads back as written, never self-clears); on any write of 1 -> RegisteredPeripherals[SAI1].Reset() if registered; writing 0 does nothing	613
+APB2Reset(RCC_APB2RSTR)	0x098	RESERVED	21	21	reserved	0x0	reserved: write discarded (unhandled-write log); read = reset-value bits = 0x0 (not forced to 0; framework read)	612
+APB2Reset(RCC_APB2RSTR)	0x098	SPI5RST	20	20	stored+callback	0x0	stored (reads back as written, never self-clears); on any write of 1 -> RegisteredPeripherals[SPI5].Reset() if registered; writing 0 does nothing	611
+APB2Reset(RCC_APB2RSTR)	0x098	RESERVED	19	19	reserved	0x0	reserved: write discarded (unhandled-write log); read = reset-value bits = 0x0 (not forced to 0; framework read)	610
+APB2Reset(RCC_APB2RSTR)	0x098	TIM17RST	18	18	stored+callback	0x0	stored (reads back as written, never self-clears); on any write of 1 -> RegisteredPeripherals[TIM17].Reset() if registered; writing 0 does nothing	609
+APB2Reset(RCC_APB2RSTR)	0x098	TIM16RST	17	17	stored+callback	0x0	stored (reads back as written, never self-clears); on any write of 1 -> RegisteredPeripherals[TIM16].Reset() if registered; writing 0 does nothing	608
+APB2Reset(RCC_APB2RSTR)	0x098	TIM15RST	16	16	stored+callback	0x0	stored (reads back as written, never self-clears); on any write of 1 -> RegisteredPeripherals[TIM15].Reset() if registered; writing 0 does nothing	607
+APB2Reset(RCC_APB2RSTR)	0x098	RESERVED	15	14	reserved	0x0	reserved: write discarded (unhandled-write log); read = reset-value bits = 0x0 (not forced to 0; framework read)	606
+APB2Reset(RCC_APB2RSTR)	0x098	SPI4RST	13	13	stored+callback	0x0	stored (reads back as written, never self-clears); on any write of 1 -> RegisteredPeripherals[SPI4].Reset() if registered; writing 0 does nothing	605
+APB2Reset(RCC_APB2RSTR)	0x098	SPI1RST	12	12	stored+callback	0x0	stored (reads back as written, never self-clears); on any write of 1 -> RegisteredPeripherals[SPI1].Reset() if registered; writing 0 does nothing	604
+APB2Reset(RCC_APB2RSTR)	0x098	RESERVED	11	6	reserved	0x0	reserved: write discarded (unhandled-write log); read = reset-value bits = 0x0 (not forced to 0; framework read)	603
+APB2Reset(RCC_APB2RSTR)	0x098	USART6RST	5	5	stored+callback	0x0	stored (reads back as written, never self-clears); on any write of 1 -> RegisteredPeripherals[USART6].Reset() if registered; writing 0 does nothing	602
+APB2Reset(RCC_APB2RSTR)	0x098	USART1RST	4	4	stored+callback	0x0	stored (reads back as written, never self-clears); on any write of 1 -> RegisteredPeripherals[USART1].Reset() if registered; writing 0 does nothing	601
+APB2Reset(RCC_APB2RSTR)	0x098	RESERVED	3	2	reserved	0x0	reserved: write discarded (unhandled-write log); read = reset-value bits = 0x0 (not forced to 0; framework read)	600
+APB2Reset(RCC_APB2RSTR)	0x098	TIM8RST	1	1	stored+callback	0x0	stored (reads back as written, never self-clears); on any write of 1 -> RegisteredPeripherals[TIM8].Reset() if registered; writing 0 does nothing	599
+APB2Reset(RCC_APB2RSTR)	0x098	TIM1RST	0	0	stored+callback	0x0	stored (reads back as written, never self-clears); on any write of 1 -> RegisteredPeripherals[TIM1].Reset() if registered; writing 0 does nothing	598
+APB4Reset(RCC_APB4RSTR)	0x09C	(gap: no field, tag or reserved)	31	31	other	0x0	unhandled bits: write has no effect, no field state; read = reset-value bits 0x0	-
+APB4Reset(RCC_APB4RSTR)	0x09C	RESERVED	30	22	reserved	0x0	reserved: write discarded (unhandled-write log); read = reset-value bits = 0x0 (not forced to 0; framework read)	639
+APB4Reset(RCC_APB4RSTR)	0x09C	SAI4RST	21	21	stored+callback	0x0	stored (reads back as written, never self-clears); on any write of 1 -> RegisteredPeripherals[SAI4].Reset() if registered; writing 0 does nothing	638
+APB4Reset(RCC_APB4RSTR)	0x09C	RESERVED	20	16	reserved	0x0	reserved: write discarded (unhandled-write log); read = reset-value bits = 0x0 (not forced to 0; framework read)	637
+APB4Reset(RCC_APB4RSTR)	0x09C	VREFRST	15	15	stored+callback	0x0	stored (reads back as written, never self-clears); on any write of 1 -> RegisteredPeripherals[VREF].Reset() if registered; writing 0 does nothing	636
+APB4Reset(RCC_APB4RSTR)	0x09C	COMP12RST	14	14	stored+callback	0x0	stored (reads back as written, never self-clears); on any write of 1 -> RegisteredPeripherals[COMP12].Reset() if registered; writing 0 does nothing	635
+APB4Reset(RCC_APB4RSTR)	0x09C	RESERVED	13	13	reserved	0x0	reserved: write discarded (unhandled-write log); read = reset-value bits = 0x0 (not forced to 0; framework read)	634
+APB4Reset(RCC_APB4RSTR)	0x09C	LPTIM5RST	12	12	stored+callback	0x0	stored (reads back as written, never self-clears); on any write of 1 -> RegisteredPeripherals[LPTIM5].Reset() if registered; writing 0 does nothing	633
+APB4Reset(RCC_APB4RSTR)	0x09C	LPTIM4RST	11	11	stored+callback	0x0	stored (reads back as written, never self-clears); on any write of 1 -> RegisteredPeripherals[LPTIM4].Reset() if registered; writing 0 does nothing	632
+APB4Reset(RCC_APB4RSTR)	0x09C	LPTIM3RST	10	10	stored+callback	0x0	stored (reads back as written, never self-clears); on any write of 1 -> RegisteredPeripherals[LPTIM3].Reset() if registered; writing 0 does nothing	631
+APB4Reset(RCC_APB4RSTR)	0x09C	LPTIM2RST	9	9	stored+callback	0x0	stored (reads back as written, never self-clears); on any write of 1 -> RegisteredPeripherals[LPTIM2].Reset() if registered; writing 0 does nothing	630
+APB4Reset(RCC_APB4RSTR)	0x09C	RESERVED	8	8	reserved	0x0	reserved: write discarded (unhandled-write log); read = reset-value bits = 0x0 (not forced to 0; framework read)	629
+APB4Reset(RCC_APB4RSTR)	0x09C	I2C4RST	7	7	stored+callback	0x0	stored (reads back as written, never self-clears); on any write of 1 -> RegisteredPeripherals[I2C4].Reset() if registered; writing 0 does nothing	628
+APB4Reset(RCC_APB4RSTR)	0x09C	RESERVED	6	6	reserved	0x0	reserved: write discarded (unhandled-write log); read = reset-value bits = 0x0 (not forced to 0; framework read)	627
+APB4Reset(RCC_APB4RSTR)	0x09C	SPI6RST	5	5	stored+callback	0x0	stored (reads back as written, never self-clears); on any write of 1 -> RegisteredPeripherals[SPI6].Reset() if registered; writing 0 does nothing	626
+APB4Reset(RCC_APB4RSTR)	0x09C	RESERVED	4	4	reserved	0x0	reserved: write discarded (unhandled-write log); read = reset-value bits = 0x0 (not forced to 0; framework read)	625
+APB4Reset(RCC_APB4RSTR)	0x09C	LPUART1EN	3	3	stored+callback	0x0	stored (reads back as written, never self-clears); on any write of 1 -> RegisteredPeripherals[LPUART1].Reset() if registered; writing 0 does nothing [model names this bit LPUART1EN in the RSTR; it is the LPUART1RST bit]	624
+APB4Reset(RCC_APB4RSTR)	0x09C	RESERVED	2	2	reserved	0x0	reserved: write discarded (unhandled-write log); read = reset-value bits = 0x0 (not forced to 0; framework read)	623
+APB4Reset(RCC_APB4RSTR)	0x09C	SYSCFGRST	1	1	stored+callback	0x0	stored (reads back as written, never self-clears); on any write of 1 -> RegisteredPeripherals[SYSCFG].Reset() if registered; writing 0 does nothing	622
+APB4Reset(RCC_APB4RSTR)	0x09C	RESERVED	0	0	reserved	0x0	reserved: write discarded (unhandled-write log); read = reset-value bits = 0x0 (not forced to 0; framework read)	621
+GlobalControl(RCC_GCR)	0x0A0	RESERVED	31	1	reserved	0x0	reserved: write discarded (unhandled-write log); read = reset-value bits = 0x0 (not forced to 0; framework read)	642
+GlobalControl(RCC_GCR)	0x0A0	WW1RSC	0	0	tag	0x0	tag: write discarded (unhandled-write log); read = reset-value bits = 0x0 (not forced to 0; framework read)	641
+D3AutonomousMode(RCC_D3AMR)	0x0A8	RESERVED	31	30	reserved	0x0	reserved: write discarded (unhandled-write log); read = reset-value bits = 0x0 (not forced to 0; framework read)	669
+D3AutonomousMode(RCC_D3AMR)	0x0A8	SRAM4AMEN	29	29	tag	0x0	tag: write discarded (unhandled-write log); read = reset-value bits = 0x0 (not forced to 0; framework read)	668
+D3AutonomousMode(RCC_D3AMR)	0x0A8	BKPRAMAMEN	28	28	tag	0x0	tag: write discarded (unhandled-write log); read = reset-value bits = 0x0 (not forced to 0; framework read)	667
+D3AutonomousMode(RCC_D3AMR)	0x0A8	RESERVED	27	25	reserved	0x0	reserved: write discarded (unhandled-write log); read = reset-value bits = 0x0 (not forced to 0; framework read)	666
+D3AutonomousMode(RCC_D3AMR)	0x0A8	ADC3AMEN	24	24	tag	0x0	tag: write discarded (unhandled-write log); read = reset-value bits = 0x0 (not forced to 0; framework read)	665
+D3AutonomousMode(RCC_D3AMR)	0x0A8	RESERVED	23	22	reserved	0x0	reserved: write discarded (unhandled-write log); read = reset-value bits = 0x0 (not forced to 0; framework read)	664
+D3AutonomousMode(RCC_D3AMR)	0x0A8	SAI4AMEN	21	21	tag	0x0	tag: write discarded (unhandled-write log); read = reset-value bits = 0x0 (not forced to 0; framework read)	663
+D3AutonomousMode(RCC_D3AMR)	0x0A8	RESERVED	20	20	reserved	0x0	reserved: write discarded (unhandled-write log); read = reset-value bits = 0x0 (not forced to 0; framework read)	662
+D3AutonomousMode(RCC_D3AMR)	0x0A8	CRCAMEN	19	19	tag	0x0	tag: write discarded (unhandled-write log); read = reset-value bits = 0x0 (not forced to 0; framework read)	661
+D3AutonomousMode(RCC_D3AMR)	0x0A8	RESERVED	18	17	reserved	0x0	reserved: write discarded (unhandled-write log); read = reset-value bits = 0x0 (not forced to 0; framework read)	660
+D3AutonomousMode(RCC_D3AMR)	0x0A8	RTCAMEN	16	16	tag	0x0	tag: write discarded (unhandled-write log); read = reset-value bits = 0x0 (not forced to 0; framework read)	659
+D3AutonomousMode(RCC_D3AMR)	0x0A8	VREFAMEN	15	15	tag	0x0	tag: write discarded (unhandled-write log); read = reset-value bits = 0x0 (not forced to 0; framework read)	658
+D3AutonomousMode(RCC_D3AMR)	0x0A8	COMP12AMEN	14	14	tag	0x0	tag: write discarded (unhandled-write log); read = reset-value bits = 0x0 (not forced to 0; framework read)	657
+D3AutonomousMode(RCC_D3AMR)	0x0A8	RESERVED	13	13	reserved	0x0	reserved: write discarded (unhandled-write log); read = reset-value bits = 0x0 (not forced to 0; framework read)	656
+D3AutonomousMode(RCC_D3AMR)	0x0A8	LPTIM5AMEN	12	12	tag	0x0	tag: write discarded (unhandled-write log); read = reset-value bits = 0x0 (not forced to 0; framework read)	655
+D3AutonomousMode(RCC_D3AMR)	0x0A8	LPTIM4AMEN	11	11	tag	0x0	tag: write discarded (unhandled-write log); read = reset-value bits = 0x0 (not forced to 0; framework read)	654
+D3AutonomousMode(RCC_D3AMR)	0x0A8	LPTIM3AMEN	10	10	tag	0x0	tag: write discarded (unhandled-write log); read = reset-value bits = 0x0 (not forced to 0; framework read)	653
+D3AutonomousMode(RCC_D3AMR)	0x0A8	LPTIM2AMEN	9	9	tag	0x0	tag: write discarded (unhandled-write log); read = reset-value bits = 0x0 (not forced to 0; framework read)	652
+D3AutonomousMode(RCC_D3AMR)	0x0A8	RESERVED	8	8	reserved	0x0	reserved: write discarded (unhandled-write log); read = reset-value bits = 0x0 (not forced to 0; framework read)	651
+D3AutonomousMode(RCC_D3AMR)	0x0A8	I2C4AMEN	7	7	tag	0x0	tag: write discarded (unhandled-write log); read = reset-value bits = 0x0 (not forced to 0; framework read)	650
+D3AutonomousMode(RCC_D3AMR)	0x0A8	RESERVED	6	6	reserved	0x0	reserved: write discarded (unhandled-write log); read = reset-value bits = 0x0 (not forced to 0; framework read)	649
+D3AutonomousMode(RCC_D3AMR)	0x0A8	SPI6AMEN	5	5	tag	0x0	tag: write discarded (unhandled-write log); read = reset-value bits = 0x0 (not forced to 0; framework read)	648
+D3AutonomousMode(RCC_D3AMR)	0x0A8	RESERVED	4	4	reserved	0x0	reserved: write discarded (unhandled-write log); read = reset-value bits = 0x0 (not forced to 0; framework read)	647
+D3AutonomousMode(RCC_D3AMR)	0x0A8	LPUART1AMEN	3	3	tag	0x0	tag: write discarded (unhandled-write log); read = reset-value bits = 0x0 (not forced to 0; framework read)	646
+D3AutonomousMode(RCC_D3AMR)	0x0A8	RESERVED	2	1	reserved	0x0	reserved: write discarded (unhandled-write log); read = reset-value bits = 0x0 (not forced to 0; framework read)	645
+D3AutonomousMode(RCC_D3AMR)	0x0A8	BDMAAMEN	0	0	tag	0x0	tag: write discarded (unhandled-write log); read = reset-value bits = 0x0 (not forced to 0; framework read)	644
+ResetStatus(RCC_RSR)	0x0D0	LPWR2RSTF	31	31	tag	0x0	tag: write discarded (unhandled-write log); read = reset-value bits = 0x0 (not forced to 0; framework read)	673
+ResetStatus(RCC_RSR)	0x0D0	LPWR1RSTF	30	30	tag	0x0	tag: write discarded (unhandled-write log); read = reset-value bits = 0x0 (not forced to 0; framework read)	674
+ResetStatus(RCC_RSR)	0x0D0	WWDG2RSTF	29	29	tag	0x0	tag: write discarded (unhandled-write log); read = reset-value bits = 0x0 (not forced to 0; framework read)	675
+ResetStatus(RCC_RSR)	0x0D0	WWDG1RSTF	28	28	tag	0x0	tag: write discarded (unhandled-write log); read = reset-value bits = 0x0 (not forced to 0; framework read)	676
+ResetStatus(RCC_RSR)	0x0D0	IWDG2RSTF	27	27	tag	0x0	tag: write discarded (unhandled-write log); read = reset-value bits = 0x0 (not forced to 0; framework read)	677
+ResetStatus(RCC_RSR)	0x0D0	IWDG1RSTF	26	26	tag	0x0	tag: write discarded (unhandled-write log); read = reset-value bits = 0x0 (not forced to 0; framework read)	678
+ResetStatus(RCC_RSR)	0x0D0	SFT2RSTF	25	25	tag	0x0	tag: write discarded (unhandled-write log); read = reset-value bits = 0x0 (not forced to 0; framework read)	679
+ResetStatus(RCC_RSR)	0x0D0	SFT1RSTF	24	24	tag	0x0	tag: write discarded (unhandled-write log); read = reset-value bits = 0x0 (not forced to 0; framework read)	680
+ResetStatus(RCC_RSR)	0x0D0	PORRSTF	23	23	stored	0x1	FieldMode.Read: stored bit; reset value from 0x00FE0000 bits; cleared only by RMVF write 1; firmware cannot set	681
+ResetStatus(RCC_RSR)	0x0D0	PINRSTF	22	22	stored	0x1	FieldMode.Read: stored bit; reset value from 0x00FE0000 bits; cleared only by RMVF write 1; firmware cannot set	682
+ResetStatus(RCC_RSR)	0x0D0	BORRSTF	21	21	stored	0x1	FieldMode.Read: stored bit; reset value from 0x00FE0000 bits; cleared only by RMVF write 1; firmware cannot set	683
+ResetStatus(RCC_RSR)	0x0D0	D2RSTF	20	20	stored	0x1	FieldMode.Read: stored bit; reset value from 0x00FE0000 bits; cleared only by RMVF write 1; firmware cannot set	684
+ResetStatus(RCC_RSR)	0x0D0	D1RSTF	19	19	stored	0x1	FieldMode.Read: stored bit; reset value from 0x00FE0000 bits; cleared only by RMVF write 1; firmware cannot set	685
+ResetStatus(RCC_RSR)	0x0D0	C2RSTF	18	18	stored	0x1	FieldMode.Read: stored bit; reset value from 0x00FE0000 bits; cleared only by RMVF write 1; firmware cannot set	686
+ResetStatus(RCC_RSR)	0x0D0	C1RSTF	17	17	stored	0x1	FieldMode.Read: stored bit; reset value from 0x00FE0000 bits; cleared only by RMVF write 1; firmware cannot set	687
+ResetStatus(RCC_RSR)	0x0D0	RMVF	16	16	write-only-action	0x0	FieldMode.WriteOneToClear: always reads 0; write 1 clears C1RSTF,C2RSTF,D1RSTF,D2RSTF,BORRSTF,PINRSTF,PORRSTF (not the tag bits 24-31)	689-702
+ResetStatus(RCC_RSR)	0x0D0	RESERVED	15	0	reserved	0x0	reserved: write discarded (unhandled-write log); read = reset-value bits = 0x0 (not forced to 0; framework read)	703
+AHB3Clock(RCC_AHB3ENR)	0x0D4	RESERVED	31	17	reserved	0x0	reserved: write discarded (unhandled-write log); read = reset-value bits = 0x0 (not forced to 0; framework read)	727
+AHB3Clock(RCC_AHB3ENR)	0x0D4	SDMMC1EN	16	16	computed-read	0x0	write: if SDMMC1 registered in RCC -> sysbus.SetPeripheralEnabled(peri,value) (lock/unlock on bus), else no-op (Noisy log); read: IsPeripheralEnabled(SDMMC1) = true iff registered and not locked, NOT a stored bit	724-726
+AHB3Clock(RCC_AHB3ENR)	0x0D4	RESERVED	15	15	reserved	0x0	reserved: write discarded (unhandled-write log); read = reset-value bits = 0x0 (not forced to 0; framework read)	723
+AHB3Clock(RCC_AHB3ENR)	0x0D4	QSPIEN	14	14	computed-read	0x0	write: if QSPI registered in RCC -> sysbus.SetPeripheralEnabled(peri,value) (lock/unlock on bus), else no-op (Noisy log); read: IsPeripheralEnabled(QSPI) = true iff registered and not locked, NOT a stored bit	720-722
+AHB3Clock(RCC_AHB3ENR)	0x0D4	RESERVED	13	13	reserved	0x0	reserved: write discarded (unhandled-write log); read = reset-value bits = 0x0 (not forced to 0; framework read)	719
+AHB3Clock(RCC_AHB3ENR)	0x0D4	FMCEN	12	12	computed-read	0x0	write: if FMC registered in RCC -> sysbus.SetPeripheralEnabled(peri,value) (lock/unlock on bus), else no-op (Noisy log); read: IsPeripheralEnabled(FMC) = true iff registered and not locked, NOT a stored bit	716-718
+AHB3Clock(RCC_AHB3ENR)	0x0D4	RESERVED	11	6	reserved	0x0	reserved: write discarded (unhandled-write log); read = reset-value bits = 0x0 (not forced to 0; framework read)	715
+AHB3Clock(RCC_AHB3ENR)	0x0D4	JPGDECEN	5	5	computed-read	0x0	write: if JPGDEC registered in RCC -> sysbus.SetPeripheralEnabled(peri,value) (lock/unlock on bus), else no-op (Noisy log); read: IsPeripheralEnabled(JPGDEC) = true iff registered and not locked, NOT a stored bit	712-714
+AHB3Clock(RCC_AHB3ENR)	0x0D4	DMA2DEN	4	4	computed-read	0x0	write: if DMA2D registered in RCC -> sysbus.SetPeripheralEnabled(peri,value) (lock/unlock on bus), else no-op (Noisy log); read: IsPeripheralEnabled(DMA2D) = true iff registered and not locked, NOT a stored bit	709-711
+AHB3Clock(RCC_AHB3ENR)	0x0D4	RESERVED	3	1	reserved	0x0	reserved: write discarded (unhandled-write log); read = reset-value bits = 0x0 (not forced to 0; framework read)	708
+AHB3Clock(RCC_AHB3ENR)	0x0D4	MDMAEN	0	0	computed-read	0x0	write: if MDMA registered in RCC -> sysbus.SetPeripheralEnabled(peri,value) (lock/unlock on bus), else no-op (Noisy log); read: IsPeripheralEnabled(MDMA) = true iff registered and not locked, NOT a stored bit	705-707
+AHB1Clock(RCC_AHB1ENR)	0x0D8	RESERVED	31	29	reserved	0x0	reserved: write discarded (unhandled-write log); read = reset-value bits = 0x0 (not forced to 0; framework read)	762
+AHB1Clock(RCC_AHB1ENR)	0x0D8	USB2OTGHSULPIEN	28	28	computed-read	0x0	write: if USB2OTGHSULPI registered in RCC -> sysbus.SetPeripheralEnabled(peri,value) (lock/unlock on bus), else no-op (Noisy log); read: IsPeripheralEnabled(USB2OTGHSULPI) = true iff registered and not locked, NOT a stored bit	759-761
+AHB1Clock(RCC_AHB1ENR)	0x0D8	USB2OTGHSEN	27	27	computed-read	0x0	write: if USB2OTGHS registered in RCC -> sysbus.SetPeripheralEnabled(peri,value) (lock/unlock on bus), else no-op (Noisy log); read: IsPeripheralEnabled(USB2OTGHS) = true iff registered and not locked, NOT a stored bit	756-758
+AHB1Clock(RCC_AHB1ENR)	0x0D8	USB1OTGHSULPIEN	26	26	computed-read	0x0	write: if USB1OTGHSULPI registered in RCC -> sysbus.SetPeripheralEnabled(peri,value) (lock/unlock on bus), else no-op (Noisy log); read: IsPeripheralEnabled(USB1OTGHSULPI) = true iff registered and not locked, NOT a stored bit	753-755
+AHB1Clock(RCC_AHB1ENR)	0x0D8	USB1OTGHSEN	25	25	computed-read	0x0	write: if USB1OTGHS registered in RCC -> sysbus.SetPeripheralEnabled(peri,value) (lock/unlock on bus), else no-op (Noisy log); read: IsPeripheralEnabled(USB1OTGHS) = true iff registered and not locked, NOT a stored bit	750-752
+AHB1Clock(RCC_AHB1ENR)	0x0D8	RESERVED	24	18	reserved	0x0	reserved: write discarded (unhandled-write log); read = reset-value bits = 0x0 (not forced to 0; framework read)	749
+AHB1Clock(RCC_AHB1ENR)	0x0D8	ETH1RXEN	17	17	computed-read	0x0	write: if ETH1RX registered in RCC -> sysbus.SetPeripheralEnabled(peri,value) (lock/unlock on bus), else no-op (Noisy log); read: IsPeripheralEnabled(ETH1RX) = true iff registered and not locked, NOT a stored bit	746-748
+AHB1Clock(RCC_AHB1ENR)	0x0D8	ETH1TXEN	16	16	computed-read	0x0	write: if ETH1TX registered in RCC -> sysbus.SetPeripheralEnabled(peri,value) (lock/unlock on bus), else no-op (Noisy log); read: IsPeripheralEnabled(ETH1TX) = true iff registered and not locked, NOT a stored bit	743-745
+AHB1Clock(RCC_AHB1ENR)	0x0D8	ETH1MACEN	15	15	computed-read	0x0	write: if ETH1MAC registered in RCC -> sysbus.SetPeripheralEnabled(peri,value) (lock/unlock on bus), else no-op (Noisy log); read: IsPeripheralEnabled(ETH1MAC) = true iff registered and not locked, NOT a stored bit	740-742
+AHB1Clock(RCC_AHB1ENR)	0x0D8	RESERVED	14	6	reserved	0x0	reserved: write discarded (unhandled-write log); read = reset-value bits = 0x0 (not forced to 0; framework read)	739
+AHB1Clock(RCC_AHB1ENR)	0x0D8	ADC12EN	5	5	computed-read	0x0	write: if ADC12 registered in RCC -> sysbus.SetPeripheralEnabled(peri,value) (lock/unlock on bus), else no-op (Noisy log); read: IsPeripheralEnabled(ADC12) = true iff registered and not locked, NOT a stored bit	736-738
+AHB1Clock(RCC_AHB1ENR)	0x0D8	(gap: no field, tag or reserved)	4	4	other	0x0	unhandled bits: write has no effect, no field state; read = reset-value bits 0x0	-
+AHB1Clock(RCC_AHB1ENR)	0x0D8	RESERVED	3	2	reserved	0x0	reserved: write discarded (unhandled-write log); read = reset-value bits = 0x0 (not forced to 0; framework read)	735
+AHB1Clock(RCC_AHB1ENR)	0x0D8	DMA2EN	1	1	computed-read	0x0	write: if DMA2 registered in RCC -> sysbus.SetPeripheralEnabled(peri,value) (lock/unlock on bus), else no-op (Noisy log); read: IsPeripheralEnabled(DMA2) = true iff registered and not locked, NOT a stored bit	732-734
+AHB1Clock(RCC_AHB1ENR)	0x0D8	DMA1EN	0	0	computed-read	0x0	write: if DMA1 registered in RCC -> sysbus.SetPeripheralEnabled(peri,value) (lock/unlock on bus), else no-op (Noisy log); read: IsPeripheralEnabled(DMA1) = true iff registered and not locked, NOT a stored bit	729-731
+AHB2Clock(RCC_AHB2ENR)	0x0DC	SRAM3EN	31	31	computed-read	0x0	write: if SRAM3 registered in RCC -> sysbus.SetPeripheralEnabled(peri,value) (lock/unlock on bus), else no-op (Noisy log); read: IsPeripheralEnabled(SRAM3) = true iff registered and not locked, NOT a stored bit	788-790
+AHB2Clock(RCC_AHB2ENR)	0x0DC	SRAM2EN	30	30	computed-read	0x0	write: if SRAM2 registered in RCC -> sysbus.SetPeripheralEnabled(peri,value) (lock/unlock on bus), else no-op (Noisy log); read: IsPeripheralEnabled(SRAM2) = true iff registered and not locked, NOT a stored bit	785-787
+AHB2Clock(RCC_AHB2ENR)	0x0DC	SRAM1EN	29	29	computed-read	0x0	write: if SRAM1 registered in RCC -> sysbus.SetPeripheralEnabled(peri,value) (lock/unlock on bus), else no-op (Noisy log); read: IsPeripheralEnabled(SRAM1) = true iff registered and not locked, NOT a stored bit	782-784
+AHB2Clock(RCC_AHB2ENR)	0x0DC	RESERVED	28	10	reserved	0x0	reserved: write discarded (unhandled-write log); read = reset-value bits = 0x0 (not forced to 0; framework read)	781
+AHB2Clock(RCC_AHB2ENR)	0x0DC	SDMMC2EN	9	9	computed-read	0x0	write: if SDMMC2 registered in RCC -> sysbus.SetPeripheralEnabled(peri,value) (lock/unlock on bus), else no-op (Noisy log); read: IsPeripheralEnabled(SDMMC2) = true iff registered and not locked, NOT a stored bit	778-780
+AHB2Clock(RCC_AHB2ENR)	0x0DC	RESERVED	8	7	reserved	0x0	reserved: write discarded (unhandled-write log); read = reset-value bits = 0x0 (not forced to 0; framework read)	777
+AHB2Clock(RCC_AHB2ENR)	0x0DC	RNGEN	6	6	computed-read	0x0	write: if RNG registered in RCC -> sysbus.SetPeripheralEnabled(peri,value) (lock/unlock on bus), else no-op (Noisy log); read: IsPeripheralEnabled(RNG) = true iff registered and not locked, NOT a stored bit	774-776
+AHB2Clock(RCC_AHB2ENR)	0x0DC	HASHEN	5	5	computed-read	0x0	write: if HASH registered in RCC -> sysbus.SetPeripheralEnabled(peri,value) (lock/unlock on bus), else no-op (Noisy log); read: IsPeripheralEnabled(HASH) = true iff registered and not locked, NOT a stored bit	771-773
+AHB2Clock(RCC_AHB2ENR)	0x0DC	CRYPTEN	4	4	computed-read	0x0	write: if CRYPT registered in RCC -> sysbus.SetPeripheralEnabled(peri,value) (lock/unlock on bus), else no-op (Noisy log); read: IsPeripheralEnabled(CRYPT) = true iff registered and not locked, NOT a stored bit	768-770
+AHB2Clock(RCC_AHB2ENR)	0x0DC	RESERVED	3	1	reserved	0x0	reserved: write discarded (unhandled-write log); read = reset-value bits = 0x0 (not forced to 0; framework read)	767
+AHB2Clock(RCC_AHB2ENR)	0x0DC	DCMIEN	0	0	computed-read	0x0	write: if DCMI registered in RCC -> sysbus.SetPeripheralEnabled(peri,value) (lock/unlock on bus), else no-op (Noisy log); read: IsPeripheralEnabled(DCMI) = true iff registered and not locked, NOT a stored bit	764-766
+AHB4Clock(RCC_AHB4ENR)	0x0E0	RESERVED	31	29	reserved	0x0	reserved: write discarded (unhandled-write log); read = reset-value bits = 0x0 (not forced to 0; framework read)	844
+AHB4Clock(RCC_AHB4ENR)	0x0E0	BKPRAMEN	28	28	computed-read	0x0	write: if BKPRAM registered in RCC -> sysbus.SetPeripheralEnabled(peri,value) (lock/unlock on bus), else no-op (Noisy log); read: IsPeripheralEnabled(BKPRAM) = true iff registered and not locked, NOT a stored bit	841-843
+AHB4Clock(RCC_AHB4ENR)	0x0E0	RESERVED	27	26	reserved	0x0	reserved: write discarded (unhandled-write log); read = reset-value bits = 0x0 (not forced to 0; framework read)	840
+AHB4Clock(RCC_AHB4ENR)	0x0E0	HSEMEN	25	25	computed-read	0x0	write: if HSEM registered in RCC -> sysbus.SetPeripheralEnabled(peri,value) (lock/unlock on bus), else no-op (Noisy log); read: IsPeripheralEnabled(HSEM) = true iff registered and not locked, NOT a stored bit	837-839
+AHB4Clock(RCC_AHB4ENR)	0x0E0	ADC3EN	24	24	computed-read	0x0	write: if ADC3 registered in RCC -> sysbus.SetPeripheralEnabled(peri,value) (lock/unlock on bus), else no-op (Noisy log); read: IsPeripheralEnabled(ADC3) = true iff registered and not locked, NOT a stored bit	834-836
+AHB4Clock(RCC_AHB4ENR)	0x0E0	RESERVED	23	22	reserved	0x0	reserved: write discarded (unhandled-write log); read = reset-value bits = 0x0 (not forced to 0; framework read)	833
+AHB4Clock(RCC_AHB4ENR)	0x0E0	BDMAEN	21	21	computed-read	0x0	write: if BDMA registered in RCC -> sysbus.SetPeripheralEnabled(peri,value) (lock/unlock on bus), else no-op (Noisy log); read: IsPeripheralEnabled(BDMA) = true iff registered and not locked, NOT a stored bit	830-832
+AHB4Clock(RCC_AHB4ENR)	0x0E0	RESERVED	20	20	reserved	0x0	reserved: write discarded (unhandled-write log); read = reset-value bits = 0x0 (not forced to 0; framework read)	829
+AHB4Clock(RCC_AHB4ENR)	0x0E0	CRCEN	19	19	computed-read	0x0	write: if CRC registered in RCC -> sysbus.SetPeripheralEnabled(peri,value) (lock/unlock on bus), else no-op (Noisy log); read: IsPeripheralEnabled(CRC) = true iff registered and not locked, NOT a stored bit	826-828
+AHB4Clock(RCC_AHB4ENR)	0x0E0	RESERVED	18	11	reserved	0x0	reserved: write discarded (unhandled-write log); read = reset-value bits = 0x0 (not forced to 0; framework read)	825
+AHB4Clock(RCC_AHB4ENR)	0x0E0	GPIOKEN	10	10	computed-read	0x0	write: if GPIOK registered in RCC -> sysbus.SetPeripheralEnabled(peri,value) (lock/unlock on bus), else no-op (Noisy log); read: IsPeripheralEnabled(GPIOK) = true iff registered and not locked, NOT a stored bit	822-824
+AHB4Clock(RCC_AHB4ENR)	0x0E0	GPIOJEN	9	9	computed-read	0x0	write: if GPIOJ registered in RCC -> sysbus.SetPeripheralEnabled(peri,value) (lock/unlock on bus), else no-op (Noisy log); read: IsPeripheralEnabled(GPIOJ) = true iff registered and not locked, NOT a stored bit	819-821
+AHB4Clock(RCC_AHB4ENR)	0x0E0	GPIOIEN	8	8	computed-read	0x0	write: if GPIOI registered in RCC -> sysbus.SetPeripheralEnabled(peri,value) (lock/unlock on bus), else no-op (Noisy log); read: IsPeripheralEnabled(GPIOI) = true iff registered and not locked, NOT a stored bit	816-818
+AHB4Clock(RCC_AHB4ENR)	0x0E0	GPIOHEN	7	7	computed-read	0x0	write: if GPIOH registered in RCC -> sysbus.SetPeripheralEnabled(peri,value) (lock/unlock on bus), else no-op (Noisy log); read: IsPeripheralEnabled(GPIOH) = true iff registered and not locked, NOT a stored bit	813-815
+AHB4Clock(RCC_AHB4ENR)	0x0E0	GPIOGEN	6	6	computed-read	0x0	write: if GPIOG registered in RCC -> sysbus.SetPeripheralEnabled(peri,value) (lock/unlock on bus), else no-op (Noisy log); read: IsPeripheralEnabled(GPIOG) = true iff registered and not locked, NOT a stored bit	810-812
+AHB4Clock(RCC_AHB4ENR)	0x0E0	GPIOFEN	5	5	computed-read	0x0	write: if GPIOF registered in RCC -> sysbus.SetPeripheralEnabled(peri,value) (lock/unlock on bus), else no-op (Noisy log); read: IsPeripheralEnabled(GPIOF) = true iff registered and not locked, NOT a stored bit	807-809
+AHB4Clock(RCC_AHB4ENR)	0x0E0	GPIOEEN	4	4	computed-read	0x0	write: if GPIOE registered in RCC -> sysbus.SetPeripheralEnabled(peri,value) (lock/unlock on bus), else no-op (Noisy log); read: IsPeripheralEnabled(GPIOE) = true iff registered and not locked, NOT a stored bit	804-806
+AHB4Clock(RCC_AHB4ENR)	0x0E0	GPIODEN	3	3	computed-read	0x0	write: if GPIOD registered in RCC -> sysbus.SetPeripheralEnabled(peri,value) (lock/unlock on bus), else no-op (Noisy log); read: IsPeripheralEnabled(GPIOD) = true iff registered and not locked, NOT a stored bit	801-803
+AHB4Clock(RCC_AHB4ENR)	0x0E0	GPIOCEN	2	2	computed-read	0x0	write: if GPIOC registered in RCC -> sysbus.SetPeripheralEnabled(peri,value) (lock/unlock on bus), else no-op (Noisy log); read: IsPeripheralEnabled(GPIOC) = true iff registered and not locked, NOT a stored bit	798-800
+AHB4Clock(RCC_AHB4ENR)	0x0E0	GPIOBEN	1	1	computed-read	0x0	write: if GPIOB registered in RCC -> sysbus.SetPeripheralEnabled(peri,value) (lock/unlock on bus), else no-op (Noisy log); read: IsPeripheralEnabled(GPIOB) = true iff registered and not locked, NOT a stored bit	795-797
+AHB4Clock(RCC_AHB4ENR)	0x0E0	GPIOAEN	0	0	computed-read	0x0	write: if GPIOA registered in RCC -> sysbus.SetPeripheralEnabled(peri,value) (lock/unlock on bus), else no-op (Noisy log); read: IsPeripheralEnabled(GPIOA) = true iff registered and not locked, NOT a stored bit	792-794
+APB3Clock(RCC_APB3ENR)	0x0E4	RESERVED	31	7	reserved	0x0	reserved: write discarded (unhandled-write log); read = reset-value bits = 0x0 (not forced to 0; framework read)	854
+APB3Clock(RCC_APB3ENR)	0x0E4	WWDG1EN	6	6	computed-read	0x0	write: if WWDG1 registered in RCC -> sysbus.SetPeripheralEnabled(peri,value) (lock/unlock on bus), else no-op (Noisy log); read: IsPeripheralEnabled(WWDG1) = true iff registered and not locked, NOT a stored bit	851-853
+APB3Clock(RCC_APB3ENR)	0x0E4	RESERVED	5	4	reserved	0x0	reserved: write discarded (unhandled-write log); read = reset-value bits = 0x0 (not forced to 0; framework read)	850
+APB3Clock(RCC_APB3ENR)	0x0E4	LTDCEN	3	3	computed-read	0x0	write: if LTDC registered in RCC -> sysbus.SetPeripheralEnabled(peri,value) (lock/unlock on bus), else no-op (Noisy log); read: IsPeripheralEnabled(LTDC) = true iff registered and not locked, NOT a stored bit	847-849
+APB3Clock(RCC_APB3ENR)	0x0E4	(gap: no field, tag or reserved)	2	2	other	0x0	unhandled bits: write has no effect, no field state; read = reset-value bits 0x0	-
+APB3Clock(RCC_APB3ENR)	0x0E4	RESERVED	1	0	reserved	0x0	reserved: write discarded (unhandled-write log); read = reset-value bits = 0x0 (not forced to 0; framework read)	846
+APB1ClockLow(RCC_APB1LENR)	0x0E8	UART8EN	31	31	computed-read	0x0	write: if UART8 registered in RCC -> sysbus.SetPeripheralEnabled(peri,value) (lock/unlock on bus), else no-op (Noisy log); read: IsPeripheralEnabled(UART8) = true iff registered and not locked, NOT a stored bit	928-930
+APB1ClockLow(RCC_APB1LENR)	0x0E8	UART7EN	30	30	computed-read	0x0	write: if UART7 registered in RCC -> sysbus.SetPeripheralEnabled(peri,value) (lock/unlock on bus), else no-op (Noisy log); read: IsPeripheralEnabled(UART7) = true iff registered and not locked, NOT a stored bit	925-927
+APB1ClockLow(RCC_APB1LENR)	0x0E8	DAC12EN	29	29	computed-read	0x0	write: if DAC12 registered in RCC -> sysbus.SetPeripheralEnabled(peri,value) (lock/unlock on bus), else no-op (Noisy log); read: IsPeripheralEnabled(DAC12) = true iff registered and not locked, NOT a stored bit	922-924
+APB1ClockLow(RCC_APB1LENR)	0x0E8	RESERVED	28	28	reserved	0x0	reserved: write discarded (unhandled-write log); read = reset-value bits = 0x0 (not forced to 0; framework read)	921
+APB1ClockLow(RCC_APB1LENR)	0x0E8	CECEN	27	27	computed-read	0x0	write: if CEC registered in RCC -> sysbus.SetPeripheralEnabled(peri,value) (lock/unlock on bus), else no-op (Noisy log); read: IsPeripheralEnabled(CEC) = true iff registered and not locked, NOT a stored bit	918-920
+APB1ClockLow(RCC_APB1LENR)	0x0E8	RESERVED	26	24	reserved	0x0	reserved: write discarded (unhandled-write log); read = reset-value bits = 0x0 (not forced to 0; framework read)	917
+APB1ClockLow(RCC_APB1LENR)	0x0E8	I2C3EN	23	23	computed-read	0x0	write: if I2C3 registered in RCC -> sysbus.SetPeripheralEnabled(peri,value) (lock/unlock on bus), else no-op (Noisy log); read: IsPeripheralEnabled(I2C3) = true iff registered and not locked, NOT a stored bit	914-916
+APB1ClockLow(RCC_APB1LENR)	0x0E8	I2C2EN	22	22	computed-read	0x0	write: if I2C2 registered in RCC -> sysbus.SetPeripheralEnabled(peri,value) (lock/unlock on bus), else no-op (Noisy log); read: IsPeripheralEnabled(I2C2) = true iff registered and not locked, NOT a stored bit	911-913
+APB1ClockLow(RCC_APB1LENR)	0x0E8	I2C1EN	21	21	computed-read	0x0	write: if I2C1 registered in RCC -> sysbus.SetPeripheralEnabled(peri,value) (lock/unlock on bus), else no-op (Noisy log); read: IsPeripheralEnabled(I2C1) = true iff registered and not locked, NOT a stored bit	908-910
+APB1ClockLow(RCC_APB1LENR)	0x0E8	UART5EN	20	20	computed-read	0x0	write: if UART5 registered in RCC -> sysbus.SetPeripheralEnabled(peri,value) (lock/unlock on bus), else no-op (Noisy log); read: IsPeripheralEnabled(UART5) = true iff registered and not locked, NOT a stored bit	905-907
+APB1ClockLow(RCC_APB1LENR)	0x0E8	UART4EN	19	19	computed-read	0x0	write: if UART4 registered in RCC -> sysbus.SetPeripheralEnabled(peri,value) (lock/unlock on bus), else no-op (Noisy log); read: IsPeripheralEnabled(UART4) = true iff registered and not locked, NOT a stored bit	902-904
+APB1ClockLow(RCC_APB1LENR)	0x0E8	USART3EN	18	18	computed-read	0x0	write: if USART3 registered in RCC -> sysbus.SetPeripheralEnabled(peri,value) (lock/unlock on bus), else no-op (Noisy log); read: IsPeripheralEnabled(USART3) = true iff registered and not locked, NOT a stored bit	899-901
+APB1ClockLow(RCC_APB1LENR)	0x0E8	USART2EN	17	17	computed-read	0x0	write: if USART2 registered in RCC -> sysbus.SetPeripheralEnabled(peri,value) (lock/unlock on bus), else no-op (Noisy log); read: IsPeripheralEnabled(USART2) = true iff registered and not locked, NOT a stored bit	896-898
+APB1ClockLow(RCC_APB1LENR)	0x0E8	SPDIFRXEN	16	16	computed-read	0x0	write: if SPDIFRX registered in RCC -> sysbus.SetPeripheralEnabled(peri,value) (lock/unlock on bus), else no-op (Noisy log); read: IsPeripheralEnabled(SPDIFRX) = true iff registered and not locked, NOT a stored bit	893-895
+APB1ClockLow(RCC_APB1LENR)	0x0E8	SPI3EN	15	15	computed-read	0x0	write: if SPI3 registered in RCC -> sysbus.SetPeripheralEnabled(peri,value) (lock/unlock on bus), else no-op (Noisy log); read: IsPeripheralEnabled(SPI3) = true iff registered and not locked, NOT a stored bit	890-892
+APB1ClockLow(RCC_APB1LENR)	0x0E8	SPI2EN	14	14	computed-read	0x0	write: if SPI2 registered in RCC -> sysbus.SetPeripheralEnabled(peri,value) (lock/unlock on bus), else no-op (Noisy log); read: IsPeripheralEnabled(SPI2) = true iff registered and not locked, NOT a stored bit	887-889
+APB1ClockLow(RCC_APB1LENR)	0x0E8	RESERVED	13	10	reserved	0x0	reserved: write discarded (unhandled-write log); read = reset-value bits = 0x0 (not forced to 0; framework read)	886
+APB1ClockLow(RCC_APB1LENR)	0x0E8	LPTIM1EN	9	9	computed-read	0x0	write: if LPTIM1 registered in RCC -> sysbus.SetPeripheralEnabled(peri,value) (lock/unlock on bus), else no-op (Noisy log); read: IsPeripheralEnabled(LPTIM1) = true iff registered and not locked, NOT a stored bit	883-885
+APB1ClockLow(RCC_APB1LENR)	0x0E8	TIM14EN	8	8	computed-read	0x0	write: if TIM14 registered in RCC -> sysbus.SetPeripheralEnabled(peri,value) (lock/unlock on bus), else no-op (Noisy log); read: IsPeripheralEnabled(TIM14) = true iff registered and not locked, NOT a stored bit	880-882
+APB1ClockLow(RCC_APB1LENR)	0x0E8	TIM13EN	7	7	computed-read	0x0	write: if TIM13 registered in RCC -> sysbus.SetPeripheralEnabled(peri,value) (lock/unlock on bus), else no-op (Noisy log); read: IsPeripheralEnabled(TIM13) = true iff registered and not locked, NOT a stored bit	877-879
+APB1ClockLow(RCC_APB1LENR)	0x0E8	TIM12EN	6	6	computed-read	0x0	write: if TIM12 registered in RCC -> sysbus.SetPeripheralEnabled(peri,value) (lock/unlock on bus), else no-op (Noisy log); read: IsPeripheralEnabled(TIM12) = true iff registered and not locked, NOT a stored bit	874-876
+APB1ClockLow(RCC_APB1LENR)	0x0E8	TIM7EN	5	5	computed-read	0x0	write: if TIM7 registered in RCC -> sysbus.SetPeripheralEnabled(peri,value) (lock/unlock on bus), else no-op (Noisy log); read: IsPeripheralEnabled(TIM7) = true iff registered and not locked, NOT a stored bit	871-873
+APB1ClockLow(RCC_APB1LENR)	0x0E8	TIM6EN	4	4	computed-read	0x0	write: if TIM6 registered in RCC -> sysbus.SetPeripheralEnabled(peri,value) (lock/unlock on bus), else no-op (Noisy log); read: IsPeripheralEnabled(TIM6) = true iff registered and not locked, NOT a stored bit	868-870
+APB1ClockLow(RCC_APB1LENR)	0x0E8	TIM5EN	3	3	computed-read	0x0	write: if TIM5 registered in RCC -> sysbus.SetPeripheralEnabled(peri,value) (lock/unlock on bus), else no-op (Noisy log); read: IsPeripheralEnabled(TIM5) = true iff registered and not locked, NOT a stored bit	865-867
+APB1ClockLow(RCC_APB1LENR)	0x0E8	TIM4EN	2	2	computed-read	0x0	write: if TIM4 registered in RCC -> sysbus.SetPeripheralEnabled(peri,value) (lock/unlock on bus), else no-op (Noisy log); read: IsPeripheralEnabled(TIM4) = true iff registered and not locked, NOT a stored bit	862-864
+APB1ClockLow(RCC_APB1LENR)	0x0E8	TIM3EN	1	1	computed-read	0x0	write: if TIM3 registered in RCC -> sysbus.SetPeripheralEnabled(peri,value) (lock/unlock on bus), else no-op (Noisy log); read: IsPeripheralEnabled(TIM3) = true iff registered and not locked, NOT a stored bit	859-861
+APB1ClockLow(RCC_APB1LENR)	0x0E8	TIM2EN	0	0	computed-read	0x0	write: if TIM2 registered in RCC -> sysbus.SetPeripheralEnabled(peri,value) (lock/unlock on bus), else no-op (Noisy log); read: IsPeripheralEnabled(TIM2) = true iff registered and not locked, NOT a stored bit	856-858
+APB1ClockHigh(RCC_APB1HENR)	0x0EC	RESERVED	31	9	reserved	0x0	reserved: write discarded (unhandled-write log); read = reset-value bits = 0x0 (not forced to 0; framework read)	950
+APB1ClockHigh(RCC_APB1HENR)	0x0EC	FDCANEN	8	8	computed-read	0x0	write: if FDCAN registered in RCC -> sysbus.SetPeripheralEnabled(peri,value) (lock/unlock on bus), else no-op (Noisy log); read: IsPeripheralEnabled(FDCAN) = true iff registered and not locked, NOT a stored bit	947-949
+APB1ClockHigh(RCC_APB1HENR)	0x0EC	RESERVED	7	6	reserved	0x0	reserved: write discarded (unhandled-write log); read = reset-value bits = 0x0 (not forced to 0; framework read)	946
+APB1ClockHigh(RCC_APB1HENR)	0x0EC	MDIOSEN	5	5	computed-read	0x0	write: if MDIOS registered in RCC -> sysbus.SetPeripheralEnabled(peri,value) (lock/unlock on bus), else no-op (Noisy log); read: IsPeripheralEnabled(MDIOS) = true iff registered and not locked, NOT a stored bit	943-945
+APB1ClockHigh(RCC_APB1HENR)	0x0EC	OPAMPEN	4	4	computed-read	0x0	write: if OPAMP registered in RCC -> sysbus.SetPeripheralEnabled(peri,value) (lock/unlock on bus), else no-op (Noisy log); read: IsPeripheralEnabled(OPAMP) = true iff registered and not locked, NOT a stored bit	940-942
+APB1ClockHigh(RCC_APB1HENR)	0x0EC	RESERVED	3	3	reserved	0x0	reserved: write discarded (unhandled-write log); read = reset-value bits = 0x0 (not forced to 0; framework read)	939
+APB1ClockHigh(RCC_APB1HENR)	0x0EC	SWPEN	2	2	computed-read	0x0	write: if SWP registered in RCC -> sysbus.SetPeripheralEnabled(peri,value) (lock/unlock on bus), else no-op (Noisy log); read: IsPeripheralEnabled(SWP) = true iff registered and not locked, NOT a stored bit	936-938
+APB1ClockHigh(RCC_APB1HENR)	0x0EC	CRSEN	1	1	computed-read	0x0	write: if CRS registered in RCC -> sysbus.SetPeripheralEnabled(peri,value) (lock/unlock on bus), else no-op (Noisy log); read: IsPeripheralEnabled(CRS) = true iff registered and not locked, NOT a stored bit	933-935
+APB1ClockHigh(RCC_APB1HENR)	0x0EC	RESERVED	0	0	reserved	0x0	reserved: write discarded (unhandled-write log); read = reset-value bits = 0x0 (not forced to 0; framework read)	932
+APB2Clock(RCC_APB2ENR)	0x0F0	RESERVED	31	30	reserved	0x0	reserved: write discarded (unhandled-write log); read = reset-value bits = 0x0 (not forced to 0; framework read)	1003
+APB2Clock(RCC_APB2ENR)	0x0F0	HRTIMEN	29	29	computed-read	0x0	write: if HRTIM registered in RCC -> sysbus.SetPeripheralEnabled(peri,value) (lock/unlock on bus), else no-op (Noisy log); read: IsPeripheralEnabled(HRTIM) = true iff registered and not locked, NOT a stored bit	1000-1002
+APB2Clock(RCC_APB2ENR)	0x0F0	DFSDM1EN	28	28	computed-read	0x0	write: if DFSDM1 registered in RCC -> sysbus.SetPeripheralEnabled(peri,value) (lock/unlock on bus), else no-op (Noisy log); read: IsPeripheralEnabled(DFSDM1) = true iff registered and not locked, NOT a stored bit	997-999
+APB2Clock(RCC_APB2ENR)	0x0F0	RESERVED	27	25	reserved	0x0	reserved: write discarded (unhandled-write log); read = reset-value bits = 0x0 (not forced to 0; framework read)	996
+APB2Clock(RCC_APB2ENR)	0x0F0	SAI3EN	24	24	computed-read	0x0	write: if SAI3 registered in RCC -> sysbus.SetPeripheralEnabled(peri,value) (lock/unlock on bus), else no-op (Noisy log); read: IsPeripheralEnabled(SAI3) = true iff registered and not locked, NOT a stored bit	993-995
+APB2Clock(RCC_APB2ENR)	0x0F0	SAI2EN	23	23	computed-read	0x0	write: if SAI2 registered in RCC -> sysbus.SetPeripheralEnabled(peri,value) (lock/unlock on bus), else no-op (Noisy log); read: IsPeripheralEnabled(SAI2) = true iff registered and not locked, NOT a stored bit	990-992
+APB2Clock(RCC_APB2ENR)	0x0F0	SAI1EN	22	22	computed-read	0x0	write: if SAI1 registered in RCC -> sysbus.SetPeripheralEnabled(peri,value) (lock/unlock on bus), else no-op (Noisy log); read: IsPeripheralEnabled(SAI1) = true iff registered and not locked, NOT a stored bit	987-989
+APB2Clock(RCC_APB2ENR)	0x0F0	RESERVED	21	21	reserved	0x0	reserved: write discarded (unhandled-write log); read = reset-value bits = 0x0 (not forced to 0; framework read)	986
+APB2Clock(RCC_APB2ENR)	0x0F0	SPI5EN	20	20	computed-read	0x0	write: if SPI5 registered in RCC -> sysbus.SetPeripheralEnabled(peri,value) (lock/unlock on bus), else no-op (Noisy log); read: IsPeripheralEnabled(SPI5) = true iff registered and not locked, NOT a stored bit	983-985
+APB2Clock(RCC_APB2ENR)	0x0F0	RESERVED	19	19	reserved	0x0	reserved: write discarded (unhandled-write log); read = reset-value bits = 0x0 (not forced to 0; framework read)	982
+APB2Clock(RCC_APB2ENR)	0x0F0	TIM17EN	18	18	computed-read	0x0	write: if TIM17 registered in RCC -> sysbus.SetPeripheralEnabled(peri,value) (lock/unlock on bus), else no-op (Noisy log); read: IsPeripheralEnabled(TIM17) = true iff registered and not locked, NOT a stored bit	979-981
+APB2Clock(RCC_APB2ENR)	0x0F0	TIM16EN	17	17	computed-read	0x0	write: if TIM16 registered in RCC -> sysbus.SetPeripheralEnabled(peri,value) (lock/unlock on bus), else no-op (Noisy log); read: IsPeripheralEnabled(TIM16) = true iff registered and not locked, NOT a stored bit	976-978
+APB2Clock(RCC_APB2ENR)	0x0F0	TIM15EN	16	16	computed-read	0x0	write: if TIM15 registered in RCC -> sysbus.SetPeripheralEnabled(peri,value) (lock/unlock on bus), else no-op (Noisy log); read: IsPeripheralEnabled(TIM15) = true iff registered and not locked, NOT a stored bit	973-975
+APB2Clock(RCC_APB2ENR)	0x0F0	RESERVED	15	14	reserved	0x0	reserved: write discarded (unhandled-write log); read = reset-value bits = 0x0 (not forced to 0; framework read)	972
+APB2Clock(RCC_APB2ENR)	0x0F0	SPI4EN	13	13	computed-read	0x0	write: if SPI4 registered in RCC -> sysbus.SetPeripheralEnabled(peri,value) (lock/unlock on bus), else no-op (Noisy log); read: IsPeripheralEnabled(SPI4) = true iff registered and not locked, NOT a stored bit	969-971
+APB2Clock(RCC_APB2ENR)	0x0F0	SPI1EN	12	12	computed-read	0x0	write: if SPI1 registered in RCC -> sysbus.SetPeripheralEnabled(peri,value) (lock/unlock on bus), else no-op (Noisy log); read: IsPeripheralEnabled(SPI1) = true iff registered and not locked, NOT a stored bit	966-968
+APB2Clock(RCC_APB2ENR)	0x0F0	RESERVED	11	6	reserved	0x0	reserved: write discarded (unhandled-write log); read = reset-value bits = 0x0 (not forced to 0; framework read)	965
+APB2Clock(RCC_APB2ENR)	0x0F0	USART6EN	5	5	computed-read	0x0	write: if USART6 registered in RCC -> sysbus.SetPeripheralEnabled(peri,value) (lock/unlock on bus), else no-op (Noisy log); read: IsPeripheralEnabled(USART6) = true iff registered and not locked, NOT a stored bit	962-964
+APB2Clock(RCC_APB2ENR)	0x0F0	USART1EN	4	4	computed-read	0x0	write: if USART1 registered in RCC -> sysbus.SetPeripheralEnabled(peri,value) (lock/unlock on bus), else no-op (Noisy log); read: IsPeripheralEnabled(USART1) = true iff registered and not locked, NOT a stored bit	959-961
+APB2Clock(RCC_APB2ENR)	0x0F0	RESERVED	3	2	reserved	0x0	reserved: write discarded (unhandled-write log); read = reset-value bits = 0x0 (not forced to 0; framework read)	958
+APB2Clock(RCC_APB2ENR)	0x0F0	TIM8EN	1	1	computed-read	0x0	write: if TIM8 registered in RCC -> sysbus.SetPeripheralEnabled(peri,value) (lock/unlock on bus), else no-op (Noisy log); read: IsPeripheralEnabled(TIM8) = true iff registered and not locked, NOT a stored bit	955-957
+APB2Clock(RCC_APB2ENR)	0x0F0	TIM1EN	0	0	computed-read	0x0	write: if TIM1 registered in RCC -> sysbus.SetPeripheralEnabled(peri,value) (lock/unlock on bus), else no-op (Noisy log); read: IsPeripheralEnabled(TIM1) = true iff registered and not locked, NOT a stored bit	952-954
+APB4Clock(RCC_APB4ENR)	0x0F4	(gap: no field, tag or reserved)	31	31	other	0x0	unhandled bits: write has no effect, no field state; read = reset-value bits 0x0	-
+APB4Clock(RCC_APB4ENR)	0x0F4	RESERVED	30	22	reserved	0x0	reserved: write discarded (unhandled-write log); read = reset-value bits = 0x0 (not forced to 0; framework read)	1046
+APB4Clock(RCC_APB4ENR)	0x0F4	SAI4EN	21	21	computed-read	0x0	write: if SAI4 registered in RCC -> sysbus.SetPeripheralEnabled(peri,value) (lock/unlock on bus), else no-op (Noisy log); read: IsPeripheralEnabled(SAI4) = true iff registered and not locked, NOT a stored bit	1043-1045
+APB4Clock(RCC_APB4ENR)	0x0F4	RESERVED	20	17	reserved	0x0	reserved: write discarded (unhandled-write log); read = reset-value bits = 0x0 (not forced to 0; framework read)	1042
+APB4Clock(RCC_APB4ENR)	0x0F4	RTCAPBEN	16	16	tag	0x1	tag: write discarded (unhandled-write log); read = reset-value bits = 0x1 (not forced to 0; framework read)	1041
+APB4Clock(RCC_APB4ENR)	0x0F4	VREFEN	15	15	computed-read	0x0	write: if VREF registered in RCC -> sysbus.SetPeripheralEnabled(peri,value) (lock/unlock on bus), else no-op (Noisy log); read: IsPeripheralEnabled(VREF) = true iff registered and not locked, NOT a stored bit	1038-1040
+APB4Clock(RCC_APB4ENR)	0x0F4	COMP12EN	14	14	computed-read	0x0	write: if COMP12 registered in RCC -> sysbus.SetPeripheralEnabled(peri,value) (lock/unlock on bus), else no-op (Noisy log); read: IsPeripheralEnabled(COMP12) = true iff registered and not locked, NOT a stored bit	1035-1037
+APB4Clock(RCC_APB4ENR)	0x0F4	RESERVED	13	13	reserved	0x0	reserved: write discarded (unhandled-write log); read = reset-value bits = 0x0 (not forced to 0; framework read)	1034
+APB4Clock(RCC_APB4ENR)	0x0F4	LPTIM5EN	12	12	computed-read	0x0	write: if LPTIM5 registered in RCC -> sysbus.SetPeripheralEnabled(peri,value) (lock/unlock on bus), else no-op (Noisy log); read: IsPeripheralEnabled(LPTIM5) = true iff registered and not locked, NOT a stored bit	1031-1033
+APB4Clock(RCC_APB4ENR)	0x0F4	LPTIM4EN	11	11	computed-read	0x0	write: if LPTIM4 registered in RCC -> sysbus.SetPeripheralEnabled(peri,value) (lock/unlock on bus), else no-op (Noisy log); read: IsPeripheralEnabled(LPTIM4) = true iff registered and not locked, NOT a stored bit	1028-1030
+APB4Clock(RCC_APB4ENR)	0x0F4	LPTIM3EN	10	10	computed-read	0x0	write: if LPTIM3 registered in RCC -> sysbus.SetPeripheralEnabled(peri,value) (lock/unlock on bus), else no-op (Noisy log); read: IsPeripheralEnabled(LPTIM3) = true iff registered and not locked, NOT a stored bit	1025-1027
+APB4Clock(RCC_APB4ENR)	0x0F4	LPTIM2EN	9	9	computed-read	0x0	write: if LPTIM2 registered in RCC -> sysbus.SetPeripheralEnabled(peri,value) (lock/unlock on bus), else no-op (Noisy log); read: IsPeripheralEnabled(LPTIM2) = true iff registered and not locked, NOT a stored bit	1022-1024
+APB4Clock(RCC_APB4ENR)	0x0F4	RESERVED	8	8	reserved	0x0	reserved: write discarded (unhandled-write log); read = reset-value bits = 0x0 (not forced to 0; framework read)	1021
+APB4Clock(RCC_APB4ENR)	0x0F4	I2C4EN	7	7	computed-read	0x0	write: if I2C4 registered in RCC -> sysbus.SetPeripheralEnabled(peri,value) (lock/unlock on bus), else no-op (Noisy log); read: IsPeripheralEnabled(I2C4) = true iff registered and not locked, NOT a stored bit	1018-1020
+APB4Clock(RCC_APB4ENR)	0x0F4	RESERVED	6	6	reserved	0x0	reserved: write discarded (unhandled-write log); read = reset-value bits = 0x0 (not forced to 0; framework read)	1017
+APB4Clock(RCC_APB4ENR)	0x0F4	SPI6EN	5	5	computed-read	0x0	write: if SPI6 registered in RCC -> sysbus.SetPeripheralEnabled(peri,value) (lock/unlock on bus), else no-op (Noisy log); read: IsPeripheralEnabled(SPI6) = true iff registered and not locked, NOT a stored bit	1014-1016
+APB4Clock(RCC_APB4ENR)	0x0F4	RESERVED	4	4	reserved	0x0	reserved: write discarded (unhandled-write log); read = reset-value bits = 0x0 (not forced to 0; framework read)	1013
+APB4Clock(RCC_APB4ENR)	0x0F4	LPUART1EN	3	3	computed-read	0x0	write: if LPUART1 registered in RCC -> sysbus.SetPeripheralEnabled(peri,value) (lock/unlock on bus), else no-op (Noisy log); read: IsPeripheralEnabled(LPUART1) = true iff registered and not locked, NOT a stored bit	1010-1012
+APB4Clock(RCC_APB4ENR)	0x0F4	RESERVED	2	2	reserved	0x0	reserved: write discarded (unhandled-write log); read = reset-value bits = 0x0 (not forced to 0; framework read)	1009
+APB4Clock(RCC_APB4ENR)	0x0F4	SYSCFGEN	1	1	computed-read	0x0	write: if SYSCFG registered in RCC -> sysbus.SetPeripheralEnabled(peri,value) (lock/unlock on bus), else no-op (Noisy log); read: IsPeripheralEnabled(SYSCFG) = true iff registered and not locked, NOT a stored bit	1006-1008
+APB4Clock(RCC_APB4ENR)	0x0F4	RESERVED	0	0	reserved	0x0	reserved: write discarded (unhandled-write log); read = reset-value bits = 0x0 (not forced to 0; framework read)	1005
+AHB3SleepClock(RCC_AHB3LPENR)	0x0FC	AXISRAMLPEN	31	31	tag	0x1	tag: write discarded (unhandled-write log); read = reset-value bits = 0x1 (not forced to 0; framework read)	1064
+AHB3SleepClock(RCC_AHB3LPENR)	0x0FC	ITCMLPEN	30	30	tag	0x1	tag: write discarded (unhandled-write log); read = reset-value bits = 0x1 (not forced to 0; framework read)	1063
+AHB3SleepClock(RCC_AHB3LPENR)	0x0FC	DTCM2LPEN	29	29	tag	0x1	tag: write discarded (unhandled-write log); read = reset-value bits = 0x1 (not forced to 0; framework read)	1062
+AHB3SleepClock(RCC_AHB3LPENR)	0x0FC	D1DTCM1LPEN	28	28	tag	0x1	tag: write discarded (unhandled-write log); read = reset-value bits = 0x1 (not forced to 0; framework read)	1061
+AHB3SleepClock(RCC_AHB3LPENR)	0x0FC	RESERVED	27	17	reserved	0x0	reserved: write discarded (unhandled-write log); read = reset-value bits = 0x0 (not forced to 0; framework read)	1060
+AHB3SleepClock(RCC_AHB3LPENR)	0x0FC	SDMMC1LPEN	16	16	tag	0x1	tag: write discarded (unhandled-write log); read = reset-value bits = 0x1 (not forced to 0; framework read)	1059
+AHB3SleepClock(RCC_AHB3LPENR)	0x0FC	RESERVED	15	15	reserved	0x0	reserved: write discarded (unhandled-write log); read = reset-value bits = 0x0 (not forced to 0; framework read)	1058
+AHB3SleepClock(RCC_AHB3LPENR)	0x0FC	QSPILPEN	14	14	tag	0x1	tag: write discarded (unhandled-write log); read = reset-value bits = 0x1 (not forced to 0; framework read)	1057
+AHB3SleepClock(RCC_AHB3LPENR)	0x0FC	RESERVED	13	13	reserved	0x0	reserved: write discarded (unhandled-write log); read = reset-value bits = 0x0 (not forced to 0; framework read)	1056
+AHB3SleepClock(RCC_AHB3LPENR)	0x0FC	FMCLPEN	12	12	tag	0x1	tag: write discarded (unhandled-write log); read = reset-value bits = 0x1 (not forced to 0; framework read)	1055
+AHB3SleepClock(RCC_AHB3LPENR)	0x0FC	RESERVED	11	9	reserved	0x0	reserved: write discarded (unhandled-write log); read = reset-value bits = 0x0 (not forced to 0; framework read)	1054
+AHB3SleepClock(RCC_AHB3LPENR)	0x0FC	FLASHLPEN	8	8	tag	0x1	tag: write discarded (unhandled-write log); read = reset-value bits = 0x1 (not forced to 0; framework read)	1053
+AHB3SleepClock(RCC_AHB3LPENR)	0x0FC	RESERVED	7	6	reserved	0x0	reserved: write discarded (unhandled-write log); read = reset-value bits = 0x0 (not forced to 0; framework read)	1052
+AHB3SleepClock(RCC_AHB3LPENR)	0x0FC	JPGDECLPEN	5	5	tag	0x1	tag: write discarded (unhandled-write log); read = reset-value bits = 0x1 (not forced to 0; framework read)	1051
+AHB3SleepClock(RCC_AHB3LPENR)	0x0FC	DMA2DLPEN	4	4	tag	0x1	tag: write discarded (unhandled-write log); read = reset-value bits = 0x1 (not forced to 0; framework read)	1050
+AHB3SleepClock(RCC_AHB3LPENR)	0x0FC	RESERVED	3	1	reserved	0x0	reserved: write discarded (unhandled-write log); read = reset-value bits = 0x0 (not forced to 0; framework read)	1049
+AHB3SleepClock(RCC_AHB3LPENR)	0x0FC	MDMALPEN	0	0	tag	0x1	tag: write discarded (unhandled-write log); read = reset-value bits = 0x1 (not forced to 0; framework read)	1048
+AHB1SleepClock(RCC_AHB1LPENR)	0x100	RESERVED	31	29	reserved	0x0	reserved: write discarded (unhandled-write log); read = reset-value bits = 0x0 (not forced to 0; framework read)	1079
+AHB1SleepClock(RCC_AHB1LPENR)	0x100	USB2OTGHSULPILPEN	28	28	tag	0x1	tag: write discarded (unhandled-write log); read = reset-value bits = 0x1 (not forced to 0; framework read)	1078
+AHB1SleepClock(RCC_AHB1LPENR)	0x100	USB2OTGHSLPEN	27	27	tag	0x1	tag: write discarded (unhandled-write log); read = reset-value bits = 0x1 (not forced to 0; framework read)	1077
+AHB1SleepClock(RCC_AHB1LPENR)	0x100	USB1OTGHSULPILPEN	26	26	tag	0x1	tag: write discarded (unhandled-write log); read = reset-value bits = 0x1 (not forced to 0; framework read)	1076
+AHB1SleepClock(RCC_AHB1LPENR)	0x100	USB1OTGHSLPEN	25	25	tag	0x1	tag: write discarded (unhandled-write log); read = reset-value bits = 0x1 (not forced to 0; framework read)	1075
+AHB1SleepClock(RCC_AHB1LPENR)	0x100	RESERVED	24	18	reserved	0x0	reserved: write discarded (unhandled-write log); read = reset-value bits = 0x0 (not forced to 0; framework read)	1074
+AHB1SleepClock(RCC_AHB1LPENR)	0x100	ETH1RXLPEN	17	17	tag	0x1	tag: write discarded (unhandled-write log); read = reset-value bits = 0x1 (not forced to 0; framework read)	1073
+AHB1SleepClock(RCC_AHB1LPENR)	0x100	ETH1TXLPEN	16	16	tag	0x1	tag: write discarded (unhandled-write log); read = reset-value bits = 0x1 (not forced to 0; framework read)	1072
+AHB1SleepClock(RCC_AHB1LPENR)	0x100	ETH1MACLPEN	15	15	tag	0x1	tag: write discarded (unhandled-write log); read = reset-value bits = 0x1 (not forced to 0; framework read)	1071
+AHB1SleepClock(RCC_AHB1LPENR)	0x100	RESERVED	14	6	reserved	0x100	reserved: write discarded (unhandled-write log); read = reset-value bits = 0x100 (not forced to 0; framework read)	1070
+AHB1SleepClock(RCC_AHB1LPENR)	0x100	ADC12LPEN	5	5	tag	0x1	tag: write discarded (unhandled-write log); read = reset-value bits = 0x1 (not forced to 0; framework read)	1069
+AHB1SleepClock(RCC_AHB1LPENR)	0x100	RESERVED	4	2	reserved	0x0	reserved: write discarded (unhandled-write log); read = reset-value bits = 0x0 (not forced to 0; framework read)	1068
+AHB1SleepClock(RCC_AHB1LPENR)	0x100	DMA2LPEN	1	1	tag	0x1	tag: write discarded (unhandled-write log); read = reset-value bits = 0x1 (not forced to 0; framework read)	1067
+AHB1SleepClock(RCC_AHB1LPENR)	0x100	DMA1LPEN	0	0	tag	0x1	tag: write discarded (unhandled-write log); read = reset-value bits = 0x1 (not forced to 0; framework read)	1066
+AHB2SleepClock(RCC_AHB2LPENR)	0x104	SRAM3LPEN	31	31	tag	0x1	tag: write discarded (unhandled-write log); read = reset-value bits = 0x1 (not forced to 0; framework read)	1091
+AHB2SleepClock(RCC_AHB2LPENR)	0x104	SRAM2LPEN	30	30	tag	0x1	tag: write discarded (unhandled-write log); read = reset-value bits = 0x1 (not forced to 0; framework read)	1090
+AHB2SleepClock(RCC_AHB2LPENR)	0x104	SRAM1LPEN	29	29	tag	0x1	tag: write discarded (unhandled-write log); read = reset-value bits = 0x1 (not forced to 0; framework read)	1089
+AHB2SleepClock(RCC_AHB2LPENR)	0x104	RESERVED	28	10	reserved	0x0	reserved: write discarded (unhandled-write log); read = reset-value bits = 0x0 (not forced to 0; framework read)	1088
+AHB2SleepClock(RCC_AHB2LPENR)	0x104	SDMMC2LPEN	9	9	tag	0x1	tag: write discarded (unhandled-write log); read = reset-value bits = 0x1 (not forced to 0; framework read)	1087
+AHB2SleepClock(RCC_AHB2LPENR)	0x104	RESERVED	8	7	reserved	0x0	reserved: write discarded (unhandled-write log); read = reset-value bits = 0x0 (not forced to 0; framework read)	1086
+AHB2SleepClock(RCC_AHB2LPENR)	0x104	RNGLPEN	6	6	tag	0x1	tag: write discarded (unhandled-write log); read = reset-value bits = 0x1 (not forced to 0; framework read)	1085
+AHB2SleepClock(RCC_AHB2LPENR)	0x104	HASHLPEN	5	5	tag	0x1	tag: write discarded (unhandled-write log); read = reset-value bits = 0x1 (not forced to 0; framework read)	1084
+AHB2SleepClock(RCC_AHB2LPENR)	0x104	CRYPTLPEN	4	4	tag	0x1	tag: write discarded (unhandled-write log); read = reset-value bits = 0x1 (not forced to 0; framework read)	1083
+AHB2SleepClock(RCC_AHB2LPENR)	0x104	RESERVED	3	1	reserved	0x0	reserved: write discarded (unhandled-write log); read = reset-value bits = 0x0 (not forced to 0; framework read)	1082
+AHB2SleepClock(RCC_AHB2LPENR)	0x104	DCMILPEN	0	0	tag	0x1	tag: write discarded (unhandled-write log); read = reset-value bits = 0x1 (not forced to 0; framework read)	1081
+AHB4SleepClock(RCC_AHB4LPENR)	0x108	RESERVED	31	30	reserved	0x0	reserved: write discarded (unhandled-write log); read = reset-value bits = 0x0 (not forced to 0; framework read)	1113
+AHB4SleepClock(RCC_AHB4LPENR)	0x108	SRAM4LPEN	29	29	tag	0x1	tag: write discarded (unhandled-write log); read = reset-value bits = 0x1 (not forced to 0; framework read)	1112
+AHB4SleepClock(RCC_AHB4LPENR)	0x108	BKPRAMLPEN	28	28	tag	0x1	tag: write discarded (unhandled-write log); read = reset-value bits = 0x1 (not forced to 0; framework read)	1111
+AHB4SleepClock(RCC_AHB4LPENR)	0x108	RESERVED	27	25	reserved	0x0	reserved: write discarded (unhandled-write log); read = reset-value bits = 0x0 (not forced to 0; framework read)	1110
+AHB4SleepClock(RCC_AHB4LPENR)	0x108	ADC3LPEN	24	24	tag	0x1	tag: write discarded (unhandled-write log); read = reset-value bits = 0x1 (not forced to 0; framework read)	1109
+AHB4SleepClock(RCC_AHB4LPENR)	0x108	RESERVED	23	22	reserved	0x0	reserved: write discarded (unhandled-write log); read = reset-value bits = 0x0 (not forced to 0; framework read)	1108
+AHB4SleepClock(RCC_AHB4LPENR)	0x108	BDMALPEN	21	21	tag	0x1	tag: write discarded (unhandled-write log); read = reset-value bits = 0x1 (not forced to 0; framework read)	1107
+AHB4SleepClock(RCC_AHB4LPENR)	0x108	RESERVED	20	20	reserved	0x0	reserved: write discarded (unhandled-write log); read = reset-value bits = 0x0 (not forced to 0; framework read)	1106
+AHB4SleepClock(RCC_AHB4LPENR)	0x108	CRCLPEN	19	19	tag	0x1	tag: write discarded (unhandled-write log); read = reset-value bits = 0x1 (not forced to 0; framework read)	1105
+AHB4SleepClock(RCC_AHB4LPENR)	0x108	RESERVED	18	11	reserved	0x0	reserved: write discarded (unhandled-write log); read = reset-value bits = 0x0 (not forced to 0; framework read)	1104
+AHB4SleepClock(RCC_AHB4LPENR)	0x108	GPIOKLPEN	10	10	tag	0x1	tag: write discarded (unhandled-write log); read = reset-value bits = 0x1 (not forced to 0; framework read)	1103
+AHB4SleepClock(RCC_AHB4LPENR)	0x108	GPIOJLPEN	9	9	tag	0x1	tag: write discarded (unhandled-write log); read = reset-value bits = 0x1 (not forced to 0; framework read)	1102
+AHB4SleepClock(RCC_AHB4LPENR)	0x108	GPIOILPEN	8	8	tag	0x1	tag: write discarded (unhandled-write log); read = reset-value bits = 0x1 (not forced to 0; framework read)	1101
+AHB4SleepClock(RCC_AHB4LPENR)	0x108	GPIOHLPEN	7	7	tag	0x1	tag: write discarded (unhandled-write log); read = reset-value bits = 0x1 (not forced to 0; framework read)	1100
+AHB4SleepClock(RCC_AHB4LPENR)	0x108	GPIOGLPEN	6	6	tag	0x1	tag: write discarded (unhandled-write log); read = reset-value bits = 0x1 (not forced to 0; framework read)	1099
+AHB4SleepClock(RCC_AHB4LPENR)	0x108	GPIOFLPEN	5	5	tag	0x1	tag: write discarded (unhandled-write log); read = reset-value bits = 0x1 (not forced to 0; framework read)	1098
+AHB4SleepClock(RCC_AHB4LPENR)	0x108	GPIOELPEN	4	4	tag	0x1	tag: write discarded (unhandled-write log); read = reset-value bits = 0x1 (not forced to 0; framework read)	1097
+AHB4SleepClock(RCC_AHB4LPENR)	0x108	GPIODLPEN	3	3	tag	0x1	tag: write discarded (unhandled-write log); read = reset-value bits = 0x1 (not forced to 0; framework read)	1096
+AHB4SleepClock(RCC_AHB4LPENR)	0x108	GPIOCLPEN	2	2	tag	0x1	tag: write discarded (unhandled-write log); read = reset-value bits = 0x1 (not forced to 0; framework read)	1095
+AHB4SleepClock(RCC_AHB4LPENR)	0x108	GPIOBLPEN	1	1	tag	0x1	tag: write discarded (unhandled-write log); read = reset-value bits = 0x1 (not forced to 0; framework read)	1094
+AHB4SleepClock(RCC_AHB4LPENR)	0x108	GPIOALPEN	0	0	tag	0x1	tag: write discarded (unhandled-write log); read = reset-value bits = 0x1 (not forced to 0; framework read)	1093
+APB3SleepClock(RCC_APB3LPENR)	0x10C	RESERVED	31	7	reserved	0x0	reserved: write discarded (unhandled-write log); read = reset-value bits = 0x0 (not forced to 0; framework read)	1119
+APB3SleepClock(RCC_APB3LPENR)	0x10C	WWDG1LPEN	6	6	tag	0x1	tag: write discarded (unhandled-write log); read = reset-value bits = 0x1 (not forced to 0; framework read)	1118
+APB3SleepClock(RCC_APB3LPENR)	0x10C	RESERVED	5	4	reserved	0x1	reserved: write discarded (unhandled-write log); read = reset-value bits = 0x1 (not forced to 0; framework read)	1117
+APB3SleepClock(RCC_APB3LPENR)	0x10C	LTDCLPEN	3	3	tag	0x1	tag: write discarded (unhandled-write log); read = reset-value bits = 0x1 (not forced to 0; framework read)	1116
+APB3SleepClock(RCC_APB3LPENR)	0x10C	RESERVED	2	0	reserved	0x0	reserved: write discarded (unhandled-write log); read = reset-value bits = 0x0 (not forced to 0; framework read)	1115
+APB1LowSleepClock(RCC_APB1LLPENR)	0x110	UART8LPEN	31	31	tag	0x1	tag: write discarded (unhandled-write log); read = reset-value bits = 0x1 (not forced to 0; framework read)	1147
+APB1LowSleepClock(RCC_APB1LLPENR)	0x110	UART7LPEN	30	30	tag	0x1	tag: write discarded (unhandled-write log); read = reset-value bits = 0x1 (not forced to 0; framework read)	1146
+APB1LowSleepClock(RCC_APB1LLPENR)	0x110	DAC12LPEN	29	29	tag	0x1	tag: write discarded (unhandled-write log); read = reset-value bits = 0x1 (not forced to 0; framework read)	1145
+APB1LowSleepClock(RCC_APB1LLPENR)	0x110	RESERVED	28	28	reserved	0x0	reserved: write discarded (unhandled-write log); read = reset-value bits = 0x0 (not forced to 0; framework read)	1144
+APB1LowSleepClock(RCC_APB1LLPENR)	0x110	CECLPEN	27	27	tag	0x1	tag: write discarded (unhandled-write log); read = reset-value bits = 0x1 (not forced to 0; framework read)	1143
+APB1LowSleepClock(RCC_APB1LLPENR)	0x110	RESERVED	26	24	reserved	0x0	reserved: write discarded (unhandled-write log); read = reset-value bits = 0x0 (not forced to 0; framework read)	1142
+APB1LowSleepClock(RCC_APB1LLPENR)	0x110	I2C3LPEN	23	23	tag	0x1	tag: write discarded (unhandled-write log); read = reset-value bits = 0x1 (not forced to 0; framework read)	1141
+APB1LowSleepClock(RCC_APB1LLPENR)	0x110	I2C2LPEN	22	22	tag	0x1	tag: write discarded (unhandled-write log); read = reset-value bits = 0x1 (not forced to 0; framework read)	1140
+APB1LowSleepClock(RCC_APB1LLPENR)	0x110	I2C1LPEN	21	21	tag	0x1	tag: write discarded (unhandled-write log); read = reset-value bits = 0x1 (not forced to 0; framework read)	1139
+APB1LowSleepClock(RCC_APB1LLPENR)	0x110	UART5LPEN	20	20	tag	0x1	tag: write discarded (unhandled-write log); read = reset-value bits = 0x1 (not forced to 0; framework read)	1138
+APB1LowSleepClock(RCC_APB1LLPENR)	0x110	UART4LPEN	19	19	tag	0x1	tag: write discarded (unhandled-write log); read = reset-value bits = 0x1 (not forced to 0; framework read)	1137
+APB1LowSleepClock(RCC_APB1LLPENR)	0x110	USART3LPEN	18	18	tag	0x1	tag: write discarded (unhandled-write log); read = reset-value bits = 0x1 (not forced to 0; framework read)	1136
+APB1LowSleepClock(RCC_APB1LLPENR)	0x110	USART2LPEN	17	17	tag	0x1	tag: write discarded (unhandled-write log); read = reset-value bits = 0x1 (not forced to 0; framework read)	1135
+APB1LowSleepClock(RCC_APB1LLPENR)	0x110	SPDIFRXLPEN	16	16	tag	0x1	tag: write discarded (unhandled-write log); read = reset-value bits = 0x1 (not forced to 0; framework read)	1134
+APB1LowSleepClock(RCC_APB1LLPENR)	0x110	SPI3LPEN	15	15	tag	0x1	tag: write discarded (unhandled-write log); read = reset-value bits = 0x1 (not forced to 0; framework read)	1133
+APB1LowSleepClock(RCC_APB1LLPENR)	0x110	SPI2LPEN	14	14	tag	0x1	tag: write discarded (unhandled-write log); read = reset-value bits = 0x1 (not forced to 0; framework read)	1132
+APB1LowSleepClock(RCC_APB1LLPENR)	0x110	RESERVED	13	10	reserved	0x2	reserved: write discarded (unhandled-write log); read = reset-value bits = 0x2 (not forced to 0; framework read)	1131
+APB1LowSleepClock(RCC_APB1LLPENR)	0x110	LPTIM1LPEN	9	9	tag	0x1	tag: write discarded (unhandled-write log); read = reset-value bits = 0x1 (not forced to 0; framework read)	1130
+APB1LowSleepClock(RCC_APB1LLPENR)	0x110	TIM14LPEN	8	8	tag	0x1	tag: write discarded (unhandled-write log); read = reset-value bits = 0x1 (not forced to 0; framework read)	1129
+APB1LowSleepClock(RCC_APB1LLPENR)	0x110	TIM13LPEN	7	7	tag	0x1	tag: write discarded (unhandled-write log); read = reset-value bits = 0x1 (not forced to 0; framework read)	1128
+APB1LowSleepClock(RCC_APB1LLPENR)	0x110	TIM12LPEN	6	6	tag	0x1	tag: write discarded (unhandled-write log); read = reset-value bits = 0x1 (not forced to 0; framework read)	1127
+APB1LowSleepClock(RCC_APB1LLPENR)	0x110	TIM7LPEN	5	5	tag	0x1	tag: write discarded (unhandled-write log); read = reset-value bits = 0x1 (not forced to 0; framework read)	1126
+APB1LowSleepClock(RCC_APB1LLPENR)	0x110	TIM6LPEN	4	4	tag	0x1	tag: write discarded (unhandled-write log); read = reset-value bits = 0x1 (not forced to 0; framework read)	1125
+APB1LowSleepClock(RCC_APB1LLPENR)	0x110	TIM5LPEN	3	3	tag	0x1	tag: write discarded (unhandled-write log); read = reset-value bits = 0x1 (not forced to 0; framework read)	1124
+APB1LowSleepClock(RCC_APB1LLPENR)	0x110	TIM4LPEN	2	2	tag	0x1	tag: write discarded (unhandled-write log); read = reset-value bits = 0x1 (not forced to 0; framework read)	1123
+APB1LowSleepClock(RCC_APB1LLPENR)	0x110	TIM3LPEN	1	1	tag	0x1	tag: write discarded (unhandled-write log); read = reset-value bits = 0x1 (not forced to 0; framework read)	1122
+APB1LowSleepClock(RCC_APB1LLPENR)	0x110	TIM2LPEN	0	0	tag	0x1	tag: write discarded (unhandled-write log); read = reset-value bits = 0x1 (not forced to 0; framework read)	1121
+APB1HighSleepClock(RCC_APB1HLPENR)	0x114	RESERVED	31	9	reserved	0x0	reserved: write discarded (unhandled-write log); read = reset-value bits = 0x0 (not forced to 0; framework read)	1157
+APB1HighSleepClock(RCC_APB1HLPENR)	0x114	FDCANLPEN	8	8	tag	0x1	tag: write discarded (unhandled-write log); read = reset-value bits = 0x1 (not forced to 0; framework read)	1156
+APB1HighSleepClock(RCC_APB1HLPENR)	0x114	RESERVED	7	6	reserved	0x0	reserved: write discarded (unhandled-write log); read = reset-value bits = 0x0 (not forced to 0; framework read)	1155
+APB1HighSleepClock(RCC_APB1HLPENR)	0x114	MDIOSLPEN	5	5	tag	0x1	tag: write discarded (unhandled-write log); read = reset-value bits = 0x1 (not forced to 0; framework read)	1154
+APB1HighSleepClock(RCC_APB1HLPENR)	0x114	OPAMPLPEN	4	4	tag	0x1	tag: write discarded (unhandled-write log); read = reset-value bits = 0x1 (not forced to 0; framework read)	1153
+APB1HighSleepClock(RCC_APB1HLPENR)	0x114	RESERVED	3	3	reserved	0x0	reserved: write discarded (unhandled-write log); read = reset-value bits = 0x0 (not forced to 0; framework read)	1152
+APB1HighSleepClock(RCC_APB1HLPENR)	0x114	SWPLPEN	2	2	tag	0x1	tag: write discarded (unhandled-write log); read = reset-value bits = 0x1 (not forced to 0; framework read)	1151
+APB1HighSleepClock(RCC_APB1HLPENR)	0x114	CRSLPEN	1	1	tag	0x1	tag: write discarded (unhandled-write log); read = reset-value bits = 0x1 (not forced to 0; framework read)	1150
+APB1HighSleepClock(RCC_APB1HLPENR)	0x114	RESERVED	0	0	reserved	0x0	reserved: write discarded (unhandled-write log); read = reset-value bits = 0x0 (not forced to 0; framework read)	1149
+APB2SleepClock(RCC_APB2LPENR)	0x118	RESERVED	31	30	reserved	0x0	reserved: write discarded (unhandled-write log); read = reset-value bits = 0x0 (not forced to 0; framework read)	1178
+APB2SleepClock(RCC_APB2LPENR)	0x118	HRTIMLPEN	29	29	tag	0x1	tag: write discarded (unhandled-write log); read = reset-value bits = 0x1 (not forced to 0; framework read)	1177
+APB2SleepClock(RCC_APB2LPENR)	0x118	DFSDM1LPEN	28	28	tag	0x1	tag: write discarded (unhandled-write log); read = reset-value bits = 0x1 (not forced to 0; framework read)	1176
+APB2SleepClock(RCC_APB2LPENR)	0x118	(gap: no field, tag or reserved)	27	27	other	0x0	unhandled bits: write has no effect, no field state; read = reset-value bits 0x0	-
+APB2SleepClock(RCC_APB2LPENR)	0x118	RESERVED	26	25	reserved	0x0	reserved: write discarded (unhandled-write log); read = reset-value bits = 0x0 (not forced to 0; framework read)	1175
+APB2SleepClock(RCC_APB2LPENR)	0x118	SAI3LPEN	24	24	tag	0x1	tag: write discarded (unhandled-write log); read = reset-value bits = 0x1 (not forced to 0; framework read)	1174
+APB2SleepClock(RCC_APB2LPENR)	0x118	SAI2LPEN	23	23	tag	0x1	tag: write discarded (unhandled-write log); read = reset-value bits = 0x1 (not forced to 0; framework read)	1173
+APB2SleepClock(RCC_APB2LPENR)	0x118	SAI1LPEN	22	22	tag	0x1	tag: write discarded (unhandled-write log); read = reset-value bits = 0x1 (not forced to 0; framework read)	1172
+APB2SleepClock(RCC_APB2LPENR)	0x118	RESERVED	21	21	reserved	0x0	reserved: write discarded (unhandled-write log); read = reset-value bits = 0x0 (not forced to 0; framework read)	1171
+APB2SleepClock(RCC_APB2LPENR)	0x118	(gap: no field, tag or reserved)	20	19	other	0x2	unhandled bits: write has no effect, no field state; read = reset-value bits 0x2	-
+APB2SleepClock(RCC_APB2LPENR)	0x118	TIM17LPEN	18	18	tag	0x1	tag: write discarded (unhandled-write log); read = reset-value bits = 0x1 (not forced to 0; framework read)	1170
+APB2SleepClock(RCC_APB2LPENR)	0x118	TIM16LPEN	17	17	tag	0x1	tag: write discarded (unhandled-write log); read = reset-value bits = 0x1 (not forced to 0; framework read)	1169
+APB2SleepClock(RCC_APB2LPENR)	0x118	TIM15LPEN	16	16	tag	0x1	tag: write discarded (unhandled-write log); read = reset-value bits = 0x1 (not forced to 0; framework read)	1168
+APB2SleepClock(RCC_APB2LPENR)	0x118	RESERVED	15	14	reserved	0x0	reserved: write discarded (unhandled-write log); read = reset-value bits = 0x0 (not forced to 0; framework read)	1167
+APB2SleepClock(RCC_APB2LPENR)	0x118	SPI4LPEN	13	13	tag	0x1	tag: write discarded (unhandled-write log); read = reset-value bits = 0x1 (not forced to 0; framework read)	1166
+APB2SleepClock(RCC_APB2LPENR)	0x118	SPI1LPEN	12	12	tag	0x1	tag: write discarded (unhandled-write log); read = reset-value bits = 0x1 (not forced to 0; framework read)	1165
+APB2SleepClock(RCC_APB2LPENR)	0x118	RESERVED	11	6	reserved	0x0	reserved: write discarded (unhandled-write log); read = reset-value bits = 0x0 (not forced to 0; framework read)	1164
+APB2SleepClock(RCC_APB2LPENR)	0x118	USART6LPEN	5	5	tag	0x1	tag: write discarded (unhandled-write log); read = reset-value bits = 0x1 (not forced to 0; framework read)	1163
+APB2SleepClock(RCC_APB2LPENR)	0x118	USART1LPEN	4	4	tag	0x1	tag: write discarded (unhandled-write log); read = reset-value bits = 0x1 (not forced to 0; framework read)	1162
+APB2SleepClock(RCC_APB2LPENR)	0x118	RESERVED	3	2	reserved	0x0	reserved: write discarded (unhandled-write log); read = reset-value bits = 0x0 (not forced to 0; framework read)	1161
+APB2SleepClock(RCC_APB2LPENR)	0x118	TIM8LPEN	1	1	tag	0x1	tag: write discarded (unhandled-write log); read = reset-value bits = 0x1 (not forced to 0; framework read)	1160
+APB2SleepClock(RCC_APB2LPENR)	0x118	TIM1LPEN	0	0	tag	0x1	tag: write discarded (unhandled-write log); read = reset-value bits = 0x1 (not forced to 0; framework read)	1159
+APB4SleepClock(RCC_APB4LPENR)	0x11C	RESERVED	31	22	reserved	0x10	reserved: write discarded (unhandled-write log); read = reset-value bits = 0x10 (not forced to 0; framework read)	1199
+APB4SleepClock(RCC_APB4LPENR)	0x11C	SAI4LPEN	21	21	tag	0x1	tag: write discarded (unhandled-write log); read = reset-value bits = 0x1 (not forced to 0; framework read)	1198
+APB4SleepClock(RCC_APB4LPENR)	0x11C	RESERVED	20	17	reserved	0x0	reserved: write discarded (unhandled-write log); read = reset-value bits = 0x0 (not forced to 0; framework read)	1197
+APB4SleepClock(RCC_APB4LPENR)	0x11C	RTCAPBLPEN	16	16	tag	0x1	tag: write discarded (unhandled-write log); read = reset-value bits = 0x1 (not forced to 0; framework read)	1196
+APB4SleepClock(RCC_APB4LPENR)	0x11C	VREFLPEN	15	15	tag	0x1	tag: write discarded (unhandled-write log); read = reset-value bits = 0x1 (not forced to 0; framework read)	1195
+APB4SleepClock(RCC_APB4LPENR)	0x11C	COMP12LPEN	14	14	tag	0x1	tag: write discarded (unhandled-write log); read = reset-value bits = 0x1 (not forced to 0; framework read)	1194
+APB4SleepClock(RCC_APB4LPENR)	0x11C	RESERVED	13	13	reserved	0x0	reserved: write discarded (unhandled-write log); read = reset-value bits = 0x0 (not forced to 0; framework read)	1193
+APB4SleepClock(RCC_APB4LPENR)	0x11C	LPTIM5LPEN	12	12	tag	0x1	tag: write discarded (unhandled-write log); read = reset-value bits = 0x1 (not forced to 0; framework read)	1192
+APB4SleepClock(RCC_APB4LPENR)	0x11C	LPTIM4LPEN	11	11	tag	0x1	tag: write discarded (unhandled-write log); read = reset-value bits = 0x1 (not forced to 0; framework read)	1191
+APB4SleepClock(RCC_APB4LPENR)	0x11C	LPTIM3LPEN	10	10	tag	0x1	tag: write discarded (unhandled-write log); read = reset-value bits = 0x1 (not forced to 0; framework read)	1190
+APB4SleepClock(RCC_APB4LPENR)	0x11C	LPTIM2LPEN	9	9	tag	0x1	tag: write discarded (unhandled-write log); read = reset-value bits = 0x1 (not forced to 0; framework read)	1189
+APB4SleepClock(RCC_APB4LPENR)	0x11C	RESERVED	8	8	reserved	0x0	reserved: write discarded (unhandled-write log); read = reset-value bits = 0x0 (not forced to 0; framework read)	1188
+APB4SleepClock(RCC_APB4LPENR)	0x11C	I2C4LPEN	7	7	tag	0x1	tag: write discarded (unhandled-write log); read = reset-value bits = 0x1 (not forced to 0; framework read)	1187
+APB4SleepClock(RCC_APB4LPENR)	0x11C	RESERVED	6	6	reserved	0x0	reserved: write discarded (unhandled-write log); read = reset-value bits = 0x0 (not forced to 0; framework read)	1186
+APB4SleepClock(RCC_APB4LPENR)	0x11C	SPI6LPEN	5	5	tag	0x1	tag: write discarded (unhandled-write log); read = reset-value bits = 0x1 (not forced to 0; framework read)	1185
+APB4SleepClock(RCC_APB4LPENR)	0x11C	RESERVED	4	4	reserved	0x0	reserved: write discarded (unhandled-write log); read = reset-value bits = 0x0 (not forced to 0; framework read)	1184
+APB4SleepClock(RCC_APB4LPENR)	0x11C	LPUART1LPEN	3	3	tag	0x1	tag: write discarded (unhandled-write log); read = reset-value bits = 0x1 (not forced to 0; framework read)	1183
+APB4SleepClock(RCC_APB4LPENR)	0x11C	RESERVED	2	2	reserved	0x0	reserved: write discarded (unhandled-write log); read = reset-value bits = 0x0 (not forced to 0; framework read)	1182
+APB4SleepClock(RCC_APB4LPENR)	0x11C	SYSCFGLPEN	1	1	tag	0x1	tag: write discarded (unhandled-write log); read = reset-value bits = 0x1 (not forced to 0; framework read)	1181
+APB4SleepClock(RCC_APB4LPENR)	0x11C	RESERVED	0	0	reserved	0x0	reserved: write discarded (unhandled-write log); read = reset-value bits = 0x0 (not forced to 0; framework read)	1180
+C1ResetStatus(RCC_C1_RSR (alias of ResetStatus))	0x130	(unnamed)	31	0	computed-read	0x0	C1 alias: read = this.ReadDoubleWord(ResetStatus) (full read of the base register, side effects included); a write is stored in the alias only and is NOT forwarded; no shared state	1202
+C1AHB3Clock(RCC_C1_AHB3ENR (alias of AHB3Clock))	0x134	(unnamed)	31	0	computed-read	0x0	C1 alias: read = this.ReadDoubleWord(AHB3Clock) (full read of the base register, side effects included); a write is stored in the alias only and is NOT forwarded; no shared state	1204
+C1AHB1Clock(RCC_C1_AHB1ENR (alias of AHB1Clock))	0x138	(unnamed)	31	0	computed-read	0x0	C1 alias: read = this.ReadDoubleWord(AHB1Clock) (full read of the base register, side effects included); a write is stored in the alias only and is NOT forwarded; no shared state	1206
+C1AHB2Clock(RCC_C1_AHB2ENR (alias of AHB2Clock))	0x13C	(unnamed)	31	0	computed-read	0x0	C1 alias: read = this.ReadDoubleWord(AHB2Clock) (full read of the base register, side effects included); a write is stored in the alias only and is NOT forwarded; no shared state	1208
+C1AHB4Clock(RCC_C1_AHB4ENR (alias of AHB4Clock))	0x140	(unnamed)	31	0	computed-read	0x0	C1 alias: read = this.ReadDoubleWord(AHB4Clock) (full read of the base register, side effects included); a write is stored in the alias only and is NOT forwarded; no shared state	1210
+C1APB3Clock(RCC_C1_APB3ENR (alias of APB3Clock))	0x144	(unnamed)	31	0	computed-read	0x0	C1 alias: read = this.ReadDoubleWord(APB3Clock) (full read of the base register, side effects included); a write is stored in the alias only and is NOT forwarded; no shared state	1212
+C1APB1ClockLow(RCC_C1_APB1LENR (alias of APB1ClockLow))	0x148	(unnamed)	31	0	computed-read	0x0	C1 alias: read = this.ReadDoubleWord(APB1ClockLow) (full read of the base register, side effects included); a write is stored in the alias only and is NOT forwarded; no shared state	1214
+C1APB1ClockHigh(RCC_C1_APB1HENR (alias of APB1ClockHigh))	0x14C	(unnamed)	31	0	computed-read	0x0	C1 alias: read = this.ReadDoubleWord(APB1ClockHigh) (full read of the base register, side effects included); a write is stored in the alias only and is NOT forwarded; no shared state	1216
+C1APB2Clock(RCC_C1_APB2ENR (alias of APB2Clock))	0x150	(unnamed)	31	0	computed-read	0x0	C1 alias: read = this.ReadDoubleWord(APB2Clock) (full read of the base register, side effects included); a write is stored in the alias only and is NOT forwarded; no shared state	1218
+C1APB4Clock(RCC_C1_APB4ENR (alias of APB4Clock))	0x154	(unnamed)	31	0	computed-read	0x0	C1 alias: read = this.ReadDoubleWord(APB4Clock) (full read of the base register, side effects included); a write is stored in the alias only and is NOT forwarded; no shared state	1220
+C1AHB3SleepClock(RCC_C1_AHB3LPENR (alias of AHB3SleepClock))	0x15C	(unnamed)	31	0	computed-read	0x0	C1 alias: read = this.ReadDoubleWord(AHB3SleepClock) (full read of the base register, side effects included); a write is stored in the alias only and is NOT forwarded; no shared state	1222
+C1AHB1SleepClock(RCC_C1_AHB1LPENR (alias of AHB1SleepClock))	0x160	(unnamed)	31	0	computed-read	0x0	C1 alias: read = this.ReadDoubleWord(AHB1SleepClock) (full read of the base register, side effects included); a write is stored in the alias only and is NOT forwarded; no shared state	1224
+C1AHB2SleepClock(RCC_C1_AHB2LPENR (alias of AHB2SleepClock))	0x164	(unnamed)	31	0	computed-read	0x0	C1 alias: read = this.ReadDoubleWord(AHB2SleepClock) (full read of the base register, side effects included); a write is stored in the alias only and is NOT forwarded; no shared state	1226
+C1AHB4SleepClock(RCC_C1_AHB4LPENR (alias of AHB4SleepClock))	0x168	(unnamed)	31	0	computed-read	0x0	C1 alias: read = this.ReadDoubleWord(AHB4SleepClock) (full read of the base register, side effects included); a write is stored in the alias only and is NOT forwarded; no shared state	1228
+C1APB3SleepClock(RCC_C1_APB3LPENR (alias of APB3SleepClock))	0x16C	(unnamed)	31	0	computed-read	0x0	C1 alias: read = this.ReadDoubleWord(APB3SleepClock) (full read of the base register, side effects included); a write is stored in the alias only and is NOT forwarded; no shared state	1230
+C1APB1LowSleepClock(RCC_C1_APB1LLPENR (alias of APB1LowSleepClock))	0x170	(unnamed)	31	0	computed-read	0x0	C1 alias: read = this.ReadDoubleWord(APB1LowSleepClock) (full read of the base register, side effects included); a write is stored in the alias only and is NOT forwarded; no shared state	1232
+C1APB1HighSleepClock(RCC_C1_APB1HLPENR (alias of APB1HighSleepClock))	0x174	(unnamed)	31	0	computed-read	0x0	C1 alias: read = this.ReadDoubleWord(APB1HighSleepClock) (full read of the base register, side effects included); a write is stored in the alias only and is NOT forwarded; no shared state	1234
+C1APB2SleepClock(RCC_C1_APB2LPENR (alias of APB2SleepClock))	0x178	(unnamed)	31	0	computed-read	0x0	C1 alias: read = this.ReadDoubleWord(APB2SleepClock) (full read of the base register, side effects included); a write is stored in the alias only and is NOT forwarded; no shared state	1236
+C1APB4SleepClock(RCC_C1_APB4LPENR (alias of APB4SleepClock))	0x17C	(unnamed)	31	0	computed-read	0x0	C1 alias BUG: valueProvider reads Registers.C1APB4SleepClock = itself (0x17C) -> unbounded recursion on read (should be APB4SleepClock 0x11C)	1238
