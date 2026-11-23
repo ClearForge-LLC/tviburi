@@ -1,6 +1,6 @@
 # Tviburi — north star
 
-**Status:** ratified by the merge of the 2026-11-23 rework (see §7); first drafted 2026-11-21. **Supersedes nothing.** Read before `architecture.md`.
+**Status:** ratified by Scotty on 2026-11-23, by the merge of the rework (PR #5) (see §7); first drafted 2026-11-21. **Supersedes nothing.** Read before `architecture.md`.
 **Authors:** Grok (seed, 2026-11-21); Claude, co-architect (rework, 2026-11-23) · **Gate:** Scotty · **Builder:** a separate build session.
 **Citing across repositories:** Aethelgard has its own `INV-01`…`INV-07`. From outside this repository, cite these invariants as `TVI-INV-n`. Inside it, "invariant n" is enough.
 

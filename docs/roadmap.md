@@ -1,6 +1,6 @@
 # Tviburi — roadmap
 
-**Status:** ratified by the merge of the 2026-11-23 rework (see Amendments); first drafted 2026-11-21. **Supersedes nothing.** Read after `architecture.md`.
+**Status:** ratified by Scotty on 2026-11-23, by the merge of the rework (PR #5) (see Amendments); first drafted 2026-11-21. **Supersedes nothing.** Read after `architecture.md`.
 **Authors:** Grok (seed, 2026-11-21); Claude, co-architect (rework, 2026-11-23) · **Gate:** Scotty · **Builder:** a separate build session.
 
 **What to build next** is answered from this document alone: the first work order in the earliest phase whose dependencies are met and whose gate has not passed. There is no other task list.
@@ -46,7 +46,7 @@
 
 ## Phase 2 — consumer integration
 
-**Depends on:** Phase 1's exit gate, and `OQ-05` (the licence).
+**Depends on:** Phase 1's exit gate. (`OQ-05`, the licence, is closed.)
 
 **Goal:** Aethelgard's verdicts run on the guarded models, with a refusal that blocks a gate by name.
 
@@ -92,7 +92,7 @@ Not planned until Phase 4 has run once. *(Amended 2026-11-23: was "until Phase 2
   - `1100` (a measurement) beside `0100a`;
   - after `1200`, the `13NN` guarded-path work orders are disjoint by peripheral family, and can run two at a time once CI exists.
 - **Human track:**
-  - Scotty ratifies Phase 0 by merging, decides `OQ-05`, and rules the `OQ-03` cut from `1100`'s queue;
+  - Scotty rules the `OQ-03` cut from `1100`'s queue;
   - Phase 4's input is a bench session at the Nucleo, which only Scotty can run;
   - Aethelgard's Phase 2 work orders queue behind its own package queue.
 

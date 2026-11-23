@@ -2,7 +2,7 @@
 
 A digital twin for commercial microcontrollers that refuses to claim it has simulated anything it has not actually modeled.
 
-**Status:** Phase 0: the steering documents are being ratified. One spike is built and under review (`TVI-WO-0100`, PR #4); nothing is released, and no consumer uses Tviburi yet.
+**Status:** Phase 0: the steering documents are ratified. One spike is built and under review (`TVI-WO-0100`, PR #4); nothing is released, and no consumer uses Tviburi yet.
 
 ## Where to go
 
@@ -21,3 +21,5 @@ Aethelgard is the first consumer. It will load Tviburi's guarded models into the
 ---
 
 This README points. It does not define. The invariants, the rulings, and the phases each have exactly one home.
+
+Licensed under either of MIT ([`LICENSE-MIT`](LICENSE-MIT)) or Apache-2.0 ([`LICENSE-APACHE`](LICENSE-APACHE)), at your option.

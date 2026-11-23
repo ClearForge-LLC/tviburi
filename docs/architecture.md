@@ -1,6 +1,6 @@
 # Tviburi — architecture
 
-**Status:** ratified by the merge of the 2026-11-23 rework (see §6); first drafted 2026-11-21. **Supersedes nothing.** Read after `northstar.md`.
+**Status:** ratified by Scotty on 2026-11-23, by the merge of the rework (PR #5) (see §6); first drafted 2026-11-21. **Supersedes nothing.** Read after `northstar.md`.
 **Authors:** Grok (seed, 2026-11-21); Claude, co-architect (rework, 2026-11-23) · **Gate:** Scotty · **Builder:** a separate build session.
 **Numbering:** the seed's `RUL-01`…`RUL-06` and `OQ-01`…`OQ-03` keep their numbers; `TVI-WO-0100` and the reviews cite them. New rulings continue from `RUL-07`. From outside this repository, cite them as `TVI-RUL-nn`, because Aethelgard has its own `RUL-` series.
 
@@ -137,14 +137,14 @@ There is no governing standard to trace against. The reference manual is the sta
 | OQ-02 | Whether the first fork vendors Renode or uses it as a submodule. | Scotty | **Closed 2026-11-23 by `RUL-09`:** neither |
 | OQ-03 | Minimum viable set of timer/DMA/BOR flags that must refuse before the first silicon re-check. | Scotty + builder | Phase 1's exit gate. **To be answered from data** by `TVI-WO-1100`'s coverage map (`RUL-13`) |
 | OQ-04 | Does a Tviburi-authored, cited model that reacts to a field count as "the twin's model reacts to it" under Aethelgard's `RUL-20` (2)? If yes, a ledger row can move from `ignored-by-model` to `observed`. | Aethelgard's architect, ratified by Scotty | Phase 4. **Prior, held loosely:** yes, but only for a field whose Tviburi model cites RM0433 and has passed a bench scar or an independent re-derivation. A model that shares its reading of the manual with the generator would be `same-source` (Aethelgard `INV-07`) |
-| OQ-05 | The licence for this repository. Nothing is licensed today, and a consumer cannot pin and redistribute the overlay in a published image without a licence. | Scotty | Phase 2's first release. **Prior:** MIT OR Apache-2.0, as Aethelgard, which Renode's MIT licence permits |
+| OQ-05 | The licence for this repository. | Scotty | **Closed 2026-11-23 by Scotty: MIT OR Apache-2.0**, as Aethelgard (`LICENSE-MIT`, `LICENSE-APACHE`). Renode's MIT licence permits it |
 
 ## 6. Amendments
 
 | Date | Section | Change | Rationale |
 |---|---|---|---|
 | 2026-11-21 | — | Initial version | Seed |
-| 2026-11-23 | §1, §2, §2.0–§2.2, §3, §4, §4.1, §5 | Rework (repo-genesis): ground truth measured from Aethelgard `f42a0c88` and `TVI-WO-0100`'s blind build; a corrections table; `RUL-01`, `03` and `04` amended; `RUL-07`…`RUL-15` added; `OQ-01` and `OQ-02` closed; `OQ-04` and `OQ-05` opened; security posture added | Scotty, 2026-11-23: a solid foundation for Aethelgard to consume Tviburi's output. The seed's seam (a shared trace) had no consumer on the other side (§2.1) |
+| 2026-11-23 | §1, §2, §2.0–§2.2, §3, §4, §4.1, §5 | Rework (repo-genesis): ground truth measured from Aethelgard `f42a0c88` and `TVI-WO-0100`'s blind build; a corrections table; `RUL-01`, `03` and `04` amended; `RUL-07`…`RUL-15` added; `OQ-01` and `OQ-02` closed; `OQ-04` opened; `OQ-05` opened and closed by Scotty (MIT OR Apache-2.0); security posture added | Scotty, 2026-11-23: a solid foundation for Aethelgard to consume Tviburi's output. The seed's seam (a shared trace) had no consumer on the other side (§2.1) |
 
 ## 7. Provenance
 
