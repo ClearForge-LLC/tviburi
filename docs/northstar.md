@@ -31,7 +31,7 @@ Each is a refusal that existed but could not be seen. Invariants 3, 8 and 2 belo
 ## 3. End state
 
 A firmware engineer or a generating tool points Tviburi at a firmware binary for a supported board and receives exactly one of:
-- **a pass:** a replayable trace of every register access, with a timestamp and the hash of the model that ran; or
+- **a pass:** a load witness and an end record, with no refusal, from a model whose hash the consumer pinned, carried in the consumer's own trace of the run; or
 - **a refusal:** a record that names the peripheral, the register or bit, the condition, and the model, at the first access the model cannot answer for, and a run status that no consumer can mistake for a pass.
 
 The gap ledger for that model is a separate, versioned artifact. A consumer records its hash and may read it by that hash, for example to predict, before running, which of its own register writes will refuse. Consumers never own the models.
@@ -50,7 +50,7 @@ The gap ledger for that model is a separate, versioned artifact. A consumer reco
 | 3 | The gap ledger is a property of the model build, not of any campaign. The model's identity is a hash of everything that executed: the compiled models, the platform description and the host simulator's build. | Two runs of the same model hash produce different gap lists; or a model file changes and the hash does not |
 | 4 | The twin holds no credential and makes no network call that could affect real silicon or a production system. | Observe any outbound connection or credential use during a run |
 | 5 | A refusal names the peripheral, the register or bit, the condition, and the model version, and locates the access (program counter, and virtual time where it can). "Not supported" is not a refusal. | Read any refusal; one lacking those fields falsifies |
-| 6 | The trace records every register access the firmware issued, including the refused one, with a timestamp relative to virtual time. | Compare a known sequence of writes against the trace; a missing access falsifies |
+| 6 | Every record the twin emits locates the access that caused it; the consumer's trace carries the records and the model and ledger hashes. Tviburi owns no trace. *(Amended 2026-11-23, Scotty: was "the trace records every register access", which no component owned.)* | Find a record that does not locate its access, or a consumer's trace of a guarded run that lacks its records or either hash |
 | 7 | Downstream consumers record the gap-ledger hash and read the ledger by it. They do not copy or restate the gaps. | Find a consumer that copies the gap list instead of the hash |
 | 8 | A run fails closed at the boundary its consumer invokes. If any refusal was recorded, or the run cannot show that the refusal runtime and the hashed model are what executed, the run's status is not a pass. | Remove the refusal runtime, crash the simulator, or trigger a refusal, and observe a pass status at the consumer's entry point |
 
@@ -79,6 +79,7 @@ The gap ledger for that model is a separate, versioned artifact. A consumer reco
 | 2026-11-23 | header, §2, §3, §5, §6 | The status names its ratification; `TVI-INV-n` for cross-repository citations; the blind build's four failures added to §2 as evidence; Aethelgard's use stated in §3; two non-goals and one failure added | The repo-genesis rework (Scotty, 2026-11-23: "give us a solid foundation for consuming Tvi output to make Aet better and not fully reliant upon Renode alone") |
 | 2026-11-23 | §4: 2, 3, 5, 7 | **2** scoped to Tviburi-authored models, with inherited models listed as unaudited. **3** defines the model's identity as everything that executed. **5** locates the access. **7** allows reading the ledger by hash | 2 was false on the first day: every inherited Renode model cites nothing (review of PR #2, ruling 6). 3 failed in practice: a hash followed an environment variable, not the compiled shim (verdict run Y5b). 5: the blind build's record carries a PC, and virtual time is quantum-granular mid-access (`TVI-WO-0100` FEEDBACK Q4). 7: a consumer that cannot read the ledger cannot predict refusals |
 | 2026-11-23 | §4: 8 (new) | **8** a run fails closed at the consumer's entry point | Both builds of `TVI-WO-0100` printed a refusal through a process that exited 0 in some path (verdict §2, item 10 and R9). The consumer gates on exit status, so a refusal it cannot see is a silent pass one layer out |
+| 2026-11-23 | §3, §4: 6 | **6** replaced: every record locates its access, and the consumer's trace carries the records and both hashes; Tviburi owns no trace. §3's pass restated to match | The old 6 promised a trace that `architecture.md` §1 and §2.1 say Tviburi does not produce, with no owner (review A11 (a); `docs/reviews/2026-11-23-mythos-5-2-tviburi.response.md` §5). Ruled by Scotty, 2026-11-23 |
 
 ## 8. Provenance
 

@@ -125,7 +125,7 @@ Not planned until Phase 4 has run once. *(Amended 2026-11-23: was "until Phase 2
   - after `1300` and `1200`, the `13NN` guarded-path work orders are disjoint by peripheral family. They can run two at a time.
 - **Human track:**
   - Scotty rules the `OQ-03` cut. `1150` (v) has joined ArduPilot's 5 s log to `1100`'s queue; a longer or armed window comes first (`OQ-03`);
-  - Scotty rules the replacement for northstar invariant 6 (the review response, "For Scotty");
+  - ~~Scotty rules the replacement for northstar invariant 6~~ ruled 2026-11-23, as the review response proposed;
   - Phase 4's input is a bench session at the Nucleo, which only Scotty can run;
   - Aethelgard's Phase 2 work orders queue behind its own package queue.
 
