@@ -1,0 +1,4 @@
+10c10
+< history-path = /var/lib/aethelgard/aethelgard-264-1795429938005376823/tool/.config/renode/history
+---
+> history-path = /out/work/.config/renode/history

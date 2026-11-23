@@ -1,0 +1,14 @@
+[00:00:00.000000000]  [INFO] Including script(s): /repo/model/Refusal.cs
+[00:00:00.000000000]  [INFO] System bus created.
+[00:00:00.000000000]  [INFO] spi1: {"tviburi":"witness","seq":0,"guard":"GuardedSTM32H7_SPI","model_version":"sha256:bfdbc2a486ed6cafc8354972bccb684aad280e0e9d0f48057e9ccd658b95eb49"}
+[00:00:00.000000000]  [INFO] Pseudorandom Number Generator was created with seed: 2100
+[00:00:00.000000000]  [INFO] sysbus: Loading block of 8 bytes length at 0x8000000.
+[00:00:00.000000000]  [INFO] sysbus: Loading block of 62 bytes length at 0x8000008.
+[00:00:00.000000000]  [INFO] cpu: Setting initial values: PC = 0x8000009, SP = 0x20020000.
+[00:00:00.000000000]  [INFO] machine-0: Machine started.
+[00:00:00.000000000]  [WARNING] spi1: Unhandled write to offset 0x0. Unhandled bits: [12] when writing value 0x1000. Tags: SSI (0x1).
+[00:00:00.000000000]  [WARNING] spi1: Unhandled write to offset 0xC. Unhandled bits: [26] when writing value 0x4400000. Tags: SSM (0x1).
+[00:00:00.000000000]  [WARNING] spi1: Unhandled write to offset 0x0. Unhandled bits: [12] when writing value 0x1001. Tags: SSI (0x1).
+[00:00:00.001000000]  [INFO] machine-0: Machine paused.
+[00:00:00.001000000]  [INFO] spi1: {"tviburi":"end","seq":1,"guard":"GuardedSTM32H7_SPI","model_version":"sha256:bfdbc2a486ed6cafc8354972bccb684aad280e0e9d0f48057e9ccd658b95eb49"}
+[00:00:00.001000000]  [INFO] machine-0: Disposed.

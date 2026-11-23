@@ -1,0 +1,13 @@
+[00:00:00.000000000]  [INFO] Including script(s): /repo/model/Refusal.cs
+[00:00:00.000000000]  [INFO] System bus created.
+[00:00:00.000000000]  [INFO] spi1: {"tviburi":"witness","seq":0,"guard":"GuardedSTM32H7_SPI","model_version":"sha256:bfdbc2a486ed6cafc8354972bccb684aad280e0e9d0f48057e9ccd658b95eb49"}
+[00:00:00.000000000]  [INFO] Pseudorandom Number Generator was created with seed: 2100
+[00:00:00.000000000]  [INFO] sysbus: Loading block of 8 bytes length at 0x8000000.
+[00:00:00.000000000]  [INFO] sysbus: Loading block of 56 bytes length at 0x8000008.
+[00:00:00.000000000]  [INFO] cpu: Setting initial values: PC = 0x8000009, SP = 0x20020000.
+[00:00:00.000000000]  [INFO] machine-0: Machine started.
+[00:00:00.000000000]  [WARNING] spi1: Unhandled write to offset 0xC. Unhandled bits: [26] when writing value 0x4400000. Tags: SSM (0x1).
+[00:00:00.000000000]  [ERROR] spi1: {"tviburi":"refusal","seq":1,"rule":"TVI-SPI-MODF","peripheral":"sysbus.spi1","register":"SPI_CR1 / SPI_CFG2","bit":"CR1.SSI (bit 12) = 0","condition":"master mode with software SS management and the internal SS input at its active level (SSM=1, SSI=0, SSIOP=0): silicon sets SR.MODF (bit 9), forces CR1.SPE to 0 and clears CFG2.MASTER; the stock model implements none of these","model_version":"sha256:bfdbc2a486ed6cafc8354972bccb684aad280e0e9d0f48057e9ccd658b95eb49","citation":"RM0433 Rev 9 §50.5.2 p2184; §50.4.7 p2165, Figure 618 p2167; §50.11.4 p2221 (SSM, SSIOP); §50.11.6 p2225 (SR.MODF)","state":"CR1 last passed=0x00000000, CFG2 last passed=0x04400000, IOLOCK latched=no, master history=CR1=0x00000000, CFG2=0x04400000","access":{"offset":"0x0","value":"0x1","width":32,"pc":"0x0800002A","virtual_time":"00:00:00.000000000"}}
+[00:00:00.001000000]  [INFO] machine-0: Machine paused.
+[00:00:00.001000000]  [INFO] spi1: {"tviburi":"end","seq":2,"guard":"GuardedSTM32H7_SPI","model_version":"sha256:bfdbc2a486ed6cafc8354972bccb684aad280e0e9d0f48057e9ccd658b95eb49"}
+[00:00:00.001000000]  [INFO] machine-0: Disposed.

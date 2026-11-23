@@ -1,0 +1,479 @@
+[00:00:00.000000000] [INFO] Loaded monitor commands from: /opt/renode/scripts/monitor.py
+Renode, version 1.17.0 (1.17.0+20260907gitf1dd1b4af.aet1605)
+
+(monitor) emulation SetSeed 2100;  emulation SetGlobalQuantum "0.000100000";  logFile @/out/spray.modeldir.both.logfile.txt;  include @/repo/model/Refusal.cs;  include @/repo/model/GuardedSTM32H7_SPI.cs;  mach create;  machine LoadPlatformDescription @/repo/model/tviburi-nucleo-h753zi.repl;  sysbus LoadELF @/out/fw-spray.elf;  cpu VectorTableOffset 0x08000000;  emulation RunFor "0.001";  echo "TVI1150-AFTER-RUN";  sysbus ReadDoubleWord 0x20000104;  peripherals;  quit
+[00:00:00.000000000] [INFO] Including script(s): /repo/model/Refusal.cs
+[00:00:00.000000000] [INFO] System bus created.
+[00:00:00.000000000] [INFO] spi1: {"tviburi":"witness","seq":0,"guard":"GuardedSTM32H7_SPI","model_version":"sha256:bfdbc2a486ed6cafc8354972bccb684aad280e0e9d0f48057e9ccd658b95eb49"}
+[00:00:00.000000000] [INFO] Pseudorandom Number Generator was created with seed: 2100
+[00:00:00.000000000] [INFO] sysbus: Loading block of 8 bytes length at 0x8000000.
+[00:00:00.000000000] [INFO] sysbus: Loading block of 237 bytes length at 0x8000008.
+[00:00:00.000000000] [INFO] cpu: Setting initial values: PC = 0x8000009, SP = 0x20020000.
+[00:00:00.000000000] [INFO] machine-0: Machine started.
+[00:00:00.000000000] [WARNING] spi1: Unhandled write to offset 0x4. Unhandled bits: [18, 20-22, 25-26, 28-30] when writing value 0x7674227B. Tags: TSER (0x7674).
+[00:00:00.000000000] [WARNING] spi1: Unhandled write to offset 0x4. Unhandled bits: [16, 18, 20-22, 25, 28-30] when writing value 0x72756269. Tags: TSER (0x7275).
+[00:00:00.000000000] [WARNING] spi1: Unhandled write to offset 0x4. Unhandled bits: [17, 19-21, 25, 29] when writing value 0x223A2269. Tags: TSER (0x223A).
+[00:00:00.000000000] [WARNING] spi1: Unhandled write to offset 0x4. Unhandled bits: [18, 20-22, 25-27, 29-30] when writing value 0x6E746977. Tags: TSER (0x6E74).
+[00:00:00.000000000] [WARNING] spi1: Unhandled write to offset 0x4. Unhandled bits: [16-17, 20-22, 25, 29] when writing value 0x22737365. Tags: TSER (0x2273).
+[00:00:00.000000000] [WARNING] spi1: Unhandled write to offset 0x4. Unhandled bits: [16-17, 20-22, 24, 26, 29-30] when writing value 0x6573222C. Tags: TSER (0x6573).
+[00:00:00.000000000] [WARNING] spi1: Unhandled write to offset 0x4. Unhandled bits: [17, 19-21, 28-29] when writing value 0x303A2271. Tags: TSER (0x303A).
+[00:00:00.000000000] [WARNING] spi1: Unhandled write to offset 0x8. Unhandled bits: [5-6, 9, 13, 18, 20-22, 25-26, 28-30] when writing value 0x7674227B. Tags: FTHLV (0x3), UDRCFG (0x1), RESERVED (0x1), CRCSIZE (0x14), RESERVED (0x1), CRCEN (0x1), RESERVED (0xC), MBR (0x7).
+[00:00:00.000000000] [WARNING] spi1: Unhandled write to offset 0x8. Unhandled bits: [5-6, 9, 13, 16, 18, 20-22, 25, 28-30] when writing value 0x72756269. Tags: FTHLV (0x3), UDRCFG (0x1), RESERVED (0x1), CRCSIZE (0x15), RESERVED (0x1), CRCEN (0x1), RESERVED (0x4), MBR (0x7).
+[00:00:00.000000000] [WARNING] spi1: Unhandled write to offset 0x8. Unhandled bits: [5-6, 9, 13, 17, 19-21, 25, 29] when writing value 0x223A2269. Tags: FTHLV (0x3), UDRCFG (0x1), RESERVED (0x1), CRCSIZE (0x1A), RESERVED (0x1), RESERVED (0x4), MBR (0x2).
+[00:00:00.000000000] [WARNING] spi1: Unhandled write to offset 0x8. Unhandled bits: [5-6, 8, 11, 13, 18, 20-22, 25-27, 29-30] when writing value 0x6E746977. Tags: FTHLV (0xB), UDRDET (0x1), RESERVED (0x1), CRCSIZE (0x14), RESERVED (0x1), CRCEN (0x1), RESERVED (0x1C), MBR (0x6).
+[00:00:00.000000000] [WARNING] spi1: Unhandled write to offset 0x8. Unhandled bits: [5-6, 8-9, 12-13, 16-17, 20-22, 25, 29] when writing value 0x22737365. Tags: FTHLV (0xB), UDRCFG (0x1), UDRDET (0x2), RESERVED (0x1), CRCSIZE (0x13), RESERVED (0x1), CRCEN (0x1), RESERVED (0x4), MBR (0x2).
+[00:00:00.000000000] [WARNING] spi1: Unhandled write to offset 0x8. Unhandled bits: [5, 9, 13, 16-17, 20-22, 24, 26, 29-30] when writing value 0x6573222C. Tags: FTHLV (0x1), UDRCFG (0x1), RESERVED (0x1), CRCSIZE (0x13), RESERVED (0x1), CRCEN (0x1), RESERVED (0xA), MBR (0x6).
+[00:00:00.000000000] [WARNING] spi1: Unhandled write to offset 0x8. Unhandled bits: [5-6, 9, 13, 17, 19-21, 28-29] when writing value 0x303A2271. Tags: FTHLV (0x3), UDRCFG (0x1), RESERVED (0x1), CRCSIZE (0x1A), RESERVED (0x1), MBR (0x3).
+[00:00:00.000000000] [WARNING] spi1: Unhandled write to offset 0x8. Unhandled bits: [5-6] when writing value 0x7D. Tags: FTHLV (0x3).
+[00:00:00.000000000] [WARNING] spi1: Unhandled write to offset 0x10. Unhandled bits: [4-6, 9, 13, 18, 20-22, 25-26, 28-30] when writing value 0x7674227B. Tags: TXTFIE (0x1), UDRIE (0x1), OVRIE (0x1), MODFIE (0x1), RESERVED (0xECE84).
+[00:00:00.000000000] [WARNING] spi1: Unhandled write to offset 0x10. Unhandled bits: [5-6, 9, 13-14, 16, 18, 20-22, 25, 28-30] when writing value 0x72756269. Tags: UDRIE (0x1), OVRIE (0x1), MODFIE (0x1), RESERVED (0xE4EAC).
+[00:00:00.000000000] [WARNING] spi1: Unhandled write to offset 0x10. Unhandled bits: [5-6, 9, 13, 17, 19-21, 25, 29] when writing value 0x223A2269. Tags: UDRIE (0x1), OVRIE (0x1), MODFIE (0x1), RESERVED (0x44744).
+[00:00:00.000000000] [WARNING] spi1: Unhandled write to offset 0x10. Unhandled bits: [2, 4-6, 8, 11, 13-14, 18, 20-22, 25-27, 29-30] when writing value 0x6E746977. Tags: DXPIE (0x1), TXTFIE (0x1), UDRIE (0x1), OVRIE (0x1), TIFREIE (0x1), RESERVED (0xDCE8D).
+[00:00:00.000000000] [WARNING] spi1: Unhandled write to offset 0x10. Unhandled bits: [2, 5-6, 8-9, 12-14, 16-17, 20-22, 25, 29] when writing value 0x22737365. Tags: DXPIE (0x1), UDRIE (0x1), OVRIE (0x1), TIFREIE (0x1), MODFIE (0x1), RESERVED (0x44E6E).
+[00:00:00.000000000] [WARNING] spi1: Unhandled write to offset 0x10. Unhandled bits: [2, 5, 9, 13, 16-17, 20-22, 24, 26, 29-30] when writing value 0x6573222C. Tags: DXPIE (0x1), UDRIE (0x1), MODFIE (0x1), RESERVED (0xCAE64).
+[00:00:00.000000000] [WARNING] spi1: Unhandled write to offset 0x10. Unhandled bits: [4-6, 9, 13, 17, 19-21, 28-29] when writing value 0x303A2271. Tags: TXTFIE (0x1), UDRIE (0x1), OVRIE (0x1), MODFIE (0x1), RESERVED (0x60744).
+[00:00:00.000000000] [WARNING] spi1: Unhandled write to offset 0x10. Unhandled bits: [2, 4-6] when writing value 0x7D. Tags: DXPIE (0x1), TXTFIE (0x1), UDRIE (0x1), OVRIE (0x1).
+[00:00:00.000000000] [WARNING] spi1: Unhandled write to offset 0x18. Unhandled bits: [0-1, 4-6, 9, 13, 18, 20-22, 25-26, 28-30] when writing value 0x7674227B. Tags: RESERVED (0x3), TXTFC (0x1), UDRC (0x1), OVRC (0x1), MODFC (0x1), RESERVED (0x76742).
+[00:00:00.000000000] [WARNING] spi1: Unhandled write to offset 0x18. Unhandled bits: [0, 5-6, 9, 13-14, 16, 18, 20-22, 25, 28-30] when writing value 0x72756269. Tags: RESERVED (0x1), UDRC (0x1), OVRC (0x1), MODFC (0x1), RESERVED (0x72756).
+[00:00:00.000000000] [WARNING] spi1: Unhandled write to offset 0x18. Unhandled bits: [0, 5-6, 9, 13, 17, 19-21, 25, 29] when writing value 0x223A2269. Tags: RESERVED (0x1), UDRC (0x1), OVRC (0x1), MODFC (0x1), RESERVED (0x223A2).
+[00:00:00.000000000] [WARNING] spi1: Unhandled write to offset 0x18. Unhandled bits: [0-2, 4-6, 8, 13-14, 18, 20-22, 25-27, 29-30] when writing value 0x6E746977. Tags: RESERVED (0x7), TXTFC (0x1), UDRC (0x1), OVRC (0x1), TIFREC (0x1), RESERVED (0x6E746).
+[00:00:00.000000000] [WARNING] spi1: Unhandled write to offset 0x18. Unhandled bits: [0, 2, 5-6, 8-9, 12-14, 16-17, 20-22, 25, 29] when writing value 0x22737365. Tags: RESERVED (0x5), UDRC (0x1), OVRC (0x1), TIFREC (0x1), MODFC (0x1), RESERVED (0x22737).
+[00:00:00.000000000] [WARNING] spi1: Unhandled write to offset 0x18. Unhandled bits: [2, 5, 9, 13, 16-17, 20-22, 24, 26, 29-30] when writing value 0x6573222C. Tags: RESERVED (0x4), UDRC (0x1), MODFC (0x1), RESERVED (0x65732).
+[00:00:00.000000000] [WARNING] spi1: Unhandled write to offset 0x18. Unhandled bits: [0, 4-6, 9, 13, 17, 19-21, 28-29] when writing value 0x303A2271. Tags: RESERVED (0x1), TXTFC (0x1), UDRC (0x1), OVRC (0x1), MODFC (0x1), RESERVED (0x303A2).
+[00:00:00.000000000] [WARNING] spi1: Unhandled write to offset 0x18. Unhandled bits: [0, 2, 4-6] when writing value 0x7D. Tags: RESERVED (0x5), TXTFC (0x1), UDRC (0x1), OVRC (0x1).
+[00:00:00.000000000] [WARNING] spi1: Unhandled write to offset 0x40, value 0x7674227B.
+[00:00:00.000000000] [WARNING] spi1: Unhandled write to offset 0x40, value 0x72756269.
+[00:00:00.000000000] [WARNING] spi1: Unhandled write to offset 0x40, value 0x223A2269.
+[00:00:00.000000000] [WARNING] spi1: Unhandled write to offset 0x40, value 0x6E746977.
+[00:00:00.000000000] [WARNING] spi1: Unhandled write to offset 0x40, value 0x22737365.
+[00:00:00.000000000] [WARNING] spi1: Unhandled write to offset 0x40, value 0x6573222C.
+[00:00:00.000000000] [WARNING] spi1: Unhandled write to offset 0x40, value 0x303A2271.
+[00:00:00.000000000] [WARNING] spi1: Unhandled write to offset 0x40, value 0x7D.
+[00:00:00.000000000] [WARNING] spi1: Unhandled write to offset 0x4C, value 0x7674227B.
+[00:00:00.000000000] [WARNING] spi1: Unhandled write to offset 0x4C, value 0x72756269.
+[00:00:00.000000000] [WARNING] spi1: Unhandled write to offset 0x4C, value 0x223A2269.
+[00:00:00.000000000] [WARNING] spi1: Unhandled write to offset 0x4C, value 0x6E746977.
+[00:00:00.000000000] [WARNING] spi1: Unhandled write to offset 0x4C, value 0x22737365.
+[00:00:00.000000000] [WARNING] spi1: Unhandled write to offset 0x4C, value 0x6573222C.
+[00:00:00.000000000] [WARNING] spi1: Unhandled write to offset 0x4C, value 0x303A2271.
+[00:00:00.000000000] [WARNING] spi1: Unhandled write to offset 0x4C, value 0x7D.
+[00:00:00.000000000] [WARNING] spi1: Unhandled write to offset 0x0. Unhandled bits: [12] when writing value 0x1000. Tags: SSI (0x1).
+[00:00:00.000000000] [WARNING] spi1: Unhandled write to offset 0xC. Unhandled bits: [26] when writing value 0x4400000. Tags: SSM (0x1).
+[00:00:00.000000000] [WARNING] spi1: Unhandled write to offset 0x0. Unhandled bits: [12] when writing value 0x1001. Tags: SSI (0x1).
+[00:00:00.001000000] [INFO] machine-0: Machine paused.
+TVI1150-AFTER-RUN
+0xAF7E0002
+Available peripherals:
+
+  sysbus (SystemBus)
+  │   
+  ├── adc3 (STM32H7_ADC)
+  │   │   <0x58026000, 0x580263FF>
+  │   │   
+  │   ├── adc3-channel0 (ADCDefaultChannelSource)
+  │   │       Address: 0
+  │   │       
+  │   ├── adc3-channel1 (ADCDefaultChannelSource)
+  │   │       Address: 1
+  │   │       
+  │   ├── adc3-channel10 (ADCDefaultChannelSource)
+  │   │       Address: 10
+  │   │       
+  │   ├── adc3-channel11 (ADCDefaultChannelSource)
+  │   │       Address: 11
+  │   │       
+  │   ├── adc3-channel12 (ADCDefaultChannelSource)
+  │   │       Address: 12
+  │   │       
+  │   ├── adc3-channel13 (ADCDefaultChannelSource)
+  │   │       Address: 13
+  │   │       
+  │   ├── adc3-channel14 (ADCDefaultChannelSource)
+  │   │       Address: 14
+  │   │       
+  │   ├── adc3-channel15 (ADCDefaultChannelSource)
+  │   │       Address: 15
+  │   │       
+  │   ├── adc3-channel16 (ADCDefaultChannelSource)
+  │   │       Address: 16
+  │   │       
+  │   ├── adc3-channel17 (ADCDefaultChannelSource)
+  │   │       Address: 17
+  │   │       
+  │   ├── adc3-channel18 (ADCDefaultChannelSource)
+  │   │       Address: 18
+  │   │       
+  │   ├── adc3-channel2 (ADCDefaultChannelSource)
+  │   │       Address: 2
+  │   │       
+  │   ├── adc3-channel3 (ADCDefaultChannelSource)
+  │   │       Address: 3
+  │   │       
+  │   ├── adc3-channel4 (ADCDefaultChannelSource)
+  │   │       Address: 4
+  │   │       
+  │   ├── adc3-channel5 (ADCDefaultChannelSource)
+  │   │       Address: 5
+  │   │       
+  │   ├── adc3-channel6 (ADCDefaultChannelSource)
+  │   │       Address: 6
+  │   │       
+  │   ├── adc3-channel7 (ADCDefaultChannelSource)
+  │   │       Address: 7
+  │   │       
+  │   ├── adc3-channel8 (ADCDefaultChannelSource)
+  │   │       Address: 8
+  │   │       
+  │   └── adc3-channel9 (ADCDefaultChannelSource)
+  │           Address: 9
+  │           
+  ├── adcM1S2 (STM32H7_ADC)
+  │   │   <0x40022000, 0x400223FF>
+  │   │   
+  │   ├── adcM1S2-channel0 (ADCDefaultChannelSource)
+  │   │       Address: 0
+  │   │       
+  │   ├── adcM1S2-channel1 (ADCDefaultChannelSource)
+  │   │       Address: 1
+  │   │       
+  │   ├── adcM1S2-channel10 (ADCDefaultChannelSource)
+  │   │       Address: 10
+  │   │       
+  │   ├── adcM1S2-channel11 (ADCDefaultChannelSource)
+  │   │       Address: 11
+  │   │       
+  │   ├── adcM1S2-channel12 (ADCDefaultChannelSource)
+  │   │       Address: 12
+  │   │       
+  │   ├── adcM1S2-channel13 (ADCDefaultChannelSource)
+  │   │       Address: 13
+  │   │       
+  │   ├── adcM1S2-channel14 (ADCDefaultChannelSource)
+  │   │       Address: 14
+  │   │       
+  │   ├── adcM1S2-channel15 (ADCDefaultChannelSource)
+  │   │       Address: 15
+  │   │       
+  │   ├── adcM1S2-channel16 (ADCDefaultChannelSource)
+  │   │       Address: 16
+  │   │       
+  │   ├── adcM1S2-channel17 (ADCDefaultChannelSource)
+  │   │       Address: 17
+  │   │       
+  │   ├── adcM1S2-channel18 (ADCDefaultChannelSource)
+  │   │       Address: 18
+  │   │       
+  │   ├── adcM1S2-channel2 (ADCDefaultChannelSource)
+  │   │       Address: 2
+  │   │       
+  │   ├── adcM1S2-channel3 (ADCDefaultChannelSource)
+  │   │       Address: 3
+  │   │       
+  │   ├── adcM1S2-channel4 (ADCDefaultChannelSource)
+  │   │       Address: 4
+  │   │       
+  │   ├── adcM1S2-channel5 (ADCDefaultChannelSource)
+  │   │       Address: 5
+  │   │       
+  │   ├── adcM1S2-channel6 (ADCDefaultChannelSource)
+  │   │       Address: 6
+  │   │       
+  │   ├── adcM1S2-channel7 (ADCDefaultChannelSource)
+  │   │       Address: 7
+  │   │       
+  │   ├── adcM1S2-channel8 (ADCDefaultChannelSource)
+  │   │       Address: 8
+  │   │       
+  │   └── adcM1S2-channel9 (ADCDefaultChannelSource)
+  │           Address: 9
+  │           
+  ├── axiSram (MappedMemory)
+  │       <0x24000000, 0x2407FFFF>
+  │       
+  ├── backupSram (MappedMemory)
+  │       <0x38800000, 0x38800FFF>
+  │       
+  ├── bdma (STM32LDMA)
+  │       <0x58025400, 0x580257FF>
+  │       
+  ├── canMessageRAM (ArrayMemory)
+  │       <0x4000AC00, 0x4000D3FF>
+  │       
+  ├── cpu (CortexM)
+  │       Slot: 0
+  │       
+  ├── crc (STM32_CRC)
+  │       <0x58024C00, 0x58024FFF>
+  │       
+  ├── crypto (STM32H7_CRYPTO)
+  │       <0x48021000, 0x480213FF>
+  │       
+  ├── dma1 (STM32DMA)
+  │       <0x40020000, 0x400203FF>
+  │       
+  ├── dma2 (STM32DMA)
+  │       <0x40020400, 0x400207FF>
+  │       
+  ├── dma2d (STM32DMA2D)
+  │       <0x52001000, 0x52001BFF>
+  │       
+  ├── dmamux1 (STM32_DMAMUX)
+  │       <0x40020800, 0x40020BFF>
+  │       
+  ├── dtcm (MappedMemory)
+  │       <0x20000000, 0x2001FFFF>
+  │       
+  ├── dwt (DWT)
+  │       <0xE0001000, 0xE0001FFF>
+  │       
+  ├── ethernet (SynopsysDWCEthernetQualityOfService)
+  │   │   <0x40028000, 0x40028BFF>
+  │   │   <0x40028C00, 0x40028DFF> [region: mtl]
+  │   │   <0x40029000, 0x400291FF> [region: dma]
+  │   │   
+  │   └── phy (EthernetPhysicalLayer)
+  │           Address: 0
+  │           
+  ├── externalFlash (MappedMemory)
+  │       <0x80000000, 0x8FFFFFFF>
+  │       
+  ├── exti (STM32H7_EXTI)
+  │       <0x58000000, 0x580003FF>
+  │       
+  ├── fdcan1 (MCAN)
+  │       <0x4000A000, 0x4000A3FF>
+  │       
+  ├── fdcan2 (MCAN)
+  │       <0x4000A400, 0x4000A7FF>
+  │       
+  ├── flashBank1 (MappedMemory)
+  │       <0x08000000, 0x080FFFFF>
+  │       
+  ├── flashBank2 (MappedMemory)
+  │       <0x08100000, 0x081FFFFF>
+  │       
+  ├── flashController (STM32H7_FlashController)
+  │       <0x52002000, 0x52002FFF>
+  │       
+  ├── fmc (PythonPeripheral)
+  │       <0x52004000, 0x52004FFF>
+  │       
+  ├── gpioPortA (STM32_GPIOPort)
+  │       <0x58020000, 0x580203FF>
+  │       
+  ├── gpioPortB (STM32_GPIOPort)
+  │   │   <0x58020400, 0x580207FF>
+  │   │   
+  │   ├── GreenLED (LED)
+  │   │       Address: 0
+  │   │       
+  │   └── RedLED (LED)
+  │           Address: 14
+  │           
+  ├── gpioPortC (STM32_GPIOPort)
+  │   │   <0x58020800, 0x58020BFF>
+  │   │   
+  │   └── UserButton1 (Button)
+  │           Address: 13
+  │           
+  ├── gpioPortD (STM32_GPIOPort)
+  │       <0x58020C00, 0x58020FFF>
+  │       
+  ├── gpioPortE (STM32_GPIOPort)
+  │   │   <0x58021000, 0x580213FF>
+  │   │   
+  │   └── YellowLED (LED)
+  │           Address: 1
+  │           
+  ├── gpioPortF (STM32_GPIOPort)
+  │       <0x58021400, 0x580217FF>
+  │       
+  ├── gpioPortG (STM32_GPIOPort)
+  │       <0x58021800, 0x58021BFF>
+  │       
+  ├── gpioPortH (STM32_GPIOPort)
+  │       <0x58021C00, 0x58021FFF>
+  │       
+  ├── gpioPortI (STM32_GPIOPort)
+  │       <0x58022000, 0x580223FF>
+  │       
+  ├── gpioPortJ (STM32_GPIOPort)
+  │       <0x58022400, 0x580227FF>
+  │       
+  ├── gpioPortK (STM32_GPIOPort)
+  │       <0x58022800, 0x58022BFF>
+  │       
+  ├── hsem (STM32H7_HardwareSemaphore)
+  │       <0x58026400, 0x580267FF>
+  │       
+  ├── i2c1 (STM32F7_I2C)
+  │       <0x40005400, 0x400057FF>
+  │       
+  ├── i2c2 (STM32F7_I2C)
+  │       <0x40005800, 0x40005BFF>
+  │       
+  ├── i2c3 (STM32F7_I2C)
+  │       <0x40005C00, 0x40005FFF>
+  │       
+  ├── i2c4 (STM32F7_I2C)
+  │       <0x58001C00, 0x58001FFF>
+  │       
+  ├── itcm (MappedMemory)
+  │       <0x00000000, 0x0000FFFF>
+  │       
+  ├── lptimer1 (STM32L0_LpTimer)
+  │       <0x40002400, 0x400027FF>
+  │       
+  ├── lptimer2 (STM32L0_LpTimer)
+  │       <0x58002400, 0x580027FF>
+  │       
+  ├── lptimer3 (STM32L0_LpTimer)
+  │       <0x58002800, 0x58002BFF>
+  │       
+  ├── lptimer4 (STM32L0_LpTimer)
+  │       <0x58002C00, 0x58002FFF>
+  │       
+  ├── lptimer5 (STM32L0_LpTimer)
+  │       <0x58003000, 0x580033FF>
+  │       
+  ├── lpuart1 (STM32F7_USART)
+  │       <0x58000C00, 0x58000FFF>
+  │       
+  ├── ltdc (STM32LTDC)
+  │       <0x50001000, 0x50001BFF>
+  │       
+  ├── nvic (NVIC)
+  │       <0xE000E000, 0xE000EFFF>
+  │       
+  ├── pwr (PythonPeripheral)
+  │       <0x58024800, 0x58024BFF>
+  │       
+  ├── qspi (STM32H7_QuadSPI)
+  │       <0x52005000, 0x52005FFF>
+  │       
+  ├── rcc (STM32H7_RCC)
+  │       <0x58024400, 0x580247FF>
+  │       
+  ├── rng (STM32_RNG)
+  │       <0x48021800, 0x48021BFF>
+  │       
+  ├── rtc (STM32F4_RTC)
+  │       <0x58004000, 0x580043FF>
+  │       
+  ├── sdmmc (STM32HSDMMC)
+  │       <0x52007000, 0x52008FFF>
+  │       
+  ├── sdramBank1 (MappedMemory)
+  │       <0xC0000000, 0xCFFFFFFF>
+  │       
+  ├── sdramBank2 (MappedMemory)
+  │       <0xD0000000, 0xDFFFFFFF>
+  │       
+  ├── spi1 (GuardedSTM32H7_SPI)
+  │       <0x40013000, 0x400133FF>
+  │       
+  ├── spi4 (STM32H7_SPI)
+  │       <0x40013400, 0x400137FF>
+  │       
+  ├── sram1 (MappedMemory)
+  │       <0x30000000, 0x3001FFFF>
+  │       
+  ├── sram2 (MappedMemory)
+  │       <0x30020000, 0x3003FFFF>
+  │       
+  ├── sram3 (MappedMemory)
+  │       <0x30040000, 0x30047FFF>
+  │       
+  ├── sram4 (MappedMemory)
+  │       <0x38000000, 0x3800FFFF>
+  │       
+  ├── sramBank1 (MappedMemory)
+  │       <0x60000000, 0x6FFFFFFF>
+  │       
+  ├── sramBank2 (MappedMemory)
+  │       <0x70000000, 0x7FFFFFFF>
+  │       
+  ├── syscfg (STM32_SYSCFG)
+  │       <0x58000400, 0x580007FF>
+  │       
+  ├── system_flash_ro (MappedMemory)
+  │       <0x1FF00000, 0x1FF1FFFF>
+  │       
+  ├── timer1 (STM32_Timer)
+  │       <0x40010000, 0x400103FF>
+  │       
+  ├── timer12 (STM32_Timer)
+  │       <0x40001800, 0x40001BFF>
+  │       
+  ├── timer13 (STM32_Timer)
+  │       <0x40001C00, 0x40001FFF>
+  │       
+  ├── timer14 (STM32_Timer)
+  │       <0x40002000, 0x400023FF>
+  │       
+  ├── timer15 (STM32_Timer)
+  │       <0x40014000, 0x400143FF>
+  │       
+  ├── timer16 (STM32_Timer)
+  │       <0x40014400, 0x400147FF>
+  │       
+  ├── timer17 (STM32_Timer)
+  │       <0x40014800, 0x40014BFF>
+  │       
+  ├── timer2 (STM32_Timer)
+  │       <0x40000000, 0x400003FF>
+  │       
+  ├── timer3 (STM32_Timer)
+  │       <0x40000400, 0x400007FF>
+  │       
+  ├── timer4 (STM32_Timer)
+  │       <0x40000800, 0x40000BFF>
+  │       
+  ├── timer5 (STM32_Timer)
+  │       <0x40000C00, 0x40000FFF>
+  │       
+  ├── timer6 (STM32_Timer)
+  │       <0x40001000, 0x400013FF>
+  │       
+  ├── timer7 (STM32_Timer)
+  │       <0x40001400, 0x400017FF>
+  │       
+  ├── timer8 (STM32_Timer)
+  │       <0x40010400, 0x400107FF>
+  │       
+  ├── uart4 (STM32F7_USART)
+  │       <0x40004C00, 0x40004FFF>
+  │       
+  ├── uart5 (STM32F7_USART)
+  │       <0x40005000, 0x400053FF>
+  │       
+  ├── uart7 (STM32F7_USART)
+  │       <0x40007800, 0x40007BFF>
+  │       
+  ├── uart8 (STM32F7_USART)
+  │       <0x40007C00, 0x40007FFF>
+  │       
+  ├── usart1 (STM32F7_USART)
+  │       <0x40011000, 0x400113FF>
+  │       
+  ├── usart2 (STM32F7_USART)
+  │       <0x40004400, 0x400047FF>
+  │       
+  ├── usart3 (STM32F7_USART)
+  │       <0x40004800, 0x40004BFF>
+  │       
+  ├── usart6 (STM32F7_USART)
+  │       <0x40011400, 0x400117FF>
+  │       
+  ├── usb1 (STM_USB)
+  │       <0x40040000, 0x4007FFFF>
+  │       
+  ├── usb2 (STM_USB)
+  │       <0x40080000, 0x400BFFFF>
+  │       
+  └── watchdog (STM32_IndependentWatchdog)
+          <0x58004800, 0x58004BFF>
+          
+Renode is quitting
+[00:00:00.001000000] [INFO] spi1: {"tviburi":"end","seq":1,"guard":"GuardedSTM32H7_SPI","model_version":"sha256:bfdbc2a486ed6cafc8354972bccb684aad280e0e9d0f48057e9ccd658b95eb49"}
+[00:00:00.001000000] [INFO] machine-0: Disposed.
