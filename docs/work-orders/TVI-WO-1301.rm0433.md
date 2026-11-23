@@ -7,6 +7,8 @@
 - The table is `model/ds12117-rev10-table9.tsv` (its own document is `TVI-WO-1301.ds12117.md`).
 - §6 lists what the architect is asked to acknowledge or rule.
 
+**The §1.1 harness named in §1–§8 was deleted at the close,** because it ran only from Furnace's scratch (ruled 2026-11-23T19:47Z). It covered the prototype, its restatement, `fields.py`, `memory-1301.sh`, `capture-gen.sh`, `smoke/`, and `replay-1301.sh`'s measurement modes. It stays in git history at `1b00410`. `replay-1301.sh accept` and the CI fixture remain.
+
 **Pages** are ST RM0433 Rev 9 (sha256 `672a9433…`), chapter 11, unless stated. They were checked against the table of contents: `GPIOx_MODER` and `GPIOx_OTYPER` p541; `OSPEEDR`, `PUPDR` p542; `IDR`, `ODR` p543; `BSRR` p544; `LCKR` pp544–545; `AFRL` p545; `AFRH` p546; the map (Table 95) pp547–548.
 
 ## 1. Sources

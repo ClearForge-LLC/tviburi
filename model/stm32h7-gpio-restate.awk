@@ -1,5 +1,5 @@
 # TVI-WO-1301: model/stm32h7-gpio-restate.repl from Renode 1.17.0's pinned platforms/cpus/stm32h7.repl (RUL-07;
-# RUL-09 (b)), as model/stm32h7-rcc-restate.awk does the RCC's. Measured at §1.1 as tests/1301/gpio-restate.awk.
+# RUL-09 (b)), as model/stm32h7-rcc-restate.awk does the RCC's. Measured at §1.1 as a prototype (in git history).
 # - Each typed port entry `gpioPortX: GPIOPort.STM32_GPIOPort @ { ... }`, with its properties and connections: the
 #   stock port cancelled (`gpioPortX: @none`), the guard declared at its address `as "gpioPortX"` with the same block
 #   (its `rcc` registration on `tviburiRcc`, as the RCC's restatement has it), the same properties and `-> syscfg`

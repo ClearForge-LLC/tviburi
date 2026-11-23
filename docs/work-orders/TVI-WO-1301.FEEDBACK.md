@@ -8,7 +8,7 @@
   - no valid path refuses (both firmwares, all 15 boots);
   - the package is declared;
   - the memory is judged in CI per 18:30Z, and passes locally as a proxy (§3).
-- **Open with the architect:** F1 and F5 (§5), asked at 19:23Z.
+- **Ruled at 19:47Z:** F1 (follow-up `TVI-WO-1301a`), F5 kept, the harness deleted, rows (§5). The merge order: 1300a (#21) first, then `main` merged here, the suite rerun, and CI re-measuring the combined file.
 - Steering documents, `README.md`, `docs/reviews/` and Aethelgard are untouched. `model/Refusal.cs` changed only as granted at 19:08Z (Q1). One PR, left unmerged.
 
 ---
@@ -89,37 +89,39 @@ Each finding was verified in the code or the manual before acting.
 - **(F3)** Recorded mode recorded only the first pin of the first rule, and latched unrecorded faults. It now records every pin and rule, and latches only what it recorded.
 - **(F10)** A second bus address now refuses.
 
-## 5. Findings and questions for the architect (asked 19:23Z)
+## 5. Findings, as ruled (2026-11-23T19:47Z)
 
-1. **F1: the stock port drives a pin's connections from ODR in every mode.** That covers LEDs, EXTI, the timers' inputs, and IDR. Silicon drives a pin from ODR only in output mode:
+1. **F1 is inherited from the stock port, and is not refused.** The stock port drives a pin's connections from ODR in every mode: LEDs, EXTI, the timers' inputs, and IDR. Silicon drives a pin from ODR only in output mode:
    - p537 (input): "The output buffer is disabled";
    - p538 (AF): "driven by the signals coming from the peripheral";
    - p539 (analog).
-   Example: after reset, BSRR = 1 on GPIOB lights GreenLED with PB0 analog. An ODR write on a timer-AF pin would override the timer's level at the consumer's motor observers.
-   **Refusing the write would refuse a valid path:** ArduPilot writes ODR = `0xFFFF` before MODER. ODR and BSRR.BS are classed `stock, wrong (…)` in the ledger. **Options:** leave it a ledger gap (the WO excludes the pins' electrical behaviour), or a later row: the guard gates each pin's output by MODER.
-2. **F5: AF mode set before AFSEL refuses `predicted-fault` on a transient state.** 139 of 168 pins print `-` at AF0. A MODER-first firmware therefore refuses at the MODER store, though silicon ends valid. (That libopencm3 orders it this way is from memory.)
-   - Neither measured firmware does it.
-   - RM0433 lists AFRx before MODER (pp534–535).
-   Built as ruled, on the state after each write. **Keep, or judge AF routing only when a peripheral asks the query (a later row)?**
-3. **Findings only:**
-   - **(F6)** RM0433 says "PK[11:8] are not used" and "PK[15:12] are not used" (pp554–555), beside p546's "x = A to J" and p548's "A to K". With no package declared, PK8 output passes (the rule is off, as ruled).
-   - **(F7)** The stock `invertedAFPins` misses PA1 AF4 (TIM15_CH1N, p89): a Renode data gap.
-   - **(F8)** PH0/PH1/PC14/PC15 are reported as GPIO while HSE/LSE use them (p540): RCC coupling.
-   - **(F9)** LCKR = 0 passes; A8 said "any write".
+   Refusing ODR/BSRR writes would refuse the valid "ODR, then MODER" order; ArduPilot's board init writes ODR = `0xFFFF` first. The ledger's ODR and BSRR.BS rows say `stock, wrong (… p537-539)`.
+   **The fix is `TVI-WO-1301a`:** the guard drives a pin's connections from ODR only in output mode, and from the peripheral in AF mode. **Its inputs, from this work order:**
+   - after reset, `GPIOB_BSRR = 0x00000001` lights `GreenLED` (PB0) with PB0 analog (silicon: dark);
+   - `GPIOC_BSRR = 0x2000` with PC13 an input fires EXTI13 and makes IDR13 read 1 (silicon: neither);
+   - an ODR or BSRR write on a timer-AF pin overrides the timer's level at the consumer's motor observers. The generated boards wire `pa8obs` and others to PA8–PA11 and PE11–PE14 (`timer1`, AF1), through `CombinedInput`, which is an OR;
+   - OTYPER = 1 then ODR = 1 drives the pin high (silicon: Hi-Z); A1 covers this one.
+2. **F5 is kept: AF mode set before AFSEL refuses `predicted-fault`.** That is the lesser error, since neither firmware does it. **A row:** once a peripheral's start asks the `WhichSignal` query, judge AF routing at the start, not at the MODER store.
+3. **Rows** (findings for the roadmap):
+   - **F6:** RM0433 says "PK[11:8] are not used" and "PK[15:12] are not used" (pp554–555), beside p546's "x = A to J" and p548's "A to K". With no package declared, PK8 output passes, as ruled.
+   - **F7: a Renode data gap.** The pinned `platforms/cpus/stm32h7.repl` (sha256 `b85cb4af…`) gives port A `invertedAFPins: [[5, 3], [7, 1, 3]]` (line 183). It lacks `[1, 4]`, so PA1's AF4 (TIM15_CH1N, DS12117 Table 9 p89) follows CH1 uninverted.
+   - **F8:** PH0/PH1 and PC14/PC15 are reported as GPIO while HSE or LSE uses them (RM0433 p540). This needs RCC coupling.
+   - **F9:** LCKR = 0 passes. It starts no key sequence and reads 0, as silicon does; A8 said "any write".
+   - **The guard-name list:** typed at 9 check calls in `tests/spike.sh` and `tests/1300/rcc.sh`. One `GUARDS` variable, after 1300a.
 4. **D3 and D5, rows for Aethelgard** (ruled): its pin data comes from ST's open pin data.
    - ST's shared H747 GPIO file gives `DSIHOST_TE` at AF13 on PA15, PB11 and PJ2, which the H753 lacks.
    - ST numbers `SPDIFRX1_IN0`–`IN3` where DS12117 has `IN1`–`IN4` (8 cells).
    No committed board uses either function.
 5. **The teardown flake (1300's §5.5), measured again.**
-   - 2 of about 80 GPIO case runs lost end records. Renode's process exited before machine disposal finished: no `Disposed` line.
-   - Both passed on three reruns. 20 bare load-and-quit runs were complete.
-   - It fails closed. Each run now needs 13 end records, and CI may meet it; a rerun is the remedy, as before.
+   - Three runs lost end records: `gpio-nopackage` and `gpio-otyper`, in one run of the 32 GPIO cases, and `rcc-resetfwd`, in one 145-check suite run. Renode's process exited before machine disposal finished.
+   - Each passed on rerun. 20 bare load-and-quit runs were complete.
+   - It fails closed. Each run now needs 13 end records, so CI may need a rerun.
 6. **Consumer side (Aethelgard Phase 2), measured, not changed.**
    - Every port reference in its platforms must name the guard's variable:
      - the untyped `gpioPortX:` blocks (chip selects, motor observers), which is the n3 trap;
      - children registered `@ gpioPortX`;
      - the package property, which no consumer platform declares today. The witness says `package: none` until it does.
-   - Its boot block changes on every board: silicon's MODER/OSPEEDR/PUPDR resets (A5).
+   - Its boot block changes on every generated board: silicon's MODER/OSPEEDR/PUPDR resets (A5).
 7. **Outside my fence, done by ruling:**
    - `.github/workflows/ci.yml` (the 19:08Z CI build);
    - `model/Refusal.cs` (Q1);
@@ -144,9 +146,9 @@ Each finding was verified in the code or the manual before acting.
 
 **Reduction pass (diff): −187 net · 2 duplicates removed · 1 dead path removed · 0 protected kept · 3 findings below.** A fresh subagent proposed the cuts; I applied three and kept the rest as findings.
 - Removed: the Python comparison, which the ruled Rust tool supersedes; the fixture's byte-identical `platform.repl`; and the guard's unread `Row.Class`.
+- **Then, as ruled at 19:47Z:** the §1.1 harness, about 590 lines that ran only from Furnace's scratch, was deleted. It is in git history at `1b00410`. `replay-1301.sh` keeps `accept` alone.
 - **Findings:**
-  1. **The §1.1 harness only reproduces §1–§8's numbers:** `proto1301.py` and its variants, `gpio-restate.awk`, `fields.py`, `memory-1301.sh`, `smoke/`, `capture-gen.sh`, and `replay-1301.sh`'s modes other than `accept`. It is about 590 lines. Keep it as evidence, or delete it and let the branch's history hold it? Your call, as in 1300.
-  2. **The 11 port names are typed at every check call** (9 copies). One `GUARDS` variable in `tests/spike.sh` would serve them all. I left that shared file's lines as 1300a will also touch them.
-  3. **`tests/1301/visual/visual.tsv` is byte-identical to the model table,** asserted in prose. An `afcheck` assertion would make it a check.
+  1. **The guard-name list** is now a row (§5 item 3).
+  2. **`tests/1301/visual/visual.tsv`** is byte-identical to the model table, asserted in prose. An `afcheck` assertion would make it a check.
 
 **Head at READY:** see the PR.
