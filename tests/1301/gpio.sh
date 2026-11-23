@@ -232,8 +232,8 @@ tviburiGpioA: @ {\
         sysbus <0x58030000, +0x400>;\
         tviburiRcc RegistrationPeripheralAlias.GPIOA\
     }' run_case twoaddr - 'sysbus ReadDoubleWord 0x58030000'
-    check "twoaddr: a port registered at a second address refuses every access, TVI-GPIO-CONFIG, unmodeled" \
-      "[ \$rc = 3 ] && first twoaddr 'r[\"rule\"] == \"TVI-GPIO-CONFIG\" and \"2 bus registrations\" in r[\"condition\"]'" ;;
+    check "twoaddr: a port registered at a second address refuses every access, TVI-GPIO-CONFIG, unmodeled; the run fails (Renode names the port by its variable, which the check was not given)" \
+      "[ \$rc = 1 ] && grep -q '\"tviburi\":\"refusal\".*\"rule\":\"TVI-GPIO-CONFIG\".*2 bus registrations' '$work/twoaddr/renode-log.txt'" ;;
   *) echo "unknown case $t" >&2; exit 2 ;;
   esac
 done
