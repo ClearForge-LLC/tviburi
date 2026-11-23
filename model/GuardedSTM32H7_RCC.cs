@@ -144,7 +144,7 @@ namespace Antmicro.Renode.Peripherals.Tviburi
                 enableName = enablePage = null;
                 return false;
             }
-            enabled = (Copy(p.EnableOffset) >> p.EnableBit & 1) != 0;
+            enabled = Enabled(p);
             enableName = p.EnableName;
             enablePage = p.EnablePage;
             return true;
@@ -162,7 +162,7 @@ namespace Antmicro.Renode.Peripherals.Tviburi
                     "TVI-WO-1300 (4): the query covers spi1, spi2, i2c1, i2c2, usart1, usart2, usart3 and rng");
             }
             var mux = muxes.Single(m => m.Def == p.Mux);
-            var enabled = (Copy(p.EnableOffset) >> p.EnableBit & 1) != 0;
+            var enabled = Enabled(p);
             var selector = p.Mux.Register + "." + p.Mux.Field + " = " + Bin(mux.Selector, p.Mux.Width);
             var citation = "RM0433 Rev 9 " + p.EnablePage + " (" + p.EnableName + "); p" + p.Mux.Page + " (" + p.Mux.Field + "); "
                 + "p371-372 (a kernel clock switch needs a clock on both inputs); p376-377 Table 62 (PERxEN gates the kernel clock)";
@@ -375,7 +375,7 @@ namespace Antmicro.Renode.Peripherals.Tviburi
             }
             var b = Base(offset);
             return RefusedPll(b, value) || RefusedPllReference(b, value) || RefusedSwitch(b, value) || RefusedField(offset, b, value)
-                || RefusedClockLoss(b, value);
+                || RefusedClockLoss(offset, b, value);
         }
 
         private void Pass(long b, uint value)
@@ -576,7 +576,7 @@ namespace Antmicro.Renode.Peripherals.Tviburi
         // loses the kernel clock it had. Evaluated on the state the write leaves: the copies take it, RCC_CR keeps what the
         // stock model keeps (the oscillator and PLL1ON clears silicon blocks, p383-386, which therefore lose nothing), and the
         // muxes settle (p371). A transition only: a peripheral that runs without a clock was refused at its start.
-        private bool RefusedClockLoss(long b, uint value)
+        private bool RefusedClockLoss(long offset, long b, uint value)
         {
             var running = guarded.Where(g => g.Value.Started && QueryKernelClock(g.Key).Running).Select(g => g.Key).ToArray();
             if(running.Length == 0)
@@ -629,11 +629,11 @@ namespace Antmicro.Renode.Peripherals.Tviburi
             var old = b == CrOffset ? inner.ReadDoubleWord(CrOffset) : Served(b);
             var written = b == CrOffset ? KeptCr(value) : value;
             var changed = Fields.Where(f => f.Offset == b && f.Class != "read-only" && f.Class != "reserved" && f.Of(old) != f.Of(written)).Select(f => f.Register + "." + f.Name + " (" + f.Bits + ") = " + f.Format(f.Of(written)));
-            records.Refuse("TVI-RCC-CLOCK", PredictedFault, RegisterAt(b), string.Join(", ", changed),
+            records.Refuse("TVI-RCC-CLOCK", PredictedFault, RegisterAt(offset), string.Join(", ", changed),
                 lost + " is enabled (SPE = 1) and this write stops its kernel clock: " + after.Condition,
                 (after.Condition.Contains("has not switched") ? "RM0433 Rev 9 §8.5.10 p371 (\"no clock will be provided to the peripheral\"); " : "RM0433 Rev 9 ")
                     + after.Citation.Substring("RM0433 Rev 9 ".Length),
-                State(), b, value, 32);
+                State(), offset, value, 32);
             return true;
         }
 
@@ -792,6 +792,11 @@ namespace Antmicro.Renode.Peripherals.Tviburi
             return copies[offset];
         }
 
+        private bool Enabled(ClockedPeripheral p)
+        {
+            return (Copy(p.EnableOffset) >> p.EnableBit & 1) != 0;
+        }
+
         private static uint ResetValue(long offset)
         {
             switch(offset)
@@ -922,8 +927,8 @@ namespace Antmicro.Renode.Peripherals.Tviburi
 
         private static readonly int[] DivmShift = { 0, 4, 12, 20 };
         private static readonly string[] PllSourceName = { "hsi_ck", "csi_ck", "hse_ck", "no clock" };
-        private static readonly long[] CopiedOffsets = { PllckselrOffset, PllcfgrOffset, 0x04C, 0x050, 0x054, 0x058,
-            0x0D4, 0x0D8, 0x0DC, 0x0E0, 0x0E4, 0x0E8, 0x0EC, 0x0F0, 0x0F4 };
+        private static readonly long[] EnableOffsets = { 0x0D4, 0x0D8, 0x0DC, 0x0E0, 0x0E4, 0x0E8, 0x0EC, 0x0F0, 0x0F4 };
+        private static readonly long[] CopiedOffsets = new[] { PllckselrOffset, PllcfgrOffset, 0x04C, 0x050, 0x054, 0x058 }.Concat(EnableOffsets).ToArray();
 
         private const long CrOffset = 0x000;
         private const long CfgrOffset = 0x010;
@@ -934,7 +939,6 @@ namespace Antmicro.Renode.Peripherals.Tviburi
         private const long PllcfgrOffset = 0x02C;
         private const long Pll1divrOffset = 0x030;
         private const uint DivrReset = 0x01010280;
-        private static readonly long[] EnableOffsets = { 0x0D4, 0x0D8, 0x0DC, 0x0E0, 0x0E4, 0x0E8, 0x0EC, 0x0F0, 0x0F4 };
         private const uint CrHsion = 1u << 0;
         private const uint CrCsion = 1u << 7;
         private const uint CrHsi48on = 1u << 12;

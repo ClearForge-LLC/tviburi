@@ -82,6 +82,10 @@ console() { "$src/scripts/monitor-output" "$work/$1/renode.out"; }
 run='emulation RunFor "0.001"'
 after='sysbus ReadDoubleWord 0x20000104'
 
+rule_bits() { # rule_bits <name>: each refusal's rule and bit, one per line
+  python3 -I -c 'import json, sys; print("\n".join(r["rule"] + " " + r["bit"] for r in (json.loads(l[8:]) for l in open(sys.argv[1]) if l.startswith("REFUSAL "))))' "$work/$1.stdout"
+}
+
 first_kernel() { # first_kernel <name> <python expr over r, the first refusal>
   records "$1" "len(recs) >= 1 and (lambda r: $2)(recs[0])"
 }
@@ -343,12 +347,12 @@ sys.exit(0 if [(r[\"rule\"], r[\"bit\"]) for r in recs] == [(\"TVI-RCC-CLOCK\", 
       "[ \$rc = 3 ] && records unheld 'len(recs) == 1 and recs[0][\"rule\"] == \"TVI-SPI-ENABLE\" and recs[0][\"kind\"] == \"unmodeled\" and \"holds it registered\" in recs[0][\"condition\"]'" ;;
   relost-sel|relost-pll)
     case $t in
-      relost-sel) fw=lost-sel; more='sysbus WriteDoubleWord 0x58024400 0x00000001'; want='[(\"TVI-RCC-CLOCK\", \"RCC_D2CCIP1R.SPI123SEL (14:12) = 001\"), (\"TVI-RCC-CLOCK\", \"RCC_CR.PLL1ON (bit 24) = 0\")]' ;;
-      relost-pll) fw=lost-pll; more='sysbus WriteDoubleWord 0x580244F0 0x00000000'; want='[(\"TVI-RCC-CLOCK\", \"RCC_CR.PLL1ON (bit 24) = 0\"), (\"TVI-RCC-CLOCK\", \"RCC_APB2ENR.SPI1EN (bit 12) = 0\")]' ;;
+      relost-sel) fw=lost-sel; more='sysbus WriteDoubleWord 0x58024400 0x00000001'; first='RCC_D2CCIP1R.SPI123SEL (14:12) = 001'; second='RCC_CR.PLL1ON (bit 24) = 0' ;;
+      relost-pll) fw=lost-pll; more='sysbus WriteDoubleWord 0x580244F0 0x00000000'; first='RCC_CR.PLL1ON (bit 24) = 0'; second='RCC_APB2ENR.SPI1EN (bit 12) = 0' ;;
     esac
     run_case "$t" "$fw" "$run" 'echo "R-SEL"' 'sysbus ReadDoubleWord 0x58024450' "$more"
     check "$t (adversarial): after a refused loss the guard's state is the pre-write state (D2CCIP1R reads 0), so a second, different loss refuses too" \
-      "[ \$rc = 3 ] && console $t | grep -A1 -x 'R-SEL' | tail -n1 | grep -qx '0x00000000' && records $t '[(r[\"rule\"], r[\"bit\"]) for r in recs] == $want'" ;;
+      '[ $rc = 3 ] && console $t | grep -A1 -x R-SEL | tail -n1 | grep -qx 0x00000000 && [ "$(rule_bits $t)" = "$(printf "TVI-RCC-CLOCK %s\nTVI-RCC-CLOCK %s" "$first" "$second")" ]' ;;
   divr2rmw)
     run_case divr2rmw - 'sysbus WriteDoubleWord 0x58024438 0x0101018F' 'sysbus WriteDoubleWord 0x58024400 0x04000001' 'echo "R-DIVR2"' 'sysbus ReadDoubleWord 0x58024438' \
       'sysbus WriteDoubleWord 0x58024438 0x0101008F' 'sysbus WriteDoubleWord 0x58024438 0x0101008E'
