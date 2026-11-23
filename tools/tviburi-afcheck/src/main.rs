@@ -10,6 +10,10 @@
 //!   name       the rest.
 //! Exit 0 only if every presence and name disagreement is a row of RULED.tsv, every RULED row still disagrees
 //! with the class it was ruled under, and nothing is af-number. Exit 1 otherwise, naming each failure; 2 on bad input.
+//!
+//! tviburi-afcheck csharp TABLE.tsv LQFP144.tsv prints the two constants model/GuardedSTM32_GPIOPort.cs carries,
+//! `AfTable` and `Lqfp144`, so the guard's data is generated from the committed tables, never typed; the unit tests
+//! check the guard's copies against them.
 use std::collections::{BTreeMap, BTreeSet};
 use std::process::ExitCode;
 
@@ -142,6 +146,36 @@ pub fn compare(table: &BTreeMap<(String, u8), String>, st: &BTreeMap<(String, u8
     out
 }
 
+/// The guard's `AfTable`: per pin `PIN:PAGE:cell0,cell1,...,cell15`, pins in table order, joined by `;`. A cell is
+/// printed text (`-` blank); none holds `:`, `,` or `;` (checked), so the C# literal needs no escape.
+pub fn csharp_table(table: &BTreeMap<(String, u8), String>, pages: &BTreeMap<String, String>) -> Result<String, String> {
+    let mut pins: Vec<&String> = table.keys().map(|(p, _)| p).collect::<BTreeSet<_>>().into_iter().collect();
+    pins.sort_by_key(|p| pin_key(p));
+    let mut out = Vec::new();
+    for p in pins {
+        let cells: Vec<&str> = (0..16u8).map(|a| table[&(p.clone(), a)].as_str()).collect();
+        if let Some(c) = cells.iter().find(|c| c.contains([':', ',', ';', '"', '\\'])) {
+            return Err(format!("{p}: a cell the encoding cannot carry: {c}"));
+        }
+        out.push(format!("{}:{}:{}", p, pages.get(p).ok_or(format!("{p}: no page"))?, cells.join(",")));
+    }
+    Ok(out.join(";"))
+}
+
+/// The guard's `Lqfp144`: per pin `PIN:PACKAGEPIN:TABLE8PAGE`, `-` where not bonded, joined by `;`.
+pub fn csharp_bonding(lqfp: &str) -> Result<String, String> {
+    lqfp.lines().skip(1).map(|l| {
+        let f: Vec<&str> = l.split('\t').collect();
+        if f.len() != 6 { return Err(format!("bonding line {l:?}: 6 fields expected")); }
+        Ok(format!("{}:{}:{}", f[1], f[2], f[3]))
+    }).collect::<Result<Vec<_>, _>>().map(|v| v.join(";"))
+}
+
+/// Each pin's page in the table file (one page per row).
+pub fn table_pages(text: &str) -> BTreeMap<String, String> {
+    text.lines().skip(1).filter_map(|l| { let f: Vec<&str> = l.split('\t').collect(); (f.len() == 5).then(|| (f[1].to_string(), f[4].to_string())) }).collect()
+}
+
 /// The verdict: every failure, by line. Empty is a pass.
 pub fn verdict(rows: &[Row], ruled: &BTreeMap<(String, String, u8), String>) -> Vec<String> {
     let mut fails = Vec::new();
@@ -165,8 +199,19 @@ pub fn verdict(rows: &[Row], ruled: &BTreeMap<(String, String, u8), String>) -> 
 
 fn main() -> ExitCode {
     let a: Vec<String> = std::env::args().collect();
+    if a.len() == 4 && a[1] == "csharp" {
+        let r = || -> Result<(String, String), String> {
+            let t = std::fs::read_to_string(&a[2]).map_err(|e| format!("{}: {}", a[2], e))?;
+            let l = std::fs::read_to_string(&a[3]).map_err(|e| format!("{}: {}", a[3], e))?;
+            Ok((csharp_table(&read_table(&t)?, &table_pages(&t))?, csharp_bonding(&l)?))
+        };
+        return match r() {
+            Ok((t, l)) => { println!("        private const string AfTable = \"{t}\";"); println!("        private const string Lqfp144 = \"{l}\";"); ExitCode::SUCCESS }
+            Err(e) => { eprintln!("tviburi-afcheck: {e}"); ExitCode::from(2) }
+        };
+    }
     if a.len() != 5 {
-        eprintln!("usage: tviburi-afcheck TABLE.tsv GPIO-MODES.xml ALIASES.tsv RULED.tsv");
+        eprintln!("usage: tviburi-afcheck TABLE.tsv GPIO-MODES.xml ALIASES.tsv RULED.tsv | csharp TABLE.tsv LQFP144.tsv");
         return ExitCode::from(2);
     }
     let read = |p: &str| std::fs::read_to_string(p).map_err(|e| format!("{}: {}", p, e));
@@ -264,6 +309,21 @@ mod tests {
         let planted = m.replace("\tPK0\t-\t", "\tPK0\t145\t");
         assert_ne!(planted, m);
         assert!(package_disagreements(&planted, &f, &t).iter().any(|x| x.starts_with("PK0:")));
+    }
+
+    #[test]
+    fn the_guard_carries_the_committed_tables_and_a_changed_cell_is_caught() {
+        let r = |p: &str| std::fs::read_to_string(format!("{}/{}", ROOT, p)).unwrap();
+        let (t, l, g) = (r("model/ds12117-rev10-table9.tsv"), r("model/ds12117-rev10-lqfp144.tsv"), r("model/GuardedSTM32_GPIOPort.cs"));
+        let table = csharp_table(&read_table(&t).unwrap(), &table_pages(&t)).unwrap();
+        let bond = csharp_bonding(&l).unwrap();
+        let line = |name: &str, v: &str| format!("        private const string {name} = \"{v}\";");
+        assert!(g.lines().any(|x| x == line("AfTable", &table)), "the guard's AfTable is not the committed table: regenerate with `tviburi-afcheck csharp`");
+        assert!(g.lines().any(|x| x == line("Lqfp144", &bond)), "the guard's Lqfp144 is not the committed bonding: regenerate");
+        let planted = t.replace("\tPA5\t5\tSPI1_SCK/I2S1_CK\t", "\tPA5\t5\t-\t");
+        assert_ne!(planted, t);
+        let changed = csharp_table(&read_table(&planted).unwrap(), &table_pages(&planted)).unwrap();
+        assert!(!g.lines().any(|x| x == line("AfTable", &changed)));
     }
 
     #[test]
