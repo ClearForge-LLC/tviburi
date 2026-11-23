@@ -1,6 +1,6 @@
 # TVI-WO-1150 — the seam spike: results
 
-**Status:** (i)–(iv) and (vii) measured; (v) and (vi) in progress. **WO §7's first stop fired at (i):** no `.repl` form re-types a stock instance. The architect ruled at 11:00Z to continue, and added (vii).
+**Status:** (i)–(iv) and (vii) measured; (vi)'s cost measured, **and WO §7's third stop fired there** (the three-file overlay exceeds 1 GiB on ArduPilot); (v)'s recorded run done; the rest of (v) and (vi) waits on a ruling. **WO §7's first stop fired at (i):** no `.repl` form re-types a stock instance. The architect ruled at 11:00Z to continue, and added (vii).
 **Predictions:** `predictions.md`, commit `f26ed6c`, before any run.
 **Setup, for every item:**
 - **Aethelgard:** `main` at `7dec1d7b`, cloned read-only to `~/tvi-1150-aet` with its push URL disabled. Its CLI and `aethelgard-bridge` were built from that clone (`cargo build --locked`) into this worktree's untracked `target-aet/`.
@@ -185,9 +185,32 @@ The guard is a spike copy (`overlay/Records1150.cs`, `overlay/GuardedSpi1150.cs`
 
 ---
 
-## (v)–(vi)
+## (vi), cost: measured early, and **WO §7's third stop fired**
 
-Being measured, in order.
+**Order.** The cost runs were made right after (v)'s recorded run, because they share its replay, and before (v)'s access log. (v)'s access log and (vi)'s reset half wait on the architect (end of this section).
+
+**Method** (`harness/replay-ap.sh`; every run in `cost-runs.txt`):
+- **The replay:** Aethelgard `7dec1d7b`'s own Renode invocation for `simulate --spec crates/aethelgard-cli/tests/fixtures/sentinel-02-own.json --firmware arducopter.elf --foreign 5000ms` (captured by `harness/capture-foreign.sh`; the CLI's verdict for that boot: pass).
+  - Replayed in the pinned image, with the CLI's environment and configuration, without its sandbox and reaper.
+  - **The ELF:** sha256 `a799dfb6633537e74a8c3b7d8b6a464f185c255e377a612b7f9fcf8378dab1ef`, 2,502,044 B, the held `~/.cache/aet-4240v/ardupilot/arducopter.elf`, CI's `generated-sentinel-02` ArduPilot Copter-4.7.2.
+- **The overlay:** the spike guard (release A) on `spi1` and `spi2`. Those are the two SPI instances `sentinel-02-own`'s emitted platform declares itself, so the class map is applied by changing their type string. It is included before `mach create`.
+- **Memory:** what the CLI's reaper measures, the peak over 100 ms samples of the summed VmRSS of Renode's processes (`run.rs` L1090–1165). The kernel's VmHWM agrees within 0.5 %.
+  - **Calibration:** the CLI's own verdict for the captured boot says `peak_rss_kib` 818,220 (780 ‰ of the bound). The replay's stock runs, without the sandbox, read 827,084–854,908.
+- **Load-only:** Aethelgard's plain-load commands (`renode.rs` `commands()`): its two models, `mach create`, the platform, `peripherals`, `quit`. These were run without and with the overlay, three pairs, for the compile cost to the listing.
+
+| Shape | ArduPilot boot, 5 s, peak KiB (runs) | Against 1 GiB (1,048,576 KiB) | Load to `peripherals`: wall s / peak KiB |
+|---|---|---|---|
+| stock | 827,084; 844,624; 847,348; 854,908 (and **1,379,148**, at 26.4 s wall under load 16) | 79–82 % | 2.90–3.05 / 618,116–644,020 |
+| **overlay, 3 files** (`TviburiRelease.cs`, `Records1150.cs`, `GuardedSpi1150.cs`) | enforcing 1,118,536; 1,126,168; 1,135,488; 1,144,632. Recorded 1,176,720 | **107–112 %: over in every run** | 3.36–3.43 / 801,460–823,444 |
+| overlay, 2 files (the constant, plus both models in one file) | 1,014,372; 1,022,976 | 97–98 %: under, by 25–34 MiB | 3.17–3.69 / 796,788–816,544 |
+| overlay, 1 file (all three in one compilation) | 885,668; 899,160 | 84–86 % | 3.11–3.51 / 725,964–728,424 |
+
+**Readings:**
+- **The memory cost is per compilation, not per line of code.** The same code costs about +290 MiB as three `include @` files, about +170 MiB as two, and about +45 MiB as one. On the load-only boot it is about +170, +165 and +90 MiB, against a stock 618–644 MiB. Aethelgard's own two models are already compiled in the stock boot. Why each extra compilation costs this much was not determined.
+- **Wall time is not the constraint here:** 9.1–10.4 s per ArduPilot boot with or without the overlay, and +0.3–0.6 s to the listing. **The stock outlier is:** at host load 16, one stock boot took 26.4 s and peaked at 1,379,148 KiB, over the bound with no overlay at all. That matches `AET-WO-4400f` F1 ("RSS grows with wall time under load").
+- **(iii)'s scheme puts the constant in its own file,** so a release is at least two compilations. That shape stays under the bound with a 25–34 MiB margin, at this host load.
+
+**Stop (WO §7):** the overlay, shipped as `0100a` ships it (one `include @` per file) plus (iii)'s constant file, **takes ArduPilot's foreign boot past the 1 GiB bound in all five runs.** That is northstar §6's "so slow or heavy" failure. Reported to the architect. (v)'s access log, its join, and (vi)'s reset and DMA measurements wait for a ruling.
 
 ---
 
