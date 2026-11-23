@@ -79,6 +79,13 @@
 - **The same code failed a run earlier** (45249617507: 1,018,148 to 1,049,556 KiB at 18.9–20.3 s a boot). This runner took 13–14 s a boot, and every configuration, `main` included, peaked about 30–40 MiB lower. **The peak follows the runner's speed** (as §8 found on Furnace, r = 0.978). On this runner, 1301 costs about 10 MiB over `main` at the median, and the margin is about 26 MiB at the worst run.
 - **For Scotty (northstar §6; `RUL-09` (a)):** the bound is judged on whatever runner GitHub gives, and runners vary. `main` alone was not measured on the slow runner. **Inferred, not measured:** the slow run's 1301 peaks less about 10 MiB give about 1,007,900 to 1,039,300 KiB, so `main` alone would likely have failed the 32 MiB-spare limit there too.
 
+## 3b. The gate on the combined tree (ruled 20:58Z)
+
+**CI run 45265963786, head `5b66c3f`** (`main` with TVI-WO-1300a merged): **green**. Acceptance, the memory step, adversarial and the mutation run (177 killed, all) each passed.
+- The ELF was `a799dfb6`.
+- **Memory peaks:** 775,980; 772,932; 773,500; 776,020; 768,856 KiB, at 15.2–16.2 s wall. All five are under 1,015,808 KiB, with 0 GPIO would-refuse.
+- **These peaks are about 200 MiB below every other measurement, and I cannot say why.** The same tree on Furnace, one run, peaked at 983,816 KiB. That boot did exactly the work of the pre-merge boots: instructions `0x53EABA5`, 4,741 CFG2 lines, 609 USART1 lines, 74,258 console lines, no record, and 1300a's 22 locked accesses. So 1300a's lock does not change what ArduPilot does. CI keeps only the summary, so its boots' work could not be compared. **Read the CI figure as this runner's, not as the overlay's cost.**
+
 ## 4. The adversarial pass (WO §5)
 
 There were two passes:
