@@ -202,3 +202,17 @@ Each consumer platform refers to the ports in up to three ways, and each must na
 - **Procedure:** PA5 in AF mode with AF6 (`-` on p89), SPI1 started.
 - **Confirms:** no SCK on PA5.
 - **Refutes:** SCK on PA5.
+
+## 7. The rulings (architect, 2026-11-23T17:52Z), and what the build does with each
+
+| Item | Ruling | The build |
+|---|---|---|
+| Stop 1, the package | The package is a property of the guard in the platform description, cited (`RUL-10`). A pin the declared package does not bond, set to output or AF (`MODER` 01 or 10), is `predicted-fault`, naming the pin, the package and the page. Input and analog writes pass. With no package declared, the rule does not run, and the witness says `package: none` | Tviburi's board declares the Nucleo's package. The bonding comes from DS12117's pin/ball table, transcribed for that package and cited by page |
+| Stop 2, the memory | Measure the reductions on the combined one file (1300a's branch plus GPIO), at least 20 runs under load like CI's. Peak, median and margin. Under 1,048,576 KiB in every run, with at least 32 MiB to spare, or stop again with what each reduction buys | §8, before any guard code |
+| Form | A subclass (`RUL-07`): the stock port is not sealed | `Tviburi.GuardedSTM32_GPIOPort`, one class for all ports |
+| A1–A10 | As classified. A5: serve silicon's reset values (invariant 1); the consumer's boot block changing is expected; MODER 11 and OSPEEDR 11 acknowledged on the valid paths. BSRR with both halves set: model RM0433's set priority (p544), or refuse as `unmodeled` naming the stock defect; never pass it | as ruled |
+| D1–D5 | DS12117 is the guard's authority. Each ST disagreement is a finding. D3 and D5 also go to FEEDBACK as rows for Aethelgard | `tests/1301/st-ruled.tsv` lists them; `tools/tviburi-afcheck` fails on anything else |
+| The comparison in CI | Yes, in Rust beside `tools/` (`RUL-14`); ST's two files committed with their BSD-3 notice and source commit | `tools/tviburi-afcheck`, `tests/1301/fixtures/st-open-pin-data/`, the suite's `afcheck` |
+| Records | One record source for the family if it fits the existing grammar; a new field is a stop; otherwise per port | see §8 |
+| AFRH | The "errata" was from the architect's research note, from memory. Record RM0433 p546 ("x = A to J") against p548 ("A to K") as a finding, and close the row | closed (`TVI-WO-1301.ds12117.md` §4) |
+| 1300a's lock | The GPIO guard adds no rule for an unclocked port | none added |

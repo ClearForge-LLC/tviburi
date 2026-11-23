@@ -16,6 +16,8 @@
 #              RCC's (RCC_AHB4ENR's GPIOxEN, for TVI-WO-1300a's lock)
 #   tracesi    as trace, with /ovl/gpio-restate-tracesi.repl: the ports reset to silicon's values (gpio-restate.awk resets=1)
 set -u
+# RUL-09 (a)'s one compilation, as tests/1300/onefile.sh: every `using` hoisted (sorted, unique), then each file's body.
+onefile() { local out=$1; shift; { grep -h '^using [A-Za-z0-9_.]*;' "$@" | sort -u; for f in "$@"; do echo; echo "// ---- $(basename "$f")"; grep -v '^using [A-Za-z0-9_.]*;' "$f"; done; } > "$out"; }
 n=$1; shift
 for mode in "$@"; do
   rm -rf /var/lib/aethelgard; cp -r /cap/$n/varlib /var/lib/aethelgard
@@ -45,7 +47,7 @@ for mode in "$@"; do
           grep -n '@ gpioPort[A-K]\|-> gpioPort[A-K]' "$plat" > /out/$n-$mode.repointed-gpio.txt
           sed -i 's/@ gpioPort\([A-K]\)/@ tviburiGpio\1/; s/-> gpioPort\([A-K]\)/-> tviburiGpio\1/g' "$plat"
           { echo; cat /ovl/gpio-restate-${mode/traceclk/trace}.repl; echo; cat /out/$n-$mode.moved-gpio.txt; } >> "$plat"
-          [ -s /tmp/onefile-$mode.cs ] || bash /repo/tests/1300/onefile.sh /tmp/onefile-$mode.cs /tmp/release/Tviburi.cs /ovl/GpioProto1301.cs
+          [ -s /tmp/onefile-$mode.cs ] || onefile /tmp/onefile-$mode.cs /tmp/release/Tviburi.cs /ovl/GpioProto1301.cs
           one=/tmp/onefile-$mode.cs
         fi
         c=${c/'mach create; '/"include @$one; mach create; "}

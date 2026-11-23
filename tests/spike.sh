@@ -18,6 +18,8 @@ ADVERSARIAL="adv-removed adv-extra-arg adv-bad-variant adv-hook adv-loglevel adv
 # acceptance group, so CI and tests/mutants.sh reach them.
 RCC_CASES=$(sed -n 's/^CASES="\(.*\)"$/\1/p' "$(dirname "$0")/1300/rcc.sh")
 ACCEPTANCE="$ACCEPTANCE $(for c in $RCC_CASES; do printf 'rcc-%s ' "$c"; done)"
+# TVI-WO-1301: DS12117 Rev 10's AF table against ST's open pin data, every disagreement ruled (tools/tviburi-afcheck).
+ACCEPTANCE="$ACCEPTANCE afcheck"
 ALL="$ACCEPTANCE $ADVERSARIAL"
 here=$(cd "$(dirname "$0")/.." && pwd)
 scratch=${TVIBURI_SCRATCH:-$HOME/.cache/tviburi}
@@ -118,6 +120,15 @@ t_unit() {
     cargo test --offline --locked --manifest-path /repo/tools/tviburi-check/Cargo.toml --target-dir /out/target &&
     cargo test --offline --locked --manifest-path /repo/tools/tviburi-release/Cargo.toml --target-dir /out/target'
   check "reference check and release program: unit tests pass" '[ $rc -eq 0 ]'
+}
+
+t_afcheck() { # TVI-WO-1301 (1): its unit tests (each a planted change it must catch), then the committed data
+  pod afcheck "$src" -- sh -c 'export PATH=/opt/cargo/bin:$PATH RUSTUP_HOME=/opt/rustup CARGO_HOME=/out/cargo-home;
+    cargo test --offline --locked --manifest-path /repo/tools/tviburi-afcheck/Cargo.toml --target-dir /out/target &&
+    cargo run --quiet --offline --locked --manifest-path /repo/tools/tviburi-afcheck/Cargo.toml --target-dir /out/target --
+      /repo/model/ds12117-rev10-table9.tsv /repo/tests/1301/fixtures/st-open-pin-data/GPIO-STM32H747_gpio_v1_0_Modes.xml
+      /repo/tests/1301/st-aliases.tsv /repo/tests/1301/st-ruled.tsv'
+  check "afcheck: the AF table agrees with ST's open pin data but for the ruled disagreements" '[ $rc -eq 0 ]'
 }
 
 t_modf() {
