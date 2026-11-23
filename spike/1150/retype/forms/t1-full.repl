@@ -1,0 +1,16 @@
+using "platforms/cpus/stm32h753.repl"
+// T1: the stock entry restated in full, with the type changed
+timer1: Tviburi1150.SpikeTimer @ {
+        sysbus 0x40010000;
+        rcc RegistrationPeripheralAlias.TIM1
+    }
+    initialLimit: 0xffff
+    frequency: 250000000
+    BreakInterrupt -> nvic@24
+    UpdateInterrupt -> nvic@25
+    [TriggerInterrupt, CommutationInterrupt] -> nvic@[26, 26]
+    CaptureCompareInterrupt -> nvic@27
+
+// Aethelgard's own update of the stock entry, as its emitter writes it (AET-WO-4400g)
+timer1:
+    frequency: 200000000

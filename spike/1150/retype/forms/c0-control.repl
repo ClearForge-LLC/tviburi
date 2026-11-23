@@ -1,0 +1,7 @@
+using "platforms/cpus/stm32h753.repl"
+spiketimer: Tviburi1150.SpikeTimer @ sysbus 0x40017000
+    initialLimit: 0xffff
+    frequency: 250000000
+
+spikercc: Tviburi1150.SpikeRcc @ sysbus 0x58027000
+    systick: nvic

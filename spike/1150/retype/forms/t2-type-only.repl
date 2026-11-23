@@ -1,0 +1,7 @@
+using "platforms/cpus/stm32h753.repl"
+// T2: the type alone
+timer1: Tviburi1150.SpikeTimer
+
+// Aethelgard's own update of the stock entry, as its emitter writes it (AET-WO-4400g)
+timer1:
+    frequency: 200000000

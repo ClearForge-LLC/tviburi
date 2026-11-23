@@ -1,0 +1,7 @@
+using "platforms/cpus/stm32h753.repl"
+// N2: NOT re-typing. The stock rcc's registration cancelled (@none), and the spike wrapper under a new name at
+// RCC's address. Every stock entry's `rcc RegistrationPeripheralAlias.X` still names the stock variable.
+rcc: @none
+
+rccg: Tviburi1150.SpikeRcc @ sysbus 0x58024400
+    systick: nvic
