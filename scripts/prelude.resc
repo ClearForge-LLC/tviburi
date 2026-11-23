@@ -1,5 +1,7 @@
-# The Tviburi machine: refusal runtime, guarded model, pinned seed, overlay. Included by the runner
-# and by tests/conditions.resc; the repository is mounted at /repo.
+# The Tviburi machine: the records log, the runtime and guarded model, a pinned seed, the overlay.
+# Included by the runner and by the tests; the repository is mounted at /repo and output at /out.
+# The log file is what tools/tviburi-check reads (RUL-11): it must be opened before the machine.
+logFile @/out/renode-log.txt
 include @/repo/model/Refusal.cs
 include @/repo/model/GuardedSTM32H7_SPI.cs
 emulation SetSeed 1

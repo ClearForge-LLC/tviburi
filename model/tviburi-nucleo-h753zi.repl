@@ -1,6 +1,6 @@
 // Tviburi overlay of Renode 1.17.0's NUCLEO-H753ZI board.
 // Stock Renode only Tags SPI1 (0x40013000, "SPI1_/_I2S1"); this registers the guarded
-// STM32H7_SPI there. Requires model/Refusal.cs and model/GuardedSTM32H7_SPI.cs to be
+// STM32H7_SPI there. Requires model/Refusal.cs (the records runtime) and model/GuardedSTM32H7_SPI.cs to be
 // included first; without them this file fails to load.
 using "platforms/boards/nucleo_h753zi.repl"
 

@@ -1,70 +1,119 @@
-// Renode's STM32H7_SPI with one refusal guard: TVI-SPI-MODF (TVI-WO-0100 spike).
+// Renode's STM32H7_SPI with refusal guards (TVI-WO-0100, TVI-WO-0100a). The rules, their truth
+// table and every page cited here: docs/work-orders/TVI-WO-0100a.rm0433.md. All citations are to
+// ST RM0433 Rev 9, chapter 50.
 //
-// Insertion point: this subclass re-implements the bus access interfaces
-// (IDoubleWordPeripheral, IWordPeripheral, IBytePeripheral), so every bus write reaches the
-// guard first; a modeled write is passed to the stock model unchanged (base.Write*). The stock
-// methods are `virtual final` and cannot be overridden; interface re-implementation is the seam
-// (measured: all three widths dispatch here, and a monitor SetHookBeforePeripheralWrite does not
-// displace it). The stock model is not modified.
+// Insertion point (RUL-07): this subclass re-implements the bus access interfaces, so every bus
+// write reaches the guard first; a write the guard passes goes to the stock model unchanged. The
+// stock methods are `virtual final`. The stock model is not modified.
 //
-// What the stock model does not model (measured on Renode 1.17.0, Infrastructure cd4b002a):
-//   - CFG2.SSM, CFG2.SSIOP, CFG2.SSOE and CR1.SSI are tags: written values are dropped and read
-//     back as 0, so the guard keeps its own copy of the last 32-bit CFG2 value written and reads
-//     SSI from the CR1 write it is evaluating;
-//   - mode fault: SPE set in master mode with the internal SS input at its active level leaves
-//     SR.MODF clear, CR1.SPE set and CFG2.MASTER set, where silicon sets MODF and clears both;
-//   - slave mode: writing CFG2.MASTER=0 is rejected with an error log and MASTER stays 1.
+// What the stock model does not model (measured on Renode 1.17.0+…aet1605): CFG2.SSM, SSIOP, SSOE
+// and CR1.SSI are tags (written values dropped, read as 0); CR1.IOLOCK is dropped; there is no mode
+// fault; slave mode is rejected. The guard therefore keeps its own copies of the last CR1 and CFG2
+// values it passed. Reads are not guarded.
 //
-// The rule, evaluated on every 32-bit CR1 write with SPE=1, passes only when a mode fault is
-// provably impossible; anything it cannot decide refuses:
-//   MASTER=1, SSM=1, SSIOP=0, SSI=1  -> pass (internal SS inactive; the stock model applies)
-//   MASTER=1, SSM=1, SSIOP=0, SSI=0  -> refuse: mode fault
-//   MASTER=1, SSM=1, SSIOP=1         -> refuse: SS polarity not handled by this guard
-//   MASTER=1, SSM=0                  -> refuse: SS input is a pin level the twin does not model
-//   MASTER=0                         -> refuse: slave mode not modeled
-// A sub-word write that overlaps CR1 or CFG2 refuses: the guard evaluates 32-bit writes only.
-// Writes the guard refuses are not passed to the model.
+// Rules. A refused write is not passed to the model.
+//   TVI-SPI-MODF   a CR1 write with SPE=1 passes only if the copies show master, Motorola mode
+//                  (SP=000), software SS (SSM=1), SSIOP=0 and SSI=1 (internal SS inactive), and no
+//                  master state other than that since reset (D1: RM0433 does not settle whether
+//                  MODF is evaluated while SPE=0, so the guard takes the side that cannot pass
+//                  falsely). Anything else refuses, by the first failing branch.
+//   TVI-SPI-IOLOCK after a CR1 write carrying IOLOCK, every CFG2 write refuses until reset.
+//   TVI-SPI-CFG2-SPE a CFG2 write while the last CR1 passed had SPE=1 refuses (write-protected).
+//   TVI-SPI-I2SMOD an I2SCFGR write with I2SMOD=1 refuses (I2S/PCM mode is not modeled).
+//   TVI-SPI-WIDTH  a 16- or 8-bit write overlapping CR1, CFG2 or I2SCFGR refuses.
+//   TVI-LOAD       (Records) the model version could not be computed: every write refuses.
 
+using System;
 using Antmicro.Renode.Core;
 using Antmicro.Renode.Peripherals.Bus;
 using Antmicro.Renode.Peripherals.SPI;
 
 namespace Antmicro.Renode.Peripherals.Tviburi
 {
-    public class GuardedSTM32H7_SPI : STM32H7_SPI, IDoubleWordPeripheral, IWordPeripheral, IBytePeripheral
+    public class GuardedSTM32H7_SPI : STM32H7_SPI, IDoubleWordPeripheral, IWordPeripheral, IBytePeripheral, IDisposable
     {
         public GuardedSTM32H7_SPI(IMachine machine) : base(machine)
         {
-            this.machine = machine;
-            Refusal.Armed(nameof(GuardedSTM32H7_SPI) + "/" + Rule);
+            records = new Records(machine, this, nameof(GuardedSTM32H7_SPI));
         }
 
+        // The base constructor calls this before `records` exists (measured): touch only the copies.
         public override void Reset()
         {
             base.Reset();
+            cr1 = 0;
             cfg2 = 0;
+            ioLock = false;
+            history = null;
+        }
+
+        public void Dispose()
+        {
+            records.End();
         }
 
         public new void WriteDoubleWord(long offset, uint value)
         {
-            if(offset == Cr1Offset && (value & Cr1Spe) != 0 && !ModeFaultImpossible(value, out var bit, out var condition))
+            if(records.LoadFailed)
             {
-                Refusal.Refuse(machine, this, Rule, "SPI_CR1 / SPI_CFG2", bit, condition, Citation,
-                    "CR1 written=0x" + value.ToString("X8") + ", " + Cfg2State(), offset, value, 32);
+                RefuseLoad(offset, value, 32);
                 return;
             }
-            if(offset == Cfg2Offset)
+            switch(offset)
             {
+            case Cr1Offset:
+                if((value & Cr1Spe) != 0 && !EnablePasses(value))
+                {
+                    return;
+                }
+                cr1 = value;
+                ioLock |= (value & Cr1IoLock) != 0;
+                NoteMasterState();
+                break;
+            case Cfg2Offset:
+                if(ioLock)
+                {
+                    records.Refuse("TVI-SPI-IOLOCK", "SPI_CFG2", "CR1.IOLOCK (bit 16) = 1",
+                        "CFG2 written after IOLOCK was set: silicon keeps the old CFG2 (\"When this bit is set, the SPI_CFG2 register content cannot be modified\"), while the stock model drops IOLOCK and would take the write. Silicon clears IOLOCK when SPE goes from 1 to 0 (p2215); that is not modeled, so the lock holds until reset",
+                        "RM0433 Rev 9 §50.11.1 p2215 (CR1.IOLOCK); §50.11.4 p2221 (CFG2 write protection)",
+                        State("CFG2 written=0x" + value.ToString("X8")), offset, value, 32);
+                    return;
+                }
+                if((cr1 & Cr1Spe) != 0)
+                {
+                    records.Refuse("TVI-SPI-CFG2-SPE", "SPI_CFG2", "CR1.SPE (bit 0) = 1",
+                        "CFG2 written while the SPI is enabled: silicon write-protects CFG2 when SPE=1 and keeps the old value; the guard's copy would take it",
+                        "RM0433 Rev 9 §50.11.1 p2217 (SPE); §50.11.4 p2221 (CFG2 write protection)",
+                        State("CFG2 written=0x" + value.ToString("X8")), offset, value, 32);
+                    return;
+                }
                 cfg2 = value;
+                NoteMasterState();
+                break;
+            case I2sCfgrOffset:
+                if((value & I2sMod) != 0)
+                {
+                    records.Refuse("TVI-SPI-I2SMOD", "SPI_I2SCFGR", "I2SCFGR.I2SMOD (bit 0) = 1",
+                        "I2S/PCM mode selected: the guard models SPI mode only, where I2SMOD must be kept at 0",
+                        "RM0433 Rev 9 §50.11.14 p2230 (I2SMOD); §50.4.9 p2171 step 2(f)",
+                        State("I2SCFGR written=0x" + value.ToString("X8")), offset, value, 32);
+                    return;
+                }
+                break;
             }
             base.WriteDoubleWord(offset, value);
         }
 
         public new void WriteWord(long offset, ushort value)
         {
+            if(records.LoadFailed)
+            {
+                RefuseLoad(offset, value, 16);
+                return;
+            }
             if(OverlapsGuarded(offset, 2))
             {
-                RefuseSubWord(offset, value, 16);
+                RefuseWidth(offset, value, 16);
                 return;
             }
             base.WriteWord(offset, value);
@@ -72,55 +121,118 @@ namespace Antmicro.Renode.Peripherals.Tviburi
 
         public new void WriteByte(long offset, byte value)
         {
+            if(records.LoadFailed)
+            {
+                RefuseLoad(offset, value, 8);
+                return;
+            }
             if(OverlapsGuarded(offset, 1))
             {
-                RefuseSubWord(offset, value, 8);
+                RefuseWidth(offset, value, 8);
                 return;
             }
             base.WriteByte(offset, value);
         }
 
-        private bool ModeFaultImpossible(uint newCr1, out string bit, out string condition)
+        // TVI-SPI-MODF at a CR1 write with SPE=1: the current state first, then the history.
+        private bool EnablePasses(uint newCr1)
+        {
+            var failure = FirstFailingBranch(cfg2, newCr1);
+            if(failure == null && history != null)
+            {
+                failure = new Branch("a master state other than the passing one, since reset: " + history,
+                    "CR1.SPE set after the SPI was configured as a master in a state where a mode fault was possible. RM0433 does not settle whether MODF is evaluated while SPE=0: against a gate, p2184 states the fault for \"the master device\" with no enable condition, and its multimaster procedure raises MODF on switching into master mode, which is done at SPE=0; for a gate, p2217 says that at SPE=0 \"any SPI operation is stopped\", and p2171 configures CFG2 before SSI. A latched MODF would block SPE and clear MASTER. The guard takes the side that cannot pass falsely (northstar invariant 1); only silicon settles it",
+                    "RM0433 Rev 9 §50.5.2 p2184; §50.11.1 p2217; §50.4.9 p2171");
+            }
+            if(failure == null)
+            {
+                return true;
+            }
+            records.Refuse(Modf, "SPI_CR1 / SPI_CFG2", failure.Bit, failure.Condition, failure.Citation,
+                State("CR1 written=0x" + newCr1.ToString("X8")), Cr1Offset, newCr1, 32);
+            return false;
+        }
+
+        // After a passed CR1 or CFG2 write: remember the first master state T1 would not pass.
+        private void NoteMasterState()
+        {
+            if(history == null && (cfg2 & Cfg2Master) != 0 && FirstFailingBranch(cfg2, cr1) != null)
+            {
+                history = "CR1=0x" + cr1.ToString("X8") + ", CFG2=0x" + cfg2.ToString("X8");
+            }
+        }
+
+        // The truth table (TVI-WO-0100a.rm0433.md §1): null only for row T1.
+        private static Branch FirstFailingBranch(uint cfg2, uint cr1)
         {
             if((cfg2 & Cfg2Master) == 0)
             {
-                bit = "CFG2.MASTER (bit 22) = 0";
-                condition = "CR1.SPE set in slave mode: the stock STM32H7_SPI model supports master mode only";
-                return false;
+                return new Branch("CFG2.MASTER (bit 22) = 0",
+                    "CR1.SPE set in slave mode: the stock STM32H7_SPI model supports master mode only (measured)",
+                    "RM0433 Rev 9 §50.11.4 p2222 (CFG2.MASTER)");
+            }
+            if((cfg2 & Cfg2Sp) != 0)
+            {
+                return new Branch("CFG2.SP[2:0] (bits 21:19) != 000",
+                    "CR1.SPE set in master mode with a serial protocol other than Motorola: in TI mode SSM, SSIOP and SSOE are not used, and the manual does not describe mode fault for a TI master, so a mode fault cannot be ruled out",
+                    "RM0433 Rev 9 §50.5.1 p2181; §50.4.9 p2171 step 2(d); §50.11.4 p2222 (SP[2:0])");
             }
             if((cfg2 & Cfg2Ssm) == 0)
             {
-                bit = "CFG2.SSM (bit 26) = 0";
-                condition = "CR1.SPE set in master mode with hardware SS management: the SS input is a pin level the twin does not model, so a mode fault (SR.MODF) cannot be ruled out";
-                return false;
+                if((cfg2 & Cfg2Ssoe) == 0)
+                {
+                    return new Branch("CFG2.SSM (bit 26) = 0, CFG2.SSOE (bit 29) = 0",
+                        "CR1.SPE set in master mode with hardware SS input: an active NSS pin level raises a mode fault, and the twin does not model the pin level",
+                        "RM0433 Rev 9 §50.4.7 p2166; §50.11.4 p2221 (SSM, SSOE)");
+                }
+                return new Branch("CFG2.SSM (bit 26) = 0, CFG2.SSOE (bit 29) = 1",
+                    "CR1.SPE set in master mode with hardware NSS output: RM0433 rules out a mode fault here (the NSS input is forced inactive), but the stock model drops SSOE, so NSS output is not modeled",
+                    "RM0433 Rev 9 §50.11.4 p2221 (SSM, SSOE); §50.4.7 p2166");
             }
             if((cfg2 & Cfg2Ssiop) != 0)
             {
-                bit = "CFG2.SSIOP (bit 28) = 1";
-                condition = "CR1.SPE set in master mode with SS active-high polarity: this guard does not handle SSIOP=1, so a mode fault (SR.MODF) cannot be ruled out";
-                return false;
+                return new Branch("CFG2.SSIOP (bit 28) = 1",
+                    "CR1.SPE set in master mode with SS active-high polarity: the manual is inconsistent on which SSI level faults (\"equal to SSIOP\" on p2165 and in Figure 618 on p2167; \"pulled low\" on p2184), so a mode fault cannot be ruled out",
+                    "RM0433 Rev 9 §50.4.7 p2165, Figure 618 p2167; §50.5.2 p2184");
             }
-            if((newCr1 & Cr1Ssi) == 0)
+            if((cr1 & Cr1Ssi) == 0)
             {
-                bit = "CR1.SSI (bit 12) = 0 with CR1.SPE (bit 0) = 1";
-                condition = "CR1.SPE set in master mode with software SS management and the internal SS input at its active level (SSM=1, SSI=0, SSIOP=0): silicon sets SR.MODF (bit 9) and clears CR1.SPE and CFG2.MASTER; the stock model implements none of these";
-                return false;
+                return new Branch("CR1.SSI (bit 12) = 0",
+                    "master mode with software SS management and the internal SS input at its active level (SSM=1, SSI=0, SSIOP=0): silicon sets SR.MODF (bit 9), forces CR1.SPE to 0 and clears CFG2.MASTER; the stock model implements none of these",
+                    "RM0433 Rev 9 §50.5.2 p2184; §50.4.7 p2165, Figure 618 p2167; §50.11.4 p2221 (SSM, SSIOP); §50.11.6 p2225 (SR.MODF)");
             }
-            bit = null;
-            condition = null;
-            return true;
+            return null;
         }
 
-        private void RefuseSubWord(long offset, ulong value, int width)
+        private void RefuseWidth(long offset, ulong value, int width)
         {
-            Refusal.Refuse(machine, this, Rule, offset < Cr1Offset + 4 ? "SPI_CR1" : "SPI_CFG2", "sub-word access",
-                width + "-bit write overlapping CR1 or CFG2: the mode-fault guard evaluates 32-bit writes only",
-                Citation, Cfg2State(), offset, value, width);
+            records.Refuse("TVI-SPI-WIDTH", RegisterAt(offset, width / 8), "sub-word access",
+                width + "-bit write overlapping CR1, CFG2 or I2SCFGR: the guards evaluate 32-bit writes only (a twin limitation; RM0433 Rev 9 §50.11 states no access width for these registers)",
+                "none: a limitation of the guard, not a behaviour of the manual", State(null), offset, value, width);
+        }
+
+        private void RefuseLoad(long offset, ulong value, int width)
+        {
+            records.Refuse("TVI-LOAD", RegisterAt(offset, width / 8), "none",
+                "write to a guarded peripheral whose model version could not be computed at load",
+                "Tviburi records contract (RUL-12); northstar invariant 5", State(null), offset, value, width);
+        }
+
+        private string State(string written)
+        {
+            return (written == null ? "" : written + ", ") + "CR1 last passed=0x" + cr1.ToString("X8") + ", CFG2 last passed=0x" + cfg2.ToString("X8")
+                + ", IOLOCK latched=" + (ioLock ? "yes" : "no") + ", master history=" + (history ?? "none");
+        }
+
+        private static string RegisterAt(long offset, int size)
+        {
+            return Overlaps(offset, size, Cr1Offset) ? "SPI_CR1" : Overlaps(offset, size, Cfg2Offset) ? "SPI_CFG2"
+                : Overlaps(offset, size, I2sCfgrOffset) ? "SPI_I2SCFGR" : "SPI offset 0x" + offset.ToString("X");
         }
 
         private static bool OverlapsGuarded(long offset, int size)
         {
-            return Overlaps(offset, size, Cr1Offset) || Overlaps(offset, size, Cfg2Offset);
+            return Overlaps(offset, size, Cr1Offset) || Overlaps(offset, size, Cfg2Offset) || Overlaps(offset, size, I2sCfgrOffset);
         }
 
         private static bool Overlaps(long offset, int size, long register)
@@ -128,22 +240,38 @@ namespace Antmicro.Renode.Peripherals.Tviburi
             return offset < register + 4 && register < offset + size;
         }
 
-        private string Cfg2State()
+        private sealed class Branch
         {
-            return "CFG2 last written=0x" + cfg2.ToString("X8");
+            public Branch(string bit, string condition, string citation)
+            {
+                Bit = bit;
+                Condition = condition;
+                Citation = citation;
+            }
+
+            public string Bit { get; }
+            public string Condition { get; }
+            public string Citation { get; }
         }
 
+        private uint cr1;
         private uint cfg2;
-        private readonly IMachine machine;
+        private bool ioLock;
+        private string history;
+        private readonly Records records;
 
-        private const string Rule = "TVI-SPI-MODF";
-        private const string Citation = "RM0433 (STM32H742/743/753/750 reference manual), SPI chapter: mode fault (MODF) error condition; SPI_CR1, SPI_CFG2 and SPI_SR register descriptions. Section number and revision not verified: no copy of the manual was available offline (TVI-WO-0100 FEEDBACK)";
+        private const string Modf = "TVI-SPI-MODF";
         private const long Cr1Offset = 0x00;
         private const long Cfg2Offset = 0x0C;
+        private const long I2sCfgrOffset = 0x50;
         private const uint Cr1Spe = 1u << 0;
         private const uint Cr1Ssi = 1u << 12;
+        private const uint Cr1IoLock = 1u << 16;
+        private const uint Cfg2Sp = 7u << 19;
         private const uint Cfg2Master = 1u << 22;
         private const uint Cfg2Ssm = 1u << 26;
         private const uint Cfg2Ssiop = 1u << 28;
+        private const uint Cfg2Ssoe = 1u << 29;
+        private const uint I2sMod = 1u << 0;
     }
 }
