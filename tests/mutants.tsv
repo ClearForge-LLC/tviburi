@@ -20,7 +20,7 @@ M16-resetHistory	model/GuardedSTM32H7_SPI.cs	            history = null;\n      
 M17-resetCfg2	model/GuardedSTM32H7_SPI.cs	            cfg2 = 0;\n	(empty)	conditions
 M18-resetCr1	model/GuardedSTM32H7_SPI.cs	            cr1 = 0;\n	(empty)	conditions
 M19-loadRefuses	model/GuardedSTM32H7_SPI.cs	            if(records.LoadFailed)\n            {\n                records.Refuse("TVI-LOAD"	            if(false)\n            {\n                records.Refuse("TVI-LOAD"	load
-M20-witness	model/Refusal.cs	                Emit(LogLevel.Info, "witness", ",\\"guard\\":" + Json(guard) + ",\\"model_version\\":" + Json(version) + ",\\"mode\\":" + Json(mode));\n	(empty)	modeled
+M20-witness	model/Refusal.cs	                Emit(LogLevel.Info, "witness", ",\\"guard\\":" + Json(guard) + ",\\"model_version\\":" + Json(version) + ",\\"mode\\":" + Json(mode) + witness);\n	(empty)	modeled
 M21-end	model/Refusal.cs	if(named)	if(false)	modeled
 M22-refusalAtError	model/Refusal.cs	Emit(LogLevel.Error, Recorded ? "would-refuse" : "refusal"	Emit(LogLevel.Info, Recorded ? "would-refuse" : "refusal"	adv-loglevel
 M23-seq	model/Refusal.cs	seq++;	(empty)	modeled
@@ -95,7 +95,7 @@ R19-unframedRecord	tools/tviburi-check/src/main.rs	if line.contains("{\\"tviburi
 M35-resetEotBySuspend	model/GuardedSTM32H7_SPI.cs	            eotBySuspend = false;\n        }	        }	conditions
 T01-modeChecked	model/Refusal.cs	if(mode != Enforcing && mode != RecordedMode)	if(false)	load
 T02-recordedKind	model/Refusal.cs	Recorded ? "would-refuse" : "refusal"	"refusal"	recorded
-T03-witnessMode	model/Refusal.cs	+ ",\\"mode\\":" + Json(mode));	+ ",\\"mode\\":" + Json(Enforcing));	recorded
+T03-witnessMode	model/Refusal.cs	+ ",\\"mode\\":" + Json(mode) + witness);	+ ",\\"mode\\":" + Json(Enforcing) + witness);	recorded
 T05-recordedPassesWrite	model/GuardedSTM32H7_SPI.cs	|| RefusedWrite(offset, value)) && !records.Recorded)	|| RefusedWrite(offset, value)))	recorded
 T06-recordedPassesRead	model/GuardedSTM32H7_SPI.cs	if(fired && !records.Recorded)	if(fired)	recorded
 T07-versionIsTheConstant	model/Refusal.cs	private readonly string version = TviburiRelease.ManifestSha256;	private readonly string version = "sha256:0000000000000000000000000000000000000000000000000000000000000000";	modeled
@@ -136,7 +136,7 @@ C22-sourceCleared	model/GuardedSTM32H7_RCC.cs	if((cr & on) != 0 && !PllReference
 C23-keptCr	model/GuardedSTM32H7_RCC.cs	kept |= bit;	;	rcc-oscsys
 F02-ack1300	tools/tviburi-release/src/main.rs	("(TVI-WO-1300 A", "TVI-WO-1300.rm0433.md	("(TVI-WO-1300 A", "TVI-WO-0100b.rm0433.md	unit rcc-ledger
 G01-afRule	model/GuardedSTM32_GPIOPort.cs	var entering = AfFaults(moder, afrl, afrh) & ~afFaulted;	var entering = 0;	gpio-blank
-G02-afOnce	model/GuardedSTM32_GPIOPort.cs	afFaulted = AfFaults(moder, base.ReadDoubleWord(AfrlOffset), base.ReadDoubleWord(AfrhOffset));	afFaulted = 0;	gpio-recorded
+G02-afOnce	model/GuardedSTM32_GPIOPort.cs	afFaulted &= AfFaults(moder, base.ReadDoubleWord(AfrlOffset), base.ReadDoubleWord(AfrhOffset));	afFaulted = 0;	gpio-recorded
 G03-package	model/GuardedSTM32_GPIOPort.cs	var entering = PackageFaults(word) & ~packageFaulted;	var entering = 0;	gpio-package
 G04-pc2Switch	model/GuardedSTM32_GPIOPort.cs	if(name == "PC2" || name == "PC3")	if(false)	gpio-pc2
 G05-bsrrPriority	model/GuardedSTM32_GPIOPort.cs	value &= ~((value & 0xFFFFu) << 16);	;	gpio-bsrr
