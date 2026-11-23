@@ -1,0 +1,371 @@
+RCC	D2CCIP1R	SPI#SEL	written	independent-rule	STM32H7_RCC.cs L403–418: every RCC_D2CCIP1R field is a tag (written value dropped, reads 0); measured, AET-WO-4230 FEEDBACK §2	458	1
+RCC	D2CCIP1R	SAI#SEL	written	independent-rule	STM32H7_RCC.cs L403–418: every RCC_D2CCIP1R field is a tag (written value dropped, reads 0); measured, AET-WO-4230 FEEDBACK §2	458	1
+RCC	D2CCIP1R	SPDIFSEL	written	independent-rule	STM32H7_RCC.cs L403–418: every RCC_D2CCIP1R field is a tag (written value dropped, reads 0); measured, AET-WO-4230 FEEDBACK §2	458	1
+RCC	D2CCIP1R	DFSDM#SEL	written	independent-rule	STM32H7_RCC.cs L403–418: every RCC_D2CCIP1R field is a tag (written value dropped, reads 0); measured, AET-WO-4230 FEEDBACK §2	458	1
+RCC	D2CCIP1R	FDCANSEL	written	independent-rule	STM32H7_RCC.cs L403–418: every RCC_D2CCIP1R field is a tag (written value dropped, reads 0); measured, AET-WO-4230 FEEDBACK §2	458	1
+RCC	D2CCIP1R	SWPSEL	written	independent-rule	STM32H7_RCC.cs L403–418: every RCC_D2CCIP1R field is a tag (written value dropped, reads 0); measured, AET-WO-4230 FEEDBACK §2	458	1
+RCC	D3CCIPR	SPI#SEL	written	independent-rule	STM32H7_RCC.cs L432–444: every RCC_D3CCIPR field is a tag (SPI6SEL L443, I2C4SEL L435)	480	1
+RCC	D3CCIPR	I#C#SEL	written	independent-rule	STM32H7_RCC.cs L432–444: every RCC_D3CCIPR field is a tag (SPI6SEL L443, I2C4SEL L435)	480	1
+RCC	D3CCIPR	LPUART#SEL	written	independent-rule	STM32H7_RCC.cs L432–444: every RCC_D3CCIPR field is a tag (SPI6SEL L443, I2C4SEL L435)	480	1
+RCC	D3CCIPR	LPTIM#SEL	written	independent-rule	STM32H7_RCC.cs L432–444: every RCC_D3CCIPR field is a tag (SPI6SEL L443, I2C4SEL L435)	480	1
+RCC	D3CCIPR	ADCSEL	written	independent-rule	STM32H7_RCC.cs L432–444: every RCC_D3CCIPR field is a tag (SPI6SEL L443, I2C4SEL L435)	480	1
+RCC	D3CCIPR	SAI#ASEL	written	independent-rule	STM32H7_RCC.cs L432–444: every RCC_D3CCIPR field is a tag (SPI6SEL L443, I2C4SEL L435)	480	1
+RCC	D3CCIPR	SAI#BSEL	written	independent-rule	STM32H7_RCC.cs L432–444: every RCC_D3CCIPR field is a tag (SPI6SEL L443, I2C4SEL L435)	480	1
+RCC	AHB4ENR	GPIOAEN	written	observed	STM32H7_RCC.cs L792 (the flag) and L1353–1365 (a write calls sysbus.SetPeripheralEnabled on the registered peripheral); AET-WO-3302 bench sheet B2's Renode column (AHB4ENR 0x3, APB1LENR 0x00200000, APB2ENR 0x1000, read back after the reference's boot; USART1EN by AET-WO-4300b FEEDBACK P2.1's image): the bit reads back only for a peripheral the platform registers	499	0
+RCC	AHB4ENR	GPIOBEN	written	observed	STM32H7_RCC.cs L795 (the flag) and L1353–1365 (a write calls sysbus.SetPeripheralEnabled on the registered peripheral); AET-WO-3302 bench sheet B2's Renode column (AHB4ENR 0x3, APB1LENR 0x00200000, APB2ENR 0x1000, read back after the reference's boot; USART1EN by AET-WO-4300b FEEDBACK P2.1's image): the bit reads back only for a peripheral the platform registers	499	0
+RCC	AHB4ENR	GPIOCEN	written	same-source		511	0
+RCC	AHB4ENR	GPIODEN	written	same-source		511	0
+RCC	AHB4ENR	GPIOEEN	written	same-source		511	0
+RCC	AHB4ENR	GPIOFEN	written	same-source		511	0
+RCC	AHB4ENR	GPIOGEN	written	same-source		511	0
+RCC	AHB4ENR	GPIOHEN	written	same-source		511	0
+RCC	AHB4ENR	GPIOIEN	written	same-source		511	0
+RCC	AHB4ENR	GPIOJEN	written	same-source		511	0
+RCC	AHB4ENR	GPIOKEN	written	same-source		511	0
+RCC	APB1LENR	TIM2EN	written	same-source		511	0
+RCC	APB1LENR	TIM3EN	written	same-source		511	0
+RCC	APB1LENR	TIM4EN	written	same-source		511	0
+RCC	APB1LENR	TIM5EN	written	same-source		511	0
+RCC	APB1LENR	TIM12EN	written	same-source		511	0
+RCC	APB1LENR	TIM13EN	written	same-source		511	0
+RCC	APB1LENR	TIM14EN	written	same-source		511	0
+RCC	APB1LENR	SPI2EN	written	observed	STM32H7_RCC.cs L887 (the flag) and L1353–1365 (a write calls sysbus.SetPeripheralEnabled on the registered peripheral); the emitted platform registers each solved SPI it adds with `rcc RegistrationPeripheralAlias.SPIn` (aethelgard-twin platform, each solved SPI's block in the emitted .repl)	499	0
+RCC	APB1LENR	SPI3EN	written	observed	STM32H7_RCC.cs L890 (the flag) and L1353–1365 (a write calls sysbus.SetPeripheralEnabled on the registered peripheral); the emitted platform registers each solved SPI it adds with `rcc RegistrationPeripheralAlias.SPIn` (aethelgard-twin platform, each solved SPI's block in the emitted .repl)	499	0
+RCC	APB1LENR	USART2EN	written	observed	STM32H7_RCC.cs L896 (the flag) and L1353–1365 (a write calls sysbus.SetPeripheralEnabled on the registered peripheral); AET-WO-4300b FEEDBACK P2.2 (four ports' images read back after the boot, measured)	499	0
+RCC	APB1LENR	USART3EN	written	observed	STM32H7_RCC.cs L899 (the flag) and L1353–1365 (a write calls sysbus.SetPeripheralEnabled on the registered peripheral); AET-WO-4300b FEEDBACK P2.2 (four ports' images read back after the boot, measured)	499	0
+RCC	APB1LENR	UART4EN	written	observed	STM32H7_RCC.cs L902 (the flag) and L1353–1365 (a write calls sysbus.SetPeripheralEnabled on the registered peripheral); AET-WO-4300b FEEDBACK P2.2 (four ports' images read back after the boot, measured)	499	0
+RCC	APB1LENR	UART5EN	written	same-source		511	0
+RCC	APB1LENR	I2C1EN	written	observed	STM32H7_RCC.cs L908 (the flag) and L1353–1365 (a write calls sysbus.SetPeripheralEnabled on the registered peripheral); AET-WO-3302 bench sheet B2's Renode column (AHB4ENR 0x3, APB1LENR 0x00200000, APB2ENR 0x1000, read back after the reference's boot; USART1EN by AET-WO-4300b FEEDBACK P2.1's image): the bit reads back only for a peripheral the platform registers	499	0
+RCC	APB1LENR	I2C2EN	written	same-source		511	0
+RCC	APB1LENR	I2C3EN	written	same-source		511	0
+RCC	APB1LENR	UART7EN	written	same-source		511	0
+RCC	APB1LENR	UART8EN	written	same-source		511	0
+RCC	APB2ENR	TIM1EN	written	observed	STM32H7_RCC.cs L952 (the flag) and L1353–1365 (a write calls sysbus.SetPeripheralEnabled on the registered peripheral); AET-WO-4300a FEEDBACK (the motor fixtures' register image, every enable register judged in full after the boot)	499	0
+RCC	APB2ENR	TIM8EN	written	same-source		511	0
+RCC	APB2ENR	USART1EN	written	observed	STM32H7_RCC.cs L959 (the flag) and L1353–1365 (a write calls sysbus.SetPeripheralEnabled on the registered peripheral); AET-WO-3302 bench sheet B2's Renode column (AHB4ENR 0x3, APB1LENR 0x00200000, APB2ENR 0x1000, read back after the reference's boot; USART1EN by AET-WO-4300b FEEDBACK P2.1's image): the bit reads back only for a peripheral the platform registers	499	0
+RCC	APB2ENR	USART6EN	written	same-source		511	0
+RCC	APB2ENR	SPI1EN	written	observed	STM32H7_RCC.cs L966 (the flag) and L1353–1365 (a write calls sysbus.SetPeripheralEnabled on the registered peripheral); the emitted platform registers each solved SPI it adds with `rcc RegistrationPeripheralAlias.SPIn` (aethelgard-twin platform, each solved SPI's block in the emitted .repl)	499	0
+RCC	APB2ENR	SPI4EN	written	observed	STM32H7_RCC.cs L969 (the flag) and L1353–1365 (a write calls sysbus.SetPeripheralEnabled on the registered peripheral); the emitted platform registers each solved SPI it adds with `rcc RegistrationPeripheralAlias.SPIn` (aethelgard-twin platform, each solved SPI's block in the emitted .repl)	499	0
+RCC	APB2ENR	TIM15EN	written	same-source		511	0
+RCC	APB2ENR	TIM16EN	written	same-source		511	0
+RCC	APB2ENR	TIM17EN	written	same-source		511	0
+RCC	APB2ENR	SPI5EN	written	observed	STM32H7_RCC.cs L983 (the flag) and L1353–1365 (a write calls sysbus.SetPeripheralEnabled on the registered peripheral); the emitted platform registers each solved SPI it adds with `rcc RegistrationPeripheralAlias.SPIn` (aethelgard-twin platform, each solved SPI's block in the emitted .repl)	499	0
+RCC	APB4ENR	SPI6EN	written	observed	STM32H7_RCC.cs L1014 (the flag) and L1353–1365 (a write calls sysbus.SetPeripheralEnabled on the registered peripheral); the emitted platform registers each solved SPI it adds with `rcc RegistrationPeripheralAlias.SPIn` (aethelgard-twin platform, each solved SPI's block in the emitted .repl)	499	0
+RCC	APB4ENR	I2C4EN	written	same-source		511	0
+RCC	AHB1ENR	ADC12EN	written	same-source		511	0
+RCC	AHB4ENR	ADC3EN	written	same-source		511	0
+RCC	CR	HSIDIV	reset	observed	STM32H7_RCC.cs L148; AET-WO-4300a FEEDBACK §0 (stored fields, each starting at 0)	570	0
+RCC	CFGR	SWS	reset	observed	STM32H7_RCC.cs L226; AET-WO-4300a FEEDBACK §0 (stored fields, each starting at 0)	570	0
+RCC	CFGR	TIMPRE	reset	observed	STM32H7_RCC.cs L231; AET-WO-4300a FEEDBACK §0 (stored fields, each starting at 0)	570	0
+RCC	D1CFGR	HPRE	reset	observed	STM32H7_RCC.cs L242; AET-WO-4300a FEEDBACK §0 (stored fields, each starting at 0)	570	0
+RCC	D1CFGR	D#PPRE	reset	observed	STM32H7_RCC.cs L243; AET-WO-4300a FEEDBACK §0 (stored fields, each starting at 0)	570	0
+RCC	D1CFGR	D#CPRE	reset	observed	STM32H7_RCC.cs L245; AET-WO-4300a FEEDBACK §0 (stored fields, each starting at 0)	570	0
+RCC	D2CFGR	D#PPRE#	reset	observed	STM32H7_RCC.cs L254, L256; AET-WO-4300a FEEDBACK §0 (stored fields, each starting at 0)	570	0
+RCC	D3CFGR	D#PPRE	reset	observed	STM32H7_RCC.cs L264; AET-WO-4300a FEEDBACK §0 (stored fields, each starting at 0)	570	0
+RCC	D1CCIPR	CKPERSEL	reset	ignored-by-model	STM32H7_RCC.cs L401: a tag, read 0 whatever was written (AET-WO-4230 FEEDBACK §2, measured for CKPERSEL, SPI123SEL, SPI45SEL, I2C123SEL)	594	0
+RCC	D2CCIP1R	SPI#SEL	reset	ignored-by-model	STM32H7_RCC.cs L408, L410: a tag, read 0 whatever was written (AET-WO-4230 FEEDBACK §2, measured for CKPERSEL, SPI123SEL, SPI45SEL, I2C123SEL)	594	0
+RCC	D2CCIP2R	USART#SEL	reset	ignored-by-model	STM32H7_RCC.cs L420–421: a tag, read 0 whatever was written (AET-WO-4230 FEEDBACK §2, measured for CKPERSEL, SPI123SEL, SPI45SEL, I2C123SEL)	594	0
+RCC	D2CCIP2R	I#C#SEL	reset	ignored-by-model	STM32H7_RCC.cs L425: a tag, read 0 whatever was written (AET-WO-4230 FEEDBACK §2, measured for CKPERSEL, SPI123SEL, SPI45SEL, I2C123SEL)	594	0
+RCC	D3CCIPR	I#C#SEL	reset	ignored-by-model	STM32H7_RCC.cs L435: a tag, read 0 whatever was written (AET-WO-4230 FEEDBACK §2, measured for CKPERSEL, SPI123SEL, SPI45SEL, I2C123SEL)	594	0
+RCC	D3CCIPR	SPI#SEL	reset	ignored-by-model	STM32H7_RCC.cs L443: a tag, read 0 whatever was written (AET-WO-4230 FEEDBACK §2, measured for CKPERSEL, SPI123SEL, SPI45SEL, I2C123SEL)	594	0
+RCC	CR	D2CKRDY	reset	ignored-by-model	STM32H7_RCC.cs L175: a tag, read 0 whatever silicon holds	609	0
+CORE	CPACR	CP#	written	same-source		621	0
+FLASH	OPTSR_CUR	BOR_LEV	reset	silicon-only		633	0
+PWR	CR3	SCUEN	written	independent-rule	the stock pwr stub (stm32h7.repl L728–745, a Python.PythonPeripheral) drops every write; the generated platform's override stores PWR_CR3's first write and D3CR.VOS (aethelgard_twin::platform::pwr_override, measured in AET-WO-4240v FEEDBACK)	685	0
+PWR	CR3	LDOEN	written	independent-rule	the stock pwr stub (stm32h7.repl L728–745, a Python.PythonPeripheral) drops every write; the generated platform's override stores PWR_CR3's first write and D3CR.VOS (aethelgard_twin::platform::pwr_override, measured in AET-WO-4240v FEEDBACK)	685	0
+PWR	CR3	BYPASS	written	independent-rule	the stock pwr stub (stm32h7.repl L728–745, a Python.PythonPeripheral) drops every write; the generated platform's override stores PWR_CR3's first write and D3CR.VOS (aethelgard_twin::platform::pwr_override, measured in AET-WO-4240v FEEDBACK)	685	0
+PWR	CR3	RES[#:#]	written	independent-rule	the stock pwr stub (stm32h7.repl L728–745, a Python.PythonPeripheral) drops every write; the generated platform's override stores PWR_CR3's first write and D3CR.VOS (aethelgard_twin::platform::pwr_override, measured in AET-WO-4240v FEEDBACK)	685	0
+PWR	CR3	RES[#]	written	independent-rule	the stock pwr stub (stm32h7.repl L728–745, a Python.PythonPeripheral) drops every write; the generated platform's override stores PWR_CR3's first write and D3CR.VOS (aethelgard_twin::platform::pwr_override, measured in AET-WO-4240v FEEDBACK)	685	0
+PWR	D3CR	VOS	written	independent-rule	the stock pwr stub (stm32h7.repl L728–745, a Python.PythonPeripheral) drops every write; the generated platform's override stores PWR_CR3's first write and D3CR.VOS (aethelgard_twin::platform::pwr_override, measured in AET-WO-4240v FEEDBACK)	685	0
+PWR	D3CR	VOSRDY	written	independent-rule	the stock pwr stub (stm32h7.repl L728–745, a Python.PythonPeripheral) drops every write; the generated platform's override stores PWR_CR3's first write and D3CR.VOS (aethelgard_twin::platform::pwr_override, measured in AET-WO-4240v FEEDBACK)	685	0
+PWR	CSR1	ACTVOSRDY	reset	silicon-only		708	0
+PWR	D3CR	VOSRDY	reset	silicon-only		708	0
+FLASH	ACR	LATENCY	reset	silicon-only		729	0
+FLASH	ACR	WRHIGHFREQ	reset	silicon-only		729	0
+RCC	CR	HSEON	written	observed	STM32H7_RCC.cs L185 (HSERDY reads HSEON); AET-WO-4240b FEEDBACK (spike/4240b/renode/results.md, Renode 1.17.0 measured): CR reads 0x00030025 after HSEON	779	0
+RCC	CR	HSEBYP	written	ignored-by-model	STM32H7_RCC.cs L186 (a tag); AET-WO-4240b FEEDBACK (spike/4240b/renode/results.md, Renode 1.17.0 measured): bit 18 written, never stored	779	0
+RCC	CR	CSSHSEON	written	silicon-only		779	0
+RCC	CR	PLL1ON	written	observed	STM32H7_RCC.cs L197 (PLL1RDY reads PLL1ON); AET-WO-4240b FEEDBACK (spike/4240b/renode/results.md, Renode 1.17.0 measured): CR reads 0x030B0025 after PLL1ON, sys_ck 64,000,000 Hz after SW	779	0
+RCC	CR	HSERDY	reset	silicon-only		787	0
+RCC	CR	PLL1RDY	reset	silicon-only		787	0
+RCC	PLLCKSELR	PLLSRC	written	independent-rule	STM32H7_RCC.cs L92–135 (sys_ck from DIVM1, DIVN1, DIVP1); AET-WO-4240b FEEDBACK (spike/4240b/renode/results.md, Renode 1.17.0 measured): PLLCKSELR and PLL1DIVR read back as written, sys_ck 64,000,000 Hz after SW on both fixtures	809	0
+RCC	PLLCKSELR	DIVM#	written	independent-rule	STM32H7_RCC.cs L92–135 (sys_ck from DIVM1, DIVN1, DIVP1); AET-WO-4240b FEEDBACK (spike/4240b/renode/results.md, Renode 1.17.0 measured): PLLCKSELR and PLL1DIVR read back as written, sys_ck 64,000,000 Hz after SW on both fixtures	809	0
+RCC	PLL1DIVR	N#	written	independent-rule	STM32H7_RCC.cs L92–135 (sys_ck from DIVM1, DIVN1, DIVP1); AET-WO-4240b FEEDBACK (spike/4240b/renode/results.md, Renode 1.17.0 measured): PLLCKSELR and PLL1DIVR read back as written, sys_ck 64,000,000 Hz after SW on both fixtures	809	0
+RCC	PLL1DIVR	P#	written	independent-rule	STM32H7_RCC.cs L92–135 (sys_ck from DIVM1, DIVN1, DIVP1); AET-WO-4240b FEEDBACK (spike/4240b/renode/results.md, Renode 1.17.0 measured): PLLCKSELR and PLL1DIVR read back as written, sys_ck 64,000,000 Hz after SW on both fixtures	809	0
+RCC	PLL1DIVR	Q#	written	independent-rule	STM32H7_RCC.cs L92–135 (sys_ck from DIVM1, DIVN1, DIVP1); AET-WO-4240b FEEDBACK (spike/4240b/renode/results.md, Renode 1.17.0 measured): PLLCKSELR and PLL1DIVR read back as written, sys_ck 64,000,000 Hz after SW on both fixtures	809	0
+RCC	PLL1DIVR	R#	written	independent-rule	STM32H7_RCC.cs L92–135 (sys_ck from DIVM1, DIVN1, DIVP1); AET-WO-4240b FEEDBACK (spike/4240b/renode/results.md, Renode 1.17.0 measured): PLLCKSELR and PLL1DIVR read back as written, sys_ck 64,000,000 Hz after SW on both fixtures	809	0
+RCC	PLLCFGR	PLL#FRACEN	written	independent-rule	STM32H7_RCC.cs L122, L291, L301–303: every RCC_PLLCFGR field the bring-up sets is a tag; AET-WO-4240b FEEDBACK (spike/4240b/renode/results.md, Renode 1.17.0 measured): written 0x30004, read back 0x01FF0000	833	1
+RCC	PLLCFGR	PLL#VCOSEL	written	independent-rule	STM32H7_RCC.cs L122, L291, L301–303: every RCC_PLLCFGR field the bring-up sets is a tag; AET-WO-4240b FEEDBACK (spike/4240b/renode/results.md, Renode 1.17.0 measured): written 0x30004, read back 0x01FF0000	833	1
+RCC	PLLCFGR	PLL#RGE	written	independent-rule	STM32H7_RCC.cs L122, L291, L301–303: every RCC_PLLCFGR field the bring-up sets is a tag; AET-WO-4240b FEEDBACK (spike/4240b/renode/results.md, Renode 1.17.0 measured): written 0x30004, read back 0x01FF0000	833	1
+RCC	PLLCFGR	DIVP#EN	written	independent-rule	STM32H7_RCC.cs L122, L291, L301–303: every RCC_PLLCFGR field the bring-up sets is a tag; AET-WO-4240b FEEDBACK (spike/4240b/renode/results.md, Renode 1.17.0 measured): written 0x30004, read back 0x01FF0000	833	1
+RCC	PLLCFGR	DIVQ#EN	written	independent-rule	STM32H7_RCC.cs L122, L291, L301–303: every RCC_PLLCFGR field the bring-up sets is a tag; AET-WO-4240b FEEDBACK (spike/4240b/renode/results.md, Renode 1.17.0 measured): written 0x30004, read back 0x01FF0000	833	1
+RCC	PLLCFGR	DIVR#EN	written	independent-rule	STM32H7_RCC.cs L122, L291, L301–303: every RCC_PLLCFGR field the bring-up sets is a tag; AET-WO-4240b FEEDBACK (spike/4240b/renode/results.md, Renode 1.17.0 measured): written 0x30004, read back 0x01FF0000	833	1
+RCC	CFGR	SW	written	observed	STM32H7_RCC.cs L219–226; AET-WO-4240b FEEDBACK (spike/4240b/renode/results.md, Renode 1.17.0 measured): CFGR reads 0x1B after SW = PLL1, sys_ck 64,000,000 Hz	846	0
+RCC	CR	HSION	written	observed	STM32H7_RCC.cs L137 (stored), L147 (HSIRDY reads HSION)	1008	0
+RCC	CR	HSIKERON	written	ignored-by-model	STM32H7_RCC.cs L146 (a tag): the written bit is dropped	1008	0
+RCC	CR	HSIRDY	written	ignored-by-model	STM32H7_RCC.cs L147 (read-only): the written bit is dropped	1008	0
+RCC	CR	HSIDIV	written	observed	STM32H7_RCC.cs L148 (stored), L1546 (hsi_ck divided by it)	1008	0
+RCC	CR	HSIDIVF	written	ignored-by-model	STM32H7_RCC.cs L158 (read-only, reads 1): the written bit is dropped	1008	0
+RCC	CR	CSION	written	observed	STM32H7_RCC.cs L160 (stored), L169 (CSIRDY reads CSION)	1008	0
+RCC	CR	CSIRDY	written	ignored-by-model	STM32H7_RCC.cs L169 (read-only): the written bit is dropped	1008	0
+RCC	CR	CSIKERON	written	ignored-by-model	STM32H7_RCC.cs L170 (a tag): the written bit is dropped	1008	0
+RCC	CR	HSI48ON	written	observed	STM32H7_RCC.cs L172 (stored), L173 (HSI48RDY reads HSI48ON)	1008	0
+RCC	CR	HSI48RDY	written	ignored-by-model	STM32H7_RCC.cs L173 (read-only): the written bit is dropped	1008	0
+RCC	CR	D1CKRDY	written	ignored-by-model	STM32H7_RCC.cs L174 (a tag): the written bit is dropped	1008	0
+RCC	CR	D2CKRDY	written	ignored-by-model	STM32H7_RCC.cs L175 (a tag): the written bit is dropped	1008	0
+RCC	CR	HSERDY	written	ignored-by-model	STM32H7_RCC.cs L185 (read-only): the written bit is dropped	1008	0
+RCC	CR	PLL1RDY	written	ignored-by-model	STM32H7_RCC.cs L197 (read-only): the written bit is dropped	1008	0
+RCC	CR	PLL2ON	written	observed	STM32H7_RCC.cs L199 (stored), L200 (PLL2RDY reads PLL2ON)	1008	0
+RCC	CR	PLL2RDY	written	ignored-by-model	STM32H7_RCC.cs L200 (read-only): the written bit is dropped	1008	0
+RCC	CR	PLL3ON	written	observed	STM32H7_RCC.cs L201 (stored), L202 (PLL3RDY reads PLL3ON)	1008	0
+RCC	CR	PLL3RDY	written	ignored-by-model	STM32H7_RCC.cs L202 (read-only): the written bit is dropped	1008	0
+RCC	CFGR	SWS	written	ignored-by-model	STM32H7_RCC.cs L226 (read-only, SW's value): the written bit is dropped	1008	0
+RCC	CFGR	STOPWUCK	written	ignored-by-model	STM32H7_RCC.cs L227 (a tag): the written bit is dropped	1008	0
+RCC	CFGR	STOPKERWUCK	written	ignored-by-model	STM32H7_RCC.cs L228 (a tag): the written bit is dropped	1008	0
+RCC	CFGR	RTCPRE	written	ignored-by-model	STM32H7_RCC.cs L229 (a tag): the written bit is dropped	1008	0
+RCC	CFGR	HRTIMSEL	written	ignored-by-model	STM32H7_RCC.cs L230 (a tag): the written bit is dropped	1008	0
+RCC	CFGR	TIMPRE	written	observed	STM32H7_RCC.cs L231 (stored), L1490–1494 (the timers' clock multiplier)	1008	0
+RCC	CFGR	MCO#PRE	written	ignored-by-model	STM32H7_RCC.cs L233, L235 (tags): the written bit is dropped	1008	0
+RCC	CFGR	MCO#	written	ignored-by-model	STM32H7_RCC.cs L234, L236 (tags): the written bit is dropped	1008	0
+RCC	PLLCKSELR	PLLSRC_CSI	written	independent-rule	STM32H7_RCC.cs L92–135 (sys_ck from DIVM1, DIVN1, DIVP1); AET-WO-4240b FEEDBACK (spike/4240b/renode/results.md, Renode 1.17.0 measured): PLLCKSELR and PLL1DIVR read back as written, sys_ck 64,000,000 Hz after SW on both fixtures	1023	0
+RCC	PLLCKSELR	PLLSRC_HSE	written	independent-rule	STM32H7_RCC.cs L92–135 (sys_ck from DIVM1, DIVN1, DIVP1); AET-WO-4240b FEEDBACK (spike/4240b/renode/results.md, Renode 1.17.0 measured): PLLCKSELR and PLL1DIVR read back as written, sys_ck 64,000,000 Hz after SW on both fixtures	1023	0
+FLASH	ACR	LATENCY	written	independent-rule	STM32H7_FlashController.cs L76–80 (LATENCY and WRHIGHFREQ stored, read back, no wait state); AET-WO-4240b FEEDBACK (spike/4240b/renode/results.md, Renode 1.17.0 measured): written 0x11, read back 0x11	1038	1
+FLASH	ACR	WRHIGHFREQ	written	independent-rule	STM32H7_FlashController.cs L76–80 (LATENCY and WRHIGHFREQ stored, read back, no wait state); AET-WO-4240b FEEDBACK (spike/4240b/renode/results.md, Renode 1.17.0 measured): written 0x11, read back 0x11	1038	1
+GPIO	OTYPER	OT#	written	ignored-by-model	AET-WO-4300b FEEDBACK §10, measured	1053	0
+GPIO	MODER	MODER#	written	same-source		1065	0
+GPIO	AFRL	AFSEL#	written	same-source		1065	0
+GPIO	AFRH	AFSEL#	written	same-source		1065	0
+GPIO	OSPEEDR	OSPEED#	written	same-source		1090	0
+GPIO	PUPDR	PUPD#	written	same-source		1090	0
+GPIO	BSRR	BS#	written	observed	AET-WO-4200 FEEDBACK (STM32_GPIOPort.cs read), AET-WO-4300 FEEDBACK §0	1104	0
+GPIO	BSRR	BR#	written	observed	AET-WO-4200 FEEDBACK (STM32_GPIOPort.cs read), AET-WO-4300 FEEDBACK §0	1104	0
+I2C	CR1	TXIE	written	independent-rule		1129	0
+I2C	CR1	RXIE	written	independent-rule		1129	0
+I2C	CR1	ADDRIE	written	independent-rule		1129	0
+I2C	CR1	NACKIE	written	independent-rule		1129	0
+I2C	CR1	STOPIE	written	independent-rule		1129	0
+I2C	CR1	TCIE	written	independent-rule		1129	0
+I2C	CR1	ERRIE	written	independent-rule		1129	0
+I2C	CR1	RXDMAEN	written	independent-rule		1129	0
+I2C	CR1	NOSTRETCH	written	independent-rule		1129	0
+I2C	CR1	DNF	written	independent-rule	AET-WO-4300b FEEDBACK §10 (pass 3, measured): DNF, ANFOFF, TXDMAEN, SBC, WUPEN, GCEN, SMBHEN, SMBDEN, ALERTEN, PECEN are not stored	1143	1
+I2C	CR1	ANFOFF	written	independent-rule	AET-WO-4300b FEEDBACK §10 (pass 3, measured): DNF, ANFOFF, TXDMAEN, SBC, WUPEN, GCEN, SMBHEN, SMBDEN, ALERTEN, PECEN are not stored	1143	1
+I2C	CR1	TXDMAEN	written	independent-rule	AET-WO-4300b FEEDBACK §10 (pass 3, measured): DNF, ANFOFF, TXDMAEN, SBC, WUPEN, GCEN, SMBHEN, SMBDEN, ALERTEN, PECEN are not stored	1143	1
+I2C	CR1	SBC	written	independent-rule	AET-WO-4300b FEEDBACK §10 (pass 3, measured): DNF, ANFOFF, TXDMAEN, SBC, WUPEN, GCEN, SMBHEN, SMBDEN, ALERTEN, PECEN are not stored	1143	1
+I2C	CR1	WUPEN	written	independent-rule	AET-WO-4300b FEEDBACK §10 (pass 3, measured): DNF, ANFOFF, TXDMAEN, SBC, WUPEN, GCEN, SMBHEN, SMBDEN, ALERTEN, PECEN are not stored	1143	1
+I2C	CR1	GCEN	written	independent-rule	AET-WO-4300b FEEDBACK §10 (pass 3, measured): DNF, ANFOFF, TXDMAEN, SBC, WUPEN, GCEN, SMBHEN, SMBDEN, ALERTEN, PECEN are not stored	1143	1
+I2C	CR1	SMBHEN	written	independent-rule	AET-WO-4300b FEEDBACK §10 (pass 3, measured): DNF, ANFOFF, TXDMAEN, SBC, WUPEN, GCEN, SMBHEN, SMBDEN, ALERTEN, PECEN are not stored	1143	1
+I2C	CR1	SMBDEN	written	independent-rule	AET-WO-4300b FEEDBACK §10 (pass 3, measured): DNF, ANFOFF, TXDMAEN, SBC, WUPEN, GCEN, SMBHEN, SMBDEN, ALERTEN, PECEN are not stored	1143	1
+I2C	CR1	ALERTEN	written	independent-rule	AET-WO-4300b FEEDBACK §10 (pass 3, measured): DNF, ANFOFF, TXDMAEN, SBC, WUPEN, GCEN, SMBHEN, SMBDEN, ALERTEN, PECEN are not stored	1143	1
+I2C	CR1	PECEN	written	independent-rule	AET-WO-4300b FEEDBACK §10 (pass 3, measured): DNF, ANFOFF, TXDMAEN, SBC, WUPEN, GCEN, SMBHEN, SMBDEN, ALERTEN, PECEN are not stored	1143	1
+I2C	CR1	PE	written	same-source		1154	0
+I2C	TIMINGR	SCLL	written	independent-rule	AET-WO-4300b FEEDBACK §10 (all of TIMINGR not stored, measured)	1165	1
+I2C	TIMINGR	SCLH	written	independent-rule	AET-WO-4300b FEEDBACK §10 (all of TIMINGR not stored, measured)	1165	1
+I2C	TIMINGR	SDADEL	written	independent-rule	AET-WO-4300b FEEDBACK §10 (all of TIMINGR not stored, measured)	1165	1
+I2C	TIMINGR	SCLDEL	written	independent-rule	AET-WO-4300b FEEDBACK §10 (all of TIMINGR not stored, measured)	1165	1
+I2C	TIMINGR	PRESC	written	independent-rule	AET-WO-4300b FEEDBACK §10 (all of TIMINGR not stored, measured)	1165	1
+I2C	CR2	SADD	written	observed	AET-WO-4220 FEEDBACK P1.3, measured	1186	0
+I2C	CR2	RD_WRN	written	observed	AET-WO-4220 FEEDBACK P1.3, measured	1186	0
+I2C	CR2	NBYTES	written	observed	AET-WO-4220 FEEDBACK P1.3, measured	1186	0
+I2C	CR2	START	written	observed	AET-WO-4220 FEEDBACK P1.3, measured	1186	0
+I2C	CR2	AUTOEND	written	same-source		1200	0
+I2C	CR2	ADD#	written	same-source		1200	0
+I2C	CR2	HEAD#R	written	same-source		1200	0
+I2C	CR2	STOP	written	same-source		1200	0
+I2C	CR2	NACK	written	same-source		1200	0
+I2C	CR2	RELOAD	written	same-source		1200	0
+I2C	CR2	PECBYTE	written	same-source		1200	0
+I2C	TXDR	TXDATA	written	observed	AET-WO-4220 FEEDBACK P1.3, measured	1211	0
+I2C	ICR	ADDRCF	written	same-source		1224	0
+I2C	ICR	NACKCF	written	same-source		1224	0
+I2C	ICR	STOPCF	written	same-source		1224	0
+I2C	ICR	BERRCF	written	same-source		1224	0
+I2C	ICR	ARLOCF	written	same-source		1224	0
+I2C	ICR	OVRCF	written	same-source		1224	0
+I2C	ICR	PECCF	written	same-source		1224	0
+I2C	ICR	TIMOUTCF	written	same-source		1224	0
+I2C	ICR	ALERTCF	written	same-source		1224	0
+SPI	CR1	SPE	written	independent-rule		1404	0
+SPI	CR1	CSTART	written	independent-rule		1404	0
+SPI	CR1	CSUSP	written	independent-rule		1404	0
+SPI	CR1	IOLOCK	written	independent-rule		1404	0
+SPI	CR1	SSI	written	independent-rule		1404	1
+SPI	CR1	MASRX	written	independent-rule		1404	1
+SPI	CR1	HDDIR	written	independent-rule		1404	1
+SPI	CR1	CRC#_#	written	independent-rule		1404	1
+SPI	CR1	RCRCINI	written	independent-rule		1404	1
+SPI	CR1	TCRCINI	written	independent-rule		1404	1
+SPI	CFG1	DSIZE	written	independent-rule		1404	0
+SPI	CFG1	RXDMAEN	written	independent-rule		1404	0
+SPI	CFG1	TXDMAEN	written	independent-rule		1404	0
+SPI	CFG1	MBR	written	independent-rule		1404	1
+SPI	CFG1	FTHLV	written	independent-rule		1404	1
+SPI	CFG1	UDRCFG	written	independent-rule		1404	1
+SPI	CFG1	UDRDET	written	independent-rule		1404	1
+SPI	CFG1	CRCSIZE	written	independent-rule		1404	1
+SPI	CFG1	CRCEN	written	independent-rule		1404	1
+SPI	CFG2	MASTER	written	independent-rule		1404	1
+SPI	CFG2	LSBFRST	written	independent-rule		1404	0
+SPI	CFG2	SSM	written	independent-rule		1404	1
+SPI	CFG2	MSSI	written	independent-rule		1404	1
+SPI	CFG2	MIDI	written	independent-rule		1404	1
+SPI	CFG2	IOSWP	written	independent-rule		1404	1
+SPI	CFG2	COMM	written	independent-rule		1404	1
+SPI	CFG2	SP	written	independent-rule		1404	1
+SPI	CFG2	CPHA	written	independent-rule		1404	1
+SPI	CFG2	CPOL	written	independent-rule		1404	1
+SPI	CFG2	SSIOP	written	independent-rule		1404	1
+SPI	CFG2	SSOE	written	independent-rule		1404	1
+SPI	CFG2	SSOM	written	independent-rule		1404	1
+SPI	CFG2	AFCNTR	written	independent-rule		1404	1
+SPI	CR2	TSIZE	written	observed	STM32H7_SPI.cs L146	1406	0
+SPI	CR2	TSER	written	ignored-by-model	STM32H7_SPI.cs L149	1416	0
+SPI	TXDR	TXDR	written	observed	STM32H7_SPI.cs L277	1426	0
+SPI	IFCR	EOTC	written	observed	STM32H7_SPI.cs L251	1436	0
+SPI	IFCR	SUSPC	written	observed	STM32H7_SPI.cs L267	1446	0
+SPI	IFCR	TXTFC	written	ignored-by-model	STM32H7_SPI.cs L258: a tag	1466	0
+SPI	IFCR	UDRC	written	ignored-by-model	STM32H7_SPI.cs L259: a tag	1466	0
+SPI	IFCR	OVRC	written	ignored-by-model	STM32H7_SPI.cs L260: a tag	1466	0
+SPI	IFCR	CRCEC	written	ignored-by-model	STM32H7_SPI.cs L261: a tag	1466	0
+SPI	IFCR	TIFREC	written	ignored-by-model	STM32H7_SPI.cs L262: a tag	1466	0
+SPI	IFCR	MODFC	written	ignored-by-model	STM32H7_SPI.cs L263: a tag	1466	0
+SPI	IFCR	TSERFC	written	ignored-by-model	STM32H7_SPI.cs L266: a tag	1466	0
+SPI	SR	MODF	reset	ignored-by-model	STM32H7_SPI.cs L238, L188	1468	0
+USART	BRR	DIV_FRACTION	written	independent-rule		1483	0
+USART	BRR	DIV_MANTISSA	written	independent-rule		1483	0
+USART	CR1	UE	written	observed	AET-WO-4300b FEEDBACK §0 (STM32F7_USART.cs read): a TDR write reaches the backend only through TransmitCharacter, when TE and UE are set; UARTBase.cs L80–92: an injected byte is queued only when RE and UE are set	1503	0
+USART	CR1	TE	written	observed	AET-WO-4300b FEEDBACK §0 (STM32F7_USART.cs read): a TDR write reaches the backend only through TransmitCharacter, when TE and UE are set; UARTBase.cs L80–92: an injected byte is queued only when RE and UE are set	1503	0
+USART	CR1	RE	written	observed	AET-WO-4300b FEEDBACK §0 (STM32F7_USART.cs read): a TDR write reaches the backend only through TransmitCharacter, when TE and UE are set; UARTBase.cs L80–92: an injected byte is queued only when RE and UE are set	1503	0
+USART	CR1	RXNEIE_RXFNEIE	written	same-source		1516	0
+USART	CR1	TCIE	written	same-source		1516	0
+USART	CR1	TXEIE_TXFNFIE	written	same-source		1516	0
+USART	CR1	PEIE	written	same-source		1516	0
+USART	CR1	PS	written	same-source		1516	0
+USART	CR1	PCE	written	same-source		1516	0
+USART	CR1	OVER#	written	same-source		1516	0
+USART	CR1	RTOIE	written	same-source		1516	0
+USART	CR1	UESM	written	ignored-by-model	AET-WO-4300b FEEDBACK §0, P4.1, measured	1532	0
+USART	CR1	IDLEIE	written	ignored-by-model	AET-WO-4300b FEEDBACK §0, P4.1, measured	1532	0
+USART	CR1	WAKE	written	ignored-by-model	AET-WO-4300b FEEDBACK §0, P4.1, measured	1532	0
+USART	CR1	M#	written	ignored-by-model	AET-WO-4300b FEEDBACK §0, P4.1, measured	1532	0
+USART	CR1	MME	written	ignored-by-model	AET-WO-4300b FEEDBACK §0, P4.1, measured	1532	0
+USART	CR1	CMIE	written	ignored-by-model	AET-WO-4300b FEEDBACK §0, P4.1, measured	1532	0
+USART	CR1	DEDT	written	ignored-by-model	AET-WO-4300b FEEDBACK §0, P4.1, measured	1532	0
+USART	CR1	DEAT	written	ignored-by-model	AET-WO-4300b FEEDBACK §0, P4.1, measured	1532	0
+USART	CR1	EOBIE	written	ignored-by-model	AET-WO-4300b FEEDBACK §0, P4.1, measured	1532	0
+USART	CR1	FIFOEN	written	ignored-by-model	AET-WO-4300b FEEDBACK §0, P4.1, measured	1532	0
+USART	CR1	TXFEIE	written	ignored-by-model	AET-WO-4300b FEEDBACK §0, P4.1, measured	1532	0
+USART	CR1	RXFFIE	written	ignored-by-model	AET-WO-4300b FEEDBACK §0, P4.1, measured	1532	0
+USART	CR2	STOP	written	same-source		1543	0
+USART	CR2	SLVEN	written	ignored-by-model	AET-WO-4300b FEEDBACK §0, P4.1, measured	1557	0
+USART	CR2	DIS_NSS	written	ignored-by-model	AET-WO-4300b FEEDBACK §0, P4.1, measured	1557	0
+USART	CR2	ADDM#	written	ignored-by-model	AET-WO-4300b FEEDBACK §0, P4.1, measured	1557	0
+USART	CR2	LBDL	written	ignored-by-model	AET-WO-4300b FEEDBACK §0, P4.1, measured	1557	0
+USART	CR2	LBDIE	written	ignored-by-model	AET-WO-4300b FEEDBACK §0, P4.1, measured	1557	0
+USART	CR2	LBCL	written	ignored-by-model	AET-WO-4300b FEEDBACK §0, P4.1, measured	1557	0
+USART	CR2	CPHA	written	ignored-by-model	AET-WO-4300b FEEDBACK §0, P4.1, measured	1557	0
+USART	CR2	CPOL	written	ignored-by-model	AET-WO-4300b FEEDBACK §0, P4.1, measured	1557	0
+USART	CR2	CLKEN	written	ignored-by-model	AET-WO-4300b FEEDBACK §0, P4.1, measured	1557	0
+USART	CR2	LINEN	written	ignored-by-model	AET-WO-4300b FEEDBACK §0, P4.1, measured	1557	0
+USART	CR2	SWAP	written	ignored-by-model	AET-WO-4300b FEEDBACK §0, P4.1, measured	1557	0
+USART	CR2	RXINV	written	ignored-by-model	AET-WO-4300b FEEDBACK §0, P4.1, measured	1557	0
+USART	CR2	TXINV	written	ignored-by-model	AET-WO-4300b FEEDBACK §0, P4.1, measured	1557	0
+USART	CR2	DATAINV	written	ignored-by-model	AET-WO-4300b FEEDBACK §0, P4.1, measured	1557	0
+USART	CR2	MSBFIRST	written	ignored-by-model	AET-WO-4300b FEEDBACK §0, P4.1, measured	1557	0
+USART	CR2	ABREN	written	ignored-by-model	AET-WO-4300b FEEDBACK §0, P4.1, measured	1557	0
+USART	CR2	ABRMODE	written	ignored-by-model	AET-WO-4300b FEEDBACK §0, P4.1, measured	1557	0
+USART	CR2	RTOEN	written	ignored-by-model	AET-WO-4300b FEEDBACK §0, P4.1, measured	1557	0
+USART	CR2	ADD	written	ignored-by-model	AET-WO-4300b FEEDBACK §0, P4.1, measured	1557	0
+USART	TDR	TDR	written	observed	AET-WO-4300b FEEDBACK P2.1, measured	1568	0
+TIM	PSC	PSC	written	independent-rule		1598	0
+TIM	ARR	ARR	written	independent-rule		1598	0
+TIM	CCR#	CCR#	written	independent-rule		1598	0
+TIM	CR1	CEN	written	observed	AET-WO-4300a FEEDBACK §0 (STM32_Timer.cs read)	1600	0
+TIM	CR1	OPM	written	observed	AET-WO-4300a FEEDBACK §0 (STM32_Timer.cs read)	1610	0
+TIM	CR1	ARPE	written	same-source		1621	0
+TIM	CR1	UDIS	written	same-source		1621	0
+TIM	CR1	URS	written	same-source		1621	0
+TIM	CR1	DIR	written	same-source		1621	0
+TIM	CR1	CMS	written	same-source		1621	0
+TIM	CR1	CKD	written	ignored-by-model	AET-WO-4300a FEEDBACK §0	1633	0
+TIM	CR1	UIFREMAP	written	ignored-by-model	AET-WO-4300a FEEDBACK §0	1633	0
+TIM	CCMR#	OC#M[#:#]	written	observed	AET-WO-4300a FEEDBACK §0	1644	0
+TIM	CCMR#	OC#M[#]	written	ignored-by-model	AET-WO-4300a FEEDBACK §0	1654	0
+TIM	CCMR#	OC#PE	written	ignored-by-model	AET-WO-4300a FEEDBACK §0	1665	0
+TIM	CCMR#	OC#FE	written	ignored-by-model	AET-WO-4300a FEEDBACK §0	1665	0
+TIM	CCMR#	OC#CE	written	ignored-by-model	AET-WO-4300a FEEDBACK §0	1665	0
+TIM	CCMR#	CC#S	written	same-source		1676	0
+TIM	CCER	CC#E	written	same-source		1687	0
+TIM	CCER	CC#P	written	same-source		1687	0
+TIM	CCER	CC#NP	written	same-source		1687	0
+TIM	CCER	CC#NE	written	ignored-by-model	AET-WO-4300a FEEDBACK §0	1698	0
+TIM	BDTR	MOE	written	ignored-by-model	AET-WO-4300a FEEDBACK §0	1711	0
+TIM	BDTR	AOE	written	ignored-by-model	AET-WO-4300a FEEDBACK §0	1711	0
+TIM	BDTR	BKE	written	ignored-by-model	AET-WO-4300a FEEDBACK §0	1711	0
+TIM	BDTR	BKP	written	ignored-by-model	AET-WO-4300a FEEDBACK §0	1711	0
+TIM	BDTR	BKF	written	ignored-by-model	AET-WO-4300a FEEDBACK §0	1711	0
+TIM	BDTR	BK#E	written	ignored-by-model	AET-WO-4300a FEEDBACK §0	1711	0
+TIM	BDTR	BK#P	written	ignored-by-model	AET-WO-4300a FEEDBACK §0	1711	0
+TIM	BDTR	BK#F	written	ignored-by-model	AET-WO-4300a FEEDBACK §0	1711	0
+TIM	BDTR	DTG	written	ignored-by-model	AET-WO-4300a FEEDBACK §0	1711	0
+TIM	BDTR	LOCK	written	ignored-by-model	AET-WO-4300a FEEDBACK §0	1711	0
+TIM	BDTR	OSSI	written	ignored-by-model	AET-WO-4300a FEEDBACK §0	1711	0
+TIM	BDTR	OSSR	written	ignored-by-model	AET-WO-4300a FEEDBACK §0	1711	0
+TIM	EGR	UG	written	observed	AET-WO-4300a FEEDBACK §0	1722	0
+TIM	EGR	CC#G	written	same-source		1733	0
+TIM	EGR	COMG	written	same-source		1733	0
+TIM	EGR	TG	written	same-source		1733	0
+TIM	EGR	BG	written	same-source		1733	0
+TIM	EGR	B#G	written	same-source		1733	0
+ADC	CR	ADCAL	written	ignored-by-model	AET-WO-1211c FEEDBACK §2, measured (Unhandled bits: ADCAL, JQDIS, SMP5)	1825	0
+ADC	CR	ADCALDIF	written	silicon-only		1825	0
+ADC	CR	ADCALLIN	written	silicon-only		1825	0
+ADC	CR	ADDIS	written	silicon-only		1825	0
+ADC	CR	ADEN	written	silicon-only		1825	0
+ADC	CR	ADSTART	written	silicon-only		1825	0
+ADC	CR	ADSTP	written	silicon-only		1825	0
+ADC	CR	ADVREGEN	written	silicon-only		1825	0
+ADC	CR	BOOST	written	silicon-only		1825	0
+ADC	CR	DEEPPWD	written	silicon-only		1825	0
+ADC	CR	JADSTART	written	silicon-only		1825	0
+ADC	CR	JADSTP	written	silicon-only		1825	0
+ADC	CR	LINCALRDYW#	written	silicon-only		1825	0
+ADC	CFGR	AUTDLY	written	silicon-only		1825	0
+ADC	CFGR	AWD1CH	written	silicon-only		1825	0
+ADC	CFGR	AWD1EN	written	silicon-only		1825	0
+ADC	CFGR	AWD1SGL	written	silicon-only		1825	0
+ADC	CFGR	CONT	written	silicon-only		1825	0
+ADC	CFGR	DISCEN	written	silicon-only		1825	0
+ADC	CFGR	DISCNUM	written	silicon-only		1825	0
+ADC	CFGR	DMNGT	written	silicon-only		1825	0
+ADC	CFGR	EXTEN	written	silicon-only		1825	0
+ADC	CFGR	EXTSEL	written	silicon-only		1825	0
+ADC	CFGR	JAUTO	written	silicon-only		1825	0
+ADC	CFGR	JAWD1EN	written	silicon-only		1825	0
+ADC	CFGR	JDISCEN	written	silicon-only		1825	0
+ADC	CFGR	JQDIS	written	ignored-by-model	AET-WO-1211c FEEDBACK §2, measured (Unhandled bits: ADCAL, JQDIS, SMP5)	1825	0
+ADC	CFGR	JQM	written	silicon-only		1825	0
+ADC	CFGR	OVRMOD	written	silicon-only		1825	0
+ADC	CFGR	RES	written	observed	AET-WO-1211c FEEDBACK §2, measured (RES 010 converts at 12 bits, P4e)	1825	0
+ADC	ISR	ADRDY	written	silicon-only		1825	0
+ADC	ISR	AWD#	written	silicon-only		1825	0
+ADC	ISR	EOC	written	silicon-only		1825	0
+ADC	ISR	EOS	written	silicon-only		1825	0
+ADC	ISR	EOSMP	written	silicon-only		1825	0
+ADC	ISR	JEOC	written	silicon-only		1825	0
+ADC	ISR	JEOS	written	silicon-only		1825	0
+ADC	ISR	JQOVF	written	silicon-only		1825	0
+ADC	ISR	LDORDY	written	silicon-only		1825	0
+ADC	ISR	OVR	written	silicon-only		1825	0
+ADC	PCSEL	PCSEL	written	observed	STM32_ADC_Common.cs L196 (the model warns of a channel not preselected); AET-WO-1211c FEEDBACK §2, measured (PCSEL 0x20)	1825	0
+ADC	SMPR#	SMP#	written	ignored-by-model	AET-WO-1211c FEEDBACK §2, measured (Unhandled bits: ADCAL, JQDIS, SMP5)	1825	0
+ADC	SQR#	L	written	observed	AET-WO-1211c FEEDBACK §2, measured (SQR1 0x140, DR 0x745 at 1.5 V on INP5)	1825	0
+ADC	SQR#	SQ#	written	observed	AET-WO-1211c FEEDBACK §2, measured (SQR1 0x140, DR 0x745 at 1.5 V on INP5)	1825	0
+ADC	CCR	CKMODE	written	silicon-only		1825	0
+ADC	CCR	DAMDF	written	silicon-only		1825	0
+ADC	CCR	DELAY	written	silicon-only		1825	0
+ADC	CCR	DUAL	written	silicon-only		1825	0
+ADC	CCR	PRESC	written	silicon-only		1825	0
+ADC	CCR	TSEN	written	silicon-only		1825	0
+ADC	CCR	VBATEN	written	silicon-only		1825	0
+ADC	CCR	VREFEN	written	silicon-only		1825	0
