@@ -119,7 +119,7 @@ C05-pllOutputEnable	model/GuardedSTM32H7_RCC.cs	return PllOn(n) && en && PllRefe
 C06-perCk	model/GuardedSTM32H7_RCC.cs	return per.Current == per.Selector && Running(PerMux.Sources[per.Current]);	return false;	rcc-switched
 C07-kernelKind	model/GuardedSTM32H7_RCC.cs	records.Refuse("TVI-RCC-KERNEL", PredictedFault,	records.Refuse("TVI-RCC-KERNEL", Unmodeled,	rcc-scar
 C08-pllLocked	model/GuardedSTM32H7_RCC.cs	if((old & mask) != (value & mask) && PllOn(n))	if(false)	rcc-pll
-C09-pllReference	model/GuardedSTM32H7_RCC.cs	if((value & on) != 0 && (old & on) == 0 && !PllReference(n, value))	if(false)	rcc-pllref
+C09-pllReference	model/GuardedSTM32H7_RCC.cs	if((cr & on) != 0 && !PllReference(n, cr))	if(false)	rcc-pllref rcc-oscclear
 C10-divmZero	model/GuardedSTM32H7_RCC.cs	return false;   // "000000: prescaler disabled" (p398-399)	return true;   // mutant	rcc-divm0
 C11-switch	model/GuardedSTM32H7_RCC.cs	if(ready)	if(true)	rcc-sw
 C12-allowList	model/GuardedSTM32H7_RCC.cs	if(f.Allowed != null && !f.Allowed.Contains(v))	if(false)	rcc-field rcc-fields
