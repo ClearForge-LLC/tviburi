@@ -31,7 +31,7 @@ M27-subwordAtRegister	model/GuardedSTM32H7_SPI.cs	if(width != 32 || offset % 4 !
 M28-unaligned	model/GuardedSTM32H7_SPI.cs	if(width != 32 || offset % 4 != 0)	if(width != 32)	conditions
 R01-refusalFirst	tools/tviburi-check/src/main.rs	let verdict = if !refusals.is_empty() {	let verdict = if !refusals.is_empty() && problems.is_empty() {	unit
 R02-sourceFilter	tools/tviburi-check/src/main.rs	let Some(ch) = channels.get_mut(source) else {	let Some(ch) = channels.values_mut().next() else {	unit
-R03-timestamp	tools/tviburi-check/src/main.rs	let stamp_ok = b.len() > 15	let stamp_ok = true || b.len() > 15	unit
+R03-timestamp	tools/tviburi-check/src/main.rs	let stamp_ok = b[0] == b'['	let stamp_ok = true || b[0] == b'['	unit
 R04-sequence	tools/tviburi-check/src/main.rs	Some(Value::Number(s)) if s.parse::<u64>() == Ok(ch.next_seq) => ch.next_seq += 1,	Some(Value::Number(_)) => ch.next_seq += 1,	unit
 R05-witnessVersion	tools/tviburi-check/src/main.rs	} else if !matches!(record.get("model_version"), Some(Value::Str(v)) if v == expected_version) {	} else if false {	unit
 R06-endRequired	tools/tviburi-check/src/main.rs	if !ch.end {	if false {	unit
@@ -79,3 +79,5 @@ N23-readIerCopy	model/GuardedSTM32H7_SPI.cs	                return ier;	        
 N24-orderTxdr	model/GuardedSTM32H7_SPI.cs	if(offset == TxdrOffset && !enabled)	if(false)	conditions
 N25-orderCr2	model/GuardedSTM32H7_SPI.cs	else if(offset == Cr2Offset && enabled)	else if(false)	conditions
 N26-orderCstart	model/GuardedSTM32H7_SPI.cs	else if(offset == Cr1Offset && !enabled && (value & Cr1Cstart) != 0)	else if(false)	conditions
+R16-consoleCr	tools/tviburi-check/src/main.rs	let line = line.trim_matches('\\r');	let line = line.trim_end_matches('\\r');	unit
+R17-virtualStamp	tools/tviburi-check/src/main.rs	&& (close == 14 || close == 19)	&& close == 14	unit

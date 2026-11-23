@@ -1,9 +1,10 @@
 //! tviburi-check <expected-model-version> <log-file> <peripheral>... — the consumer-side reference
 //! check of Tviburi's records contract (RUL-10 (d), RUL-11, RUL-12, RUL-19, northstar invariant 8).
 //!
-//! It reads only a Renode log file (the `logFile` backend; the console framing waits for
-//! TVI-WO-1150 (ii)). A record is the message text after `<source>: `, one JSON object:
-//!   [HH:MM:SS.ffff] <spaces> [LEVEL] <source>: {"tviburi":<kind>,"seq":<n>,...}
+//! It reads a Renode log in either framing of RUL-11 (`split_line`): a `logFile`, or a console
+//! captured as Aethelgard runs Renode (TVI-WO-1150 (ii)'s fixture). A record is the message text after
+//! `<source>: `, one JSON object:
+//!   <stamp> <spaces> [LEVEL] <source>: {"tviburi":<kind>,"seq":<n>,...}
 //! A record is accepted only from a named guarded peripheral. A record from any other source fails
 //! the run: a guarded peripheral nobody named, or an imitation. Lines that are not records, a
 //! firmware UART line included (`usart3: [host: …] …`), are ignored. A named peripheral's line that
@@ -50,13 +51,19 @@ struct Channel {
 
 const LEVELS: [&str; 5] = ["NOISY", "DEBUG", "INFO", "WARNING", "ERROR"];
 
-/// The source and message of a logFile line, or None if the line is not in that format.
+/// The source and message of a record line, or None if the line is not in a framing the check reads
+/// (RUL-11, amended): a stamp, one or more spaces, `[LEVEL] `, then `<source>: `. The stamp is the
+/// `logFile` backend's host stamp `[HH:MM:SS.ffff]`, or the virtual stamp `[hh:mm:ss.nnnnnnnnn]`
+/// that Aethelgard's configuration (`log-timestamps-type = Virtual`) gives on the console (one space)
+/// and in a `logFile` (two spaces). A carriage return the console leaves before or after a line
+/// (TVI-WO-1150 (ii)) is not part of it.
 fn split_line(line: &str) -> Option<(&str, &str)> {
+    let line = line.trim_matches('\r');
+    let close = line.find(']')?;
     let b = line.as_bytes();
-    let stamp_ok = b.len() > 15
-        && b[0] == b'['
-        && b[14] == b']'
-        && b[1..14].iter().enumerate().all(|(i, c)| match i {
+    let stamp_ok = b[0] == b'['
+        && (close == 14 || close == 19)
+        && b[1..close].iter().enumerate().all(|(i, c)| match i {
             2 | 5 => *c == b':',
             8 => *c == b'.',
             _ => c.is_ascii_digit(),
@@ -64,9 +71,10 @@ fn split_line(line: &str) -> Option<(&str, &str)> {
     if !stamp_ok {
         return None;
     }
-    let rest = line[15..].trim_start_matches(' ');
-    if rest.len() == line.len() - 15 {
-        return None; // no space after the timestamp
+    let after = &line[close + 1..];
+    let rest = after.trim_start_matches(' ');
+    if rest.len() == after.len() {
+        return None; // no space after the stamp
     }
     let rest = rest.strip_prefix('[')?;
     let (level, rest) = rest.split_once("] ")?;
@@ -352,8 +360,53 @@ mod tests {
         assert_eq!(check(&log, V, &names).verdict, Verdict::Fail);
     }
 
+    // TVI-WO-1150 (ii)'s fixtures: 0100a's records, framed as Aethelgard's console and logFile give them.
+    const FX: &str = "sha256:bfdbc2a486ed6cafc8354972bccb684aad280e0e9d0f48057e9ccd658b95eb49";
+    fn fx(log: &str) -> Report {
+        check(log, FX, &["spi1".to_string()])
+    }
+
+    #[test]
+    fn the_console_fixture_is_read_in_both_framings() {
+        let modeled = fx(include_str!("../tests/fixtures/aet-7dec1d7b/modeled.modeldir.console.txt"));
+        // The witness and the end record (after a CR) are both found; 0100a's witness has no mode, so
+        // the run is not a pass (RUL-19), and that is the only problem.
+        assert_eq!(modeled.verdict, Verdict::Fail);
+        assert_eq!(modeled.problems.len(), 1, "{:?}", modeled.problems);
+        assert!(modeled.problems[0].contains("not in enforcing mode"));
+        for log in [
+            include_str!("../tests/fixtures/aet-7dec1d7b/modf.modeldir.console.txt"),
+            include_str!("../tests/fixtures/aet-7dec1d7b/modf.modeldir.both.logfile.txt"),
+        ] {
+            let r = fx(log);
+            assert_eq!(r.verdict, Verdict::Refused);
+            assert_eq!(r.refusals.len(), 1);
+            assert!(r.refusals[0].contains("\"rule\":\"TVI-SPI-MODF\""));
+        }
+        // Aethelgard's empty environment: 0100a's guard refuses at load (review A2).
+        let empty = fx(include_str!("../tests/fixtures/aet-7dec1d7b/modeled.empty.console.txt"));
+        assert_eq!(empty.verdict, Verdict::Refused);
+        assert!(empty.refusals[0].contains("\"rule\":\"TVI-LOAD\""));
+    }
+
+    #[test]
+    fn forged_records_on_the_console_are_not_records() {
+        // usart3's analyzer prints imitation records; after `usart3: ` the message is not a record.
+        let r = fx(include_str!("../tests/fixtures/aet-7dec1d7b/forge.modeldir.analyzer.console.txt"));
+        assert!(r.refusals.is_empty());
+        assert_eq!(r.problems.len(), 1, "{:?}", r.problems);
+        assert!(r.problems[0].contains("not in enforcing mode"));
+    }
+
     #[test]
     fn line_format() {
+        let v = "[00:00:00.001000000] [INFO] spi1: {}";
+        assert_eq!(split_line(v), Some(("spi1", "{}")));
+        assert_eq!(split_line(&format!("\r{v}\r")), Some(("spi1", "{}")));
+        assert_eq!(split_line("[00:00:00.000000000]  [ERROR] spi1: x"), Some(("spi1", "x")));
+        assert_eq!(split_line("[00:00:00.00000000] [INFO] spi1: x"), None);
+        assert_eq!(split_line("[00:00:00.0000000000] [INFO] spi1: x"), None);
+        assert_eq!(split_line("x[00:00:00.000000000] [INFO] spi1: x"), None);
         assert_eq!(split_line("[08:46:14.4011]  [ERROR] spi1: {}"), Some(("spi1", "{}")));
         assert_eq!(split_line("[08:46:14.4011] [INFO] spi1: x"), Some(("spi1", "x")));
         assert_eq!(split_line("[08:46:14.4011][INFO] spi1: x"), None);
