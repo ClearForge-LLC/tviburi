@@ -8,6 +8,7 @@
   - no valid path refuses (both firmwares, all 15 boots);
   - the package is declared;
   - the memory is judged in CI per 18:30Z, and passes locally as a proxy (§3).
+- **STOPPED at 19:57Z: CI cannot meet the memory bound** (§3), as the 18:30Z ruling requires me to report.
 - **Ruled at 19:47Z:** F1 (follow-up `TVI-WO-1301a`), F5 kept, the harness deleted, rows (§5). The merge order: 1300a (#21) first, then `main` merged here, the suite rerun, and CI re-measuring the combined file.
 - Steering documents, `README.md`, `docs/reviews/` and Aethelgard are untouched. `model/Refusal.cs` changed only as granted at 19:08Z (Q1). One PR, left unmerged.
 
@@ -51,7 +52,7 @@
 | Clause | Where shown | Result |
 |---|---|---|
 | ArduPilot's full 5 s boot, recorded, with the guard: no `would-refuse` under any GPIO port | `replay-1301.sh accept` on the fresh capture | **0**; 11 recorded witnesses and 11 ends; the boot reached its end; its boot block differs from stock only by 1300's `AHB2ENR` |
-| …the one-file peak under 1,048,576 KiB, with the runs and the margin | CI: `tests/1301/ci-memory.sh`, 5 runs, each ≤ 1,015,808 KiB (32 MiB spare, ruled 18:30Z). The ELF is built from Aethelgard's pinned image and held to `a799dfb6` | **Furnace, as a proxy (host load 10–13):** 951,832; 971,916; 1,008,376; 974,744; 985,060 KiB, all under the limit; ELF `a799dfb6` reproduced byte for byte. **CI's numbers are the PR's** |
+| …the one-file peak under 1,048,576 KiB, with the runs and the margin | CI: `tests/1301/ci-memory.sh`, 5 runs, each ≤ 1,015,808 KiB (32 MiB spare, ruled 18:30Z). The ELF is built from Aethelgard's pinned image and held to `a799dfb6` | **CI, run 45249617507 on `1b00410` (this branch alone, without 1300a): FAILS.** The ELF reproduced `a799dfb6`. The peaks were **1,049,556; 1,019,700; 1,029,164; 1,041,540; 1,018,148 KiB**, at 18.9–20.3 s wall. All five are over the 32 MiB-spare limit, and run 1 is over the bound itself. Every boot reached its end, with 0 GPIO would-refuse. **On Furnace, unslowed (about 10 s wall):** 951,832 to 1,008,376 KiB, all under |
 | The generated firmware's GPIO sequences pass, enforcing | the 14 boots replayed, ports enforcing; `gpio-ardupilot`, `gpio-gen-s03` (planted) | 0 refusals; every boot-block difference is silicon's reset (A5, ruled expected); motor observers identical to stock |
 | A planted AF with no function refuses `predicted-fault`, naming the pin, the AF and the page; the table's AF passes | `gpio-blank`, `-blankfirst`, `-afterwards`, `-afrh`, `-pk8af`; `gpio-valid` | as stated |
 | Every field outside the allow-list refuses `unmodeled` (gate clause 6) | `gpio-fields` (25), `gpio-pupdr`, `-lckr`, `-brr`, `-read`, `-misaligned` | all refuse by name |
