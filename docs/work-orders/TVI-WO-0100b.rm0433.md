@@ -29,21 +29,21 @@
 | # | Access | Value | Function |
 |---|---|---|---|
 | 1 | R `CR1` | `0x0` | `spi_lld_start+0xc0` |
-| 2 | W `CR1` | `0x0` | `spi_lld_start+0xc6` |
-| 3 | W `CR1` | `0x100` (`MASRX`) | `spi_lld_start+0xcc` |
+| 2 | W `CR1` | `0x0` (`CR1 &= ~SPE`: read-modify-write of row 1) | `spi_lld_start+0xc6` |
+| 3 | W `CR1` | `0x100` (`MASRX`), **a constant, written whole** (`MOV.W r2,#0x100` at `0x8100e84`) | `spi_lld_start+0xcc` |
 | 4 | W `CR2` | `0x0` | `spi_lld_start+0xd0` |
 | 5 | W `CFG1` | `0x2000C007` (`MBR`=010, `TXDMAEN`, `RXDMAEN`, `CRCSIZE`=00000, `DSIZE`=00111) | `spi_lld_start+0xde` |
 | 6 | W `CFG2` | `0x20400000` (`SSOE`, `MASTER`; `SSM`=0) | `spi_lld_start+0xee` |
 | 7 | W `IER` | `0x40` (`OVRIE`) | `spi_lld_start+0xf2` |
 | 8 | W `IFCR` | `0xFFFFFFFF` | `spi_lld_start+0xf8` |
-| 9 | R `CR1` | `0x0` (stock: `MASRX` is a tag and reads 0) | `spi_lld_start+0xfa` |
-| 10 | W `CR1` | `0x1` (`SPE`) | `spi_lld_start+0x100` |
+| 9 | R `CR1` | `0x0` (stock: `MASRX` is a tag and reads 0; silicon reads `0x100`) | `spi_lld_start+0xfa` |
+| 10 | W `CR1` | `0x1` (`CR1 \|= SPE`: read-modify-write of row 9, `LDR`/`ORR #1`/`STR` at `0x8100eb6`–`ebc`; on silicon `0x101`) | `spi_lld_start+0x100` |
 | 11–12 | R `CR1`; W `IFCR` `0xFFFFFFFF` | | `spi_lld_wait_complete` |
 | 13–18 | W `TXDR` (8-bit) ×2; R/W `CR1` → `0x201` (`CSTART`); R `RXDR` (8-bit) ×2 | | `spi_lld_exchange` |
 | 19–20 | R `CR1`; W `CR1` `0x601` (`CSUSP`) | | `spi_lld_serve_dma_rx_interrupt` |
 | stop | R `CR1`; W `CR1` `0x0` ×2; W `CR2`, `CFG1`, `CFG2`, `IER` = `0x0` | | `spi_lld_stop` |
 
-- **Read-modify-write.** Every `CR1` write follows a `CR1` read in the same function. `CR2`, `CFG1`, `CFG2`, `IER` and `IFCR` are never read: they are written whole. `SR`, `CRCPOLY`, `UDRDR` and `I2SCFGR` are never accessed.
+- **Read-modify-write,** from the log and the instructions (Thumb-2, decoded by hand from the ELF at `0x8100e7c`–`0x8100ebc`): `CR1` is read twice in `spi_lld_start`, and both `SPE` changes are read-modify-writes (`BIC #1`, `ORR #1`). `MASRX` is a constant written whole. `CFG1` and `CFG2` are computed from the driver's configuration (`LDR r2,[r0,#0x14]`), not from a register read. `CR2`, `CFG1`, `CFG2`, `IER` and `IFCR` are never read. `SR`, `CRCPOLY`, `UDRDR` and `I2SCFGR` are never accessed. Every other `CR1` write (`spi_lld_exchange`, `spi_lld_serve_dma_rx_interrupt`, `spi_lld_stop`) follows a `CR1` read in the same function; those were not decoded.
 - **Row 9 is a stale-value route the stock model already takes.** On silicon `CR1` reads `0x100` there, so ChibiOS would write `0x101`. The stock model reads `MASRX` as 0, so the twin's word is `0x1`. Whatever is ruled for `MASRX` (§4), a guard that allows it must serve it from its copy on read (`RUL-17`).
 - **No write to `CFG1`, `CFG2`, `CR2`, `CRCPOLY`, `UDRDR` or `I2SCFGR` happens while `SPE` = 1, in either firmware, and neither firmware ever sets `IOLOCK`** (measured over every SPI write of both logs).
 - **The generated firmware's SPI start** (11 boards, `spi1` and `spi2`): `CR1` = `0x1000` (`SSI`), `CFG1` = `0x10070007` or `0x40070007` (`MBR` = 001 or 100), `CFG2` = `0x84400000` (`AFCNTR`, `SSM`, `MASTER`), `CR2` = `TSIZE`, `CR1` = `0x1001`, then `0x1201` (`CSTART`); 8-bit `TXDR` writes; `IFCR` = `0x8` (`EOTC`); `CR1` = `0x1000`.
@@ -51,8 +51,8 @@
 ### 1.2 (1)'s routing question: does any pin carry `SPIx_NSS` by its alternate function?
 
 **No, on either firmware's platform.**
-- **The NSS pins** (DS12117 Rev 10 Table 9): `SPI1_NSS` is PA4, PA15 and PG10 at AF5 (pp89, 90, 96). The other instances' NSS pins are PA4 (AF6, AF8), PA11 (AF5), PA15 (AF6, AF7), PB4 (AF7), PB9 and PB12 (AF5), PE4 and PE11 (AF5), PF6, PG8, PH5, PI0 and PK1 (pp89–100).
-- **ArduPilot**, from the final and every intermediate `MODER`/`AFRx` state in the run: PA5–PA7 and PB13–PB15 at AF5 (SPI1 and SPI2 SCK, MISO, MOSI), PA9 and PA10 at AF7, PB6 and PB7 at AF4. No NSS pin is in alternate-function mode; chip selects are GPIO outputs.
+- **The NSS pins** (DS12117 Rev 10 Table 9): `SPI1_NSS` is PA4, PA15 and PG10 at AF5 (pp89, 90, 96). The pins that carry any `SPIx_NSS` are PA4, PA11, PA15, PB4, PB9, PB12, PE4, PE11, PF6, PG8, PG10, PH5, PI0 and PK1 (pp89–100). **The conclusion below rests on pin identity:** the AF columns of the other instances' cells were taken from each page's header by position, which misplaces some (it gives AF2 for PF6 and AF0 for PH5), so they are not stated.
+- **ArduPilot**, from the final and every intermediate `MODER`/`AFRx` state in the run: PA5–PA7 and PB13–PB15 at AF5 (SPI1 and SPI2 SCK, MISO, MOSI), PA9 and PA10 at AF7, PB6 and PB7 at AF4. No NSS pin is in alternate-function mode; how the chip selects are driven was not decoded.
 - **The generated firmware**, per board, from `writes.tsv`: AF5 on PA5–PA7, PA12, PB5, PB13–PB15; AF7, AF4 and AF1 elsewhere. Two NSS-capable pins appear, PA11 (motor boards) and PE11 (`sentinel-03`), both at AF1, which is `TIM1_CH4` and `TIM1_CH2` (p89, p94). No pin carries NSS.
 - **What the manual says of exactly this case:** "Even if SPI AF is not applied to the NSS pin (it can be used as a standard GPIO then), SSOE=1 setting should be kept anyway to assure default NSS input level and prevent any mode fault evaluation" (p2166). With NSS unrouted, `SSOE` = 1 has no pin to drive, and its one remaining effect, preventing the mode fault, is what (1) models. **Whether that makes `SSOE` = 1 modeled is the architect's (§4, A2).** The twin cannot see routing itself: GPIO is not guarded (`RUL-13`'s `13NN`).
 
@@ -145,7 +145,7 @@ One run of the stock `STM32H7_SPI` at `spi1` (each register written all-ones aft
 | `SPI_IFCR.Res31_12` | 31:12 | 0x0 | 2227 | reserved L274 | reserved | none (write-only register) | 0x0 | 0xfffff | 0 only — **ArduPilot writes all ones** |
 | `SPI_IFCR.SUSPC` | 11 | 0x0 | 2227 | flag L267, implemented | stock | implemented (L267) | 0 | 1 | **ack: inherited** |
 | `SPI_IFCR.TSERFC` | 10 | 0x0 | 2227 | tag L266 | tag | clears a flag the model never sets | 0 | 1 | 0 only — **ArduPilot writes 1** |
-| `SPI_IFCR.MODFC` | 9 | 0x0 | 2227 | tag L263 | tag + guard | the guard: clears the D1 history, MASTER unknown (§3.2) | 0 | 1 | 0, 1 (guard) |
+| `SPI_IFCR.MODFC` | 9 | 0x0 | 2227 | tag L263 | tag + guard | the guard: with the D1 history set, clears it and makes `MASTER` unknown; with none, no effect (§3.2, H0) | 0 | 1 | 0, 1 (guard) |
 | `SPI_IFCR.TIFREC` | 8 | 0x0 | 2227 | tag L262 | tag | clears a flag the model never sets | 0 | 1 | 0 only — **ArduPilot writes 1** |
 | `SPI_IFCR.CRCEC` | 7 | 0x0 | 2227 | tag L261 | tag | clears a flag the model never sets | 0 | 1 | 0 only — **ArduPilot writes 1** |
 | `SPI_IFCR.OVRC` | 6 | 0x0 | 2227 | tag L260 | tag | clears a flag the model never sets | 0 | 1 | 0 only — **ArduPilot writes 1** |
@@ -195,13 +195,14 @@ Silicon, by page: `IOLOCK` "can be set when SPI is disabled only else it is writ
 | # | Sequence | Head | Silicon (RM0433) | Proposed |
 |---|---|---|---|---|
 | L1 | `CR1`=`IOLOCK` (SPE was 0), then `CFG2`=x | refuse `TVI-SPI-IOLOCK` | write-protected: `CFG2` keeps its value (p2215, p2221) | unchanged; `kind: predicted-fault` |
-| L2 | `CR1`=`SPE`, then `CR1`=`SPE`\|`IOLOCK`, then `CR1`=0, then `CFG2`=x | latch set at the 2nd write; `CFG2` refuses `TVI-SPI-IOLOCK` (over-strict, review A12) | 2nd write: `IOLOCK` write-protected, not set (p2215, p2217); `CFG2` is writable after `SPE` 1→0 | **latch not set**: `IOLOCK` latches only when the last passed `CR1` had `SPE`=0. `CFG2` passes. A `CR1` read serves `IOLOCK` from the latch (0), not the stock value (1) |
+| L2 | `CR1`=`0x1000` (`SSI`), `CFG2`=`0x04400000`, `CR1`=`0x1001` (passes, T1), `CR1`=`0x11001` (`IOLOCK` with `SPE`=1), `CR1`=`0x1000` (`SPE` 1→0), `CFG2`=`0x04400000` | latch set at the 4th write; the last write refuses `TVI-SPI-IOLOCK` (over-strict, review A12) | 4th write: `IOLOCK` write-protected, not set (p2215, p2217); the last `CFG2` is writable | **latch not set**: `IOLOCK` latches only when the last passed `CR1` had `SPE`=0. The last write passes. A `CR1` read serves `IOLOCK` from the latch (0), not the stock value (1) |
 | L3 | `CR1`=`SPE`\|`IOLOCK` from `SPE`=0, in one write | latch set | not settled: "can be set when SPI is disabled only" does not say whether the write that enables counts | latch set (the refusing side: later `CR1` reads refuse until reset; a `CFG2` write needs `SPE`=0 first, which clears `IOLOCK` on silicon either way). Recorded as undecided |
 | L4 | `CR1`=`IOLOCK` while the D1 history is set | latch set | if silicon raised `MODF`, `IOLOCK` "cannot be set" (p2215, p2225) | latch set (the refusing side), recorded |
-| L5 | latch set, then `SPE` 1→0, then `CFG2`=x | refuse | `IOLOCK` cleared by the 1→0 edge; `CFG2` writable | unchanged unless either firmware meets it (WO (3)); see §4 |
+| L5 | `CR1`=`IOLOCK` (`SPE` was 0), `CR1`=`SPE`…, `CR1`=0 (`SPE` 1→0), then `CFG2`=x | refuse `TVI-SPI-IOLOCK` | `IOLOCK` was cleared by the 1→0 edge; `CFG2` is writable, so silicon takes the write | still refuses (the clear is not modeled: neither firmware meets it), **but `kind: unmodeled`**, not `predicted-fault` (§3.3) |
+| H0 | no history: `CR1`=`0x1000`, `CFG2`=`0x04400000` (T1), `IFCR`=`0xFFFFFFFF` (`MODFC` among the bits), `CR1`=`0x1001` | pass (`MODFC` is a stock tag, dropped) | no `MODF` can be set, so `MODFC` clears nothing (p2227) | **pass: `MODFC` has no effect without the history; `MASTER` stays known.** ArduPilot does this on every start (§1.1 rows 8 and 12, `SSOE` = 1). The WO's "after `MODFC` the copy's `MASTER` is unknown" is read as applying only while the history is set (§4 C6) |
 | H1 | `CFG2`=`MASTER`\|`SSM` with `SSI`=0 (history set), `IFCR`=`MODFC`, then `CR1`=`SSI`\|`SPE` | refuse on the history; `MODFC` is a stock tag (dropped) | if `MODF` was raised, `MODFC` clears it (p2227), but the fault also cleared `MASTER` (p2184) and `MODFC` does not set it | **history cleared by `MODFC`; `MASTER` unknown**: the enable refuses (`kind: unmodeled`), and so does a `CFG2` read, until `CFG2` is written again |
 | H2 | as H1, then `CFG2`=`MASTER`\|`SSM` with `SSI`=1, then `CR1`=`SSI`\|`SPE` | refuse | `MASTER` written again; the new state is T1 | **pass** |
-| H3 | the history built from a `CR1` write: `CR1`=0 is the reset state, `CFG2`=`MASTER`\|`SSM`\|… with `SSI`=1 passes, then `CR1`=0 (clears `SSI`) | history set at the `CR1` write (`NoteMasterState` after `CR1`); no test covers it (review A12) | p2184: the internal input active while master | unchanged; **add the test** and the mutant that removes that call |
+| H3 | the history built from a `CR1` write: `CR1`=`0x1000` (`SSI`), `CFG2`=`0x04400000` (T1: no history), `CR1`=`0x0` (`SSI`=0 while master with `SSM`=1), `CR1`=`0x1000`, `CR1`=`0x1001` | the 3rd write sets the history (`NoteMasterState` after a `CR1` write); the enable refuses on it. No test covers it (review A12) | p2184: the internal input active while master | unchanged; **add this test**, and the mutant that removes that call (the enable would then pass) |
 
 ### 3.3 (4) A `kind` on every refusal (`RUL-18`)
 
@@ -211,7 +212,8 @@ Silicon, by page: `IOLOCK` "can be set when SPI is disabled only else it is writ
 |---|---|---|---|
 | `TVI-SPI-MODF` "CR1.SSI (bit 12) = 0" (T2) | `predicted-fault` | "Mode fault occurs when the master device has its internal slave select logic input (… SSI bit in slave select software mode) pulled low" (p2184); `SSIOP`=0, so low is active on both readings (p2165, p2184) | yes: the `modf` firmware on the Nucleo, read `SR.MODF` and `CFG2.MASTER` |
 | `TVI-SPI-CFG2-SPE` | `predicted-fault` | "When SPE=1 … SPI_CFG2 … write protected" (p2217); `CFG2` "is write protected when SPI is enabled" (p2221) | yes: write `CFG2` with `SPE`=1, read it back |
-| `TVI-SPI-IOLOCK` on a `CFG2` write | `predicted-fault` | "When this bit is set, the SPI_CFG2 register content cannot be modified" (p2215; p2221) | yes: the `iolock` firmware, read `CFG2` back |
+| `TVI-SPI-IOLOCK` on a `CFG2` write, latch certain (L1: set from `SPE`=0, no history, and no `SPE` 1→0 since) | `predicted-fault` | "When this bit is set, the SPI_CFG2 register content cannot be modified" (p2215; p2221) | yes: the `iolock` firmware, read `CFG2` back |
+| `TVI-SPI-IOLOCK` on a `CFG2` write, latch uncertain (L3, L4) or after an `SPE` 1→0 edge (L5) | `unmodeled` | p2215 contradicts `predicted-fault` here: "cleared by hardware whenever SPE bit is changed from 1 to 0" (L5); L3 and L4 latch without knowing that silicon did. **This is the WO §7 "RM0433 contradicts a `kind`" item:** the WO expects every `CFG2` write under `IOLOCK` to be `predicted-fault` | — |
 | `TVI-SPI-MODF` "CFG2.MASTER (bit 22) = 0" (T5) | `unmodeled` | slave mode is not modeled by the stock model (L188); p2222 | — |
 | `TVI-SPI-MODF` "CFG2.SP[2:0] … != 000" (T7) | `unmodeled` | TI mode: the manual does not describe a TI master's mode fault (p2181, p2171) | — |
 | `TVI-SPI-MODF` "SSM = 0, SSOE = 0" (T4a) | `unmodeled` | the NSS pin level is not modeled (p2166) | — |
@@ -236,7 +238,7 @@ Silicon, by page: `IOLOCK` "can be set when SPI is disabled only else it is writ
 | A1 | `SPI_CFG1.MBR` | generated: 001, 100 (whole). ArduPilot: 010 (`spi1`), 101 (`spi2`) (whole, `spi_lld_start`) | p2218 | no clock: a transfer completes in zero virtual time | **acknowledge.** Timing only; cycle accuracy is a non-goal (northstar §5). `RUL-17`'s drafting note (response §4.2) names this field |
 | A2 | `SPI_CFG2.SSOE` = 1 | ArduPilot, whole, `spi_lld_start` (row 6), with `SSM`=0 and no NSS pin routed (§1.2) | p2221, p2166 | the mode-fault side is modeled by (1); the NSS output has no pin to drive | **acknowledge**, on p2166's own statement of this case. The twin cannot check the routing (GPIO is unguarded). The alternative, refused, makes every ArduPilot SPI start refuse, which is the §7 stop |
 | A3 | `SPI_CFG2.AFCNTR` = 1 | generated, whole, every master (Aethelgard's `AET-WO-4230` R4) | p2221 | 0: the model has no pins; the bit "is taken into account when SPE=0 only" | **acknowledge.** Pin-level only |
-| A4 | `SPI_CR1.MASRX` = 1 | ArduPilot, by read-modify-write, `spi_lld_start` (row 3); then lost by the stock read at row 9 | p2217 | the stock FIFO is a queue that never fills, so the model neither overruns nor suspends | **acknowledge, with the guard serving `MASRX` from its copy on read**, so that row 9 reads `0x100` and the enable is `0x101`, as on silicon |
+| A4 | `SPI_CR1.MASRX` = 1 | ArduPilot, a constant written whole (row 3); the enable's read-modify-write (rows 9–10) carries it on silicon, and the stock read loses it | p2217 | the stock FIFO is a queue that never fills, so the model neither overruns nor suspends | **acknowledge, with the guard serving `MASRX` from its copy on read**, so that row 9 reads `0x100` and the enable is `0x101`, as on silicon |
 | A5 | `SPI_CFG1.CRCSIZE` = 00000 | ArduPilot, whole, every start and stop (`CFG1`=`0x…C007` and `0x0`) | p2219: 00000 is "reserved"; "If CRC calculation is disabled by CRCEN=0, the CRCSIZE field must be kept at its default setting" | 00111; CRC is not modeled, and `CRCEN` is 0 | **acknowledge, with `CRCEN`=0 as its condition**: the manual gives the field no effect without CRC. Refusing it refuses every ArduPilot start (the §7 stop). The breach of "must be kept" is recorded, not modeled |
 | A6 | `SPI_CFG1.DSIZE` = 00000 | ArduPilot, whole, `spi_lld_stop` (`CFG1`=`0x0`), with `SPE`=0 | p2220: 00000 "not used" | whole bytes only; 00000 behaves as 8-bit | **acknowledge 00000 as a value at rest**, or rule C1. Every start rewrites 00111 before the enable. Refusing it refuses ArduPilot's first `spi_lld_stop`, not its start |
 | A7 | `SPI_IER.OVRIE` = 1 | ArduPilot, whole, `spi_lld_start` (row 7) | p2223 | 0; `SR.OVR` is a tag, so the interrupt never fires | **acknowledge**: the gap is `OVR`'s, which is never raised, not the enable's |
@@ -267,13 +269,17 @@ Silicon, by page: `IOLOCK` "can be set when SPI is disabled only else it is writ
 - **C2. Reads of copied fields.** `RUL-17`: "Every field the guard keeps a copy of is served from that copy on read." Lean: the guard keeps a whole copy of `CR1` (other than `CSTART`, `CSUSP` and `SPE`, which the stock model drives), `CFG1` and `CFG2`, and serves those reads from it. `CFG1`'s copy resets to `0x00070007` (p2218), which fixes the read §1.3 measured (`0x0`). Neither firmware reads `CFG1`.
 - **C3. A `CFG1` write while `SPE` = 1.** Silicon keeps everything but `TXDMAEN` and `RXDMAEN` (p2218). The stock model drops the whole write (L329), DMA bits included. Lean: refuse, `predicted-fault` if a protected field changes, otherwise `unmodeled`. Neither firmware does it.
 - **C4. `CRCPOLY`.** No firmware touches it. Its read is wrong (`0x0`, silicon `0x107`). Lean: the guard serves `0x107` from a copy, and a write of any other value refuses (`unmodeled`: CRC is not modeled).
+- **C6. `MODFC` without the history.** Lean: no effect, and `MASTER` stays known (§3.2 H0). Read literally for every `MODFC` write, the WO's "after `MODFC` the copy's `MASTER` is unknown" would refuse every ArduPilot start, because `IFCR` = `0xFFFFFFFF` comes between `CFG2` and the enable (§1.1 rows 6, 8 and 10).
+- **C7. `TVI-SPI-IOLOCK`'s kind** is split, by RM0433 p2215 (§3.3): `predicted-fault` only while the latch is certain and no `SPE` 1→0 edge has followed; otherwise `unmodeled`.
 - **C5. Wider data-register accesses.** One `TXDR` or `RXDR` access is one frame (§1.3). Lean: an access narrower or wider than the frame refuses (`unmodeled`). Silicon forbids the narrower one (p2227, p2228) and packs the wider one. Both firmwares use 8-bit accesses with 8-bit frames.
 
 ### D. Measured and not built, per the work order
 
+- **The generated firmware's reads are not measured** (`writes.tsv` holds writes only). C2 and C5 change what a read returns, so before building them I will take its SPI reads, and their widths, from one SPI-only replay of a `1100` capture.
+
 - **`IOLOCK`'s hardware clear on `SPE` 1→0** (p2215) is not modeled: neither firmware sets `IOLOCK` (§1.1), so modeling it removes no refusal either meets.
 - **`SR.MODF` reads 0 while the D1 history is set,** as built (`0100a` F2). `SR` is not guarded, and ArduPilot never reads it.
-- **ArduPilot's SPI start under the acknowledged table.** With every item of A and B acknowledged, every access in §1.1's start, exchange and stop passes on paper. With A6 refused, the first `spi_lld_stop` refuses; with any other item of A refused, the first start does. It is replayed as a planted firmware in the build (WO §2).
+- **ArduPilot's SPI start under the acknowledged table.** With every item of A and B acknowledged, and C6 ruled as leaned, every access in §1.1's start, exchange and stop passes on paper. With A6 refused, the first `spi_lld_stop` refuses; with any other item of A refused, the first start does. It is replayed as a planted firmware in the build (WO §2).
 
 ## 5. Findings for FEEDBACK (the steering documents are not changed here)
 
@@ -295,4 +301,4 @@ Silicon, by page: `IOLOCK` "can be set when SPI is disabled only else it is writ
 
 ## 7. Quote check
 
-Every quotation from RM0433 in this file was matched, after whitespace was normalised, against the text Ghostscript extracted from the PDF for the page its line cites. That is 17 quotations on pages named in the same line, plus "must be kept at reset value" (on every SPI register page, p2215–p2232) and "can be set when SPI is disabled only" (p2215), whose lines name no page. The other quoted strings are code text (the stock model's log messages, the guard's bit texts), a ruling's words (`RUL-17`), or a table title in DS12117. DS12117's rows were read with each `SPIx_NSS` cell's alternate-function column taken from the same page's header. The two pins either firmware uses that can carry NSS, PA11 and PE11, were read by eye at AF1 (p89, p94).
+Every quotation from RM0433 in this file was matched, after whitespace was normalised, against the text Ghostscript extracted from the PDF for the page its line cites. That is 17 quotations on pages named in the same line, plus "must be kept at reset value" (on every SPI register page, p2215–p2232) and "can be set when SPI is disabled only" (p2215), whose lines name no page. The other quoted strings are code text (the stock model's log messages, the guard's bit texts), a ruling's words (`RUL-17`), or a table title in DS12117. In DS12117, which pins carry an `SPIx_NSS` cell was read from Table 9 (pp89–100); the cell's AF column was not relied on (§1.2). The two pins either firmware uses that can carry NSS, PA11 and PE11, were read by eye: at AF1 each is `TIM1` (p89, p94).
