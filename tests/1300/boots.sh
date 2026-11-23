@@ -48,10 +48,13 @@ replay)
   image=$(sed -n 's/^IMAGE=//p' "$here/tests/spike.sh")
   for b in ${*:-$(boards)}; do
     cap=$dir/$b/capture
-    # the first boot between this board's BEGIN and END in the capture's index (1300's captures hold several boards)
-    n=$(awk -v b="$b" '$1 == "BEGIN" && $2 == b {f = 1; next} $1 == "END" {f = 0} f && $1 ~ /^[0-9]+$/ {print $1; exit}' "$cap/index.txt" 2>/dev/null)
-    [ -n "$n" ] || n=$(awk '$1 ~ /^[0-9]+$/ {print $1; exit}' "$cap/index.txt" 2>/dev/null)
-    [ -n "$n" ] && [ -s "$cap/$n/argv.bin" ] || { echo "boots: $b: no captured boot in $cap" >&2; continue; }
+    # this board's boots: those between its BEGIN and END in the capture's index (1300's captures hold several boards), or
+    # every boot; the one that is Renode itself, not the CLI's reaper wrapping it (its argv has --aethelgard-internal-reaper)
+    n=
+    for k in $(awk -v b="$b" '$1 == "BEGIN" {f = ($2 == b); any = 1; next} $1 == "END" {f = 0; next} $1 ~ /^[0-9]+$/ && (f || !any) {print $1}' "$cap/index.txt" 2>/dev/null); do
+      [ -s "$cap/$k/argv.bin" ] && ! grep -qa -- '--aethelgard-internal-reaper' "$cap/$k/argv.bin" && { n=$k; break; }
+    done
+    [ -n "$n" ] || { echo "boots: $b: no captured boot in $cap" >&2; continue; }
     rm -rf "$dir/$b/replay"; mkdir -p "$dir/$b/replay"
     BOOTS_MEM=${BOOTS_MEM:-8G} container -v "$cap:/cap:ro,Z" -v "$here:/repo:ro,Z" -v "$here/tests/1300:/bin1300:ro,Z" \
       -v "$dir/$b/replay:/out:Z" "$image" bash /bin1300/replay-1300.sh "$n" accept >"$dir/$b/replay/stdout.txt" 2>&1

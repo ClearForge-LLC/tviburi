@@ -1,0 +1,23 @@
+# tests/1300/boots.tsv — the consumer's boots that tests/1300/boots.sh replays on the guards, and what each must record (TVI-WO-1300a (6);
+# ruled 2026-11-23 17:16Z). Tab-separated: board; its specification in Aethelgard at the commit below ("-" for ArduPilot, captured by
+# `aethelgard simulate --foreign` in 1300 §1.1); the guards it loads (each must witness, recorded, and end); the would-refuse records it must
+# make, each "peripheral | rule | kind | bit", separated by " ; ", or "none". Any other record on any boot is a §7 stop, not an edit here.
+# The nine per_ck boards are expected to refuse at SPI1 (and SPI2 on two): the scar this work order catches. Aethelgard's AET-WO-4240e
+# fixes the generator, and a later change empties their rows.
+# d1-drv8876's ADC3EN refusal is 1300's (F8). Measured 2026-11-23 on 1300's captures (~/.cache/tvi-1300a-from-1300): peaks 504,788-967,372 KiB.
+# aethelgard 75da80535ef5c4d75e59d677cfc94ef00a4c753b
+ardupilot	-	rcc,spi1,spi2	none
+d1-drv8876	crates/aethelgard-ir/tests/fixtures/d1-drv8876.json	rcc	rcc | TVI-RCC-FIELD | unmodeled | RCC_AHB4ENR.ADC3EN (bit 24) = 1
+driver-judges-nothing	crates/aethelgard-cli/tests/fixtures/driver-judges-nothing.json	rcc	none
+hse-crystal-16	crates/aethelgard-cli/tests/fixtures/hse-crystal-16.json	rcc,spi1,spi2	none
+hse-external-8	crates/aethelgard-cli/tests/fixtures/hse-external-8.json	rcc,spi1,spi2	none
+motors-dshot600	crates/aethelgard-cli/tests/fixtures/motors-dshot600.json	rcc,spi1	spi1 | TVI-SPI-KERNEL | predicted-fault | RCC_D2CCIP1R.SPI123SEL = 100
+motors-pwm	crates/aethelgard-cli/tests/fixtures/motors-pwm.json	rcc,spi1	spi1 | TVI-SPI-KERNEL | predicted-fault | RCC_D2CCIP1R.SPI123SEL = 100
+sentinel-01	examples/sentinel-01.json	rcc,spi1	spi1 | TVI-SPI-KERNEL | predicted-fault | RCC_D2CCIP1R.SPI123SEL = 100
+sentinel-01-ext-bmp581	examples/sentinel-01-ext-bmp581.json	rcc,spi1	spi1 | TVI-SPI-KERNEL | predicted-fault | RCC_D2CCIP1R.SPI123SEL = 100
+sentinel-01-minimal	examples/sentinel-01-minimal.json	rcc,spi1	spi1 | TVI-SPI-KERNEL | predicted-fault | RCC_D2CCIP1R.SPI123SEL = 100
+sentinel-02-bench	examples/sentinel-02-bench.json	rcc,spi1	spi1 | TVI-SPI-KERNEL | predicted-fault | RCC_D2CCIP1R.SPI123SEL = 100
+sentinel-02-bench-hse8	examples/sentinel-02-bench-hse8.json	rcc,spi1	none
+sentinel-02-shaped	crates/aethelgard-cli/tests/fixtures/sentinel-02-shaped.json	rcc,spi1,spi2	spi1 | TVI-SPI-KERNEL | predicted-fault | RCC_D2CCIP1R.SPI123SEL = 100 ; spi2 | TVI-SPI-KERNEL | predicted-fault | RCC_D2CCIP1R.SPI123SEL = 100
+sentinel-03	crates/aethelgard-cli/tests/fixtures/sentinel-03.json	rcc,spi1,spi2	spi1 | TVI-SPI-KERNEL | predicted-fault | RCC_D2CCIP1R.SPI123SEL = 100 ; spi2 | TVI-SPI-KERNEL | predicted-fault | RCC_D2CCIP1R.SPI123SEL = 100
+serial-dshot-9600	crates/aethelgard-cli/tests/fixtures/serial-dshot-9600.json	rcc,spi1	spi1 | TVI-SPI-KERNEL | predicted-fault | RCC_D2CCIP1R.SPI123SEL = 100

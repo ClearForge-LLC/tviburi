@@ -13,7 +13,7 @@ set -euo pipefail
 
 here=$(cd "$(dirname "$0")/../.." && pwd)
 IMAGE=$(sed -n 's/^IMAGE=//p' "$here/tests/spike.sh")
-CASES="scar switch stuck clocked switched alias field pll divq pllref divm0 sw width read usart2 uncovered fields reset resetfwd spi1rst alias17c registrations hse16 recorded recordedfield ardupilot gen-s03 gen-hc16 oscclear oscsys rsrbyte misaligned ledger unenabled tim2 lost-pll lost-sel lost-en lost-osc lost-ckper stopped ckper-live blocked cfg2same sel5 divr pll1src kernelq"
+CASES="scar switch stuck clocked switched alias field pll divq pllref divm0 sw width read usart2 uncovered fields reset resetfwd spi1rst alias17c registrations hse16 recorded recordedfield ardupilot gen-s03 gen-hc16 oscclear oscsys rsrbyte misaligned ledger unenabled tim2 lost-pll lost-sel lost-en lost-osc lost-ckper stopped ckper-live blocked cfg2same sel5 divr pll1src kernelq spi1off cstart"
 scratch=${TVIBURI_SCRATCH:-$HOME/.cache/tviburi}
 mkdir -p "$scratch"
 work=$(mktemp -d "$scratch/rcc.XXXXXX")
@@ -305,6 +305,20 @@ sys.exit(0 if len(f) == 677 and a and all(r[\"reason\"].startswith(\"TVI-WO-1300
       'sysbus WriteDoubleWord 0x58024400 0x01010000'
     check "pll1src (TVI-WO-1300a (5)): HSION cleared while HSI feeds PLL1 (on, not the system clock): RM0433 contradicts itself (p384-386 against p340-342), so TVI-RCC-PLL-REF, unmodeled, as 1300 ruled; bench row R10 asks the Nucleo" \
       "[ \$rc = 3 ] && records pll1src 'len(recs) == 1 and recs[0][\"rule\"] == \"TVI-RCC-PLL-REF\" and recs[0][\"kind\"] == \"unmodeled\" and recs[0][\"bit\"] == \"PLL1ON (bit 24) = 1\"'" ;;
+  spi1off)
+    run_case spi1off - 'sysbus WriteDoubleWord 0x580244F0 0x00001000' 'sysbus WriteDoubleWord 0x580244F0 0x0' 'sysbus WriteDoubleWord 0x4001300C 0x04400000'
+    check "spi1off: SPI1EN set, then cleared (SPI1 stopped), then a CFG2 write: SPI1 stays unlocked on the bus, so its guard refuses, TVI-SPI-ENABLE, predicted-fault" \
+      "[ \$rc = 3 ] && records spi1off 'len(recs) == 1 and recs[0][\"rule\"] == \"TVI-SPI-ENABLE\" and recs[0][\"kind\"] == \"predicted-fault\"' && ! grep -q 'locked peripheral: machine-0.spi1' '$work/spi1off/renode.out'" ;;
+  cstart)
+    PLATFORM=/repo/tests/1300/recorded.repl run_case cstart - 'sysbus WriteDoubleWord 0x58024400 0x01000001' 'sysbus WriteDoubleWord 0x580244F0 0x00001000' \
+      'sysbus WriteDoubleWord 0x40013000 0x00001000' 'sysbus WriteDoubleWord 0x4001300C 0x04400000' 'sysbus WriteDoubleWord 0x40013000 0x00001001' \
+      'sysbus WriteDoubleWord 0x58024400 0x00000001' 'sysbus WriteDoubleWord 0x40013000 0x00001201' 'sysbus WriteDoubleWord 0x580244E8 0x00000001'
+    check "cstart (recorded): SPI1 started on pll1_q_ck, PLL1ON cleared (TVI-RCC-CLOCK), then CSTART with SPE (a start, TVI-SPI-KERNEL), then an unrelated RCC write, which loses nothing that ran: exactly those two would-refuse records" \
+      "python3 -I -c '
+import json, re, sys
+recs = [json.loads(m.group(1)) for m in (re.search(r\"\\] (?:rcc|spi1): (\\{\\\"tviburi\\\":\\\"would-refuse\\\".*)\$\", l.rstrip()) for l in open(sys.argv[1])) if m]
+sys.exit(0 if [(r[\"rule\"], r[\"bit\"]) for r in recs] == [(\"TVI-RCC-CLOCK\", \"RCC_CR.PLL1ON (bit 24) = 0\"), (\"TVI-SPI-KERNEL\", \"RCC_D2CCIP1R.SPI123SEL = 000\")] else 1)
+' '$work/cstart/renode-log.txt'" ;;
   kernelq)
     rq='python "self.Machine[\"sysbus.rcc\"].RequireKernelClock(\"spi1\", \"CR1.SPE\")"'
     run_case kernelq - 'sysbus WriteDoubleWord 0x580244F0 0x00001000' "$rq" 'sysbus WriteDoubleWord 0x58024450 0x00004000' "$rq"
