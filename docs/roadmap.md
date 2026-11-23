@@ -88,6 +88,8 @@ Not planned until Phase 4 has run once. *(Amended 2026-11-23: was "until Phase 2
 
 **Goal:** the refusal table of `RUL-16`, generated from each vendor's register files, with adapters into Renode and into a second simulator, and a coverage report per target. It is not a new emulator.
 
+**Exit gate:** none yet; it is written when the phase is scoped.
+
 **Shape:** not scoped yet. The spike that shapes it is the first target past the trigger. When it starts, decide whether it needs its own repository, and if so, name it then (Scotty, 2026-11-23: "if our Renode-like extension or a total rework project needs its own repo home ... we will come up with an appropriate name and create that repo"). The research behind the trigger and the order of vendors is `docs/reviews/2026-11-23-chip-families-research.md`.
 
 ## Critical path
