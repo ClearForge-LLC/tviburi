@@ -1,9 +1,9 @@
-# The Tviburi machine: the records log, the runtime and guarded model, a pinned seed, the overlay.
-# Included by the runner and by the tests; the repository is mounted at /repo and output at /out.
-# The log file is what tools/tviburi-check reads (RUL-11): it must be opened before the machine.
+# The Tviburi machine: the records log, the release's one C# file, a pinned seed, the overlay platform.
+# Included by the runner and by the tests, after scripts/build-release has written /out/release; the repository
+# is mounted at /repo and output at /out. The log file is what tools/tviburi-check reads (RUL-11): it must be
+# opened before the machine.
 logFile @/out/renode-log.txt
-include @/repo/model/Refusal.cs
-include @/repo/model/GuardedSTM32H7_SPI.cs
+include @/out/release/Tviburi.cs
 emulation SetSeed 1
 mach create
 machine LoadPlatformDescription @/repo/model/tviburi-nucleo-h753zi.repl

@@ -1,0 +1,9 @@
+[package]
+name = "tviburi-release"
+version = "0.1.0"
+edition = "2021"
+license = "MIT OR Apache-2.0"
+description = "Tviburi's release: the one-file overlay, the manifest, the ledger and the tarball (RUL-03, RUL-09, RUL-10)"
+publish = false
+
+[dependencies]

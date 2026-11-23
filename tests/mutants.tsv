@@ -20,13 +20,13 @@ M16-resetHistory	model/GuardedSTM32H7_SPI.cs	            history = null;\n      
 M17-resetCfg2	model/GuardedSTM32H7_SPI.cs	            cfg2 = 0;\n	(empty)	conditions
 M18-resetCr1	model/GuardedSTM32H7_SPI.cs	            cr1 = 0;\n	(empty)	conditions
 M19-loadRefuses	model/GuardedSTM32H7_SPI.cs	            if(records.LoadFailed)\n            {\n                records.Refuse("TVI-LOAD"	            if(false)\n            {\n                records.Refuse("TVI-LOAD"	load
-M20-witness	model/Refusal.cs	                Emit(LogLevel.Info, "witness", ",\\"guard\\":" + Json(guard) + ",\\"model_version\\":" + Json(version) + ",\\"mode\\":" + Json(Mode));\n	(empty)	modeled
+M20-witness	model/Refusal.cs	                Emit(LogLevel.Info, "witness", ",\\"guard\\":" + Json(guard) + ",\\"model_version\\":" + Json(version) + ",\\"mode\\":" + Json(mode));\n	(empty)	modeled
 M21-end	model/Refusal.cs	if(named)	if(false)	modeled
-M22-refusalAtError	model/Refusal.cs	Emit(LogLevel.Error, "refusal"	Emit(LogLevel.Info, "refusal"	adv-loglevel
+M22-refusalAtError	model/Refusal.cs	Emit(LogLevel.Error, Recorded ? "would-refuse" : "refusal"	Emit(LogLevel.Info, Recorded ? "would-refuse" : "refusal"	adv-loglevel
 M23-seq	model/Refusal.cs	seq++;	(empty)	modeled
 M24-readCr1Ssi	model/GuardedSTM32H7_SPI.cs	return (value & Cr1Stock) | (cr1 & ~Cr1Stock & ~Cr1IoLock);	return value;	modeled
 M25-readCfg2Copy	model/GuardedSTM32H7_SPI.cs	return cfg2;	return value;	rmw
-M26-readIolock	model/GuardedSTM32H7_SPI.cs	if(ioLock)\n                {\n                    records.Refuse("TVI-SPI-IOLOCK", Unmodeled, "SPI_CR1"	if(false)\n                {\n                    records.Refuse("TVI-SPI-IOLOCK", Unmodeled, "SPI_CR1"	conditions
+M26-readIolock	model/GuardedSTM32H7_SPI.cs	if(ioLock && !fired)\n                {\n                    records.Refuse("TVI-SPI-IOLOCK", Unmodeled, "SPI_CR1"	if(false)\n                {\n                    records.Refuse("TVI-SPI-IOLOCK", Unmodeled, "SPI_CR1"	conditions
 M27-subwordAtRegister	model/GuardedSTM32H7_SPI.cs	if(width != 32 || offset % 4 != 0)	if(offset % 4 != 0)	conditions
 M28-unaligned	model/GuardedSTM32H7_SPI.cs	if(width != 32 || offset % 4 != 0)	if(width != 32)	conditions
 R01-refusalFirst	tools/tviburi-check/src/main.rs	let verdict = if !refusals.is_empty() {	let verdict = if !refusals.is_empty() && problems.is_empty() {	unit
@@ -46,9 +46,8 @@ S03-oneArgument	scripts/tviburi-spike	[ $# -eq 1 ] ||	true ||	adv-extra-arg
 S04-scriptEnd	scripts/tviburi-spike	grep -qx 'TVIBURI-END' <<<"$console" && 	(empty)	adv-noend
 S05-afterMarker	scripts/tviburi-spike	 && [ "$after" = "0xAF7E0002" ]	(empty)	nomark
 S06-variantMustMatch	scripts/tviburi-spike	[ -n "$variant" ] ||	true ||	adv-bad-variant
-M31-cfg2ReadAfterHistory	model/GuardedSTM32H7_SPI.cs	if(doubt != null)	if(false)	conditions
+M31-cfg2ReadAfterHistory	model/GuardedSTM32H7_SPI.cs	if(doubt != null && !fired)	if(false)	conditions
 M32-loadRefusalAtNaming	model/Refusal.cs	                Refuse("TVI-LOAD", "unmodeled", "none", "none"	                if(false) Refuse("TVI-LOAD", "unmodeled", "none", "none"	load
-S07-modelDirOverride	scripts/tviburi-spike	export TVIBURI_MODEL_DIR=$root/model\n	(empty)	adv-env
 N01-noteMasterStateAfterCr1	model/GuardedSTM32H7_SPI.cs	                cr1 = value;\n                NoteMasterState();	                cr1 = value;	conditions
 N02-fieldAllowList	model/GuardedSTM32H7_SPI.cs	if(f.Allowed != null && !f.Allowed.Contains(v))	if(false)	fields
 N03-noRegister	model/GuardedSTM32H7_SPI.cs	if(rows.Length == 0)	if(false)	fields
@@ -94,3 +93,20 @@ N33-eotcClearsFlag	model/GuardedSTM32H7_SPI.cs	                if((value & IfcrE
 N34-orderCsusp	model/GuardedSTM32H7_SPI.cs	else if(offset == Cr1Offset && !enabled && (value & Cr1Csusp) != 0)	else if(false)	conditions
 R19-unframedRecord	tools/tviburi-check/src/main.rs	if line.contains("{\\"tviburi\\"") {	if false {	unit
 M35-resetEotBySuspend	model/GuardedSTM32H7_SPI.cs	            eotBySuspend = false;\n        }	        }	conditions
+T01-modeChecked	model/Refusal.cs	if(mode != Enforcing && mode != RecordedMode)	if(false)	load
+T02-recordedKind	model/Refusal.cs	Recorded ? "would-refuse" : "refusal"	"refusal"	recorded
+T03-witnessMode	model/Refusal.cs	+ ",\\"mode\\":" + Json(mode));	+ ",\\"mode\\":" + Json(Enforcing));	recorded
+T05-recordedPassesWrite	model/GuardedSTM32H7_SPI.cs	|| RefusedWrite(offset, value)) && !records.Recorded)	|| RefusedWrite(offset, value)))	recorded
+T06-recordedPassesRead	model/GuardedSTM32H7_SPI.cs	if(fired && !records.Recorded)	if(fired)	recorded
+T07-versionIsTheConstant	model/Refusal.cs	private readonly string version = TviburiRelease.ManifestSha256;	private readonly string version = "sha256:0000000000000000000000000000000000000000000000000000000000000000";	modeled
+U01-bitOverlap	tools/tviburi-release/src/main.rs	if entry.1 & mask != 0 {	if false {	unit
+U02-bitGap	tools/tviburi-release/src/main.rs	.find(|(_, (_, m))| *m != 0xFFFF_FFFF)	.find(|_| false)	unit
+U03-usingAfterDeclaration	tools/tviburi-release/src/overlay.rs	Using::Namespace(ns) if header =>	Using::Namespace(ns) =>	unit
+U04-verifyBody	tools/tviburi-release/src/main.rs	 && sha256::hex(&shipped[..len]) == h	(empty)	verify
+U05-verifyConstant	tools/tviburi-release/src/main.rs	 && shipped[len..] == *filled.as_bytes()	(empty)	verify
+U06-ledgerOrder	tools/tviburi-release/src/ledger.rs	if last.as_ref().is_some_and(|l| *l >= k) {	if false {	unit
+U07-sourcesInManifest	tools/tviburi-release/src/main.rs	        m += &format!("source {} {}\\n", sha256::hex(&src.bytes), src.path);\n	(empty)	identity
+U08-stockPin	tools/tviburi-release/src/stock.rs	if got != pin.sha256 {	if false {	adv-release
+U09-runnerRenodeBuild	scripts/tviburi-spike	renode --version 2>/dev/null | grep -qxF "  build: $build" ||	true ||	adv-release
+F01-allowedList	tools/tviburi-release/src/fields.rs	return list.split(',').map(	return list.split(',').take(1).map(	unit
+U10-ledgerRowsBound	tools/tviburi-release/src/main.rs	(Ok(n), Some(h)) if t.split_once('\\n')	(Ok(n), Some(h)) if true || t.split_once('\\n')	verify

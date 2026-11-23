@@ -1,0 +1,10 @@
+// The release constant (RUL-10 (b), (e)), written by tools/tviburi-release: the sha256 of the release's
+// MANIFEST, which lists this template's sha256 and the bytes of the overlay before it. `static readonly`, not
+// `const`: with Renode's compiler cache on, a `const` reported the previous release (TVI-WO-1150 (iii)).
+namespace Antmicro.Renode.Peripherals.Tviburi
+{
+    public static class TviburiRelease
+    {
+        public static readonly string ManifestSha256 = "sha256:@@MANIFEST_SHA256@@";
+    }
+}

@@ -11,7 +11,7 @@
 //! starts with `{` but is not a well-formed record fails the run.
 //! A witness passes only with the expected model version, given as `sha256:<64 hex>`, and with
 //! `"mode":"enforcing"`: a recorded-mode or mode-less witness is never a pass (RUL-19). The version
-//! compared is still TVI-WO-0100a's (the model-directory hash) until TVI-WO-1200.
+//! is the release hash, the sha256 of the release's MANIFEST (RUL-10; TVI-WO-1200).
 //!
 //! Exit status:
 //!   3  REFUSED - any named peripheral emitted a refusal record. Checked first.
@@ -333,7 +333,9 @@ mod tests {
         let recorded = witness(0).replace(r#""mode":"enforcing""#, r#""mode":"recorded""#);
         let modeless = witness(0).replace(r#","mode":"enforcing""#, "");
         let other = witness(0).replace(r#""mode":"enforcing""#, r#""mode":1"#);
-        for w in [recorded, modeless, other] {
+        let case = witness(0).replace(r#""mode":"enforcing""#, r#""mode":"Enforcing""#);
+        let twice = witness(0).replace(r#""mode":"enforcing""#, r#""mode":"recorded","mode":"enforcing""#);
+        for w in [recorded, modeless, other, case, twice] {
             assert_eq!(run(&(w.clone() + &end(1))), Verdict::Fail, "{w}");
         }
     }
