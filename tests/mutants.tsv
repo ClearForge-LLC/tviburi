@@ -11,7 +11,7 @@ M06-ssi	model/GuardedSTM32H7_SPI.cs	if((cr1 & Cr1Ssi) == 0)	if(false)	modf
 M07-historyCheck	model/GuardedSTM32H7_SPI.cs	if(failure == null && history != null)	if(false)	cfg2first
 M08-historyNote	model/GuardedSTM32H7_SPI.cs	if(history == null && (cfg2 & Cfg2Master) != 0 && FirstFailingBranch(cfg2, cr1) != null)	if(false)	cfg2first
 M09-speGate	model/GuardedSTM32H7_SPI.cs	if((value & Cr1Spe) != 0 && !EnablePasses(value))	if(false)	modf
-M10-iolockCheck	model/GuardedSTM32H7_SPI.cs	if(ioLock)	if(false)	iolock
+M10-iolockCheck	model/GuardedSTM32H7_SPI.cs	if(ioLock)\n                {\n                    records.Refuse("TVI-SPI-IOLOCK", "SPI_CFG2"	if(false)\n                {\n                    records.Refuse("TVI-SPI-IOLOCK", "SPI_CFG2"	iolock
 M11-iolockLatch	model/GuardedSTM32H7_SPI.cs	ioLock |= (value & Cr1IoLock) != 0;	(empty)	iolock
 M12-cfg2WhileEnabled	model/GuardedSTM32H7_SPI.cs	if((cr1 & Cr1Spe) != 0)	if(false)	conditions
 M13-i2smod	model/GuardedSTM32H7_SPI.cs	if((value & I2sMod) != 0)	if(false)	conditions
@@ -21,10 +21,17 @@ M16-resetHistory	model/GuardedSTM32H7_SPI.cs	history = null;	(empty)	conditions
 M17-resetCfg2	model/GuardedSTM32H7_SPI.cs	            cfg2 = 0;\n	(empty)	conditions
 M18-resetCr1	model/GuardedSTM32H7_SPI.cs	            cr1 = 0;\n	(empty)	conditions
 M19-loadRefuses	model/GuardedSTM32H7_SPI.cs	RefuseLoad(offset, value, 32);\n                return;	(empty)	load
-M20-witness	model/Refusal.cs	if(loadFailure == null)	if(false)	modeled
+M20-witness	model/Refusal.cs	                Emit(LogLevel.Info, "witness", ",\\"guard\\":" + Json(guard) + ",\\"model_version\\":" + Json(version));\n	(empty)	modeled
 M21-end	model/Refusal.cs	if(named)	if(false)	modeled
 M22-refusalAtError	model/Refusal.cs	Emit(LogLevel.Error, "refusal"	Emit(LogLevel.Info, "refusal"	adv-loglevel
 M23-seq	model/Refusal.cs	seq++;	(empty)	modeled
+M24-readCr1Ssi	model/GuardedSTM32H7_SPI.cs	return (value & ~Cr1Ssi) | (cr1 & Cr1Ssi);	return value;	modeled
+M25-readCfg2Copy	model/GuardedSTM32H7_SPI.cs	            case Cfg2Offset:\n                return cfg2;\n	(empty)	rmw
+M26-readIolock	model/GuardedSTM32H7_SPI.cs	if(ioLock)\n                {\n                    records.Refuse("TVI-SPI-IOLOCK", "SPI_CR1"	if(false)\n                {\n                    records.Refuse("TVI-SPI-IOLOCK", "SPI_CR1"	conditions
+M27-unalignedWrite	model/GuardedSTM32H7_SPI.cs	if(OverlapsGuarded(offset, 4) && !IsGuardedRegister(offset))\n            {\n                RefuseWidth(offset, value, 32, "write");	if(false)\n            {\n                RefuseWidth(offset, value, 32, "write");	conditions
+M28-subwordRead	model/GuardedSTM32H7_SPI.cs	RefuseWidth(offset, value, 16, "read");	(empty)	conditions
+M29-unalignedRead	model/GuardedSTM32H7_SPI.cs	if(OverlapsGuarded(offset, 4) && !IsGuardedRegister(offset))\n            {\n                RefuseWidth(offset, value, 32, "read");	if(false)\n            {\n                RefuseWidth(offset, value, 32, "read");	conditions
+M30-loadRefusesReads	model/GuardedSTM32H7_SPI.cs	            if(records.LoadFailed)\n            {\n                RefuseLoad(offset, value, 32);\n                return value;\n            }\n	(empty)	load
 R01-refusalFirst	tools/tviburi-check/src/main.rs	let verdict = if !refusals.is_empty() {	let verdict = if !refusals.is_empty() && problems.is_empty() {	unit
 R02-sourceFilter	tools/tviburi-check/src/main.rs	let Some(ch) = channels.get_mut(source) else { continue };	let Some(ch) = channels.values_mut().next() else { continue };	unit
 R03-timestamp	tools/tviburi-check/src/main.rs	let stamp_ok = b.len() > 15	let stamp_ok = true || b.len() > 15	unit

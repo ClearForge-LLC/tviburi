@@ -8,8 +8,16 @@
 //
 // What the stock model does not model (measured on Renode 1.17.0+…aet1605): CFG2.SSM, SSIOP, SSOE
 // and CR1.SSI are tags (written values dropped, read as 0); CR1.IOLOCK is dropped; there is no mode
-// fault; slave mode is rejected. The guard therefore keeps its own copies of the last CR1 and CFG2
-// values it passed. Reads are not guarded.
+// fault; slave mode is rejected; CFG2.MASTER always reads 1. The guard therefore keeps its own copies
+// of the last CR1 and CFG2 values it passed.
+//
+// Reads (modeled, so that firmware that reads a register, changes a field and writes it back computes
+// the word silicon would; adversarial pass, TVI-WO-0100a): a CFG2 read returns the guard's copy
+// (every CFG2 field is software-written, rw, reset 0: RM0433 Rev 9 §50.11.4 p2221-2222; the guard
+// refuses every CFG2 write silicon would drop, and any mode fault refuses before it could clear MASTER).
+// A CR1 read returns the stock value with SSI taken from the copy (SSI is rw, p2215). A CR1 read while
+// the IOLOCK latch is set refuses: silicon reads IOLOCK=1 until SPE goes from 1 to 0, which is not
+// modeled. A sub-word or unaligned read overlapping a guarded register refuses.
 //
 // Rules. A refused write is not passed to the model.
 //   TVI-SPI-MODF   a CR1 write with SPE=1 passes only if the copies show master, Motorola mode
@@ -20,8 +28,8 @@
 //   TVI-SPI-IOLOCK after a CR1 write carrying IOLOCK, every CFG2 write refuses until reset.
 //   TVI-SPI-CFG2-SPE a CFG2 write while the last CR1 passed had SPE=1 refuses (write-protected).
 //   TVI-SPI-I2SMOD an I2SCFGR write with I2SMOD=1 refuses (I2S/PCM mode is not modeled).
-//   TVI-SPI-WIDTH  a 16- or 8-bit write overlapping CR1, CFG2 or I2SCFGR refuses.
-//   TVI-LOAD       (Records) the model version could not be computed: every write refuses.
+//   TVI-SPI-WIDTH  any access overlapping CR1, CFG2 or I2SCFGR other than an aligned 32-bit one refuses.
+//   TVI-LOAD       (Records) the model version could not be computed: every access refuses.
 
 using System;
 using Antmicro.Renode.Core;
@@ -57,6 +65,11 @@ namespace Antmicro.Renode.Peripherals.Tviburi
             if(records.LoadFailed)
             {
                 RefuseLoad(offset, value, 32);
+                return;
+            }
+            if(OverlapsGuarded(offset, 4) && !IsGuardedRegister(offset))
+            {
+                RefuseWidth(offset, value, 32, "write");
                 return;
             }
             switch(offset)
@@ -95,7 +108,7 @@ namespace Antmicro.Renode.Peripherals.Tviburi
                 {
                     records.Refuse("TVI-SPI-I2SMOD", "SPI_I2SCFGR", "I2SCFGR.I2SMOD (bit 0) = 1",
                         "I2S/PCM mode selected: the guard models SPI mode only, where I2SMOD must be kept at 0",
-                        "RM0433 Rev 9 §50.11.14 p2230 (I2SMOD); §50.4.9 p2171 step 2(f)",
+                        "RM0433 Rev 9 §50.11.14 p2230 (\"kept at 0 in SPI mode\"), p2232 (I2SMOD, bit 0); §50.4.9 p2171 step 2(f)",
                         State("I2SCFGR written=0x" + value.ToString("X8")), offset, value, 32);
                     return;
                 }
@@ -113,7 +126,7 @@ namespace Antmicro.Renode.Peripherals.Tviburi
             }
             if(OverlapsGuarded(offset, 2))
             {
-                RefuseWidth(offset, value, 16);
+                RefuseWidth(offset, value, 16, "write");
                 return;
             }
             base.WriteWord(offset, value);
@@ -128,10 +141,68 @@ namespace Antmicro.Renode.Peripherals.Tviburi
             }
             if(OverlapsGuarded(offset, 1))
             {
-                RefuseWidth(offset, value, 8);
+                RefuseWidth(offset, value, 8, "write");
                 return;
             }
             base.WriteByte(offset, value);
+        }
+
+        public new uint ReadDoubleWord(long offset)
+        {
+            var value = base.ReadDoubleWord(offset);
+            if(records.LoadFailed)
+            {
+                RefuseLoad(offset, value, 32);
+                return value;
+            }
+            if(OverlapsGuarded(offset, 4) && !IsGuardedRegister(offset))
+            {
+                RefuseWidth(offset, value, 32, "read");
+                return value;
+            }
+            switch(offset)
+            {
+            case Cr1Offset:
+                if(ioLock)
+                {
+                    records.Refuse("TVI-SPI-IOLOCK", "SPI_CR1", "CR1.IOLOCK (bit 16), read",
+                        "CR1 read while the guard's IOLOCK latch is set: silicon reads IOLOCK=1 until SPE goes from 1 to 0, the stock model reads 0, and the guard does not model the clear, so the value cannot be given",
+                        "RM0433 Rev 9 §50.11.1 p2215 (CR1.IOLOCK)", State(null), offset, value, 32);
+                    return value;
+                }
+                return (value & ~Cr1Ssi) | (cr1 & Cr1Ssi);
+            case Cfg2Offset:
+                return cfg2;
+            }
+            return value;
+        }
+
+        public new ushort ReadWord(long offset)
+        {
+            var value = base.ReadWord(offset);
+            if(records.LoadFailed)
+            {
+                RefuseLoad(offset, value, 16);
+            }
+            else if(OverlapsGuarded(offset, 2))
+            {
+                RefuseWidth(offset, value, 16, "read");
+            }
+            return value;
+        }
+
+        public new byte ReadByte(long offset)
+        {
+            var value = base.ReadByte(offset);
+            if(records.LoadFailed)
+            {
+                RefuseLoad(offset, value, 8);
+            }
+            else if(OverlapsGuarded(offset, 1))
+            {
+                RefuseWidth(offset, value, 8, "read");
+            }
+            return value;
         }
 
         // TVI-SPI-MODF at a CR1 write with SPE=1: the current state first, then the history.
@@ -174,7 +245,7 @@ namespace Antmicro.Renode.Peripherals.Tviburi
             if((cfg2 & Cfg2Sp) != 0)
             {
                 return new Branch("CFG2.SP[2:0] (bits 21:19) != 000",
-                    "CR1.SPE set in master mode with a serial protocol other than Motorola: in TI mode SSM, SSIOP and SSOE are not used, and the manual does not describe mode fault for a TI master, so a mode fault cannot be ruled out",
+                    "CR1.SPE set in master mode with a serial protocol other than Motorola: in TI mode the setting of SSM, SSIOP and SSOE is not required, and the manual does not describe mode fault for a TI master, so a mode fault cannot be ruled out",
                     "RM0433 Rev 9 §50.5.1 p2181; §50.4.9 p2171 step 2(d); §50.11.4 p2222 (SP[2:0])");
             }
             if((cfg2 & Cfg2Ssm) == 0)
@@ -204,17 +275,17 @@ namespace Antmicro.Renode.Peripherals.Tviburi
             return null;
         }
 
-        private void RefuseWidth(long offset, ulong value, int width)
+        private void RefuseWidth(long offset, ulong value, int width, string access)
         {
-            records.Refuse("TVI-SPI-WIDTH", RegisterAt(offset, width / 8), "sub-word access",
-                width + "-bit write overlapping CR1, CFG2 or I2SCFGR: the guards evaluate 32-bit writes only (a twin limitation; RM0433 Rev 9 §50.11 states no access width for these registers)",
+            records.Refuse("TVI-SPI-WIDTH", RegisterAt(offset, width / 8), "sub-word or unaligned " + access,
+                width + "-bit " + access + " at offset 0x" + offset.ToString("X") + " overlapping CR1, CFG2 or I2SCFGR: the guards evaluate aligned 32-bit accesses only (a twin limitation; RM0433 Rev 9 §50.11 states no access width for these registers)",
                 "none: a limitation of the guard, not a behaviour of the manual", State(null), offset, value, width);
         }
 
         private void RefuseLoad(long offset, ulong value, int width)
         {
             records.Refuse("TVI-LOAD", RegisterAt(offset, width / 8), "none",
-                "write to a guarded peripheral whose model version could not be computed at load",
+                "access to a guarded peripheral whose model version could not be computed at load",
                 "Tviburi records contract (RUL-12); northstar invariant 5", State(null), offset, value, width);
         }
 
@@ -228,6 +299,11 @@ namespace Antmicro.Renode.Peripherals.Tviburi
         {
             return Overlaps(offset, size, Cr1Offset) ? "SPI_CR1" : Overlaps(offset, size, Cfg2Offset) ? "SPI_CFG2"
                 : Overlaps(offset, size, I2sCfgrOffset) ? "SPI_I2SCFGR" : "SPI offset 0x" + offset.ToString("X");
+        }
+
+        private static bool IsGuardedRegister(long offset)
+        {
+            return offset == Cr1Offset || offset == Cfg2Offset || offset == I2sCfgrOffset;
         }
 
         private static bool OverlapsGuarded(long offset, int size)

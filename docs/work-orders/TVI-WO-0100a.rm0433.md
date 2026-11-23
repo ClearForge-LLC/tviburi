@@ -111,8 +111,8 @@ All of these agree. The register map (Table 429, p2233) is consistent with them,
   - Turning it into a pass is R7, which is not in this WO.
 
 **D6. TI mode and I2S mode: the pass row's other premise. This is in the passing direction, and it is undecided by the manual.**
-- **What the guard does:** it never reads `CFG2.SP[2:0]` (bits 21:19, p2222), and it never sees `SPI_I2SCFGR.I2SMOD` (offset `0x50`, bit 0, p2230).
-- **What the manual says:** in TI mode, SSM, SSIOP and SSOE are "not required" (p2181, p2171). Mode fault in a TI master is not described anywhere in chapter 50. I2SMOD "needs to be kept at 0 in SPI mode" (p2230, and p2171 step 2(f)).
+- **What the guard does:** it never reads `CFG2.SP[2:0]` (bits 21:19, p2222), and it never sees `SPI_I2SCFGR.I2SMOD` (offset `0x50` on p2230, bit 0 on p2232).
+- **What the manual says:** in TI mode, SSM, SSIOP and SSOE are "not required" (p2181, p2171). Mode fault in a TI master is not described anywhere in chapter 50. I2SMOD "needs to be kept at 0 in SPI mode" (p2230, and p2171 step 2(f)); the bit itself is defined on p2232.
 - **So:** T1's argument holds only for Motorola SPI with `I2SMOD=0`.
 - **Lean:** the pass row also requires `SP=000` in the guard's CFG2 copy. Any write to `SPI_I2SCFGR` with `I2SMOD=1` refuses, as unmodeled. `SPI_I2SCFGR` is a third guarded register, but it is still SPI, not another peripheral.
 - **This changes the rule the build passes on, so it needs the same ruling as D1.**

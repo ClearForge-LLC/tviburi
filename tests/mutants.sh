@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # tests/mutants.sh [SRC] — the diff-sized mutation run: for each row of tests/mutants.tsv, a copy of
 # the source with that one edit, then the named tests of tests/spike.sh on it. A mutant is killed
-# only when those tests report a FAIL (exit 1); a setup error (exit 2) counts as not killed.
+# only when those tests exit 1 with a FAIL line; any other failure (a setup error, an aborted
+# fixture) counts as not killed.
 # Exit 0 only if every mutant was killed. Same environment as tests/spike.sh (TVIBURI_CI, scratch).
 set -euo pipefail
 
@@ -33,7 +34,7 @@ assert s.count(o) == 1, "mutant text not found exactly once"
 open(p, "w").write(s.replace(o, n))' "$tree/$file" "$old" "$new"
   rc=0
   TVIBURI_TESTS="$tests" TVIBURI_SCRATCH="$work" "$here/tests/spike.sh" "$tree" >"$work/$id.log" 2>&1 || rc=$?
-  if [ $rc -eq 1 ]; then
+  if [ $rc -eq 1 ] && grep -q '^FAIL ' "$work/$id.log"; then
     echo "killed $id by: $(grep '^FAIL ' "$work/$id.log" | head -1 | cut -c6-)"
   else
     echo "ALIVE  $id (tests: $tests; spike.sh exit $rc; log $work/$id.log)"

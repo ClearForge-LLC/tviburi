@@ -43,8 +43,9 @@ sysbus WriteDoubleWord 0x4001300C 0x04400000
 # pass: disable, then IOLOCK with SPE=0
 sysbus WriteDoubleWord 0x40013000 0x1000
 sysbus WriteDoubleWord 0x40013000 0x11000
-# 9. CFG2 after IOLOCK: refuses
+# 9. CFG2 after IOLOCK: refuses; 9a. a CR1 read while IOLOCK is latched: refuses
 sysbus WriteDoubleWord 0x4001300C 0x04400000
+sysbus ReadDoubleWord 0x40013000
 machine Reset
 # pass: reset cleared the IOLOCK latch and the history: the passing sequence passes again
 sysbus WriteDoubleWord 0x40013000 0x1000
@@ -53,15 +54,34 @@ sysbus WriteDoubleWord 0x40013000 0x1001
 # 10. I2SCFGR with I2SMOD=1: refuses; pass: I2SCFGR with I2SMOD=0
 sysbus WriteDoubleWord 0x40013050 0x1
 sysbus WriteDoubleWord 0x40013050 0x0
-# 11-13. sub-word writes overlapping CR1, CFG2 and I2SCFGR refuse
+# 11-13. sub-word writes overlapping CR1, CFG2 and I2SCFGR refuse; 13a. an unaligned 32-bit write;
+# 13b. a sub-word read; 13c. an unaligned 32-bit read
 sysbus WriteWord 0x40013002 0x0
 sysbus WriteByte 0x4001300E 0x0
 sysbus WriteByte 0x40013051 0x0
+sysbus WriteDoubleWord 0x4001300D 0x0
+sysbus ReadWord 0x40013000
+sysbus ReadDoubleWord 0x4001300D
 # pass: a byte write to TXDR is not guarded
 sysbus WriteByte 0x40013020 0x55
 machine Reset
 # 14. reset cleared the CFG2 copy: SPE refuses as slave; then reset cleared the CR1 copy (SPE=0): CFG2 passes
 sysbus WriteDoubleWord 0x40013000 0x1001
 sysbus WriteDoubleWord 0x4001300C 0x04400000
+machine Reset
+# reads give silicon's value: the CFG2 fields the stock model drops, and CR1.SSI (no refusal)
+sysbus WriteDoubleWord 0x40013000 0x1000
+sysbus WriteDoubleWord 0x4001300C 0x10000000
+echo "READ-CR1"
+sysbus ReadDoubleWord 0x40013000
+echo "READ-CFG2"
+sysbus ReadDoubleWord 0x4001300C
+# 15. an RCC reset of SPI1 (RCC_APB2RSTR SPI1RST, RM0433 Rev 9 §8.7.35 p442) resets the guard's
+# copies with the model: after enabling, SPI1RST, then SPE refuses as slave
+sysbus WriteDoubleWord 0x4001300C 0x04400000
+sysbus WriteDoubleWord 0x40013000 0x1001
+sysbus WriteDoubleWord 0x58024498 0x1000
+sysbus WriteDoubleWord 0x58024498 0x0
+sysbus WriteDoubleWord 0x40013000 0x1001
 echo "TVIBURI-END"
 quit

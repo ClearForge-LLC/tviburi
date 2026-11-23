@@ -1,10 +1,13 @@
 //! Bare-metal probes for the SPI1 guards. No dependencies; built with rustc alone.
 //! Variant chosen at build time with `--cfg path="..."`:
-//!   path="modeled"   - master, software NSS, SSI=1 written before CFG2: the passing path (row T1).
+//!   path="modeled"   - master, software NSS, SSI=1 written before CFG2, then SPE set by
+//!                      read-modify-write of CR1 (as HAL's SET_BIT): the passing path (row T1).
 //!   path="modf"      - master, software NSS, SSI=0: internal SS active, silicon raises MODF.
 //!   path="cfg2first" - the modeled writes with CFG2 before SSI: a master state with SSI=0 precedes
 //!                      the enable, which TVI-SPI-MODF refuses (truth table D1).
 //!   path="iolock"    - CFG2=MASTER, CR1.IOLOCK, then CFG2=MASTER|SSM: refused by TVI-SPI-IOLOCK.
+//!   path="rmw"       - CFG2=SSIOP, then CFG2 |= MASTER|SSM by read-modify-write: silicon holds
+//!                      SSIOP=1 (row T3), so the enable refuses (adversarial pass, TVI-WO-0100a).
 //!   path="forge"     - the modeled path, after printing imitation records on USART3 (RUL-11).
 //!   path="spray"     - the modeled path, after writing the bytes of a record into every unguarded
 //!                      SPI1 register, so that the model logs them under its own name (RUL-11).
@@ -13,7 +16,7 @@
 #![no_std]
 #![no_main]
 
-use core::ptr::write_volatile;
+use core::ptr::{read_volatile, write_volatile};
 
 const RCC_APB2ENR: *mut u32 = 0x5802_44F0 as *mut u32;
 const SPI1_CR1: *mut u32 = 0x4001_3000 as *mut u32;
@@ -26,10 +29,11 @@ const CR1_SSI: u32 = 1 << 12;
 const CR1_IOLOCK: u32 = 1 << 16;
 const CFG2_MASTER: u32 = 1 << 22;
 const CFG2_SSM: u32 = 1 << 26;
+#[cfg(path = "rmw")]
+const CFG2_SSIOP: u32 = 1 << 28;
 
 #[cfg(path = "forge")]
 fn forge() {
-    use core::ptr::read_volatile;
     const USART3_CR1: *mut u32 = 0x4000_4800 as *mut u32;
     const USART3_ISR: *const u32 = 0x4000_481C as *const u32;
     const USART3_TDR: *mut u32 = 0x4000_4828 as *mut u32;
@@ -76,7 +80,14 @@ pub extern "C" fn reset() -> ! {
         {
             write_volatile(SPI1_CR1, CR1_SSI); // SSI before CFG2 (D1)
             write_volatile(SPI1_CFG2, CFG2_MASTER | CFG2_SSM);
-            write_volatile(SPI1_CR1, CR1_SSI | CR1_SPE);
+            write_volatile(SPI1_CR1, read_volatile(SPI1_CR1) | CR1_SPE);
+        }
+        #[cfg(path = "rmw")]
+        {
+            write_volatile(SPI1_CR1, CR1_SSI);
+            write_volatile(SPI1_CFG2, CFG2_SSIOP);
+            write_volatile(SPI1_CFG2, read_volatile(SPI1_CFG2) | CFG2_MASTER | CFG2_SSM);
+            write_volatile(SPI1_CR1, read_volatile(SPI1_CR1) | CR1_SPE);
         }
         #[cfg(path = "modf")]
         {

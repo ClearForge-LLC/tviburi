@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# tviburi-spike <modeled|modf|cfg2first|iolock|forge|spray> — Tviburi's own runner (RUL-12). Runs INSIDE
+# tviburi-spike <modeled|modf|cfg2first|iolock|forge|spray|rmw> — Tviburi's own runner (RUL-12). Runs INSIDE
 # the pinned tools image (see tests/spike.sh), with the repository mounted read-only at /repo and a
 # writable, empty output directory at /out. It takes no flags.
 #
@@ -15,8 +15,8 @@ set -uo pipefail
 
 variant=${1:-}
 case "$variant" in
-  modeled|modf|cfg2first|iolock|forge|spray) ;;
-  *) echo "usage: tviburi-spike <modeled|modf|cfg2first|iolock|forge|spray>" >&2; exit 1 ;;
+  modeled|modf|cfg2first|iolock|forge|spray|rmw) ;;
+  *) echo "usage: tviburi-spike <modeled|modf|cfg2first|iolock|forge|spray|rmw>" >&2; exit 1 ;;
 esac
 [ $# -eq 1 ] || { echo "tviburi-spike takes exactly one argument" >&2; exit 1; }
 
@@ -27,7 +27,7 @@ export TVIBURI_MODEL_DIR=$root/model
 
 export PATH=/opt/cargo/bin:$PATH RUSTUP_HOME=/opt/rustup CARGO_HOME=$out/cargo-home
 rustc --edition 2021 --target thumbv7em-none-eabihf -C opt-level=s -C panic=abort -C debuginfo=0 \
-  --cfg "path=\"$variant\"" --check-cfg 'cfg(path, values("modeled","modf","cfg2first","iolock","forge","spray"))' \
+  --cfg "path=\"$variant\"" --check-cfg 'cfg(path, values("modeled","modf","cfg2first","iolock","forge","spray","rmw"))' \
   -C link-arg=-T"$root/firmware/link.x" -o "$out/fw.elf" "$root/firmware/spi1.rs" \
   || { echo "VERDICT FAIL (firmware build)"; exit 1; }
 cargo build --quiet --offline --locked --manifest-path "$root/tools/tviburi-check/Cargo.toml" --target-dir "$out/target" \
@@ -56,7 +56,9 @@ if [ $crc -eq 3 ]; then
   echo "VERDICT REFUSED (renode exit $rc)"
   exit 3
 fi
-console=$(tr -d '\r' <"$out/renode.out")  # the monitor ends its lines with \r\r\n (measured)
+# The monitor's own output, without log entries: the monitor ends its lines with \r\r\n, and Renode
+# prints log entries from another thread, which can land mid-line, inside an echo (both measured).
+console=$(tr -d '\r' <"$out/renode.out" | sed -zE 's/\[[0-9]{2}:[0-9]{2}:[0-9]{2}\.[0-9]{4}\] \[[A-Z]+\] [^\n]*\n//g')
 after=$(grep -A1 -x 'TVIBURI-MARK-AFTER' <<<"$console" | tail -n1)
 if [ $crc -eq 0 ] && [ $rc -eq 0 ] && grep -qx 'TVIBURI-END' <<<"$console" && [ "$after" = "0xAF7E0002" ]; then
   echo "VERDICT PASS"

@@ -12,7 +12,7 @@
 set -euo pipefail
 
 IMAGE=ghcr.io/clearforge-llc/aethelgard-tools@sha256:e5fc7ddbe36c050e78763ad1d203ec8d176408a3e534bed5563c424d8d9a1b58
-ACCEPTANCE="unit modf modeled stable cfg2first iolock forge stock-forge stock-modf nomark conditions load crash"
+ACCEPTANCE="unit modf modeled stable cfg2first iolock rmw forge stock-forge stock-modf nomark conditions load crash"
 ADVERSARIAL="adv-removed adv-extra-arg adv-env adv-hook adv-loglevel adv-spray adv-noend"
 ALL="$ACCEPTANCE $ADVERSARIAL"
 here=$(cd "$(dirname "$0")/.." && pwd)
@@ -81,6 +81,10 @@ fields='(len(recs) == 1 and all(isinstance(recs[0].get(k), str) and recs[0][k].s
   ("rule", "peripheral", "register", "bit", "condition", "model_version", "citation", "state"))
   and recs[0]["peripheral"] == "sysbus.spi1" and recs[0]["model_version"].startswith("sha256:")
   and len(recs[0]["model_version"]) == 71 and "RM0433 Rev 9" in recs[0]["citation"])'
+monitor_output() { # as the runner reads it: no \r, and no log entries (they can land mid-line)
+  tr -d '\r' <"$1" | sed -zE 's/\[[0-9]{2}:[0-9]{2}:[0-9]{2}\.[0-9]{4}\] \[[A-Z]+\] [^\n]*\n//g'
+}
+
 forged_in() { grep -q 'usart3: .*{"tviburi":"witness"' "$work/$1/renode-log.txt"; }
 
 t_unit() {
@@ -122,6 +126,12 @@ t_iolock() {
   run iolock iolock
   check "IOLOCK then CFG2 exits REFUSED (3) by TVI-SPI-IOLOCK" \
     "[ \$rc -eq 3 ] && records '$work/iolock.stdout' 'len(recs) == 1 and recs[0][\"rule\"] == \"TVI-SPI-IOLOCK\"'"
+}
+
+t_rmw() {
+  run rmw rmw
+  check "read-modify-write of CFG2 after SSIOP=1: the guard's copy follows silicon, REFUSED (3) on SSIOP" \
+    "[ \$rc -eq 3 ] && records '$work/rmw.stdout' 'len(recs) == 1 and recs[0][\"bit\"] == \"CFG2.SSIOP (bit 28) = 1\"'"
 }
 
 t_forge() {
@@ -170,21 +180,30 @@ t_conditions() {
  (\"TVI-SPI-MODF\", \"a master state other than the passing one, since reset: CR1=0x00000000, CFG2=0x04400000\", \"0x0\", 32),
  (\"TVI-SPI-CFG2-SPE\", \"CR1.SPE (bit 0) = 1\", \"0xC\", 32),
  (\"TVI-SPI-IOLOCK\", \"CR1.IOLOCK (bit 16) = 1\", \"0xC\", 32),
+ (\"TVI-SPI-IOLOCK\", \"CR1.IOLOCK (bit 16), read\", \"0x0\", 32),
  (\"TVI-SPI-I2SMOD\", \"I2SCFGR.I2SMOD (bit 0) = 1\", \"0x50\", 32),
- (\"TVI-SPI-WIDTH\", \"sub-word access\", \"0x2\", 16),
- (\"TVI-SPI-WIDTH\", \"sub-word access\", \"0xE\", 8),
- (\"TVI-SPI-WIDTH\", \"sub-word access\", \"0x51\", 8),
+ (\"TVI-SPI-WIDTH\", \"sub-word or unaligned write\", \"0x2\", 16),
+ (\"TVI-SPI-WIDTH\", \"sub-word or unaligned write\", \"0xE\", 8),
+ (\"TVI-SPI-WIDTH\", \"sub-word or unaligned write\", \"0x51\", 8),
+ (\"TVI-SPI-WIDTH\", \"sub-word or unaligned write\", \"0xD\", 32),
+ (\"TVI-SPI-WIDTH\", \"sub-word or unaligned read\", \"0x0\", 16),
+ (\"TVI-SPI-WIDTH\", \"sub-word or unaligned read\", \"0xD\", 32),
+ (\"TVI-SPI-MODF\", \"CFG2.MASTER (bit 22) = 0\", \"0x0\", 32),
  (\"TVI-SPI-MODF\", \"CFG2.MASTER (bit 22) = 0\", \"0x0\", 32)]' \
-      && grep -qx 'CHECK REFUSED' '$work/conditions.stdout' && tr -d '\r' <'$work/conditions/renode.out' | grep -qx TVIBURI-END"
+      && grep -qx 'CHECK REFUSED' '$work/conditions.stdout'"
+  local console; console=$(monitor_output "$work/conditions/renode.out")
+  check "the conditions script reached its end" 'grep -qx TVIBURI-END <<<"$console"'
+  check "reads return silicon's value: CR1.SSI from the copy, CFG2 from the copy" \
+    "[ \"\$(grep -A1 -x READ-CR1 <<<\"\$console\" | tail -n1)\" = 0x00001000 ] && [ \"\$(grep -A1 -x READ-CFG2 <<<\"\$console\" | tail -n1)\" = 0x10000000 ]"
 }
 
 t_load() {
   need_check
   renode_in load /repo/tests/conditions.resc
-  local writes; writes=$(grep -c '^sysbus Write' "$src/tests/conditions.resc")
-  check "no model version at load: a TVI-LOAD refusal at seq 0, no witness, every write refused (3)" \
+  local accesses; accesses=$(grep -cE '^sysbus (Write|Read)[A-Za-z]* 0x4001' "$src/tests/conditions.resc")
+  check "no model version at load: a TVI-LOAD refusal at seq 0, no witness, every SPI1 access refused (3)" \
     "grep -qx 'CHECK REFUSED' '$work/load.stdout' && ! grep -q 'tviburi\":\"witness' '$work/load/renode-log.txt' \
-     && records '$work/load.stdout' 'recs[0][\"seq\"] == 0 and recs[0][\"bit\"] == \"none\" and len(recs) == $((writes + 1)) and all(r[\"rule\"] == \"TVI-LOAD\" for r in recs)'"
+     && records '$work/load.stdout' 'recs[0][\"seq\"] == 0 and recs[0][\"bit\"] == \"none\" and len(recs) == $((accesses + 1)) and all(r[\"rule\"] == \"TVI-LOAD\" for r in recs)'"
 }
 
 t_crash() {
@@ -225,14 +244,16 @@ t_adv-extra-arg() {
 
 t_adv-env() {
   pod adv-env "$src" -e TVIBURI_MODEL_DIR=/nonexistent -- /repo/scripts/tviburi-spike modf
-  check "TVIBURI_MODEL_DIR from the caller is overridden: MODF still REFUSED (3)" '[ $rc -eq 3 ]'
+  check "TVIBURI_MODEL_DIR from the caller is overridden: MODF still REFUSED (3) by TVI-SPI-MODF" \
+    "[ \$rc -eq 3 ] && records '$work/adv-env.stdout' 'len(recs) == 1 and recs[0][\"rule\"] == \"TVI-SPI-MODF\"'"
 }
 
 t_adv-hook() {
   fixture hook scripts/prelude.resc "$prelude_line" "$prelude_line
-sysbus SetHookBeforePeripheralWrite spi1 \"value = value\""
+sysbus SetHookBeforePeripheralWrite spi1 \"value = value | 0x100\""
   run adv-hook modf "$work/hook.tree"
-  check "a monitor write hook on spi1 does not displace the guard: REFUSED (3)" '[ $rc -eq 3 ]'
+  check "a monitor write hook on spi1 is installed (it changed the value) and does not displace the guard: REFUSED (3)" \
+    "[ \$rc -eq 3 ] && records '$work/adv-hook.stdout' 'len(recs) == 1 and recs[0][\"access\"][\"value\"] == \"0x101\"'"
 }
 
 t_adv-loglevel() {
