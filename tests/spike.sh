@@ -218,7 +218,11 @@ t_conditions() {
  (\"TVI-SPI-WIDTH\", \"unmodeled\", \"16-bit read, frame 8 bits\", \"0x30\", 16),
  (\"TVI-SPI-WIDTH\", \"unmodeled\", \"sub-word or unaligned write\", \"0x4\", 16),
  (\"TVI-SPI-FIELD\", \"unmodeled\", \"SPI_CRCPOLY.CRCPOLY (31:0) = 0x7\", \"0x40\", 32),
- (\"TVI-SPI-FIELD\", \"unmodeled\", \"no register at offset 0x1C\", \"0x1C\", 32)]' \
+ (\"TVI-SPI-FIELD\", \"unmodeled\", \"no register at offset 0x1C\", \"0x1C\", 32),
+ (\"TVI-SPI-ORDER\", \"unmodeled\", \"CR1.SPE (bit 0) = 0, TXDR written\", \"0x20\", 8),
+ (\"TVI-SPI-ORDER\", \"unmodeled\", \"CR1.CSTART (bit 9) = 1 with SPE = 0\", \"0x0\", 32),
+ (\"TVI-SPI-ORDER\", \"unmodeled\", \"CR1.CSTART (bit 9) = 1 with SPE = 0\", \"0x0\", 32),
+ (\"TVI-SPI-ORDER\", \"unmodeled\", \"CR1.SPE (bit 0) = 1, CR2 written\", \"0x4\", 32)]' \
       && grep -qx 'CHECK REFUSED' '$work/conditions.stdout'"
   local console; console=$("$src/scripts/monitor-output" "$work/conditions/renode.out")
   check "the conditions script reached its end" 'grep -qx TVIBURI-END <<<"$console"'

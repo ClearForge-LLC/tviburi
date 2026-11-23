@@ -159,6 +159,9 @@ sysbus WriteDoubleWord 0x40013000 0x1001
 machine Reset
 # 25 (C5). data registers: an 8-bit TXDR write and RXDR read pass with 8-bit frames; a 32-bit TXDR
 # write and a 16-bit RXDR read refuse; a 16-bit CR2 write refuses (every register is 32-bit)
+sysbus WriteDoubleWord 0x40013000 0x1000
+sysbus WriteDoubleWord 0x4001300C 0x04400000
+sysbus WriteDoubleWord 0x40013000 0x1001
 sysbus WriteByte 0x40013020 0x55
 sysbus ReadByte 0x40013030
 sysbus WriteDoubleWord 0x40013020 0x55
@@ -180,5 +183,15 @@ sysbus ReadDoubleWord 0x40013010
 sysbus WriteDoubleWord 0x40013040 0x107
 sysbus WriteDoubleWord 0x40013040 0x7
 sysbus WriteDoubleWord 0x4001301C 0x0
+machine Reset
+# 27 (TVI-SPI-ORDER). TXDR with SPE=0; CSTART with SPE=0, alone and in the write that enables; then
+# enabled: CR2 refuses
+sysbus WriteByte 0x40013020 0x55
+sysbus WriteDoubleWord 0x40013000 0x1000
+sysbus WriteDoubleWord 0x4001300C 0x04400000
+sysbus WriteDoubleWord 0x40013000 0x1200
+sysbus WriteDoubleWord 0x40013000 0x1201
+sysbus WriteDoubleWord 0x40013000 0x1001
+sysbus WriteDoubleWord 0x40013004 0x4
 echo "TVIBURI-END"
 quit

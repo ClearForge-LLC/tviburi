@@ -76,3 +76,6 @@ R13-unnamedSource	tools/tviburi-check/src/main.rs	if message.starts_with('{') &&
 R14-refusalKind	tools/tviburi-check/src/main.rs	if !matches!(record.get("kind"), Some(Value::Str(k)) if k == "predicted-fault" || k == "unmodeled") {	if false {	unit
 R15-usageVersion	tools/tviburi-check/src/main.rs	args.len() >= 3 && !args.iter().any(|a| a.starts_with('-')) && is_version(&args[0])	args.len() >= 2 && !args.iter().any(|a| a.starts_with('-'))	unit
 N23-readIerCopy	model/GuardedSTM32H7_SPI.cs	                return ier;	                return value;	conditions
+N24-orderTxdr	model/GuardedSTM32H7_SPI.cs	if(offset == TxdrOffset && !enabled)	if(false)	conditions
+N25-orderCr2	model/GuardedSTM32H7_SPI.cs	else if(offset == Cr2Offset && enabled)	else if(false)	conditions
+N26-orderCstart	model/GuardedSTM32H7_SPI.cs	else if(offset == Cr1Offset && !enabled && (value & Cr1Cstart) != 0)	else if(false)	conditions

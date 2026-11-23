@@ -23,6 +23,9 @@
 //   TVI-LOAD          (Records) the model version could not be computed: every access refuses.
 //   TVI-SPI-WIDTH     any access other than an aligned 32-bit one, except at TXDR and RXDR, where the
 //                     access must be as wide as the frame (whole bytes of DSIZE+1 bits).
+//   TVI-SPI-ORDER     a write the manual orders against SPE, where it does not say what silicon does:
+//                     TXDR with SPE=0 (the FIFOs are flushed at SPE=0, p2217; the stock model queues the
+//                     data and sends it at the enable), CR2 with SPE=1 (p2218), CSTART with SPE=0 (p2216).
 //   TVI-SPI-IOLOCK    a CFG2 write while the IOLOCK latch is set. The latch is taken only from a CR1
 //                     write made with SPE=0, as silicon accepts it (p2217). predicted-fault while the
 //                     latch is certain, otherwise unmodeled (ruling C7).
@@ -76,7 +79,7 @@ namespace Antmicro.Renode.Peripherals.Tviburi
 
         public new void WriteDoubleWord(long offset, uint value)
         {
-            if(RefusedAccess(offset, value, 32, "write") || RefusedWrite(offset, value))
+            if(RefusedAccess(offset, value, 32, "write") || RefusedOrder(offset, value, 32) || RefusedWrite(offset, value))
             {
                 return;
             }
@@ -126,7 +129,7 @@ namespace Antmicro.Renode.Peripherals.Tviburi
 
         public new void WriteWord(long offset, ushort value)
         {
-            if(!RefusedAccess(offset, value, 16, "write"))
+            if(!RefusedAccess(offset, value, 16, "write") && !RefusedOrder(offset, value, 16))
             {
                 base.WriteWord(offset, value);
             }
@@ -134,7 +137,7 @@ namespace Antmicro.Renode.Peripherals.Tviburi
 
         public new void WriteByte(long offset, byte value)
         {
-            if(!RefusedAccess(offset, value, 8, "write"))
+            if(!RefusedAccess(offset, value, 8, "write") && !RefusedOrder(offset, value, 8))
             {
                 base.WriteByte(offset, value);
             }
@@ -225,7 +228,38 @@ namespace Antmicro.Renode.Peripherals.Tviburi
             return false;
         }
 
-        // The write rules after TVI-SPI-WIDTH, in order: true if the write was refused.
+        // TVI-SPI-ORDER, after TVI-SPI-WIDTH: true if the write was refused.
+        private bool RefusedOrder(long offset, ulong value, int width)
+        {
+            var enabled = (cr1 & Cr1Spe) != 0;
+            string bit = null, condition = null, citation = null;
+            if(offset == TxdrOffset && !enabled)
+            {
+                bit = "CR1.SPE (bit 0) = 0, TXDR written";
+                condition = "TXDR written while the SPI is disabled: at SPE=0 \"all the FIFOs content is flushed\", while the stock model queues the data and sends it when SPE is set; the manual does not say what silicon does with the write";
+                citation = "RM0433 Rev 9 §50.11.1 p2217 (SPE); §50.11.8 p2227 (TXDR)";
+            }
+            else if(offset == Cr2Offset && enabled)
+            {
+                bit = "CR1.SPE (bit 0) = 1, CR2 written";
+                condition = "CR2 written while the SPI is enabled: \"When these bits are changed by software, the SPI must be disabled\", and the manual does not say what silicon does otherwise; the stock model takes the write";
+                citation = "RM0433 Rev 9 §50.11.2 p2218 (TSIZE)";
+            }
+            else if(offset == Cr1Offset && !enabled && (value & Cr1Cstart) != 0)
+            {
+                bit = "CR1.CSTART (bit 9) = 1 with SPE = 0";
+                condition = "CSTART set while the SPI was disabled: the manual describes CSTART only for an enabled master, and the stock model sets it and starts the transfer at the enable";
+                citation = "RM0433 Rev 9 §50.11.1 p2216 (CSTART), p2217 (SPE)";
+            }
+            if(bit == null)
+            {
+                return false;
+            }
+            records.Refuse("TVI-SPI-ORDER", Unmodeled, RegisterAt(offset), bit, condition, citation, State(), offset, value, width);
+            return true;
+        }
+
+        // The write rules after TVI-SPI-ORDER, in order: true if the write was refused.
         private bool RefusedWrite(long offset, uint value)
         {
             switch(offset)
@@ -597,6 +631,7 @@ namespace Antmicro.Renode.Peripherals.Tviburi
         private const string PredictedFault = "predicted-fault";
         private const string Unmodeled = "unmodeled";
         private const long Cr1Offset = 0x00;
+        private const long Cr2Offset = 0x04;
         private const long Cfg1Offset = 0x08;
         private const long Cfg2Offset = 0x0C;
         private const long IerOffset = 0x10;
@@ -607,6 +642,7 @@ namespace Antmicro.Renode.Peripherals.Tviburi
         private const long I2sCfgrOffset = 0x50;
         private const uint Cr1Spe = 1u << 0;
         private const uint Cr1Stock = (1u << 0) | (1u << 9) | (1u << 10); // SPE, CSTART, CSUSP: driven by the stock model
+        private const uint Cr1Cstart = 1u << 9;
         private const uint Cr1Ssi = 1u << 12;
         private const uint Cr1IoLock = 1u << 16;
         private const uint Cfg1Reset = 0x00070007; // p2218

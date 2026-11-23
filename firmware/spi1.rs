@@ -9,7 +9,7 @@
 //!   path="rmw"       - CFG2=SSIOP, then CFG2 |= MASTER|SSM by read-modify-write: silicon holds
 //!                      SSIOP=1 (row T3), so the enable refuses (adversarial pass, TVI-WO-0100a).
 //!   path="forge"     - the modeled path, after printing imitation records on USART3 (RUL-11).
-//!   path="spray"     - the modeled path, after writing the bytes of a record into SPI1's registers,
+//!   path="spray"     - the modeled path, then the bytes of a record written into SPI1's registers,
 //!                      so that the model logs them under its own name (RUL-11).
 //!   path="ardupilot" - ArduPilot's ChibiOS SPI driver on SPI1, as measured (TVI-WO-0100b.rm0433.md
 //!                      §1.1): spi_lld_start, spi_lld_wait_complete, spi_lld_exchange, the DMA RX
@@ -142,13 +142,13 @@ pub extern "C" fn reset() -> ! {
         write_volatile(RCC_APB2ENR, 1 << 12); // SPI1EN
         #[cfg(path = "forge")]
         forge();
-        #[cfg(path = "spray")]
-        spray();
         #[cfg(any(path = "modeled", path = "forge", path = "spray"))]
         {
             write_volatile(SPI1_CR1, CR1_SSI); // SSI before CFG2 (D1)
             write_volatile(SPI1_CFG2, CFG2_MASTER | CFG2_SSM);
             write_volatile(SPI1_CR1, read_volatile(SPI1_CR1) | CR1_SPE);
+            #[cfg(path = "spray")]
+            spray(); // after the enable: TXDR takes data only while SPE=1 (TVI-SPI-ORDER)
         }
         #[cfg(path = "rmw")]
         {
