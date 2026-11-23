@@ -127,6 +127,13 @@ namespace Antmicro.Renode.Peripherals.Tviburi
             }
         }
 
+        // Whether this guard holds `spi` registered under `name`: only then does it keep it unlocked and watch its clock
+        // (TVI-RCC-CLOCK), so an SPI guard that is not held refuses rather than run unwatched.
+        public bool Holds(string name, IPeripheral spi)
+        {
+            return name != null && guarded.TryGetValue(name, out var g) && g == spi;
+        }
+
         // Whether P's bus-clock enable is set in the guard's copy, for P's own guard (TVI-SPI-ENABLE). False when the
         // query has no rule for P. Allocates nothing: it is asked at every access to a guarded peripheral.
         public bool TryGetEnable(string peripheral, out bool enabled, out string enableName, out string enablePage)
@@ -435,7 +442,7 @@ namespace Antmicro.Renode.Peripherals.Tviburi
                     }
                 }
             }
-            if(divr.TryGetValue(b, out var oldDivr) && value != oldDivr)
+            if(divr.TryGetValue(b, out var oldDivr) && value != oldDivr && value != inner.ReadDoubleWord(b))
             {
                 var n = (int)(b - Pll1divrOffset) / 8 + 1;
                 if(PllOn(n))
@@ -624,7 +631,8 @@ namespace Antmicro.Renode.Peripherals.Tviburi
             var changed = Fields.Where(f => f.Offset == b && f.Class != "read-only" && f.Class != "reserved" && f.Of(old) != f.Of(written)).Select(f => f.Register + "." + f.Name + " (" + f.Bits + ") = " + f.Format(f.Of(written)));
             records.Refuse("TVI-RCC-CLOCK", PredictedFault, RegisterAt(b), string.Join(", ", changed),
                 lost + " is enabled (SPE = 1) and this write stops its kernel clock: " + after.Condition,
-                "RM0433 Rev 9 §8.5.10 p371 (\"no clock will be provided to the peripheral\"); " + after.Citation.Substring("RM0433 Rev 9 ".Length),
+                (after.Condition.Contains("has not switched") ? "RM0433 Rev 9 §8.5.10 p371 (\"no clock will be provided to the peripheral\"); " : "RM0433 Rev 9 ")
+                    + after.Citation.Substring("RM0433 Rev 9 ".Length),
                 State(), b, value, 32);
             return true;
         }
@@ -938,7 +946,8 @@ namespace Antmicro.Renode.Peripherals.Tviburi
         private readonly IMachine host;
         // The guarded peripherals registered here, by their alias's name (spi1): kept unlocked; asked whether they run.
         private readonly Dictionary<string, GuardedSTM32H7_SPI> guarded = new Dictionary<string, GuardedSTM32H7_SPI>();
-        // RCC_PLLxDIVR as last written, at the reset value p403-410 give: TVI-RCC-PLL compares a write with it.
+        // RCC_PLLxDIVR as last written, at the reset value p403-410 give: TVI-RCC-PLL refuses a write that differs from it and
+        // from what the stock model reads back, which drops the top bit of each PLL2/3 field (a read-modify-write is no change).
         private readonly Dictionary<long, uint> divr = new Dictionary<long, uint> { [Pll1divrOffset] = DivrReset, [Pll1divrOffset + 8] = DivrReset, [Pll1divrOffset + 16] = DivrReset };
         private uint? crAfter;
         private readonly Records records;
@@ -1413,7 +1422,7 @@ namespace Antmicro.Renode.Peripherals.Tviburi
             R("RCC_AHB1ENR", 0x0D8, "§8.7.41", "ETH1TXEN", 16, 16, Any, "inherited, unaudited (acknowledged by name)", "the guard's copy; the stock bus enable (computed-read)", 455),
             R("RCC_AHB1ENR", 0x0D8, "§8.7.41", "ETH1MACEN", 15, 15, Any, "inherited, unaudited (acknowledged by name)", "the guard's copy; the stock bus enable (computed-read)", 455),
             R("RCC_AHB1ENR", 0x0D8, "§8.7.41", "Res14_6", 14, 6, Zero, "reserved", "reserved: dropped, reads its reset value", 455),
-            R("RCC_AHB1ENR", 0x0D8, "§8.7.41", "ADC12EN", 5, 5, Zero, "inherited, unaudited (acknowledged by name)", "disabled: a kernel-clocked peripheral the query does not cover (TVI-WO-1300 (4))", 455),
+            R("RCC_AHB1ENR", 0x0D8, "§8.7.41", "ADC12EN", 5, 5, Zero, "inherited, unaudited (acknowledged by name)", "disabled: the ADC clock is chosen by ADCx_CCR.CKMODE[1:0] (p920), an ADC register the RCC guard cannot see: adc_sclk unless CKMODE = 00, else the kernel clock ADCSEL selects (p419); unmodeled until an ADC guard reads CKMODE", 455),
             R("RCC_AHB1ENR", 0x0D8, "§8.7.41", "Res4_2", 4, 2, Zero, "reserved", "reserved: dropped, reads its reset value", 455),
             R("RCC_AHB1ENR", 0x0D8, "§8.7.41", "DMA2EN", 1, 1, Any, "inherited, unaudited (acknowledged by name)", "the guard's copy; the stock bus enable (computed-read)", 455),
             R("RCC_AHB1ENR", 0x0D8, "§8.7.41", "DMA1EN", 0, 0, Any, "inherited, unaudited (acknowledged by name)", "the guard's copy; the stock bus enable (computed-read)", 455),
@@ -1432,7 +1441,7 @@ namespace Antmicro.Renode.Peripherals.Tviburi
             R("RCC_AHB4ENR", 0x0E0, "§8.7.43", "BKPRAMEN", 28, 28, Any, "inherited, unaudited (acknowledged by name)", "the guard's copy; the stock bus enable (computed-read)", 458),
             R("RCC_AHB4ENR", 0x0E0, "§8.7.43", "Res27_26", 27, 26, Zero, "reserved", "reserved: dropped, reads its reset value", 458),
             R("RCC_AHB4ENR", 0x0E0, "§8.7.43", "HSEMEN", 25, 25, Any, "inherited, unaudited (acknowledged by name)", "the guard's copy; the stock bus enable (computed-read)", 458),
-            R("RCC_AHB4ENR", 0x0E0, "§8.7.43", "ADC3EN", 24, 24, Zero, "inherited, unaudited (acknowledged by name)", "disabled: a kernel-clocked peripheral the query does not cover (TVI-WO-1300 (4))", 458),
+            R("RCC_AHB4ENR", 0x0E0, "§8.7.43", "ADC3EN", 24, 24, Zero, "inherited, unaudited (acknowledged by name)", "disabled: the ADC clock is chosen by ADCx_CCR.CKMODE[1:0] (p920), an ADC register the RCC guard cannot see: adc_sclk unless CKMODE = 00, else the kernel clock ADCSEL selects (p419); unmodeled until an ADC guard reads CKMODE", 458),
             R("RCC_AHB4ENR", 0x0E0, "§8.7.43", "Res23_22", 23, 22, Zero, "reserved", "reserved: dropped, reads its reset value", 458),
             R("RCC_AHB4ENR", 0x0E0, "§8.7.43", "BDMAEN", 21, 21, Any, "inherited, unaudited (acknowledged by name)", "the guard's copy; the stock bus enable (computed-read)", 458),
             R("RCC_AHB4ENR", 0x0E0, "§8.7.43", "Res20", 20, 20, Zero, "reserved", "reserved: dropped, reads its reset value", 458),

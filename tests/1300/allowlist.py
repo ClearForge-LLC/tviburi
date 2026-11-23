@@ -99,6 +99,11 @@ def build():
         elif reg.endswith('ENR') and not reg.endswith('LPENR') and acc.startswith('rw'):
             if base in SIX:
                 cls, allowed, behaves = 'guard', None, "the guard's copy and the stock bus enable; the kernel clock query"
+            elif base in ('ADC12EN', 'ADC3EN'):
+                # ruled 2026-11-23 17:52Z (TVI-WO-1300a): the ADC's clock is chosen by ADCx_CCR.CKMODE, which the RCC guard cannot see
+                cls, allowed, behaves = 'kernel-unmodeled', [0], ('disabled: the ADC clock is chosen by ADCx_CCR.CKMODE[1:0] (p920), an ADC register '
+                    'the RCC guard cannot see: adc_sclk unless CKMODE = 00, else the kernel clock ADCSEL selects (p419); unmodeled until an ADC guard '
+                    'reads CKMODE')
             elif base in EXTRA_KERNEL or 'kernel clock' in (r[8] if len(r) > 8 else ''):
                 cls, allowed, behaves = 'kernel-unmodeled', [0], 'disabled: a kernel-clocked peripheral the query does not cover (TVI-WO-1300 (4))'
             elif sk in ('computed-read',):

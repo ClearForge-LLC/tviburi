@@ -152,3 +152,7 @@ S03-cstartIsStart	model/GuardedSTM32H7_SPI.cs	 || ((value & Cr1Cstart) != 0 && (
 S04-cfg2Same	model/GuardedSTM32H7_SPI.cs	(cr1 & Cr1Spe) != 0 && value != cfg2	(cr1 & Cr1Spe) != 0	conditions rcc-cfg2same
 S05-started	model/GuardedSTM32H7_SPI.cs	public bool Started => (cr1 & Cr1Spe) != 0;	public bool Started => false;	rcc-lost-pll
 F03-sweepEnable	tools/tviburi-release/src/main.rs	let mut out = enable_line.clone();	let mut out = String::new();	unit fields
+C33-trialRestoresCopy	model/GuardedSTM32H7_RCC.cs	                    copies[b] = savedCopy.Value;	(empty)	rcc-relost-sel
+C34-trialRestoresCr	model/GuardedSTM32H7_RCC.cs	                crAfter = null;	(empty)	rcc-relost-pll
+C35-divrReadBack	model/GuardedSTM32H7_RCC.cs	 && value != inner.ReadDoubleWord(b))	)	rcc-divr2rmw
+S06-heldByRcc	model/GuardedSTM32H7_SPI.cs	 && rcc.Holds(name, this) ? rcc : null;	 ? rcc : null;	rcc-unheld

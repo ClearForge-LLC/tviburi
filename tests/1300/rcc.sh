@@ -13,7 +13,7 @@ set -euo pipefail
 
 here=$(cd "$(dirname "$0")/../.." && pwd)
 IMAGE=$(sed -n 's/^IMAGE=//p' "$here/tests/spike.sh")
-CASES="scar switch stuck clocked switched alias field pll divq pllref divm0 sw width read usart2 uncovered fields reset resetfwd spi1rst alias17c registrations hse16 recorded recordedfield ardupilot gen-s03 gen-hc16 oscclear oscsys rsrbyte misaligned ledger unenabled tim2 lost-pll lost-sel lost-en lost-osc lost-ckper stopped ckper-live blocked cfg2same sel5 divr pll1src kernelq spi1off cstart"
+CASES="scar switch stuck clocked switched alias field pll divq pllref divm0 sw width read usart2 uncovered fields reset resetfwd spi1rst alias17c registrations hse16 recorded recordedfield ardupilot gen-s03 gen-hc16 oscclear oscsys rsrbyte misaligned ledger unenabled tim2 lost-pll lost-sel lost-en lost-osc lost-ckper stopped ckper-live blocked cfg2same sel5 divr pll1src kernelq spi1off cstart dma lost-alias adc3 unheld relost-sel relost-pll divr2rmw"
 scratch=${TVIBURI_SCRATCH:-$HOME/.cache/tviburi}
 mkdir -p "$scratch"
 work=$(mktemp -d "$scratch/rcc.XXXXXX")
@@ -319,6 +319,41 @@ import json, re, sys
 recs = [json.loads(m.group(1)) for m in (re.search(r\"\\] (?:rcc|spi1): (\\{\\\"tviburi\\\":\\\"would-refuse\\\".*)\$\", l.rstrip()) for l in open(sys.argv[1])) if m]
 sys.exit(0 if [(r[\"rule\"], r[\"bit\"]) for r in recs] == [(\"TVI-RCC-CLOCK\", \"RCC_CR.PLL1ON (bit 24) = 0\"), (\"TVI-SPI-KERNEL\", \"RCC_D2CCIP1R.SPI123SEL = 000\")] else 1)
 ' '$work/cstart/renode-log.txt'" ;;
+  dma)
+    # DMA1 stream 0, memory to SPI1's CFG2, with DMA1EN set and SPI1EN never set (RM0433 Rev 9 §15.5.5 p662 (DMA_SxCR); SxCR 0x10,
+    # SxNDTR 0x14, SxPAR 0x18, SxM0AR 0x1C; mem-to-mem DIR = 10 with 32-bit sizes, as TVI-WO-1300a.measure.md §1.1 measured)
+    run_case dma - 'sysbus WriteDoubleWord 0x580244D8 0x00000001' 'sysbus WriteDoubleWord 0x24000100 0x04400000' 'sysbus WriteDoubleWord 0x40020014 0x1' \
+      'sysbus WriteDoubleWord 0x40020018 0x24000100' 'sysbus WriteDoubleWord 0x4002001C 0x4001300C' 'sysbus WriteDoubleWord 0x40020010 0x00005481' \
+      'echo "R-NDTR"' 'sysbus ReadDoubleWord 0x40020014'
+    check "dma (adversarial): a DMA write to SPI1 with SPI1EN never set reaches SPI1's guard, which refuses, TVI-SPI-ENABLE, predicted-fault" \
+      "[ \$rc = 3 ] && console dma | grep -A1 -x 'R-NDTR' | tail -n1 | grep -qx '0x00000000' && records dma 'len(recs) == 1 and recs[0][\"rule\"] == \"TVI-SPI-ENABLE\" and recs[0][\"register\"] == \"SPI_CFG2\"'" ;;
+  lost-alias)
+    run_case lost-alias - 'sysbus WriteDoubleWord 0x58024400 0x01000001' 'sysbus WriteDoubleWord 0x580244F0 0x00001000' \
+      'sysbus WriteDoubleWord 0x40013000 0x00001000' 'sysbus WriteDoubleWord 0x4001300C 0x04400000' 'sysbus WriteDoubleWord 0x40013000 0x00001001' \
+      'sysbus WriteDoubleWord 0x58024550 0x00000000'
+    check "lost-alias (adversarial): SPI1EN cleared through RCC_C1_APB2ENR (0x150, the same register, p382) under a running SPI1 refuses, TVI-RCC-CLOCK, naming the alias" \
+      "[ \$rc = 3 ] && records lost-alias 'len(recs) == 1 and recs[0][\"rule\"] == \"TVI-RCC-CLOCK\" and recs[0][\"register\"] == \"RCC_C1_APB2ENR\" and recs[0][\"bit\"] == \"RCC_APB2ENR.SPI1EN (bit 12) = 0\"'" ;;
+  adc3)
+    run_case adc3 - 'sysbus WriteDoubleWord 0x580244E0 0x01000000'
+    check "adc3: ADC3EN refuses unmodeled (TVI-RCC-FIELD), naming ADCx_CCR.CKMODE and p920: the ADC's clock is an ADC register the RCC guard cannot see (ruled 17:52Z)" \
+      "[ \$rc = 3 ] && records adc3 'len(recs) == 1 and recs[0][\"rule\"] == \"TVI-RCC-FIELD\" and recs[0][\"kind\"] == \"unmodeled\" and recs[0][\"bit\"] == \"RCC_AHB4ENR.ADC3EN (bit 24) = 1\" and \"CKMODE\" in recs[0][\"condition\"] and \"p920\" in recs[0][\"condition\"]'" ;;
+  unheld)
+    PLATFORM=/repo/tests/1300/unregistered.repl run_case unheld - 'sysbus WriteDoubleWord 0x580244F0 0x00001000' 'sysbus WriteDoubleWord 0x4001300C 0x04400000'
+    check "unheld (adversarial): a guarded SPI1 not registered on the RCC guard refuses its access, TVI-SPI-ENABLE, unmodeled: unwatched, it cannot pass" \
+      "[ \$rc = 3 ] && records unheld 'len(recs) == 1 and recs[0][\"rule\"] == \"TVI-SPI-ENABLE\" and recs[0][\"kind\"] == \"unmodeled\" and \"holds it registered\" in recs[0][\"condition\"]'" ;;
+  relost-sel|relost-pll)
+    case $t in
+      relost-sel) fw=lost-sel; more='sysbus WriteDoubleWord 0x58024400 0x00000001'; want='[(\"TVI-RCC-CLOCK\", \"RCC_D2CCIP1R.SPI123SEL (14:12) = 001\"), (\"TVI-RCC-CLOCK\", \"RCC_CR.PLL1ON (bit 24) = 0\")]' ;;
+      relost-pll) fw=lost-pll; more='sysbus WriteDoubleWord 0x580244F0 0x00000000'; want='[(\"TVI-RCC-CLOCK\", \"RCC_CR.PLL1ON (bit 24) = 0\"), (\"TVI-RCC-CLOCK\", \"RCC_APB2ENR.SPI1EN (bit 12) = 0\")]' ;;
+    esac
+    run_case "$t" "$fw" "$run" 'echo "R-SEL"' 'sysbus ReadDoubleWord 0x58024450' "$more"
+    check "$t (adversarial): after a refused loss the guard's state is the pre-write state (D2CCIP1R reads 0), so a second, different loss refuses too" \
+      "[ \$rc = 3 ] && console $t | grep -A1 -x 'R-SEL' | tail -n1 | grep -qx '0x00000000' && records $t '[(r[\"rule\"], r[\"bit\"]) for r in recs] == $want'" ;;
+  divr2rmw)
+    run_case divr2rmw - 'sysbus WriteDoubleWord 0x58024438 0x0101018F' 'sysbus WriteDoubleWord 0x58024400 0x04000001' 'echo "R-DIVR2"' 'sysbus ReadDoubleWord 0x58024438' \
+      'sysbus WriteDoubleWord 0x58024438 0x0101008F' 'sysbus WriteDoubleWord 0x58024438 0x0101008E'
+    check "divr2rmw (adversarial): PLL2DIVR reads back with DIVN2's top bit dropped (the stock model; a finding); writing back what it read while PLL2 is on is no change and passes; a real change refuses, TVI-RCC-PLL" \
+      "[ \$rc = 3 ] && console divr2rmw | grep -A1 -x 'R-DIVR2' | tail -n1 | grep -qx '0x0101008F' && records divr2rmw 'len(recs) == 1 and recs[0][\"rule\"] == \"TVI-RCC-PLL\" and recs[0][\"access\"][\"value\"] == \"0x101008E\"'" ;;
   kernelq)
     rq='python "self.Machine[\"sysbus.rcc\"].RequireKernelClock(\"spi1\", \"CR1.SPE\")"'
     run_case kernelq - 'sysbus WriteDoubleWord 0x580244F0 0x00001000' "$rq" 'sysbus WriteDoubleWord 0x58024450 0x00004000' "$rq"

@@ -425,7 +425,7 @@ namespace Antmicro.Renode.Peripherals.Tviburi
             {
                 kind = Unmodeled;
                 bit = "none";
-                condition = access + " of " + (name ?? "an SPI") + " with no RCC guard at " + RccName + ": the twin cannot say whether its bus clock is enabled";
+                condition = access + " of " + (name ?? "an SPI") + " with no RCC guard at " + RccName + " that holds it registered under that name: the twin cannot say whether its bus clock is enabled, nor watch its kernel clock";
                 citation = "TVI-WO-1300a (1), (2): the SPI guard asks the RCC guard, found by name (RUL-09 (b))";
             }
             else if(!rcc.TryGetEnable(name, out var enabled, out var enableName, out var enablePage))
@@ -465,7 +465,7 @@ namespace Antmicro.Renode.Peripherals.Tviburi
             if(k == null || !k.Modeled)
             {
                 records.Refuse("TVI-SPI-KERNEL", Unmodeled, "SPI_CR1", start + " = 1",
-                    (name ?? "an SPI") + " started with no kernel-clock rule: " + (k == null ? "no RCC guard at " + RccName : k.Condition),
+                    (name ?? "an SPI") + " started with no kernel-clock rule: " + (k == null ? "no RCC guard at " + RccName + " that holds it registered under that name" : k.Condition),
                     k == null ? "TVI-WO-1300a (2): the SPI guard asks the RCC guard, found by name (RUL-09 (b))" : k.Citation,
                     State(), Cr1Offset, newCr1, 32);
                 return true;
@@ -484,7 +484,7 @@ namespace Antmicro.Renode.Peripherals.Tviburi
             {
                 name = null;
             }
-            return name != null && host.TryGetByName<GuardedSTM32H7_RCC>(RccName, out var rcc) ? rcc : null;
+            return name != null && host.TryGetByName<GuardedSTM32H7_RCC>(RccName, out var rcc) && rcc.Holds(name, this) ? rcc : null;
         }
 
         // TVI-SPI-FIELD: the first field, in the table's order, whose written value is not allowed.

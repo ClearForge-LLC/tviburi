@@ -3,7 +3,9 @@
 # Every container runs under ~/bin/capped-run with --network none, one at a time.
 #
 #   capture <aethelgard checkout> <dir> <board>...
-#       Build Aethelgard's CLI in the image its checkout pins (container/IMAGE), then capture each board's `aethelgard
+#       Fetch Aethelgard's crates on the host (`cargo fetch --locked` into <dir>/cargo-home: the one network access; the image
+#       carries no registry), build its CLI and its bridge (verify's simulate gate runs the bridge beside the CLI) offline in the
+#       image its checkout pins (container/IMAGE), then capture each board's `aethelgard
 #       verify` boot with spike/1100/harness/capture.sh into <dir>/<board>/capture. The board's specification is the path
 #       tests/1300/boots.tsv gives; the checkout must be at the commit boots.tsv names (checked). Kani runs inside
 #       verify: give it memory (BOOTS_MEM, default 24G) and time (about 5-17 minutes a board).
@@ -12,7 +14,8 @@
 #       recorded mode, the consumer's platform with the RCC restated) into <dir>/<board>/replay, with its peak memory.
 #   check <dir>
 #       Compare every board of boots.tsv with its replay: each guard's witness (recorded) and end, and exactly the
-#       would-refuse records boots.tsv expects (peripheral, rule, kind, bit), each TVI-SPI-KERNEL citing p414 and p371-372.
+#       would-refuse records boots.tsv expects (peripheral, rule, kind, bit), each TVI-SPI-KERNEL citing p414 and p371-372, and
+#       each refusal of an ADC enable naming ADCx_CCR.CKMODE and p920.
 #       A board with no replay fails; it is never skipped. Exit 0 only if every board matches.
 # ArduPilot's boot is captured by `aethelgard simulate --foreign`, not verify: its capture is 1300's (see boots.tsv); replay
 # and check take it like any other.
@@ -31,16 +34,20 @@ capture)
   aet=$(cd "$1" && pwd); dir=$2; shift 2
   [ "$(git -C "$aet" rev-parse HEAD)" = "$aet_commit" ] || { echo "boots: $aet is not at $aet_commit (boots.tsv)" >&2; exit 2; }
   image=$(cat "$aet/container/IMAGE")
-  mkdir -p "$dir/target-aet"
-  container -v "$aet:/repo:ro,Z" -v "$(cd "$dir" && pwd)/target-aet:/target:Z" "$image" bash -c \
-    'export PATH=/opt/cargo/bin:$PATH RUSTUP_HOME=/opt/rustup CARGO_HOME=/target/cargo-home; cd /repo && cargo build --offline --locked -p aethelgard-cli --target-dir /target' \
+  mkdir -p "$dir/target-aet" "$dir/cargo-home"
+  for m in Cargo.toml bridge/Cargo.toml; do
+    CARGO_HOME=$(cd "$dir" && pwd)/cargo-home cargo fetch --locked --manifest-path "$aet/$m" \
+      || { echo "boots: cargo fetch of Aethelgard's $m failed" >&2; exit 1; }
+  done
+  container -v "$aet:/repo:ro,Z" -v "$(cd "$dir" && pwd)/target-aet:/target:Z" -v "$(cd "$dir" && pwd)/cargo-home:/cargo:Z" "$image" bash -c \
+    'export CARGO_HOME=/cargo; cd /repo && cargo build --offline --locked -p aethelgard-cli --target-dir /target && cd bridge && cargo build --offline --locked --target-dir /target' \
     || { echo "boots: Aethelgard's CLI did not build" >&2; exit 1; }
   for b in "$@"; do
     spec=$(spec_of "$b"); [ -n "$spec" ] || { echo "boots: $b is not in boots.tsv" >&2; exit 2; }
     rm -rf "$dir/$b/capture"; mkdir -p "$dir/$b"
     container -v "$aet:/repo:ro,Z" -v "$(cd "$dir" && pwd)/target-aet:/target:ro,Z" -v "$here/spike/1100/harness:/h:ro,Z" \
       -v "$(cd "$dir/$b" && pwd):/out:Z" "$image" bash /h/capture.sh "$spec"
-    echo "boots: captured $b: $(grep -c '^[0-9]' "$dir/$b/capture/index.txt" 2>/dev/null || echo 0) boot(s)"
+    echo "boots: captured $b: $(grep -c '^[0-9]' "$dir/$b/capture/index.txt" 2>/dev/null) boot(s); $(grep "^END $b" "$dir/$b/capture/index.txt" 2>/dev/null)"
   done ;;
 replay)
   [ $# -ge 1 ] || { echo "usage: boots.sh replay <dir> [board...]" >&2; exit 2; }
@@ -91,6 +98,8 @@ for line in open(table):
     for s, r in wr:
         if r['rule'] == 'TVI-SPI-KERNEL' and not ('p414' in r['citation'] and 'p371-372' in r['citation']):
             problems.append('%s TVI-SPI-KERNEL without p414 and p371-372' % s)
+        if 'ADC' in r['bit'] and not ('CKMODE' in r['condition'] and 'p920' in r['condition']):
+            problems.append('%s %s without CKMODE and p920 (ruled 17:52Z)' % (s, r['bit']))
     print(('ok   %s: %d would-refuse' % (board, len(wr))) if not problems else ('FAIL %s: %s' % (board, '; '.join(problems))))
     fails += bool(problems)
 print('%d failed' % fails)

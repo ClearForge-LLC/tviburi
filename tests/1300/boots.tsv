@@ -4,7 +4,8 @@
 # make, each "peripheral | rule | kind | bit", separated by " ; ", or "none". Any other record on any boot is a §7 stop, not an edit here.
 # The nine per_ck boards are expected to refuse at SPI1 (and SPI2 on two): the scar this work order catches. Aethelgard's AET-WO-4240e
 # fixes the generator, and a later change empties their rows.
-# d1-drv8876's ADC3EN refusal is 1300's (F8). Measured 2026-11-23 on 1300's captures (~/.cache/tvi-1300a-from-1300): peaks 504,788-967,372 KiB.
+# d1-drv8876's ADC3EN refusal is 1300's (F8), unmodeled: its ADC3 runs on adc_sclk (ADC3_CCR.CKMODE = 11, p920), which the RCC guard
+# cannot see, so the refusal names CKMODE (ruled 17:52Z); an ADC guard that reads CKMODE removes it. Measured 2026-11-23 on 1300's captures (~/.cache/tvi-1300a-from-1300): peaks 504,788-967,372 KiB.
 # aethelgard 75da80535ef5c4d75e59d677cfc94ef00a4c753b
 ardupilot	-	rcc,spi1,spi2	none
 d1-drv8876	crates/aethelgard-ir/tests/fixtures/d1-drv8876.json	rcc	rcc | TVI-RCC-FIELD | unmodeled | RCC_AHB4ENR.ADC3EN (bit 24) = 1
