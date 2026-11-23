@@ -111,12 +111,18 @@ fn state(class: &str) -> Option<(&'static str, Option<String>)> {
     })
 }
 
-/// The TVI-WO-0100b.rm0433.md §4 acknowledgement a `behaves as` text cites, as `(A<n>)` or `(A<n>; …)`.
+/// The acknowledgement a `behaves as` text cites, each resolved to its own document: `(A<n>)` or `(A<n>; …)` is
+/// TVI-WO-0100b.rm0433.md §4's; `(TVI-WO-1300 A<n>)` or `(TVI-WO-1300 A<n>; …)` is TVI-WO-1300.rm0433.md §8's
+/// (granted by the architect, 2026-11-23T15:15Z).
 fn acknowledgement(behaves: &str) -> Option<String> {
-    let i = behaves.find("(A")?;
-    let digits: String = behaves[i + 2..].chars().take_while(char::is_ascii_digit).collect();
-    let after = behaves[i + 2 + digits.len()..].chars().next();
-    (!digits.is_empty() && matches!(after, Some(')') | Some(';'))).then(|| format!("TVI-WO-0100b.rm0433.md §4 A{digits}"))
+    for (tag, doc) in [("(TVI-WO-1300 A", "TVI-WO-1300.rm0433.md §8"), ("(A", "TVI-WO-0100b.rm0433.md §4")] {
+        if let Some(i) = behaves.find(tag) {
+            let digits: String = behaves[i + tag.len()..].chars().take_while(char::is_ascii_digit).collect();
+            let after = behaves[i + tag.len() + digits.len()..].chars().next();
+            return (!digits.is_empty() && matches!(after, Some(')') | Some(';'))).then(|| format!("{doc} A{digits}"));
+        }
+    }
+    None
 }
 
 /// One ledger row per field of a guard's table, after checking that every bit 31:0 of every register is in
@@ -564,6 +570,10 @@ mod tests {
         assert_eq!(acknowledgement("no pins (A3)").as_deref(), Some("TVI-WO-0100b.rm0433.md §4 A3"));
         assert_eq!(acknowledgement("x (A2; DS12117)").as_deref(), Some("TVI-WO-0100b.rm0433.md §4 A2"));
         assert_eq!(acknowledgement("x (Ax)"), None);
+        // TVI-WO-1300's acknowledgements cite TVI-WO-1300's document, never 0100b's.
+        assert_eq!(acknowledgement("no oscillator (TVI-WO-1300 A3)").as_deref(), Some("TVI-WO-1300.rm0433.md §8 A3"));
+        assert_eq!(acknowledgement("x (TVI-WO-1300 A12; p427)").as_deref(), Some("TVI-WO-1300.rm0433.md §8 A12"));
+        assert_eq!(acknowledgement("x (TVI-WO-1300 Ax)"), None);
         let bare = fields::Row { behaves_as: "no reason".into(), ..row("R", 0, "ALL", 31, 0, None, "acknowledged by name") };
         assert!(field_rows("G", "f", &[bare]).unwrap_err().contains("no (A<n>) reason"));
     }

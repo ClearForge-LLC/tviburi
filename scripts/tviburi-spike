@@ -53,7 +53,7 @@ EOF2
 timeout 120 renode --disable-gui --console --plain "$out/run.resc" </dev/null >"$out/renode.out" 2>&1
 rc=$?
 
-"$out/target/debug/tviburi-check" "$version" "$out/renode-log.txt" spi1 >"$out/check.txt"
+"$out/target/debug/tviburi-check" "$version" "$out/renode-log.txt" spi1 rcc >"$out/check.txt"
 crc=$?
 cat "$out/check.txt"
 if [ $crc -eq 3 ]; then

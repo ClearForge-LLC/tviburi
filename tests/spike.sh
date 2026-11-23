@@ -14,6 +14,10 @@ set -euo pipefail
 IMAGE=ghcr.io/clearforge-llc/aethelgard-tools@sha256:1e0ab105ec42bdba66b773464f0b6679d622e4afdafef30ec4931e4326f49c63
 ACCEPTANCE="unit modf modeled ardupilot generated field stable cfg2first iolock rmw forge stock-forge stock-modf nomark conditions fields load crash identity verify reproducible recorded"
 ADVERSARIAL="adv-removed adv-extra-arg adv-bad-variant adv-hook adv-loglevel adv-spray adv-noend adv-version adv-recorded adv-noname adv-release adv-cache"
+# TVI-WO-1300: the RCC guard's cases live in tests/1300/rcc.sh; each is a test here, rcc-<case>, run as part of the
+# acceptance group, so CI and tests/mutants.sh reach them.
+RCC_CASES=$(sed -n 's/^CASES="\(.*\)"$/\1/p' "$(dirname "$0")/1300/rcc.sh")
+ACCEPTANCE="$ACCEPTANCE $(for c in $RCC_CASES; do printf 'rcc-%s ' "$c"; done)"
 ALL="$ACCEPTANCE $ADVERSARIAL"
 here=$(cd "$(dirname "$0")/.." && pwd)
 scratch=${TVIBURI_SCRATCH:-$HOME/.cache/tviburi}
@@ -58,7 +62,7 @@ renode_in() { # renode_in <name> <tree> <resc> [podman args...]: the release, Re
   local name=$1 tree=$2 resc=$3; shift 3
   pod "$name" "$tree" -v "$work/check-build:/check:ro,Z" "$@" -- sh -c "v=\$(/repo/scripts/build-release) || exit 9; \
     timeout 120 renode --disable-gui --console --plain $resc </dev/null >/out/renode.out 2>&1; \
-    echo renode-exit=\$?; /check/debug/tviburi-check \$v /out/renode-log.txt spi1"
+    echo renode-exit=\$?; /check/debug/tviburi-check \$v /out/renode-log.txt spi1 rcc"
 }
 
 version_of() { # version_of <name>: the release hash of the release a run built, sha256:<hex>
@@ -84,12 +88,15 @@ prelude_line='machine LoadPlatformDescription @/repo/model/tviburi-nucleo-h753zi
 # The platform's guarded spi1, and the stock model in its place (which has no `mode` property).
 guarded_spi1='spi1: Tviburi.GuardedSTM32H7_SPI @ {
         sysbus 0x40013000;
-        rcc RegistrationPeripheralAlias.SPI1
+        tviburiRcc RegistrationPeripheralAlias.SPI1
     }
+    mode: "enforcing"'
+# spi1's mode line in the board: unique, because the RCC guard's own mode line follows its hseFrequency, not a brace
+spi1_mode='    }
     mode: "enforcing"'
 stock_spi1='spi1: SPI.STM32H7_SPI @ {
         sysbus 0x40013000;
-        rcc RegistrationPeripheralAlias.SPI1
+        tviburiRcc RegistrationPeripheralAlias.SPI1
     }'
 
 records() { # records <stdout> <python expr over `recs`>: the check's REFUSAL lines, parsed
@@ -262,7 +269,7 @@ t_conditions() {
     "python3 -I - '$work/conditions.stdout' '$work/conditions/release/LEDGER.jsonl' <<'EOF'
 import json, sys
 faults = {(r['rule'], r['bit']) for r in (json.loads(l[8:]) for l in open(sys.argv[1]) if l.startswith('REFUSAL ')) if r['kind'] == 'predicted-fault'}
-bench = {(r['rule'], r['bit']) for r in (json.loads(l) for l in list(open(sys.argv[2]))[1:]) if r['row'] == 'bench'}
+bench = {(r['rule'], r['bit']) for r in (json.loads(l) for l in list(open(sys.argv[2]))[1:]) if r['row'] == 'bench' and r['peripheral'] == 'Tviburi.GuardedSTM32H7_SPI'}
 print('predicted-fault', sorted(faults), 'bench', sorted(bench))
 sys.exit(0 if faults and faults == bench else 1)
 EOF
@@ -324,11 +331,11 @@ grep -qx 'CHECK REFUSED' '$work/fields.stdout'"
 
 t_load() {
   need_check
-  fixture badmode model/tviburi-nucleo-h753zi.repl 'mode: "enforcing"' 'mode: "Recorded"'
+  fixture badmode model/tviburi-nucleo-h753zi.repl "$spi1_mode" "${spi1_mode/enforcing/Recorded}"
   renode_in load "$work/badmode.tree" /repo/tests/conditions.resc
   local accesses; accesses=$(grep -cE '^sysbus (Write|Read)[A-Za-z]* 0x4001' "$src/tests/conditions.resc")
   check "mode \"Recorded\" in the platform: a TVI-LOAD refusal at seq 0, no witness, every SPI1 access refused (3) (gate clause 7)" \
-    "grep -qx 'CHECK REFUSED' '$work/load.stdout' && ! grep -q 'tviburi\":\"witness' '$work/load/renode-log.txt' \
+    "grep -qx 'CHECK REFUSED' '$work/load.stdout' && ! grep -q 'spi1: {\"tviburi\":\"witness' '$work/load/renode-log.txt' \
      && records '$work/load.stdout' 'recs[0][\"seq\"] == 0 and recs[0][\"bit\"] == \"none\" and len(recs) == $((accesses + 1)) and all(r[\"rule\"] == \"TVI-LOAD\" for r in recs)'"
 }
 
@@ -340,7 +347,7 @@ t_crash() {
     renode --disable-gui --console --plain /out/long.resc </dev/null >/out/renode.out 2>&1 & pid=$!
     for i in $(seq 600); do grep -q "spi1: {\"tviburi\":\"witness\"" /out/renode-log.txt 2>/dev/null && break; sleep 0.1; done
     kill -9 $pid; wait $pid; echo renode-exit=$?
-    /check/debug/tviburi-check $v /out/renode-log.txt spi1'
+    /check/debug/tviburi-check $v /out/renode-log.txt spi1 rcc'
   check "a simulator killed after its witness does not PASS (1, no end record, the witness seen)" \
     "grep -qx 'renode-exit=137' '$work/crash.stdout' && grep -qx 'CHECK FAIL' '$work/crash.stdout' \
      && grep -q '^PROBLEM spi1: no end record' '$work/crash.stdout' && ! grep -q '^PROBLEM spi1: no load witness' '$work/crash.stdout'"
@@ -358,7 +365,7 @@ t_identity() {
   pod id-empty "$src" -v "$work/check-build:/check:ro,Z" -- sh -c 'v=$(/repo/scripts/build-release) || exit 9
     printf "include @/repo/scripts/prelude.resc\nquit\n" >/out/empty.resc; cd /out
     env -i /opt/renode/renode --disable-gui --console --plain /out/empty.resc </dev/null >/out/renode.out 2>&1
-    /check/debug/tviburi-check $v /out/renode-log.txt spi1'
+    /check/debug/tviburi-check $v /out/renode-log.txt spi1 rcc'
   check "the witness's version is the same with TVIBURI_MODEL_DIR at another directory (and the run PASSes), and with an empty environment" \
     "grep -qx 'VERDICT PASS' '$work/id-otherdir.stdout' && [ \$(version_of id-otherdir) = $v ] && spi1_records id-otherdir 'recs[0][\"model_version\"] == \"$v\"' \
      && [ \$(version_of id-empty) = $v ] && spi1_records id-empty 'recs[0][\"tviburi\"] == \"witness\" and recs[0][\"model_version\"] == \"$v\"'"
@@ -421,7 +428,7 @@ t_reproducible() {
 
 t_recorded() {
   # RUL-19, gate clause 7: a recorded run logs would-refuse records, goes on, and is never a pass.
-  [ -d "$work/recorded.tree" ] || fixture recorded model/tviburi-nucleo-h753zi.repl 'mode: "enforcing"' 'mode: "recorded"'
+  [ -d "$work/recorded.tree" ] || fixture recorded model/tviburi-nucleo-h753zi.repl "$spi1_mode" "${spi1_mode/enforcing/recorded}"
   run recorded modf "$work/recorded.tree"
   check "modf, recorded: a recorded witness, would-refuse TVI-SPI-MODF predicted-fault first, the after-marker, an end; not a pass (1)" \
     "[ \$rc -eq 1 ] && grep -q 'after-marker=0xAF7E0002' '$work/recorded.stdout' && grep -qx 'CHECK FAIL' '$work/recorded.stdout' \
@@ -503,9 +510,9 @@ t_adv-version() {
   need_check
   pod adv-version "$src" -v "$work/check-build:/check:ro,Z" -v "$work/modeled:/run:ro,Z" -- sh -c '
     v=sha256:$(sha256sum </run/release/MANIFEST | cut -c1-64); w=sha256:$(printf %064d 0)
-    /check/debug/tviburi-check "$v" /run/renode-log.txt spi1 >/dev/null; echo right=$?
-    /check/debug/tviburi-check "$w" /run/renode-log.txt spi1 >/dev/null; echo wrong=$?
-    /check/debug/tviburi-check /run/renode-log.txt spi1 >/dev/null; echo none=$?
+    /check/debug/tviburi-check "$v" /run/renode-log.txt spi1 rcc >/dev/null; echo right=$?
+    /check/debug/tviburi-check "$w" /run/renode-log.txt spi1 rcc >/dev/null; echo wrong=$?
+    /check/debug/tviburi-check /run/renode-log.txt spi1 rcc >/dev/null; echo none=$?
     /check/debug/tviburi-check "$v" /run/renode-log.txt spi2 >/run-unnamed.txt; echo unnamed=$?; grep -c "not named" /run-unnamed.txt'
   check "the check passes the modeled run only with its expected version: wrong (1) and none (1) fail (gate clause 7)" \
     "grep -qx right=0 '$work/adv-version.stdout' && grep -qx wrong=1 '$work/adv-version.stdout' && grep -qx none=1 '$work/adv-version.stdout'"
@@ -514,7 +521,7 @@ t_adv-version() {
 }
 
 t_adv-recorded() {
-  [ -d "$work/recorded.tree" ] || fixture recorded model/tviburi-nucleo-h753zi.repl 'mode: "enforcing"' 'mode: "recorded"'
+  [ -d "$work/recorded.tree" ] || fixture recorded model/tviburi-nucleo-h753zi.repl "$spi1_mode" "${spi1_mode/enforcing/recorded}"
   run adv-recorded modeled "$work/recorded.tree"
   check "a recorded-mode witness is never a pass: the modeled path FAILs (1) (gate clause 7; RUL-19)" \
     "[ \$rc -eq 1 ] && grep -q '^PROBLEM .*not in enforcing mode' '$work/adv-recorded.stdout'"
@@ -564,7 +571,7 @@ t_adv-release() {
   fixture rel-form model/GuardedSTM32H7_SPI.cs '"MSSI", 3, 0, Zero, Tag, "0000 (no delay)", 2222),' '"MSSI", 3, 0, Zero, Tag, "0000 (no delay)", 2222), // a comment'
   fixture rel-pin tools/tviburi-release/pins.tsv 'b85cb4af7a7e' 'b85cb4af7a7f'
   fixture rel-template tools/tviburi-release/TviburiRelease.cs.template 'public static readonly string' 'public const string'
-  fixture rel-bench model/bench-checks.tsv 'Tviburi.GuardedSTM32H7_SPI	B4' 'Tviburi.GuardedSTM32H7_RCC	B4'
+  fixture rel-bench model/bench-checks.tsv 'Tviburi.GuardedSTM32H7_SPI	B4' 'Tviburi.GuardedSTM32H7_TIM	B4'
   local f why
   for f in rel-symlink:'not a regular file' rel-subdir:'not a regular file' rel-case:'another case' rel-alias:'alias' \
       rel-late:'after a declaration' rel-row:'in no row' rel-class:'a stop' rel-form:'not one' rel-pin:'not the pinned' \
@@ -603,6 +610,18 @@ t_adv-cache() {
   # cache holds nothing to reuse, and the second boot reports its own release.
   check "...and it in fact reports its own release" "grep -q \"spi1: {.tviburi.:.witness.*\$(sed -n 's/^b=//p' '$work/adv-cache.stdout')\" '$work/adv-cache/b-log.txt'"
 }
+
+t_rcc() { # t_rcc <case>: one case of tests/1300/rcc.sh on this source, its ok/FAIL lines counted here
+  local out rrc=0
+  out=$(TVIBURI_TESTS="$1" TVIBURI_SCRATCH="$work" "$src/tests/1300/rcc.sh" "$src" 2>&1) || rrc=$?
+  grep -E '^(ok|FAIL) ' <<<"$out" || true
+  local f; f=$(grep -c '^FAIL ' <<<"$out" || true)
+  if [ "$rrc" -ne 0 ] && [ "$f" -eq 0 ]; then
+    echo "FAIL rcc-$1: tests/1300/rcc.sh exited $rrc with no verdict"; f=1
+  fi
+  fails=$((fails + f))
+}
+for c in $RCC_CASES; do eval "t_rcc-$c() { t_rcc $c; }"; done
 
 for t in ${TVIBURI_TESTS:-acceptance}; do
   case "$t" in

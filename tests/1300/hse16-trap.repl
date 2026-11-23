@@ -1,0 +1,6 @@
+// TVI-WO-1300: the consumer's form today (Aethelgard's HSE fixtures): an untyped `rcc:` update. With the stock rcc
+// cancelled it binds to the cancelled entry, with no error, and the guard keeps 8 MHz: the trap, measured.
+using "/repo/model/tviburi-nucleo-h753zi.repl"
+
+rcc:
+    hseFrequency: 16000000
