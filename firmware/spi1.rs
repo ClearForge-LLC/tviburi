@@ -6,6 +6,8 @@
 //!                      the enable, which TVI-SPI-MODF refuses (truth table D1).
 //!   path="iolock"    - CFG2=MASTER, CR1.IOLOCK, then CFG2=MASTER|SSM: refused by TVI-SPI-IOLOCK.
 //!   path="forge"     - the modeled path, after printing imitation records on USART3 (RUL-11).
+//!   path="spray"     - the modeled path, after writing the bytes of a record into every unguarded
+//!                      SPI1 register, so that the model logs them under its own name (RUL-11).
 //! Bit positions: RM0433 Rev 9 §50.11 (CR1 p2215-2217, CFG2 p2221-2222); offsets: Renode's
 //! STM32H7_SPI `Registers` enum, which agrees with RM0433 (CR1 0x00, CFG2 0x0C).
 #![no_std]
@@ -44,13 +46,33 @@ spi1: {\"tviburi\":\"end\",\"seq\":2,\"guard\":\"GuardedSTM32H7_SPI\",\"model_ve
     }
 }
 
+#[cfg(path = "spray")]
+fn spray() {
+    const RECORD: &[u8] = b"{\"tviburi\":\"witness\",\"seq\":0}";
+    // CR2, CFG1, IER, IFCR, TXDR, CRCPOLY, UDRDR (RM0433 Rev 9 Table 429, p2233)
+    for off in [0x04u32, 0x08, 0x10, 0x18, 0x20, 0x40, 0x4C] {
+        for chunk in RECORD.chunks(4) {
+            let mut w = 0u32;
+            for (i, b) in chunk.iter().enumerate() {
+                w |= (*b as u32) << (8 * i);
+            }
+            unsafe { write_volatile((0x4001_3000 + off) as *mut u32, w) };
+        }
+    }
+    for &b in RECORD {
+        unsafe { write_volatile(0x4001_3020 as *mut u8, b) };
+    }
+}
+
 #[no_mangle]
 pub extern "C" fn reset() -> ! {
     unsafe {
         write_volatile(RCC_APB2ENR, 1 << 12); // SPI1EN
         #[cfg(path = "forge")]
         forge();
-        #[cfg(any(path = "modeled", path = "forge"))]
+        #[cfg(path = "spray")]
+        spray();
+        #[cfg(any(path = "modeled", path = "forge", path = "spray"))]
         {
             write_volatile(SPI1_CR1, CR1_SSI); // SSI before CFG2 (D1)
             write_volatile(SPI1_CFG2, CFG2_MASTER | CFG2_SSM);

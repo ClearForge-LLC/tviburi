@@ -22,3 +22,7 @@ jobs:
         run: podman pull "$(sed -n 's/^IMAGE=//p' tests/spike.sh)"
       - name: Acceptance suite
         run: TVIBURI_SCRATCH="$RUNNER_TEMP/tviburi" tests/spike.sh
+      - name: Adversarial cases
+        run: TVIBURI_SCRATCH="$RUNNER_TEMP/tviburi" tests/adversarial.sh
+      - name: Mutation run (one mutant per guard this change adds; each must be killed)
+        run: TVIBURI_SCRATCH="$RUNNER_TEMP/tviburi" tests/mutants.sh

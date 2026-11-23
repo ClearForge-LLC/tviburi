@@ -132,3 +132,15 @@ All of these agree. The register map (Table 429, p2233) is consistent with them,
 - **Apart from D1 and D6, which are T1's unchecked premises, and T7, which is D6 in the table, no row contradicts the manual in the passing direction.**
 - **D2 is the known false pass that fix (1) closes.**
 - **D3 and D4 refuse where silicon would not**, so they are false refusals, not false passes.
+
+## 6. Rulings (architect, 2026-11-23T08:45Z) and where each is built
+
+| Point | Ruling | Built as |
+|---|---|---|
+| D1 | The widened lean. Refuse the enable if any master state since reset was one T1 would not pass. The control firmware writes SSI before CFG2. The condition cites both sides and says the manual does not settle it. Bench check on the Nucleo named in FEEDBACK. | `TVI-SPI-MODF`, the history branch. `firmware/spi1.rs` `modeled`; `cfg2first` is the refusing fixture |
+| D2 | IOLOCK locks all of CFG2 and no CR1 field but itself. Latch cleared only on `Reset()`; the p2215 clear-on-disable is stated as unmodeled in the record. | `TVI-SPI-IOLOCK` |
+| D3 | In scope: a CFG2 write while SPE=1 refuses. | `TVI-SPI-CFG2-SPE` |
+| D4 | Keep refusing; the text names SSOE as unmodeled. | `TVI-SPI-MODF`, the `SSM=0, SSOE=1` branch |
+| D6 | The pass needs `SP=000`; an I2SCFGR write with `I2SMOD=1` refuses. | `TVI-SPI-MODF`, the SP branch; `TVI-SPI-I2SMOD` |
+| Inconsistencies | Recorded, not acted on (p2171 "IOLOCK … SPI_CFG1"; p2184 "pulled low" against p2165 "equal to SSIOP"). | §4 above; the SSIOP=1 refusal's condition text |
+| Image | Pin what Aethelgard `main` pins: `e5fc7ddb…` | `tests/spike.sh` `IMAGE` |

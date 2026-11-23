@@ -238,7 +238,8 @@ mod tests {
             r#"{"seq":0}"#,
             r#"{"tviburi":"witness","seq":"0","model_version":"x"}"#,
         ] {
-            let log = rec("INFO", "spi1", bad) + &witness(1) + &end(2);
+            // The malformed line is the only fault: it consumes no sequence number.
+            let log = witness(0) + &rec("INFO", "spi1", bad) + &end(1);
             assert_eq!(run(&log), Verdict::Fail, "{bad}");
         }
         let short = rec("INFO", "spi1", r#"{"tviburi":"witness","seq":0,"model_version":"sha256:00"}"#) + &end(1);
@@ -255,6 +256,12 @@ mod tests {
         // A line with no source, a prompt prefix, or a bad timestamp is not a record line.
         let noise = format!("(machine-0) {}", refusal(0)) + &refusal(0)[1..] + "spi1: {\"tviburi\":\"refusal\",\"seq\":0}\n";
         assert_eq!(run(&(witness(0) + &noise + &end(1))), Verdict::Pass);
+    }
+
+    #[test]
+    fn well_formed_records_under_another_name_do_not_count() {
+        let other = |line: String| line.replace("] spi1: ", "] spi2: ");
+        assert_eq!(run(&(other(witness(0)) + &other(end(1)))), Verdict::Fail);
     }
 
     #[test]

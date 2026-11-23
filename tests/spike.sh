@@ -4,14 +4,17 @@
 # committed. Each run is one container in the pinned tools image, with no network and the source
 # mounted read-only. Outputs go under ${TVIBURI_SCRATCH:-$HOME/.cache/tviburi}.
 #
-#   TVIBURI_TESTS="modf conditions ..."  run only these tests (default: all, in the order below).
+#   TVIBURI_TESTS="modf conditions ..."  run only these tests, or a group: "acceptance" (the default),
+#                                        "adversarial" (tests/adversarial.sh) or "all".
 #   TVIBURI_CI=1                         run containers with plain `podman run`. Only for a
 #                                        disposable CI runner; elsewhere ~/bin/capped-run is required.
 # Exit 0 only if every selected test passed.
 set -euo pipefail
 
 IMAGE=ghcr.io/clearforge-llc/aethelgard-tools@sha256:e5fc7ddbe36c050e78763ad1d203ec8d176408a3e534bed5563c424d8d9a1b58
-ALL="unit modf modeled stable cfg2first iolock forge stock-forge stock-modf nomark conditions load crash"
+ACCEPTANCE="unit modf modeled stable cfg2first iolock forge stock-forge stock-modf nomark conditions load crash"
+ADVERSARIAL="adv-removed adv-extra-arg adv-env adv-hook adv-loglevel adv-spray adv-noend"
+ALL="$ACCEPTANCE $ADVERSARIAL"
 here=$(cd "$(dirname "$0")/.." && pwd)
 scratch=${TVIBURI_SCRATCH:-$HOME/.cache/tviburi}
 mkdir -p "$scratch"
@@ -63,6 +66,8 @@ fixture() { # fixture <name> <file> <old> <new>: a copy of the source with one e
   python3 -I -c 'import sys; p,o,n=sys.argv[1:4]; s=open(p).read(); assert s.count(o)==1; open(p,"w").write(s.replace(o,n))' \
     "$work/$1.tree/$2" "$3" "$4"
 }
+
+prelude_line='machine LoadPlatformDescription @/repo/model/tviburi-nucleo-h753zi.repl'
 
 records() { # records <stdout> <python expr over `recs`>: the check's REFUSAL lines, parsed
   python3 -I -c '
@@ -168,7 +173,8 @@ t_conditions() {
  (\"TVI-SPI-I2SMOD\", \"I2SCFGR.I2SMOD (bit 0) = 1\", \"0x50\", 32),
  (\"TVI-SPI-WIDTH\", \"sub-word access\", \"0x2\", 16),
  (\"TVI-SPI-WIDTH\", \"sub-word access\", \"0xE\", 8),
- (\"TVI-SPI-WIDTH\", \"sub-word access\", \"0x51\", 8)]' \
+ (\"TVI-SPI-WIDTH\", \"sub-word access\", \"0x51\", 8),
+ (\"TVI-SPI-MODF\", \"CFG2.MASTER (bit 22) = 0\", \"0x0\", 32)]' \
       && grep -qx 'CHECK REFUSED' '$work/conditions.stdout' && tr -d '\r' <'$work/conditions/renode.out' | grep -qx TVIBURI-END"
 }
 
@@ -194,8 +200,80 @@ t_crash() {
      && grep -q '^PROBLEM spi1: no end record' '$work/crash.stdout'"
 }
 
-for t in ${TVIBURI_TESTS:-$ALL}; do
-  case " $ALL " in *" $t "*) "t_$t" ;; *) echo "unknown test: $t" >&2; exit 2 ;; esac
+# --- Adversarial (WO §5): a refusal or a missing witness that still passes; a firmware-written
+# line taken as a record; a route around the guard. Each must not PASS.
+
+t_adv-removed() {
+  fixture rm-guard scripts/prelude.resc 'include @/repo/model/GuardedSTM32H7_SPI.cs' ''
+  fixture rm-runtime scripts/prelude.resc 'include @/repo/model/Refusal.cs' ''
+  fixture renamed model/tviburi-nucleo-h753zi.repl 'Tviburi.GuardedSTM32H7_SPI' 'Tviburi.Missing'
+  fixture no-overlay model/tviburi-nucleo-h753zi.repl 'spi1: Tviburi.GuardedSTM32H7_SPI @ {
+        sysbus 0x40013000;
+        rcc RegistrationPeripheralAlias.SPI1
+    }' ''
+  local f
+  for f in rm-guard rm-runtime renamed no-overlay; do
+    run "adv-$f" modeled "$work/$f.tree"
+    check "guard removed ($f): the modeled path does not PASS (1)" '[ $rc -eq 1 ]'
+  done
+}
+
+t_adv-extra-arg() {
+  pod adv-extra-arg "$src" -- /repo/scripts/tviburi-spike modf --no-refuse
+  check "an extra runner argument fails (1)" '[ $rc -eq 1 ]'
+}
+
+t_adv-env() {
+  pod adv-env "$src" -e TVIBURI_MODEL_DIR=/nonexistent -- /repo/scripts/tviburi-spike modf
+  check "TVIBURI_MODEL_DIR from the caller is overridden: MODF still REFUSED (3)" '[ $rc -eq 3 ]'
+}
+
+t_adv-hook() {
+  fixture hook scripts/prelude.resc "$prelude_line" "$prelude_line
+sysbus SetHookBeforePeripheralWrite spi1 \"value = value\""
+  run adv-hook modf "$work/hook.tree"
+  check "a monitor write hook on spi1 does not displace the guard: REFUSED (3)" '[ $rc -eq 3 ]'
+}
+
+t_adv-loglevel() {
+  fixture loglevel-after scripts/prelude.resc "$prelude_line" "$prelude_line
+logLevel 3"
+  run adv-loglevel-modf modf "$work/loglevel-after.tree"
+  check "logLevel 3 after load cannot hide a refusal (Error): REFUSED (3)" '[ $rc -eq 3 ]'
+  run adv-loglevel-modeled modeled "$work/loglevel-after.tree"
+  check "logLevel 3 after load hides the end record: the modeled path does not PASS (1)" '[ $rc -eq 1 ]'
+  fixture loglevel-before scripts/prelude.resc 'emulation SetSeed 1' 'logLevel 3
+emulation SetSeed 1'
+  run adv-loglevel-before modeled "$work/loglevel-before.tree"
+  check "logLevel 3 before load hides the witness: the modeled path does not PASS (1)" \
+    "[ \$rc -eq 1 ] && grep -q '^PROBLEM spi1: no load witness' '$work/adv-loglevel-before.stdout'"
+}
+
+t_adv-spray() {
+  run adv-spray spray
+  check "record bytes written to SPI1 reach the log under spi1 (the test is not vacuous)" \
+    "grep -q 'spi1: \[cpu: 0x[0-9A-F]*\] WriteUInt32 to 0x20 (TransmitData), value 0x7674227B' '$work/adv-spray/renode-log.txt'"
+  check "...and none is taken as a record: the modeled path PASSes (0) with no PROBLEM" \
+    "[ \$rc -eq 0 ] && ! grep -q '^PROBLEM' '$work/adv-spray.stdout'"
+}
+
+t_adv-noend() {
+  fixture noend scripts/tviburi-spike 'echo "TVIBURI-END"
+quit' 'no_such_monitor_command
+echo "TVIBURI-END"
+quit'
+  run adv-noend modeled "$work/noend.tree"
+  check "a script that stops before its end (Renode still disposes cleanly) does not PASS (1)" \
+    "[ \$rc -eq 1 ] && grep -qx 'CHECK PASS' '$work/adv-noend.stdout'"
+}
+
+for t in ${TVIBURI_TESTS:-acceptance}; do
+  case "$t" in
+    acceptance) for u in $ACCEPTANCE; do "t_$u"; done ;;
+    adversarial) for u in $ADVERSARIAL; do "t_$u"; done ;;
+    all) for u in $ALL; do "t_$u"; done ;;
+    *) case " $ALL " in *" $t "*) "t_$t" ;; *) echo "unknown test: $t" >&2; exit 2 ;; esac ;;
+  esac
 done
 
 echo "outputs: $work"

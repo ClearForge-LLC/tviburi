@@ -1,0 +1,43 @@
+# One mutant per guard TVI-WO-0100a adds or changes (diff-sized), and the spike.sh tests
+# that must kill it. Columns, tab-separated: id, file, old text (exactly once), new text, tests.
+# In the text columns, \n is a newline and \\ a backslash; (empty) is the empty text. No field is
+# ever empty: bash's read collapses empty tab-separated fields. Run by tests/mutants.sh.
+M01-slave	model/GuardedSTM32H7_SPI.cs	if((cfg2 & Cfg2Master) == 0)	if(false)	conditions
+M02-tiMode	model/GuardedSTM32H7_SPI.cs	if((cfg2 & Cfg2Sp) != 0)	if(false)	conditions
+M03-hardwareSs	model/GuardedSTM32H7_SPI.cs	if((cfg2 & Cfg2Ssm) == 0)	if(false)	conditions
+M04-ssoeSplit	model/GuardedSTM32H7_SPI.cs	if((cfg2 & Cfg2Ssoe) == 0)	if(true)	conditions
+M05-ssiop	model/GuardedSTM32H7_SPI.cs	if((cfg2 & Cfg2Ssiop) != 0)	if(false)	conditions
+M06-ssi	model/GuardedSTM32H7_SPI.cs	if((cr1 & Cr1Ssi) == 0)	if(false)	modf
+M07-historyCheck	model/GuardedSTM32H7_SPI.cs	if(failure == null && history != null)	if(false)	cfg2first
+M08-historyNote	model/GuardedSTM32H7_SPI.cs	if(history == null && (cfg2 & Cfg2Master) != 0 && FirstFailingBranch(cfg2, cr1) != null)	if(false)	cfg2first
+M09-speGate	model/GuardedSTM32H7_SPI.cs	if((value & Cr1Spe) != 0 && !EnablePasses(value))	if(false)	modf
+M10-iolockCheck	model/GuardedSTM32H7_SPI.cs	if(ioLock)	if(false)	iolock
+M11-iolockLatch	model/GuardedSTM32H7_SPI.cs	ioLock |= (value & Cr1IoLock) != 0;	(empty)	iolock
+M12-cfg2WhileEnabled	model/GuardedSTM32H7_SPI.cs	if((cr1 & Cr1Spe) != 0)	if(false)	conditions
+M13-i2smod	model/GuardedSTM32H7_SPI.cs	if((value & I2sMod) != 0)	if(false)	conditions
+M14-widthI2scfgr	model/GuardedSTM32H7_SPI.cs	 || Overlaps(offset, size, I2sCfgrOffset);	;	conditions
+M15-resetIolock	model/GuardedSTM32H7_SPI.cs	ioLock = false;	(empty)	conditions
+M16-resetHistory	model/GuardedSTM32H7_SPI.cs	history = null;	(empty)	conditions
+M17-resetCfg2	model/GuardedSTM32H7_SPI.cs	            cfg2 = 0;\n	(empty)	conditions
+M18-resetCr1	model/GuardedSTM32H7_SPI.cs	            cr1 = 0;\n	(empty)	conditions
+M19-loadRefuses	model/GuardedSTM32H7_SPI.cs	RefuseLoad(offset, value, 32);\n                return;	(empty)	load
+M20-witness	model/Refusal.cs	if(loadFailure == null)	if(false)	modeled
+M21-end	model/Refusal.cs	if(named)	if(false)	modeled
+M22-refusalAtError	model/Refusal.cs	Emit(LogLevel.Error, "refusal"	Emit(LogLevel.Info, "refusal"	adv-loglevel
+M23-seq	model/Refusal.cs	seq++;	(empty)	modeled
+R01-refusalFirst	tools/tviburi-check/src/main.rs	let verdict = if !refusals.is_empty() {	let verdict = if !refusals.is_empty() && problems.is_empty() {	unit
+R02-sourceFilter	tools/tviburi-check/src/main.rs	let Some(ch) = channels.get_mut(source) else { continue };	let Some(ch) = channels.values_mut().next() else { continue };	unit
+R03-timestamp	tools/tviburi-check/src/main.rs	let stamp_ok = b.len() > 15	let stamp_ok = true || b.len() > 15	unit
+R04-sequence	tools/tviburi-check/src/main.rs	Some(Value::Number(s)) if s.parse::<u64>() == Ok(ch.next_seq) => ch.next_seq += 1,	Some(Value::Number(_)) => ch.next_seq += 1,	unit
+R05-witnessVersion	tools/tviburi-check/src/main.rs	} else if !version_ok {	} else if false {	unit
+R06-endRequired	tools/tviburi-check/src/main.rs	if !ch.end {	if false {	unit
+R07-witnessRequired	tools/tviburi-check/src/main.rs	if !ch.witness {	if false {	unit
+R08-afterEnd	tools/tviburi-check/src/main.rs	if ch.end {	if false {	unit
+R09-malformed	tools/tviburi-check/src/main.rs	problems.push(fail(&format!("malformed record ({e})")));	(empty)	unit
+R10-duplicateKey	tools/tviburi-check/src/json.rs	if map.insert(key.clone(), v).is_some() {	if map.insert(key.clone(), v).is_some() && false {	unit
+R11-trailingInput	tools/tviburi-check/src/json.rs	if p.i != p.s.len() {	if false {	unit
+S01-refusedExit	scripts/tviburi-spike	if [ $crc -eq 3 ]; then	if false; then	modf
+S02-checkMustPass	scripts/tviburi-spike	if [ $crc -eq 0 ] && [ $rc	if [ $rc	stock-modf
+S03-oneArgument	scripts/tviburi-spike	[ $# -eq 1 ] ||	true ||	adv-extra-arg
+S04-scriptEnd	scripts/tviburi-spike	grep -qx 'TVIBURI-END' <<<"$console" && 	(empty)	adv-noend
+S05-afterMarker	scripts/tviburi-spike	 && [ "$after" = "0xAF7E0002" ]	(empty)	nomark

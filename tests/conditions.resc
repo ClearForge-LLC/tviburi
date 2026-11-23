@@ -59,5 +59,9 @@ sysbus WriteByte 0x4001300E 0x0
 sysbus WriteByte 0x40013051 0x0
 # pass: a byte write to TXDR is not guarded
 sysbus WriteByte 0x40013020 0x55
+machine Reset
+# 14. reset cleared the CFG2 copy: SPE refuses as slave; then reset cleared the CR1 copy (SPE=0): CFG2 passes
+sysbus WriteDoubleWord 0x40013000 0x1001
+sysbus WriteDoubleWord 0x4001300C 0x04400000
 echo "TVIBURI-END"
 quit

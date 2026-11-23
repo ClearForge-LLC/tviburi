@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# tviburi-spike <modeled|modf|cfg2first|iolock|forge> — Tviburi's own runner (RUL-12). Runs INSIDE
+# tviburi-spike <modeled|modf|cfg2first|iolock|forge|spray> — Tviburi's own runner (RUL-12). Runs INSIDE
 # the pinned tools image (see tests/spike.sh), with the repository mounted read-only at /repo and a
 # writable, empty output directory at /out. It takes no flags.
 #
@@ -15,8 +15,8 @@ set -uo pipefail
 
 variant=${1:-}
 case "$variant" in
-  modeled|modf|cfg2first|iolock|forge) ;;
-  *) echo "usage: tviburi-spike <modeled|modf|cfg2first|iolock|forge>" >&2; exit 1 ;;
+  modeled|modf|cfg2first|iolock|forge|spray) ;;
+  *) echo "usage: tviburi-spike <modeled|modf|cfg2first|iolock|forge|spray>" >&2; exit 1 ;;
 esac
 [ $# -eq 1 ] || { echo "tviburi-spike takes exactly one argument" >&2; exit 1; }
 
@@ -27,7 +27,7 @@ export TVIBURI_MODEL_DIR=$root/model
 
 export PATH=/opt/cargo/bin:$PATH RUSTUP_HOME=/opt/rustup CARGO_HOME=$out/cargo-home
 rustc --edition 2021 --target thumbv7em-none-eabihf -C opt-level=s -C panic=abort -C debuginfo=0 \
-  --cfg "path=\"$variant\"" --check-cfg 'cfg(path, values("modeled","modf","cfg2first","iolock","forge"))' \
+  --cfg "path=\"$variant\"" --check-cfg 'cfg(path, values("modeled","modf","cfg2first","iolock","forge","spray"))' \
   -C link-arg=-T"$root/firmware/link.x" -o "$out/fw.elf" "$root/firmware/spi1.rs" \
   || { echo "VERDICT FAIL (firmware build)"; exit 1; }
 cargo build --quiet --offline --locked --manifest-path "$root/tools/tviburi-check/Cargo.toml" --target-dir "$out/target" \
