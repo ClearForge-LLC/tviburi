@@ -12,8 +12,8 @@
 set -euo pipefail
 
 IMAGE=ghcr.io/clearforge-llc/aethelgard-tools@sha256:e5fc7ddbe36c050e78763ad1d203ec8d176408a3e534bed5563c424d8d9a1b58
-ACCEPTANCE="unit modf modeled stable cfg2first iolock rmw forge stock-forge stock-modf nomark conditions fields load crash"
-ADVERSARIAL="adv-removed adv-extra-arg adv-bad-variant adv-env adv-hook adv-loglevel adv-spray adv-noend"
+ACCEPTANCE="unit modf modeled ardupilot generated field stable cfg2first iolock rmw forge stock-forge stock-modf nomark conditions fields load crash"
+ADVERSARIAL="adv-removed adv-extra-arg adv-bad-variant adv-env adv-hook adv-loglevel adv-spray adv-noend adv-version adv-recorded"
 ALL="$ACCEPTANCE $ADVERSARIAL"
 here=$(cd "$(dirname "$0")/.." && pwd)
 scratch=${TVIBURI_SCRATCH:-$HOME/.cache/tviburi}
@@ -97,6 +97,8 @@ t_modf() {
     "records '$work/modf.stdout' 'recs[0][\"rule\"] == \"TVI-SPI-MODF\" and recs[0][\"bit\"] == \"CR1.SSI (bit 12) = 0\" and recs[0][\"seq\"] == 1'"
   check "the trace still records the refused access" \
     "grep -q 'spi1: \[cpu: 0x[0-9A-F]*\] WriteUInt32 to 0x0 (Control1), value 0x1\$' '$work/modf/renode-log.txt'"
+  check "the MODF scar is a predicted-fault, citing RM0433 Rev 9 p2184 (gate clause 4; RUL-18)" \
+    "records '$work/modf.stdout' 'recs[0][\"kind\"] == \"predicted-fault\" and \"RM0433 Rev 9 §50.5.2 p2184\" in recs[0][\"citation\"]'"
 }
 
 t_modeled() {
@@ -110,6 +112,24 @@ t_stable() {
   run modf-2 modf
   check "same invocation, same refusal record" \
     "cmp -s <(grep '^REFUSAL' '$work/modf.stdout') <(grep '^REFUSAL' '$work/modf-2.stdout')"
+}
+
+t_ardupilot() {
+  run ardupilot ardupilot
+  check "ArduPilot's SPI start, exchange and stop, as measured, PASS (0) in enforcing mode" '[ $rc -eq 0 ] && ! grep -q "^REFUSAL" "$work/ardupilot.stdout"'
+  check "...and its enable carries MASRX by read-modify-write, as on silicon (CR1 0x101)" \
+    "grep -q 'spi1: \[cpu: 0x[0-9A-F]*\] WriteUInt32 to 0x0 (Control1), value 0x101\$' '$work/ardupilot/renode-log.txt'"
+}
+
+t_generated() {
+  run generated generated
+  check "the generated firmware's SPI1 sequence PASSes (0) in enforcing mode" '[ $rc -eq 0 ] && ! grep -q "^REFUSAL" "$work/generated.stdout"'
+}
+
+t_field() {
+  run field field
+  check "a planted field outside the allow-list (CFG2.CPOL=1) is REFUSED (3), TVI-SPI-FIELD, unmodeled" \
+    "[ \$rc -eq 3 ] && records '$work/field.stdout' 'len(recs) == 1 and recs[0][\"rule\"] == \"TVI-SPI-FIELD\" and recs[0][\"kind\"] == \"unmodeled\" and recs[0][\"bit\"] == \"SPI_CFG2.CPOL (bit 25) = 1\"'"
 }
 
 t_cfg2first() {
@@ -304,6 +324,25 @@ t_adv-spray() {
     "grep -q 'spi1: \[cpu: 0x[0-9A-F]*\] WriteUInt32 to 0x18 (InterruptStatusFlagsClear), value 0x7674227B' '$work/adv-spray/renode-log.txt'"
   check "...and none is taken as a record: the modeled path PASSes (0) with no PROBLEM" \
     "[ \$rc -eq 0 ] && ! grep -q '^PROBLEM' '$work/adv-spray.stdout'"
+}
+
+t_adv-version() {
+  [ -d "$work/modeled" ] || run modeled modeled
+  need_check
+  pod adv-version "$src" -v "$work/check-build:/check:ro,Z" -v "$work/modeled:/run:ro,Z" -- sh -c '
+    v=$(/repo/tests/model-version /repo/model); w=sha256:$(printf %064d 0)
+    /check/debug/tviburi-check "$v" /run/renode-log.txt spi1 >/dev/null; echo right=$?
+    /check/debug/tviburi-check "$w" /run/renode-log.txt spi1 >/dev/null; echo wrong=$?
+    /check/debug/tviburi-check /run/renode-log.txt spi1 >/dev/null; echo none=$?'
+  check "the check passes the modeled run only with its expected version: wrong (1) and none (1) fail (gate clause 7)" \
+    "grep -qx right=0 '$work/adv-version.stdout' && grep -qx wrong=1 '$work/adv-version.stdout' && grep -qx none=1 '$work/adv-version.stdout'"
+}
+
+t_adv-recorded() {
+  fixture recorded model/Refusal.cs 'private const string Mode = "enforcing";' 'private const string Mode = "recorded";'
+  run adv-recorded modeled "$work/recorded.tree"
+  check "a recorded-mode witness is never a pass: the modeled path FAILs (1) (gate clause 7; RUL-19)" \
+    "[ \$rc -eq 1 ] && grep -q '^PROBLEM .*not in enforcing mode' '$work/adv-recorded.stdout'"
 }
 
 t_adv-noend() {

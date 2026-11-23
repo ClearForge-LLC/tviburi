@@ -163,9 +163,15 @@ pub fn check(log: &str, expected_version: &str, peripherals: &[String]) -> Repor
     Report { verdict, refusals, problems }
 }
 
+/// The arguments are an expected version, a log file and at least one peripheral, and no flags: a
+/// call without the version (the 0100a form) is refused, never read as a version-less pass.
+fn usage_ok(args: &[String]) -> bool {
+    args.len() >= 3 && !args.iter().any(|a| a.starts_with('-')) && is_version(&args[0])
+}
+
 fn main() -> ExitCode {
     let args: Vec<String> = std::env::args().skip(1).collect();
-    if args.len() < 3 || args.iter().any(|a| a.starts_with('-')) || !is_version(&args[0]) {
+    if !usage_ok(&args) {
         eprintln!("usage: tviburi-check <expected-model-version sha256:...> <renode-log-file> <guarded-peripheral>...");
         println!("CHECK FAIL: usage");
         return ExitCode::from(1);
@@ -319,6 +325,16 @@ mod tests {
         assert!(problems(&log).iter().any(|p| p.contains("without a kind")));
         let unknown = refusal(1).replace("predicted-fault", "fault");
         assert!(problems(&(witness(0) + &unknown + &end(2))).iter().any(|p| p.contains("without a kind")));
+    }
+
+    #[test]
+    fn a_call_without_the_expected_version_is_refused() {
+        let a = |v: &[&str]| v.iter().map(|s| s.to_string()).collect::<Vec<_>>();
+        assert!(usage_ok(&a(&[V, "log", "spi1"])));
+        assert!(!usage_ok(&a(&["log", "spi1"])));
+        assert!(!usage_ok(&a(&["log", "spi1", "spi2"])));
+        assert!(!usage_ok(&a(&[V, "log"])));
+        assert!(!usage_ok(&a(&[V, "log", "spi1", "--no-refuse"])));
     }
 
     #[test]
