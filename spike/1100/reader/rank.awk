@@ -1,13 +1,13 @@
 # TVI-WO-1100 scratch reader: merge the per-board joins and rank them by spike/1100/predictions.md §2.
 # Usage: gawk -F'\t' -f rank.awk boards.tsv pins-*.tsv joined-*.tsv > queue.tsv
-#   boards.tsv: board <TAB> spec <TAB> motor labels (comma-separated, "-" for none) <TAB> dshot (1|0)
+#   boards.tsv: board <TAB> spec <TAB> motor labels (comma-separated, "-" for none)
 #   pins*.tsv: pins.awk output     joined*.tsv: view2-join.awk output (21 columns)
 # A row enters the queue when, on any board, the ledger classes it ignored-by-model or same-source, or
 # its note says "also ignored-by-model", or the executed model drops a written value there.
 # Output: rank cls clsname nboards(in class)/nboards(all) boards(in class) id ledger_classes also_ign access values model view2 drop
 #         fw_writes one_sided entry_line source
 BEGIN { OFS = "\t"; split("motor output,clocks,power,sensor buses,the rest", CN, ",") }
-FILENAME ~ /boards\.tsv$/ { motorlab[$1] = $3; dshot[$1] = $4; next }
+FILENAME ~ /boards\.tsv$/ { motorlab[$1] = $3; next }
 FILENAME ~ /pins(-[^/]*)?\.tsv$/ { role[$1, $3, $4] = $5 "|" $7; if ($7 ~ /^TIM/ && index("," motorlab[$1] ",", "," $5 ",")) mtim[$1, $7] = 1; next }
 function pinrole(b, reg, field,   port, idx, r, net, per) {
   port = reg; sub(/\..*/, "", port); idx = field; gsub(/[^0-9]/, "", idx)

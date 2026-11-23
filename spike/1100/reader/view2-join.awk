@@ -35,7 +35,7 @@ FILENAME == ARGV[2] {
   # was still dropped. orv: bits any write set; andv: bits every write kept set.
   if (!(k in andv)) andv[k] = 0xFFFFFFFF
   orv[k] = or(orv[k], and(v, m)); andv[k] = and(andv[k], or(and(v, m), compl(m) % 4294967296))
-  if (!(k in fpc)) fpc[k] = $9; lpc[k] = $9; fseq[k] = (k in fseq) ? fseq[k] : $3
+  if (!(k in fpc)) fpc[k] = $9
   wk[k] = 1; next
 }
 $1 != board { next }

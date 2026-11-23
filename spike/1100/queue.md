@@ -199,7 +199,7 @@ Every one-sided row has a reason from the closed set committed before the join (
 - `predictions.md`: the rule and the predictions, committed before any run.
 - `harness/`:
   - `capture.sh`: verify plus the `/proc` watcher;
-  - `replay.sh`: pure, logged, and logged with the map;
+  - `replay.sh`: pure, and logged with the map;
   - `regmap.py`: the executed register map, by reflection;
   - `dumps.txt`;
   - `pipeline.sh`: from the captures to `queue.tsv`.
@@ -210,5 +210,5 @@ Every one-sided row has a reason from the closed set committed before the join (
   - `writes.tsv`: the parsed access-log writes and warnings;
   - `pins.tsv`: each board's pin roles, from its generated `board.rs`;
   - `table-entries.tsv`: `ledger.rs` `table()`, rendered;
-  - `boards.tsv`, `boards-motors.tsv`.
+  - `boards.tsv`.
 - **Reproduce:** run `capture.sh` (in the pinned image, with the clone mounted at `/repo`), then `pipeline.sh WORK CAPDIR…`. The raw consoles (about 2.7 MB per board) are not committed. `pipeline.sh` regenerates them from the captures.

@@ -63,8 +63,7 @@ while read -r board cap n; do
   gawk -v board="$board" -f "$R/pins.awk" "$bd/src/board.rs" > "$d/pins.tsv"
   specjson=$(ls "$cap"/capture/"$n"/varlib/aethelgard-*/tool/spec/specification.json | head -1)
   labels=$(jq -r '[.motor_outputs[]?.label] | if length == 0 then "-" else join(",") end' "$specjson")
-  dshot=$(jq -r '[.motor_outputs[]?.protocol | select(test("dshot"))] | if length > 0 then 1 else 0 end' "$specjson")
-  printf '%s\t%s\t%s\t%s\n' "$board" "$specjson" "$labels" "$dshot" >> "$work/boards.tsv"
+  printf '%s\t%s\t%s\n' "$board" "$specjson" "$labels" >> "$work/boards.tsv"
   # The positive control: the boot block of the pure and the logged replay must be identical.
   for m in pure dump; do tr -d '\r' < "$d/replay-$n-$m.log" | awk '/^AETHELGARD-BOOT-BEGIN$/{f=1} f && !/^\[/{print} /^AETHELGARD-BOOT-END$/{f=0}' > "$d/boot-$m.txt"; done
   if cmp -s "$d/boot-pure.txt" "$d/boot-dump.txt" && [ -s "$d/boot-pure.txt" ]; then echo "$board control: identical ($(wc -l < "$d/boot-pure.txt") lines)"; else echo "$board control: DIFFERS or empty"; fi

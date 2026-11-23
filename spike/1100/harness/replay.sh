@@ -3,8 +3,8 @@
 # Usage (in the container): replay.sh N MODE [DUMPS]
 #   N      capture number (/cap/N/argv.bin = Renode's /proc/<pid>/cmdline, argv[0] first; /cap/N/varlib)
 #   MODE   pure   - the captured argv, unchanged
-#          logged - the same, with `sysbus LogAllPeripheralsAccess true` inserted right after `sysbus LoadELF @...`
-#          dump   - logged, plus each line of DUMPS (monitor commands) inserted right before the final `quit`
+#          dump   - the same, with `sysbus LogAllPeripheralsAccess true` inserted right after `sysbus LoadELF @...`
+#                   and each line of DUMPS (monitor commands) inserted right before the final `quit`
 # The captured scratch is restored at its original path, so every @path in the argv resolves as it did.
 # Renode is run with the variables the CLI gives it (main.rs renode_env; run.rs HOME and TMPDIR = workdir),
 # without the CLI's Landlock/seccomp sandbox; the container has no network.
@@ -22,14 +22,12 @@ for i in "${!args[@]}"; do
   c=${args[$((i + 1))]}
   case $mode in
     pure) ;;
-    logged|dump)
+    dump)
       [[ $c =~ (sysbus LoadELF @[^;]*; ) ]] || { echo "replay: no LoadELF in the commands" >&2; exit 3; }
       c=${c/"${BASH_REMATCH[1]}"/"${BASH_REMATCH[1]}sysbus LogAllPeripheralsAccess true; "}
-      if [ "$mode" = dump ]; then
-        extra=$(paste -sd ';' "$dumps" | sed 's/;/; /g')
-        [[ $c == *"; quit" ]] || { echo "replay: commands do not end in quit" >&2; exit 3; }
-        c="${c%; quit}; ${extra}; quit"
-      fi ;;
+      extra=$(paste -sd ';' "$dumps" | sed 's/;/; /g')
+      [[ $c == *"; quit" ]] || { echo "replay: commands do not end in quit" >&2; exit 3; }
+      c="${c%; quit}; ${extra}; quit" ;;
     *) echo "replay: mode $mode?" >&2; exit 2 ;;
   esac
   args[$((i + 1))]=$c
