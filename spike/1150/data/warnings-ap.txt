@@ -1,0 +1,58 @@
+   4727 dma1	[WARNING] dma1: Unhandled write to offset O. Unhandled bits: [5] when writing value V. Tags: FS (0x4).
+   4727 dma1	[WARNING] dma1: Unhandled write to offset O. Unhandled bits: [1-2, 16] when writing value V. Tags: DMEIE (0x1), TEIE (0x1), PL (0x1).
+   4708 spi2	[WARNING] spi2: Unhandled write to offset O. Unhandled bits: [0-2, 4-10, 12-31] when writing value V. Tags: RESERVED (0x7), TXTFC (0x1), UDRC (0x1), OVRC (0x1), CRCEC (0x1), TIFREC (0x1), MODFC (0x1), TSERFC (0x1), RESERVED (0xFFFFF).
+   4708 dma1	[WARNING] dma1: Unhandled write to offset O. Unhandled bits: [22, 24-26] when writing value V. Tags: CFEIF3 (0x1), CDMEIF3 (0x1), CTEIF3 (0x1), CHTIF3 (0x1).
+   4708 dma1	[WARNING] dma1: Unhandled write to offset O. Unhandled bits: [16, 18-20] when writing value V. Tags: CFEIF2 (0x1), CDMEIF2 (0x1), CTEIF2 (0x1), CHTIF2 (0x1).
+   2773 i2c1	[WARNING] i2c1: Unhandled write to offset O. Unhandled bits: [2] when writing value V. Tags: RESERVED (0x4).
+   2354 spi2	[WARNING] spi2: Unhandled write to offset O. Unhandled bits: [8] when writing value V. Tags: MASRX (0x1).
+   2354 spi2	[WARNING] spi2: Unhandled write to offset O. Unhandled bits: [6] when writing value V. Tags: OVRIE (0x1).
+   2354 spi2	[WARNING] spi2: Unhandled write to offset O. Unhandled bits: [29] when writing value V. Tags: SSOE (0x1).
+   2354 spi2	[WARNING] spi2: Unhandled write to offset O. Unhandled bits: [28, 30] when writing value V. Tags: MBR (0x5).
+   2353 rcc	[WARNING] rcc: Unhandled write to offset O. Unhandled bits: [14] when writing value V. Tags: SPI2LPEN (0x0).
+    969 i2c1	[WARNING] i2c1: Unhandled write to offset O. Unhandled bits: [6] when writing value V. Tags: RESERVED (0x1).
+    544 i2c1	[WARNING] i2c1: Unhandled write to offset O. Unhandled bits: [3-5, 8-11, 20-21] when writing value V. Tags: SCLL (0x38), SCLH (0xF), SCLDEL (0x3).
+    489 i2c1	[WARNING] i2c1: Unhandled write to offset O. Unhandled bits: [1] when writing value V. Tags: RESERVED (0x2).
+     82 flashController	[WARNING] flashController: Unhandled write to offset O. Unhandled bits: [0-15, 17, 19-20, 23-24, 27-31] when writing value V. Tags: RESERVED (0xFFFF), CLR_WRPERR2 (0x1), CLR_STRBERR2 (0x1), RESERVED (0x1), CLR_RDPERR2 (0x1), CLR_RDSERR2 (0x1), CLR_CRCEND2 (0x1), RESERVED (0xF).
+     57 dma1	[WARNING] dma1: Unhandled write to offset O. Unhandled bits: [0, 2-4] when writing value V. Tags: CFEIF4 (0x1), CDMEIF4 (0x1), CTEIF4 (0x1), CHTIF4 (0x1).
+     36 spi1	[WARNING] spi1: Unhandled write to offset O. Unhandled bits: [0-2, 4-10, 12-31] when writing value V. Tags: RESERVED (0x7), TXTFC (0x1), UDRC (0x1), OVRC (0x1), CRCEC (0x1), TIFREC (0x1), MODFC (0x1), TSERFC (0x1), RESERVED (0xFFFFF).
+     36 dma2	[WARNING] dma2: Unhandled write to offset O. Unhandled bits: [6, 8-10] when writing value V. Tags: CFEIF1 (0x1), CDMEIF1 (0x1), CTEIF1 (0x1), CHTIF1 (0x1).
+     36 dma1	[WARNING] dma1: Unhandled write to offset O. Unhandled bits: [6, 8-10] when writing value V. Tags: CFEIF1 (0x1), CDMEIF1 (0x1), CTEIF1 (0x1), CHTIF1 (0x1).
+     32 rcc	[WARNING] rcc: Unhandled write to offset O. Unhandled bits: [1] when writing value V. Tags: DMA2LPEN (0x0).
+     29 dma1	[WARNING] dma1: Unhandled write to offset O. Unhandled bits: [1-2, 20] when writing value V. Tags: DMEIE (0x1), TEIE (0x1), TRBUFF (0x1).
+     19 dma2	[WARNING] dma2: Unhandled write to offset O. Unhandled bits: [1-2, 16] when writing value V. Tags: DMEIE (0x1), TEIE (0x1), PL (0x1).
+     17 spi1	[WARNING] spi1: Unhandled write to offset O. Unhandled bits: [8] when writing value V. Tags: MASRX (0x1).
+     17 spi1	[WARNING] spi1: Unhandled write to offset O. Unhandled bits: [6] when writing value V. Tags: OVRIE (0x1).
+     17 spi1	[WARNING] spi1: Unhandled write to offset O. Unhandled bits: [29] when writing value V. Tags: SSOE (0x1).
+     17 spi1	[WARNING] spi1: Unhandled write to offset O. Unhandled bits: [29] when writing value V. Tags: MBR (0x2).
+     17 dma2	[WARNING] dma2: Unhandled write to offset O. Unhandled bits: [5] when writing value V. Tags: FS (0x4).
+     16 rcc	[WARNING] rcc: Unhandled write to offset O. Unhandled bits: [12] when writing value V. Tags: SPI1LPEN (0x0).
+      4 usart1	[WARNING] usart1: Unhandled write to offset O. Unhandled bits: [6] when writing value V. Tags: LBDIE (0x1).
+      4 usart1	[WARNING] usart1: Unhandled write to offset O. Unhandled bits: [4, 29] when writing value V. Tags: IDLEIE (0x1), RESERVED (0x1).
+      4 usart1	[WARNING] usart1: Unhandled write to offset O. Unhandled bits: [0] when writing value V. Tags: EIE (0x1).
+      4 usart1	[WARNING] usart1: Unhandled write to offset O. Unhandled bits: [0-5, 7-10, 12-31] when writing value V. Tags: PECF (0x1), FECF (0x1), NCF (0x1), ORECF (0x1), IDLECF (0x1), RESERVED (0x1), CTSCF (0x1), RESERVED (0x1), RESERVED (0xF), CMCF (0x1), RESERVED (0x3), WUCF (0x1), RESERVED (0x7FF), TCBGTCF (0x1), LBDCF (0x1), EOBCF (0x1).
+      4 flashController	[WARNING] flashController: Unhandled write to offset O. Unhandled bits: [4] when writing value V. Tags: PSIZE2 (0x2).
+      4 flashController	[WARNING] flashController: Unhandled write to offset O. Unhandled bits: [0-15, 17, 19-20, 23-24, 27-31] when writing value V. Tags: RESERVED (0xFFFF), CLR_WRPERR1 (0x1), CLR_STRBERR1 (0x1), RESERVED (0x1), CLR_RDPERR1 (0x1), CLR_RDSERR1 (0x1), CLR_CRCEND1 (0x1), RESERVED (0xF).
+      4 flashController	[WARNING] flashController: Unhandled write to offset O. Unhandled bits: [0, 2-15, 17, 19-20, 23-24, 27-31] when writing value V. Tags: BSY2 (0x1), QW2 (0x1), CRC_BUSY2 (0x1), RESERVED (0xFFF), WRPERR2 (0x1), STRBERR2 (0x1), RESERVED (0x1), RDPERR2 (0x1), RDSERR2 (0x1), CRCEND2 (0x1), RESERVED (0xF).
+      2 pwr	[WARNING] pwr: Unhandled access to offset O
+      2 nvic	[WARNING] nvic: Unhandled write to offset O. Unhandled bits: [0] when writing value V. Tags: EN (TCM Enable) (0x1).
+      2 dma1	[WARNING] dma1: Unhandled write to offset O. Unhandled bits: [0, 2-4] when writing value V. Tags: CFEIF0 (0x1), CDMEIF0 (0x1), CTEIF0 (0x1), CHTIF0 (0x1).
+      1 sysbus	[WARNING] sysbus: [cpu: 0x81037E2] (tag: 'GPV_matrix_(AXIM)') WriteDoubleWord to non existing peripheral at 0x51008108, value V.
+      1 sysbus	[WARNING] sysbus: [cpu: 0x8103662] WriteDoubleWord to non existing peripheral at 0x5C00103C, value V.
+      1 rcc	[WARNING] rcc: Unhandled write to offset O. Unhandled bits: [8, 16, 28] when writing value V. Tags: I2C4SEL (0x1), ADCSEL (0x1), SPI6SEL (0x1).
+      1 rcc	[WARNING] rcc: Unhandled write to offset O. Unhandled bits: [6] when writing value V. Tags: RNGLPEN (0x0).
+      1 rcc	[WARNING] rcc: Unhandled write to offset O. Unhandled bits: [5] when writing value V. Tags: QSPISEL (0x2).
+      1 rcc	[WARNING] rcc: Unhandled write to offset O. Unhandled bits: [2-4, 6-14, 16-24, 26, 28-30] when writing value V. Tags: RESERVED (0x3), RESERVED (0x1FF), RESERVED (0x7F), RESERVED (0x1), RESERVED (0x7).
+      1 rcc	[WARNING] rcc: Unhandled write to offset O. Unhandled bits: [2-3, 6-11, 14-15, 19, 21, 25-27, 30-31] when writing value V. Tags: RESERVED (0x3), RESERVED (0x3F), RESERVED (0x3), RESERVED (0x1), RESERVED (0x1), RESERVED (0x7), RESERVED (0x3).
+      1 rcc	[WARNING] rcc: Unhandled write to offset O. Unhandled bits: [16, 28] when writing value V. Tags: SPI45SEL (0x1), FDCANSEL (0x1).
+      1 rcc	[WARNING] rcc: Unhandled write to offset O. Unhandled bits: [11-18, 20, 22-23, 26-31] when writing value V. Tags: RESERVED (0xFF), RESERVED (0x1), RESERVED (0x3), RESERVED (0x3F).
+      1 rcc	[WARNING] rcc: Unhandled write to offset O. Unhandled bits: [11, 20, 27] when writing value V. Tags: RTCPRE (0x8), MCO1PRE (0x4), MCO2PRE (0x4).
+      1 rcc	[WARNING] rcc: Unhandled write to offset O. Unhandled bits: [10-13, 24-26, 28] when writing value V. Tags: RESERVED (0xF), RESERVED (0x7), RESERVED (0x1).
+      1 rcc	[WARNING] rcc: Unhandled write to offset O. Unhandled bits: [1-3, 7-8, 10-31] when writing value V. Tags: RESERVED (0x7), RESERVED (0x3), RESERVED (0x3FFFFF).
+      1 rcc	[WARNING] rcc: Unhandled write to offset O. Unhandled bits: [1-3, 6-11, 13, 15, 17-30] when writing value V. Tags: RESERVED (0x7), RESERVED (0x3F), RESERVED (0x1), RESERVED (0x1), RESERVED (0x3FFF).
+      1 rcc	[WARNING] rcc: Unhandled write to offset O. Unhandled bits: [0-2, 4-31] when writing value V. Tags: RESERVED (0x7), RESERVED (0xFFFFFFF).
+      1 rcc	[WARNING] rcc: Unhandled write to offset O. Unhandled bits: [0, 3, 6-7, 9-31] when writing value V. Tags: RESERVED (0x1), RESERVED (0x1), RESERVED (0x3), RESERVED (0x7FFFFF).
+      1 rcc	[WARNING] rcc: Unhandled write to offset O. Unhandled bits: [0, 3, 12, 21-23] when writing value V. Tags: USART234578SEL (0x1), USART16SEL (0x1), I2C123SEL (0x1), USBSEL (0x2), CECSEL (0x3).
+      1 rcc	[WARNING] rcc: Unhandled write to offset O. Unhandled bits: [0, 2-4, 6-11, 22] when writing value V. Tags: PLL1FRACEN (0x1), PLL1GRE (0x3), PLL2FRACEN (0x1), PLL2RGE (0x3), PLL3FRACEN (0x1), PLL3VCOSEL (0x1), PLL3RGE (0x3), DIVP3EN (0x0).
+      1 rcc	[WARNING] rcc: Unhandled write to offset O. Unhandled bits: [0, 2, 4, 6, 8, 13, 16-20, 22-31] when writing value V. Tags: RESERVED (0x1), RESERVED (0x1), RESERVED (0x1), RESERVED (0x1), RESERVED (0x1), RESERVED (0x1), RESERVED (0x1F), RESERVED (0x1FF).
+      1 gpioPortB	[WARNING] gpioPortB: Unhandled write to offset O. Unhandled bits: [6-7] when writing value V. Tags: OT6 (0x1), OT7 (0x1).
+      1 dwt	[WARNING] dwt: Unhandled write to offset O (Function3+0xf58), value V.

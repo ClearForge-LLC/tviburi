@@ -1,0 +1,10 @@
+// GENERATED at release by spike/1150/release/make-release.sh. Holds only the release constant: the sha256 of the
+// overlay manifest, which lists every other overlay file's sha256 and excludes this file by name. A consumer
+// checks this file byte for byte against this template filled with the manifest hash it pinned (TVI-WO-1150 (iii)).
+namespace Antmicro.Renode.Peripherals.Tviburi1150
+{
+    public static class TviburiRelease
+    {
+        public static readonly string ManifestSha256 = "sha256:@@MANIFEST_SHA256@@";
+    }
+}

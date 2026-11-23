@@ -1,0 +1,4 @@
+using "platforms/cpus/stm32h753.repl"
+// N5: NOT re-typing in one description. timer1's registrations cancelled here; the monitor then loads a second
+// description (retype/second/n5-timer1.repl) that declares `timer1` with the spike type.
+timer1: @none

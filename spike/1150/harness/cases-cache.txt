@@ -1,0 +1,7 @@
+# (iii) the compiler cache: const against static readonly
+iii-cacheon-const-A A spike/1150/overlay/nucleo-default.repl modeled cache-on
+iii-cacheon-const-C.again C spike/1150/overlay/nucleo-default.repl modeled cache-on
+iii-cacheon-readonly-A RA spike/1150/overlay/nucleo-default.repl modeled cache-on
+iii-cacheon-readonly-C.again RC spike/1150/overlay/nucleo-default.repl modeled cache-on
+iii-cacheoff-readonly-A RA spike/1150/overlay/nucleo-default.repl modeled
+iii-cacheoff-readonly-C.again RC spike/1150/overlay/nucleo-default.repl modeled

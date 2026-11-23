@@ -1,0 +1,15 @@
+using "platforms/cpus/stm32h753.repl"
+// N1: NOT re-typing. The stock timer1's registrations cancelled (@none), and a spike instance under a new
+// name at TIM1's address, with the alias and interrupts restated: the consumer change a class map would need.
+timer1: @none
+
+tim1g: Tviburi1150.SpikeTimer @ {
+        sysbus 0x40010000;
+        rcc RegistrationPeripheralAlias.TIM1
+    }
+    initialLimit: 0xffff
+    frequency: 200000000
+    BreakInterrupt -> nvic@24
+    UpdateInterrupt -> nvic@25
+    [TriggerInterrupt, CommutationInterrupt] -> nvic@[26, 26]
+    CaptureCompareInterrupt -> nvic@27

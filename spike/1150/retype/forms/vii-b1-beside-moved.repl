@@ -1,0 +1,7 @@
+using "platforms/cpus/stm32h753.repl"
+// VII-B1: candidate (b). The stock rcc stays declared and registered, so its 58 registrations resolve, but is
+// moved to a free address (0x58027000); RccGuard takes the RCC's address and forwards to it (`stock: rcc`).
+rcc: @ sysbus 0x58027000
+
+rccguard: Tviburi1150.RccGuard @ sysbus 0x58024400
+    stock: rcc

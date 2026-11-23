@@ -1,0 +1,19 @@
+using "platforms/cpus/stm32h753.repl"
+// N3: NOT re-typing. timer1's registrations cancelled, and the spike declared under a new variable but registered
+// under the stock NAME (`as "timer1"`), with frequency 250000000 restated; then Aethelgard's untyped update of
+// `timer1`, as its emitter writes it, to see which object it reaches.
+timer1: @none
+
+tim1g: Tviburi1150.SpikeTimer @ {
+        sysbus 0x40010000;
+        rcc RegistrationPeripheralAlias.TIM1
+    } as "timer1"
+    initialLimit: 0xffff
+    frequency: 250000000
+    BreakInterrupt -> nvic@24
+    UpdateInterrupt -> nvic@25
+    [TriggerInterrupt, CommutationInterrupt] -> nvic@[26, 26]
+    CaptureCompareInterrupt -> nvic@27
+
+timer1:
+    frequency: 200000000

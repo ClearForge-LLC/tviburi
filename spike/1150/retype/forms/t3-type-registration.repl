@@ -1,0 +1,10 @@
+using "platforms/cpus/stm32h753.repl"
+// T3: the type and the registration, no constructor arguments, no interrupts
+timer1: Tviburi1150.SpikeTimer @ {
+        sysbus 0x40010000;
+        rcc RegistrationPeripheralAlias.TIM1
+    }
+
+// Aethelgard's own update of the stock entry, as its emitter writes it (AET-WO-4400g)
+timer1:
+    frequency: 200000000

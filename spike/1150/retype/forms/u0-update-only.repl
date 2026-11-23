@@ -1,0 +1,6 @@
+using "platforms/cpus/stm32h753.repl"
+// U0: no type: only Aethelgard's update, which merges into the stock entry
+
+// Aethelgard's own update of the stock entry, as its emitter writes it (AET-WO-4400g)
+timer1:
+    frequency: 200000000

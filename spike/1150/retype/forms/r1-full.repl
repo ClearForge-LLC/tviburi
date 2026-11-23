@@ -1,0 +1,4 @@
+using "platforms/cpus/stm32h753.repl"
+// R1: the stock entry restated in full, with the type changed
+rcc: Tviburi1150.SpikeRcc @ sysbus 0x58024400
+    systick: nvic

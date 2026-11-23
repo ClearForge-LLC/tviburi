@@ -1,0 +1,9 @@
+using "platforms/cpus/stm32h753.repl"
+// VII-B2: candidate (b), narrowed. The stock rcc keeps 0x58024400 to 0x5802444F; RccGuard takes 0x58024450 to
+// 0x580247FF (D2CCIP1R, at offset 0x50, and every register above it) and forwards at offset + 0x50.
+rcc: @ sysbus <0x58024400, +0x50>
+
+rccguard: Tviburi1150.RccGuard @ sysbus <0x58024450, +0x3B0>
+    stock: rcc
+    baseOffset: 0x50
+    size: 0x3B0

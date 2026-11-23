@@ -1,0 +1,8 @@
+// TVI-WO-1150 spike platform: the Nucleo board with the spike guard on spi1 (stock Renode only tags SPI1), no mode
+// given, so the guard's default ("enforcing") applies.
+using "platforms/boards/nucleo_h753zi.repl"
+
+spi1: Tviburi1150.GuardedSpi1150 @ {
+        sysbus 0x40013000;
+        rcc RegistrationPeripheralAlias.SPI1
+    }

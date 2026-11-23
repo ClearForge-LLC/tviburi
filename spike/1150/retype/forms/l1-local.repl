@@ -1,0 +1,5 @@
+using "platforms/cpus/stm32h753.repl"
+// L1: a local declaration of the same name, with the type changed
+local timer1: Tviburi1150.SpikeTimer @ sysbus 0x40010000
+    initialLimit: 0xffff
+    frequency: 250000000

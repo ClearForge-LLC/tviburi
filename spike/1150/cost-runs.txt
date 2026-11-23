@@ -1,0 +1,46 @@
+# TVI-WO-1150 (vi): every cost run, in order, as harness/replay-ap.sh printed it (2026-11-23, Furnace, image e5fc7ddb…).
+# Capture 2 = Aethelgard 7dec1d7b's `simulate --spec sentinel-02-own.json --firmware arducopter.elf (a799dfb6…) --foreign 5000ms`.
+# Its own verdict for that boot: memory.peak_rss_kib 818220, bound_kib 1048576, share_permille 780.
+# peak_tree_vmrss_kib: the peak over 100 ms samples of summed VmRSS (the CLI reaper's measure). vmhwm_kib: the kernel's peak.
+# Overlay shapes: "3 files" = TviburiRelease.cs, Records1150.cs, GuardedSpi1150.cs (cases/A); "1 file" = the same code as one
+# include (cases/A1); "2 files" = TviburiRelease.cs + the two models as one file (cases/A2).
+# container 1 (overlay: 3 files)
+mode=pure         wall_s=9.74  peak_tree_vmrss_kib=844624  vmhwm_kib=844624  load=8.91 10.20 9.45
+mode=enforcing    wall_s=9.33  peak_tree_vmrss_kib=1135488 vmhwm_kib=1135504 load=8.15 9.99 9.40
+mode=recorded     wall_s=10.19 peak_tree_vmrss_kib=1176720 vmhwm_kib=1176720 load=7.67 9.83 9.35
+mode=load-stock   wall_s=2.90  peak_tree_vmrss_kib=634864  vmhwm_kib=635488  load=7.37 9.73 9.32
+mode=load-overlay wall_s=3.43  peak_tree_vmrss_kib=801460  vmhwm_kib=801460  load=7.10 9.64 9.29
+mode=load-stock   wall_s=2.91  peak_tree_vmrss_kib=618116  vmhwm_kib=635676  load=7.10 9.64 9.29
+mode=load-overlay wall_s=3.36  peak_tree_vmrss_kib=823444  vmhwm_kib=824896  load=7.01 9.58 9.27
+mode=load-stock   wall_s=3.05  peak_tree_vmrss_kib=644020  vmhwm_kib=644184  load=7.01 9.58 9.27
+mode=load-overlay wall_s=3.36  peak_tree_vmrss_kib=801624  vmhwm_kib=801624  load=6.69 9.47 9.24
+# container 2 (overlay: 3 files), pairs
+mode=pure         wall_s=26.42 peak_tree_vmrss_kib=1379148 vmhwm_kib=1379148 load=16.01 11.35 9.89
+mode=enforcing    wall_s=10.15 peak_tree_vmrss_kib=1118536 vmhwm_kib=1118588 load=15.93 11.49 9.95
+mode=pure         wall_s=10.42 peak_tree_vmrss_kib=827084  vmhwm_kib=827084  load=15.40 11.53 9.97
+mode=enforcing    wall_s=10.12 peak_tree_vmrss_kib=1126168 vmhwm_kib=1126196 load=14.65 11.49 9.98
+mode=pure         wall_s=9.75  peak_tree_vmrss_kib=854908  vmhwm_kib=854908  load=15.06 11.68 10.06
+mode=enforcing    wall_s=9.77  peak_tree_vmrss_kib=1144632 vmhwm_kib=1144632 load=13.59 11.47 10.01
+# container 3 (overlay: 1 file)
+mode=enforcing    wall_s=9.11  peak_tree_vmrss_kib=899160  vmhwm_kib=899344  load=12.34 11.27 9.96
+mode=load-overlay wall_s=3.11  peak_tree_vmrss_kib=725964  vmhwm_kib=728392  load=12.34 11.27 9.96
+mode=enforcing    wall_s=9.23  peak_tree_vmrss_kib=885668  vmhwm_kib=885704  load=12.30 11.30 9.98
+mode=load-overlay wall_s=3.51  peak_tree_vmrss_kib=728424  vmhwm_kib=735276  load=12.11 11.28 9.98
+# container 4 (overlay: 2 files)
+mode=enforcing    wall_s=9.90  peak_tree_vmrss_kib=1014372 vmhwm_kib=1014372 load=12.82 11.48 10.09
+mode=load-overlay wall_s=3.69  peak_tree_vmrss_kib=816544  vmhwm_kib=816544  load=12.44 11.43 10.08
+mode=pure         wall_s=9.43  peak_tree_vmrss_kib=847348  vmhwm_kib=847352  load=12.16 11.39 10.07
+mode=enforcing    wall_s=9.44  peak_tree_vmrss_kib=1022976 vmhwm_kib=1023036 load=12.37 11.46 10.11
+mode=load-overlay wall_s=3.17  peak_tree_vmrss_kib=796788  vmhwm_kib=796800  load=11.62 11.31 10.07
+# Added after the advisor's check: every enforcing run above stopped at the first refusal (A6), at 71,384,611 instructions
+# (0x4413E23), while stock and recorded boots run 88,058,789 (0x53EABA5). So full-boot cost is read from recorded mode.
+# container 5 (overlay: 1 file), full boots
+mode=pure         wall_s=10.53 peak_tree_vmrss_kib=853776  vmhwm_kib=853780  load=12.78 10.61 11.74
+mode=recorded     wall_s=12.07 peak_tree_vmrss_kib=954716  vmhwm_kib=954716  load=13.04 10.73 11.77
+mode=pure         wall_s=10.96 peak_tree_vmrss_kib=823944  vmhwm_kib=824016  load=12.65 10.73 11.75
+mode=recorded     wall_s=12.89 peak_tree_vmrss_kib=964704  vmhwm_kib=964708  load=13.41 10.99 11.82
+# container 6 (overlay: 2 files), full boots
+mode=pure         wall_s=10.09 peak_tree_vmrss_kib=814740  vmhwm_kib=814744  load=13.26 11.04 11.83
+mode=recorded     wall_s=11.51 peak_tree_vmrss_kib=1069240 vmhwm_kib=1071020 load=13.62 11.18 11.87
+mode=pure         wall_s=13.10 peak_tree_vmrss_kib=874492  vmhwm_kib=874572  load=13.93 11.37 11.92
+mode=recorded     wall_s=11.46 peak_tree_vmrss_kib=1071880 vmhwm_kib=1071880 load=13.86 11.44 11.94

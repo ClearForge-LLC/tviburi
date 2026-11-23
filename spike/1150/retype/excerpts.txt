@@ -1,0 +1,577 @@
+# TVI-WO-1150 (i) and (vii): excerpts of each form's console, from harness/run-retype.sh, 2026-11-23, image e5fc7ddb…, Renode 1.17.0+20260907gitf1dd1b4af.aet1605, Aethelgard 7dec1d7b's renode.config. Lines: the load error (with its next two lines), TVICHK, TVI1150 markers and the value after each, SPIKE and HOOK lines, and access-log lines. Every form's Renode exited 0.
+
+## c0-control
+TVICHK at 0x40010000: sysbus.timer1 Antmicro.Renode.Peripherals.Timers.STM32_Timer
+TVICHK at 0x58024400: sysbus.rcc Antmicro.Renode.Peripherals.Miscellaneous.STM32H7_RCC
+TVICHK at 0x40017000: sysbus.spiketimer Antmicro.Renode.Peripherals.Tviburi1150.SpikeTimer
+TVICHK at 0x58027000: sysbus.spikercc Antmicro.Renode.Peripherals.Tviburi1150.SpikeRcc
+TVICHK timer1: class Antmicro.Renode.Peripherals.Timers.STM32_Timer
+TVICHK timer1: parents sysbus
+TVICHK timer1: Frequency 250000000
+TVICHK timer1: Limit 65535
+TVICHK timer1: BreakInterrupt connected=True -> sysbus.nvic@24
+TVICHK timer1: UpdateInterrupt connected=True -> sysbus.nvic@25
+TVICHK timer1: TriggerInterrupt connected=True -> ?@0
+TVICHK timer1: CommutationInterrupt connected=True -> ?@1
+TVICHK timer1: CaptureCompareInterrupt connected=True -> sysbus.nvic@27
+TVICHK rcc: class Antmicro.Renode.Peripherals.Miscellaneous.STM32H7_RCC
+TVICHK rcc: parents sysbus
+TVICHK rcc: RCC registered 58: ADC12=sysbus.adcM1S2,ADC3=sysbus.adc3,BDMA=sysbus.bdma,CRC=sysbus.crc,DMA1=sysbus.dma1,DMA2=sysbus.dma2,DMA2D=sysbus.dma2d,ETH1MAC=sysbus.ethernet,GPIOA=sysbus.gpioPortA,GPIOB=sysbus.gpioPortB,GPIOC=sysbus.gpioPortC,GPIOD=sysbus.gpioPortD,GPIOE=sysbus.gpioPortE,GPIOF=sysbus.gpioPortF,GPIOG=sysbus.gpioPortG,GPIOH=sysbus.gpioPortH,GPIOI=sysbus.gpioPortI,GPIOJ=sysbus.gp
+TVICHK spiketimer: class Antmicro.Renode.Peripherals.Tviburi1150.SpikeTimer
+TVICHK spiketimer: parents sysbus
+TVICHK spiketimer: Frequency 250000000
+TVICHK spiketimer: Limit 65535
+TVICHK spiketimer: BreakInterrupt connected=False -> -
+TVICHK spiketimer: UpdateInterrupt connected=False -> -
+TVICHK spiketimer: TriggerInterrupt connected=False -> -
+TVICHK spiketimer: CommutationInterrupt connected=False -> -
+TVICHK spiketimer: CaptureCompareInterrupt connected=False -> -
+TVICHK spikercc: class Antmicro.Renode.Peripherals.Tviburi1150.SpikeRcc
+TVICHK spikercc: parents sysbus
+TVICHK spikercc: RCC registered 0: 
+TVICHK tim1g: not in the machine
+TVICHK rccg: not in the machine
+TVICHK rccguard: not in the machine
+TVICHK sealed: STM32H7_RCC=True STM32_Timer=False
+TVICHK-END
+[00:00:00.000000000] [WARNING] rcc: Unhandled write to offset 0x50. Unhandled bits: [12] when writing value 0x1000. Tags: SPI123SEL (0x1).
+TVI1150-AFTER
+0xAF7E1150
+TVI1150-ISPR0
+0x02000000
+TVI1150-PSC-BEFORE-RESET
+0x00000005
+TVI1150-PSC-AFTER-TIM1RST
+0x00000000
+
+## l1-local
+There was an error executing command 'machine LoadPlatformDescription @/repo/spike/1150/retype/forms/l1-local.repl': 
+Error E02: Variable 'timer1' was already declared, previous declaration was at :316:1.
+At /repo/spike/1150/retype/forms/l1-local.repl:3:1:
+
+## n1-timer-unregister-rename
+TVICHK at 0x40010000: sysbus.tim1g Antmicro.Renode.Peripherals.Tviburi1150.SpikeTimer
+TVICHK at 0x58024400: sysbus.rcc Antmicro.Renode.Peripherals.Miscellaneous.STM32H7_RCC
+TVICHK at 0x40017000: - -
+TVICHK at 0x58027000: - -
+TVICHK timer1: not in the machine
+TVICHK rcc: class Antmicro.Renode.Peripherals.Miscellaneous.STM32H7_RCC
+TVICHK rcc: parents sysbus
+TVICHK rcc: RCC registered 58: ADC12=sysbus.adcM1S2,ADC3=sysbus.adc3,BDMA=sysbus.bdma,CRC=sysbus.crc,DMA1=sysbus.dma1,DMA2=sysbus.dma2,DMA2D=sysbus.dma2d,ETH1MAC=sysbus.ethernet,GPIOA=sysbus.gpioPortA,GPIOB=sysbus.gpioPortB,GPIOC=sysbus.gpioPortC,GPIOD=sysbus.gpioPortD,GPIOE=sysbus.gpioPortE,GPIOF=sysbus.gpioPortF,GPIOG=sysbus.gpioPortG,GPIOH=sysbus.gpioPortH,GPIOI=sysbus.gpioPortI,GPIOJ=sysbus.gp
+TVICHK spiketimer: not in the machine
+TVICHK spikercc: not in the machine
+TVICHK tim1g: class Antmicro.Renode.Peripherals.Tviburi1150.SpikeTimer
+TVICHK tim1g: parents sysbus
+TVICHK tim1g: Frequency 200000000
+TVICHK tim1g: Limit 65535
+TVICHK tim1g: BreakInterrupt connected=True -> ?@1
+TVICHK tim1g: UpdateInterrupt connected=True -> ?@1
+TVICHK tim1g: TriggerInterrupt connected=True -> ?@2
+TVICHK tim1g: CommutationInterrupt connected=True -> ?@3
+TVICHK tim1g: CaptureCompareInterrupt connected=True -> ?@1
+TVICHK rccg: not in the machine
+TVICHK rccguard: not in the machine
+TVICHK sealed: STM32H7_RCC=True STM32_Timer=False
+TVICHK-END
+[00:00:00.000000000] [WARNING] tim1g: TVI1150-SPIKE SpikeTimer write offset=0x30 value=0x5 pc=none
+[00:00:00.000000000] [WARNING] rcc: Unhandled write to offset 0x50. Unhandled bits: [12] when writing value 0x1000. Tags: SPI123SEL (0x1).
+[00:00:00.000000000] [WARNING] tim1g: TVI1150-SPIKE SpikeTimer write offset=0x28 value=0x0 pc=0x08000028
+[00:00:00.000000000] [WARNING] tim1g: TVI1150-SPIKE SpikeTimer write offset=0x2C value=0x63 pc=0x0800002C
+[00:00:00.000000000] [WARNING] tim1g: TVI1150-SPIKE SpikeTimer write offset=0xC value=0x1 pc=0x0800002E
+[00:00:00.000000000] [WARNING] tim1g: TVI1150-SPIKE SpikeTimer write offset=0x0 value=0x1 pc=0x08000030
+TVI1150-AFTER
+0xAF7E1150
+TVI1150-ISPR0
+0x02000000
+TVI1150-PSC-BEFORE-RESET
+[00:00:00.000500000] [WARNING] tim1g: TVI1150-SPIKE SpikeTimer write offset=0x28 value=0x5 pc=none
+TVI1150-PSC-AFTER-TIM1RST
+0x00000000
+
+## n2-rcc-unregister-rename
+There was an error executing command 'machine LoadPlatformDescription @/repo/spike/1150/retype/forms/n2-rcc-unregister-rename.repl': 
+Error E39: Unable to finish the registration of 'adc3'. Are all parents: ['sysbus', 'rcc'], registered?
+At /opt/renode/platforms/cpus/stm32h7.repl:84:1:
+
+## n3-alias-stock-name
+TVICHK at 0x40010000: sysbus.timer1 Antmicro.Renode.Peripherals.Tviburi1150.SpikeTimer
+TVICHK at 0x58024400: sysbus.rcc Antmicro.Renode.Peripherals.Miscellaneous.STM32H7_RCC
+TVICHK at 0x40017000: - -
+TVICHK at 0x58027000: - -
+TVICHK timer1: class Antmicro.Renode.Peripherals.Tviburi1150.SpikeTimer
+TVICHK timer1: parents sysbus
+TVICHK timer1: Frequency 250000000
+TVICHK timer1: Limit 65535
+TVICHK timer1: BreakInterrupt connected=True -> ?@1
+TVICHK timer1: UpdateInterrupt connected=True -> ?@1
+TVICHK timer1: TriggerInterrupt connected=True -> ?@2
+TVICHK timer1: CommutationInterrupt connected=True -> ?@3
+TVICHK timer1: CaptureCompareInterrupt connected=True -> ?@1
+TVICHK rcc: class Antmicro.Renode.Peripherals.Miscellaneous.STM32H7_RCC
+TVICHK rcc: parents sysbus
+TVICHK rcc: RCC registered 58: ADC12=sysbus.adcM1S2,ADC3=sysbus.adc3,BDMA=sysbus.bdma,CRC=sysbus.crc,DMA1=sysbus.dma1,DMA2=sysbus.dma2,DMA2D=sysbus.dma2d,ETH1MAC=sysbus.ethernet,GPIOA=sysbus.gpioPortA,GPIOB=sysbus.gpioPortB,GPIOC=sysbus.gpioPortC,GPIOD=sysbus.gpioPortD,GPIOE=sysbus.gpioPortE,GPIOF=sysbus.gpioPortF,GPIOG=sysbus.gpioPortG,GPIOH=sysbus.gpioPortH,GPIOI=sysbus.gpioPortI,GPIOJ=sysbus.gp
+TVICHK spiketimer: not in the machine
+TVICHK spikercc: not in the machine
+TVICHK tim1g: not in the machine
+TVICHK rccg: not in the machine
+TVICHK rccguard: not in the machine
+TVICHK sealed: STM32H7_RCC=True STM32_Timer=False
+TVICHK-END
+[00:00:00.000000000] [WARNING] timer1: TVI1150-SPIKE SpikeTimer write offset=0x30 value=0x5 pc=none
+[00:00:00.000000000] [WARNING] rcc: Unhandled write to offset 0x50. Unhandled bits: [12] when writing value 0x1000. Tags: SPI123SEL (0x1).
+[00:00:00.000000000] [WARNING] timer1: TVI1150-SPIKE SpikeTimer write offset=0x28 value=0x0 pc=0x08000028
+[00:00:00.000000000] [WARNING] timer1: TVI1150-SPIKE SpikeTimer write offset=0x2C value=0x63 pc=0x0800002C
+[00:00:00.000000000] [WARNING] timer1: TVI1150-SPIKE SpikeTimer write offset=0xC value=0x1 pc=0x0800002E
+[00:00:00.000000000] [WARNING] timer1: TVI1150-SPIKE SpikeTimer write offset=0x0 value=0x1 pc=0x08000030
+TVI1150-AFTER
+0xAF7E1150
+TVI1150-ISPR0
+0x02000000
+TVI1150-PSC-BEFORE-RESET
+[00:00:00.000500000] [WARNING] timer1: TVI1150-SPIKE SpikeTimer write offset=0x28 value=0x5 pc=none
+TVI1150-PSC-AFTER-TIM1RST
+0x00000000
+
+## n5-second-load
+TVICHK at 0x40010000: sysbus.timer1 Antmicro.Renode.Peripherals.Tviburi1150.SpikeTimer
+TVICHK at 0x58024400: sysbus.rcc Antmicro.Renode.Peripherals.Miscellaneous.STM32H7_RCC
+TVICHK at 0x40017000: - -
+TVICHK at 0x58027000: - -
+TVICHK timer1: class Antmicro.Renode.Peripherals.Tviburi1150.SpikeTimer
+TVICHK timer1: parents sysbus
+TVICHK timer1: Frequency 200000000
+TVICHK timer1: Limit 65535
+TVICHK timer1: BreakInterrupt connected=True -> sysbus.nvic@24
+TVICHK timer1: UpdateInterrupt connected=True -> sysbus.nvic@25
+TVICHK timer1: TriggerInterrupt connected=True -> ?@0
+TVICHK timer1: CommutationInterrupt connected=True -> ?@1
+TVICHK timer1: CaptureCompareInterrupt connected=True -> sysbus.nvic@27
+TVICHK rcc: class Antmicro.Renode.Peripherals.Miscellaneous.STM32H7_RCC
+TVICHK rcc: parents sysbus
+TVICHK rcc: RCC registered 58: ADC12=sysbus.adcM1S2,ADC3=sysbus.adc3,BDMA=sysbus.bdma,CRC=sysbus.crc,DMA1=sysbus.dma1,DMA2=sysbus.dma2,DMA2D=sysbus.dma2d,ETH1MAC=sysbus.ethernet,GPIOA=sysbus.gpioPortA,GPIOB=sysbus.gpioPortB,GPIOC=sysbus.gpioPortC,GPIOD=sysbus.gpioPortD,GPIOE=sysbus.gpioPortE,GPIOF=sysbus.gpioPortF,GPIOG=sysbus.gpioPortG,GPIOH=sysbus.gpioPortH,GPIOI=sysbus.gpioPortI,GPIOJ=sysbus.gp
+TVICHK spiketimer: not in the machine
+TVICHK spikercc: not in the machine
+TVICHK tim1g: not in the machine
+TVICHK rccg: not in the machine
+TVICHK rccguard: not in the machine
+TVICHK sealed: STM32H7_RCC=True STM32_Timer=False
+TVICHK-END
+[00:00:00.000000000] [WARNING] timer1: TVI1150-SPIKE SpikeTimer write offset=0x30 value=0x5 pc=none
+[00:00:00.000000000] [WARNING] rcc: Unhandled write to offset 0x50. Unhandled bits: [12] when writing value 0x1000. Tags: SPI123SEL (0x1).
+[00:00:00.000000000] [WARNING] timer1: TVI1150-SPIKE SpikeTimer write offset=0x28 value=0x0 pc=0x08000028
+[00:00:00.000000000] [WARNING] timer1: TVI1150-SPIKE SpikeTimer write offset=0x2C value=0x63 pc=0x0800002C
+[00:00:00.000000000] [WARNING] timer1: TVI1150-SPIKE SpikeTimer write offset=0xC value=0x1 pc=0x0800002E
+[00:00:00.000000000] [WARNING] timer1: TVI1150-SPIKE SpikeTimer write offset=0x0 value=0x1 pc=0x08000030
+TVI1150-AFTER
+0xAF7E1150
+TVI1150-ISPR0
+0x02000000
+TVI1150-PSC-BEFORE-RESET
+[00:00:00.000500000] [WARNING] timer1: TVI1150-SPIKE SpikeTimer write offset=0x28 value=0x5 pc=none
+TVI1150-PSC-AFTER-TIM1RST
+0x00000000
+
+## r1-full
+There was an error executing command 'machine LoadPlatformDescription @/repo/spike/1150/retype/forms/r1-full.repl': 
+Error E02: Variable 'rcc' was already declared, previous declaration was at :513:1.
+At /repo/spike/1150/retype/forms/r1-full.repl:3:1:
+
+## r2-type-only
+There was an error executing command 'machine LoadPlatformDescription @/repo/spike/1150/retype/forms/r2-type-only.repl': 
+Error E02: Variable 'rcc' was already declared, previous declaration was at :513:1.
+At /repo/spike/1150/retype/forms/r2-type-only.repl:3:1:
+
+## r3-type-registration
+There was an error executing command 'machine LoadPlatformDescription @/repo/spike/1150/retype/forms/r3-type-registration.repl': 
+Error E02: Variable 'rcc' was already declared, previous declaration was at :513:1.
+At /repo/spike/1150/retype/forms/r3-type-registration.repl:3:1:
+
+## t1b-full-update-first
+There was an error executing command 'machine LoadPlatformDescription @/repo/spike/1150/retype/forms/t1b-full-update-first.repl': 
+Error E02: Variable 'timer1' was already declared, previous declaration was at :316:1.
+At /repo/spike/1150/retype/forms/t1b-full-update-first.repl:7:1:
+
+## t1-full
+There was an error executing command 'machine LoadPlatformDescription @/repo/spike/1150/retype/forms/t1-full.repl': 
+Error E02: Variable 'timer1' was already declared, previous declaration was at :316:1.
+At /repo/spike/1150/retype/forms/t1-full.repl:3:1:
+
+## t2-type-only
+There was an error executing command 'machine LoadPlatformDescription @/repo/spike/1150/retype/forms/t2-type-only.repl': 
+Error E02: Variable 'timer1' was already declared, previous declaration was at :316:1.
+At /repo/spike/1150/retype/forms/t2-type-only.repl:3:1:
+
+## t3-type-registration
+There was an error executing command 'machine LoadPlatformDescription @/repo/spike/1150/retype/forms/t3-type-registration.repl': 
+Error E02: Variable 'timer1' was already declared, previous declaration was at :316:1.
+At /repo/spike/1150/retype/forms/t3-type-registration.repl:3:1:
+
+## t4-type-ctor
+There was an error executing command 'machine LoadPlatformDescription @/repo/spike/1150/retype/forms/t4-type-ctor.repl': 
+Error E02: Variable 'timer1' was already declared, previous declaration was at :316:1.
+At /repo/spike/1150/retype/forms/t4-type-ctor.repl:3:1:
+
+## t5-type-registration-ctor
+There was an error executing command 'machine LoadPlatformDescription @/repo/spike/1150/retype/forms/t5-type-registration-ctor.repl': 
+Error E02: Variable 'timer1' was already declared, previous declaration was at :316:1.
+At /repo/spike/1150/retype/forms/t5-type-registration-ctor.repl:3:1:
+
+## u0-update-only
+TVICHK at 0x40010000: sysbus.timer1 Antmicro.Renode.Peripherals.Timers.STM32_Timer
+TVICHK at 0x58024400: sysbus.rcc Antmicro.Renode.Peripherals.Miscellaneous.STM32H7_RCC
+TVICHK at 0x40017000: - -
+TVICHK at 0x58027000: - -
+TVICHK timer1: class Antmicro.Renode.Peripherals.Timers.STM32_Timer
+TVICHK timer1: parents sysbus
+TVICHK timer1: Frequency 200000000
+TVICHK timer1: Limit 65535
+TVICHK timer1: BreakInterrupt connected=True -> sysbus.nvic@24
+TVICHK timer1: UpdateInterrupt connected=True -> sysbus.nvic@25
+TVICHK timer1: TriggerInterrupt connected=True -> ?@0
+TVICHK timer1: CommutationInterrupt connected=True -> ?@1
+TVICHK timer1: CaptureCompareInterrupt connected=True -> sysbus.nvic@27
+TVICHK rcc: class Antmicro.Renode.Peripherals.Miscellaneous.STM32H7_RCC
+TVICHK rcc: parents sysbus
+TVICHK rcc: RCC registered 58: ADC12=sysbus.adcM1S2,ADC3=sysbus.adc3,BDMA=sysbus.bdma,CRC=sysbus.crc,DMA1=sysbus.dma1,DMA2=sysbus.dma2,DMA2D=sysbus.dma2d,ETH1MAC=sysbus.ethernet,GPIOA=sysbus.gpioPortA,GPIOB=sysbus.gpioPortB,GPIOC=sysbus.gpioPortC,GPIOD=sysbus.gpioPortD,GPIOE=sysbus.gpioPortE,GPIOF=sysbus.gpioPortF,GPIOG=sysbus.gpioPortG,GPIOH=sysbus.gpioPortH,GPIOI=sysbus.gpioPortI,GPIOJ=sysbus.gp
+TVICHK spiketimer: not in the machine
+TVICHK spikercc: not in the machine
+TVICHK tim1g: not in the machine
+TVICHK rccg: not in the machine
+TVICHK rccguard: not in the machine
+TVICHK sealed: STM32H7_RCC=True STM32_Timer=False
+TVICHK-END
+[00:00:00.000000000] [WARNING] rcc: Unhandled write to offset 0x50. Unhandled bits: [12] when writing value 0x1000. Tags: SPI123SEL (0x1).
+TVI1150-AFTER
+0xAF7E1150
+TVI1150-ISPR0
+0x02000000
+TVI1150-PSC-BEFORE-RESET
+0x00000005
+TVI1150-PSC-AFTER-TIM1RST
+0x00000000
+
+## vii-a2-wrapper-restated-hooked
+TVICHK at 0x40010000: sysbus.timer1 Antmicro.Renode.Peripherals.Timers.STM32_Timer
+TVICHK at 0x58024400: sysbus.rccg Antmicro.Renode.Peripherals.Tviburi1150.SpikeRcc
+TVICHK at 0x40017000: - -
+TVICHK at 0x58027000: - -
+TVICHK timer1: class Antmicro.Renode.Peripherals.Timers.STM32_Timer
+TVICHK timer1: parents sysbus
+TVICHK timer1: Frequency 250000000
+TVICHK timer1: Limit 65535
+TVICHK timer1: BreakInterrupt connected=True -> sysbus.nvic@24
+TVICHK timer1: UpdateInterrupt connected=True -> sysbus.nvic@25
+TVICHK timer1: TriggerInterrupt connected=True -> ?@0
+TVICHK timer1: CommutationInterrupt connected=True -> ?@1
+TVICHK timer1: CaptureCompareInterrupt connected=True -> sysbus.nvic@27
+TVICHK rcc: not in the machine
+TVICHK spiketimer: not in the machine
+TVICHK spikercc: not in the machine
+TVICHK tim1g: not in the machine
+TVICHK rccg: class Antmicro.Renode.Peripherals.Tviburi1150.SpikeRcc
+TVICHK rccg: parents sysbus
+TVICHK rccg: RCC registered 58: ADC12=sysbus.adcM1S2,ADC3=sysbus.adc3,BDMA=sysbus.bdma,CRC=sysbus.crc,DMA1=sysbus.dma1,DMA2=sysbus.dma2,DMA2D=sysbus.dma2d,ETH1MAC=sysbus.ethernet,GPIOA=sysbus.gpioPortA,GPIOB=sysbus.gpioPortB,GPIOC=sysbus.gpioPortC,GPIOD=sysbus.gpioPortD,GPIOE=sysbus.gpioPortE,GPIOF=sysbus.gpioPortF,GPIOG=sysbus.gpioPortG,GPIOH=sysbus.gpioPortH,GPIOI=sysbus.gpioPortI,GPIOJ=sysbus.g
+TVICHK rccguard: not in the machine
+TVICHK sealed: STM32H7_RCC=True STM32_Timer=False
+TVICHK-END
+[00:00:00.000000000] [INFO] rccg: WriteUInt32 to 0x54 (unknown), value 0x0
+[00:00:00.000000000] [WARNING] rccg: TVI1150-SPIKE SpikeRcc write offset=0x54 value=0x0 pc=none
+[00:00:00.000000000] [INFO] rccg: [cpu: 0x800001A] WriteUInt32 to 0xF0 (unknown), value 0x1
+[00:00:00.000000000] [WARNING] rccg: TVI1150-SPIKE SpikeRcc write offset=0xF0 value=0x1 pc=0x0800001A
+[00:00:00.000000000] [INFO] rccg: [cpu: 0x800001E] WriteUInt32 to 0x50 (unknown), value 0x1000
+[00:00:00.000000000] [WARNING] rccg: TVI1150-SPIKE SpikeRcc write offset=0x50 value=0x1000 pc=0x0800001E
+[00:00:00.000000000] [WARNING] Unhandled write to offset 0x50. Unhandled bits: [12] when writing value 0x1000. Tags: SPI123SEL (0x1).
+TVI1150-AFTER
+0xAF7E1150
+TVI1150-ISPR0
+0x02000000
+TVI1150-PSC-BEFORE-RESET
+0x00000005
+[00:00:00.000500000] [INFO] rccg: WriteUInt32 to 0x98 (unknown), value 0x1
+[00:00:00.000500000] [WARNING] rccg: TVI1150-SPIKE SpikeRcc write offset=0x98 value=0x1 pc=none
+[00:00:00.000500000] [INFO] rccg: WriteUInt32 to 0x98 (unknown), value 0x0
+[00:00:00.000500000] [WARNING] rccg: TVI1150-SPIKE SpikeRcc write offset=0x98 value=0x0 pc=none
+TVI1150-PSC-AFTER-TIM1RST
+0x00000000
+
+## vii-a-wrapper-restated
+TVICHK at 0x40010000: sysbus.timer1 Antmicro.Renode.Peripherals.Timers.STM32_Timer
+TVICHK at 0x58024400: sysbus.rccg Antmicro.Renode.Peripherals.Tviburi1150.SpikeRcc
+TVICHK at 0x40017000: - -
+TVICHK at 0x58027000: - -
+TVICHK timer1: class Antmicro.Renode.Peripherals.Timers.STM32_Timer
+TVICHK timer1: parents sysbus
+TVICHK timer1: Frequency 250000000
+TVICHK timer1: Limit 65535
+TVICHK timer1: BreakInterrupt connected=True -> sysbus.nvic@24
+TVICHK timer1: UpdateInterrupt connected=True -> sysbus.nvic@25
+TVICHK timer1: TriggerInterrupt connected=True -> ?@0
+TVICHK timer1: CommutationInterrupt connected=True -> ?@1
+TVICHK timer1: CaptureCompareInterrupt connected=True -> sysbus.nvic@27
+TVICHK rcc: not in the machine
+TVICHK spiketimer: not in the machine
+TVICHK spikercc: not in the machine
+TVICHK tim1g: not in the machine
+TVICHK rccg: class Antmicro.Renode.Peripherals.Tviburi1150.SpikeRcc
+TVICHK rccg: parents sysbus
+TVICHK rccg: RCC registered 58: ADC12=sysbus.adcM1S2,ADC3=sysbus.adc3,BDMA=sysbus.bdma,CRC=sysbus.crc,DMA1=sysbus.dma1,DMA2=sysbus.dma2,DMA2D=sysbus.dma2d,ETH1MAC=sysbus.ethernet,GPIOA=sysbus.gpioPortA,GPIOB=sysbus.gpioPortB,GPIOC=sysbus.gpioPortC,GPIOD=sysbus.gpioPortD,GPIOE=sysbus.gpioPortE,GPIOF=sysbus.gpioPortF,GPIOG=sysbus.gpioPortG,GPIOH=sysbus.gpioPortH,GPIOI=sysbus.gpioPortI,GPIOJ=sysbus.g
+TVICHK rccguard: not in the machine
+TVICHK sealed: STM32H7_RCC=True STM32_Timer=False
+TVICHK-END
+[00:00:00.000000000] [WARNING] rccg: TVI1150-SPIKE SpikeRcc write offset=0x54 value=0x0 pc=none
+[00:00:00.000000000] [WARNING] rccg: TVI1150-SPIKE SpikeRcc write offset=0xF0 value=0x1 pc=0x0800001A
+[00:00:00.000000000] [WARNING] rccg: TVI1150-SPIKE SpikeRcc write offset=0x50 value=0x1000 pc=0x0800001E
+[00:00:00.000000000] [WARNING] Unhandled write to offset 0x50. Unhandled bits: [12] when writing value 0x1000. Tags: SPI123SEL (0x1).
+TVI1150-AFTER
+0xAF7E1150
+TVI1150-ISPR0
+0x02000000
+TVI1150-PSC-BEFORE-RESET
+0x00000005
+[00:00:00.000500000] [WARNING] rccg: TVI1150-SPIKE SpikeRcc write offset=0x98 value=0x1 pc=none
+[00:00:00.000500000] [WARNING] rccg: TVI1150-SPIKE SpikeRcc write offset=0x98 value=0x0 pc=none
+TVI1150-PSC-AFTER-TIM1RST
+0x00000000
+
+## vii-b1-beside-moved
+[00:00:00.000000000] [WARNING] rcc: Unhandled write to offset 0x50. Unhandled bits: [12-13] when writing value 0x3000. Tags: SPI123SEL (0x3).
+TVICHK at 0x40010000: sysbus.timer1 Antmicro.Renode.Peripherals.Timers.STM32_Timer
+TVICHK at 0x58024400: sysbus.rccguard Antmicro.Renode.Peripherals.Tviburi1150.RccGuard
+TVICHK at 0x40017000: - -
+TVICHK at 0x58027000: sysbus.rcc Antmicro.Renode.Peripherals.Miscellaneous.STM32H7_RCC
+TVICHK timer1: class Antmicro.Renode.Peripherals.Timers.STM32_Timer
+TVICHK timer1: parents sysbus
+TVICHK timer1: Frequency 250000000
+TVICHK timer1: Limit 65535
+TVICHK timer1: BreakInterrupt connected=True -> sysbus.nvic@24
+TVICHK timer1: UpdateInterrupt connected=True -> sysbus.nvic@25
+TVICHK timer1: TriggerInterrupt connected=True -> ?@0
+TVICHK timer1: CommutationInterrupt connected=True -> ?@1
+TVICHK timer1: CaptureCompareInterrupt connected=True -> sysbus.nvic@27
+TVICHK rcc: class Antmicro.Renode.Peripherals.Miscellaneous.STM32H7_RCC
+TVICHK rcc: parents sysbus
+TVICHK rcc: RCC registered 58: ADC12=sysbus.adcM1S2,ADC3=sysbus.adc3,BDMA=sysbus.bdma,CRC=sysbus.crc,DMA1=sysbus.dma1,DMA2=sysbus.dma2,DMA2D=sysbus.dma2d,ETH1MAC=sysbus.ethernet,GPIOA=sysbus.gpioPortA,GPIOB=sysbus.gpioPortB,GPIOC=sysbus.gpioPortC,GPIOD=sysbus.gpioPortD,GPIOE=sysbus.gpioPortE,GPIOF=sysbus.gpioPortF,GPIOG=sysbus.gpioPortG,GPIOH=sysbus.gpioPortH,GPIOI=sysbus.gpioPortI,GPIOJ=sysbus.gp
+TVICHK spiketimer: not in the machine
+TVICHK spikercc: not in the machine
+TVICHK tim1g: not in the machine
+TVICHK rccg: not in the machine
+TVICHK rccguard: class Antmicro.Renode.Peripherals.Tviburi1150.RccGuard
+TVICHK rccguard: parents sysbus
+TVICHK sealed: STM32H7_RCC=True STM32_Timer=False
+TVICHK-END
+[00:00:00.000000000] [WARNING] rccguard: TVI1150-SPIKE RccGuard write offset=0x54 value=0x0 pc=none
+[00:00:00.000000000] [WARNING] rccguard: TVI1150-SPIKE RccGuard write offset=0xF0 value=0x1 pc=0x0800001A
+[00:00:00.000000000] [WARNING] rccguard: TVI1150-SPIKE RccGuard write offset=0x50 value=0x1000 pc=0x0800001E
+[00:00:00.000000000] [WARNING] rcc: Unhandled write to offset 0x50. Unhandled bits: [12] when writing value 0x1000. Tags: SPI123SEL (0x1).
+TVI1150-AFTER
+0xAF7E1150
+TVI1150-ISPR0
+0x02000000
+TVI1150-PSC-BEFORE-RESET
+0x00000005
+[00:00:00.000500000] [WARNING] rccguard: TVI1150-SPIKE RccGuard write offset=0x98 value=0x1 pc=none
+[00:00:00.000500000] [WARNING] rccguard: TVI1150-SPIKE RccGuard write offset=0x98 value=0x0 pc=none
+TVI1150-PSC-AFTER-TIM1RST
+0x00000000
+
+## vii-b2-beside-narrowed
+TVICHK at 0x40010000: sysbus.timer1 Antmicro.Renode.Peripherals.Timers.STM32_Timer
+TVICHK at 0x58024400: sysbus.rcc Antmicro.Renode.Peripherals.Miscellaneous.STM32H7_RCC
+TVICHK at 0x40017000: - -
+TVICHK at 0x58027000: - -
+TVICHK timer1: class Antmicro.Renode.Peripherals.Timers.STM32_Timer
+TVICHK timer1: parents sysbus
+TVICHK timer1: Frequency 250000000
+TVICHK timer1: Limit 65535
+TVICHK timer1: BreakInterrupt connected=True -> sysbus.nvic@24
+TVICHK timer1: UpdateInterrupt connected=True -> sysbus.nvic@25
+TVICHK timer1: TriggerInterrupt connected=True -> ?@0
+TVICHK timer1: CommutationInterrupt connected=True -> ?@1
+TVICHK timer1: CaptureCompareInterrupt connected=True -> sysbus.nvic@27
+TVICHK rcc: class Antmicro.Renode.Peripherals.Miscellaneous.STM32H7_RCC
+TVICHK rcc: parents sysbus
+TVICHK rcc: RCC registered 58: ADC12=sysbus.adcM1S2,ADC3=sysbus.adc3,BDMA=sysbus.bdma,CRC=sysbus.crc,DMA1=sysbus.dma1,DMA2=sysbus.dma2,DMA2D=sysbus.dma2d,ETH1MAC=sysbus.ethernet,GPIOA=sysbus.gpioPortA,GPIOB=sysbus.gpioPortB,GPIOC=sysbus.gpioPortC,GPIOD=sysbus.gpioPortD,GPIOE=sysbus.gpioPortE,GPIOF=sysbus.gpioPortF,GPIOG=sysbus.gpioPortG,GPIOH=sysbus.gpioPortH,GPIOI=sysbus.gpioPortI,GPIOJ=sysbus.gp
+TVICHK spiketimer: not in the machine
+TVICHK spikercc: not in the machine
+TVICHK tim1g: not in the machine
+TVICHK rccg: not in the machine
+TVICHK rccguard: class Antmicro.Renode.Peripherals.Tviburi1150.RccGuard
+TVICHK rccguard: parents sysbus
+TVICHK sealed: STM32H7_RCC=True STM32_Timer=False
+TVICHK-END
+[00:00:00.000000000] [WARNING] rccguard: TVI1150-SPIKE RccGuard write offset=0x54 value=0x0 pc=none
+[00:00:00.000000000] [WARNING] rccguard: TVI1150-SPIKE RccGuard write offset=0xF0 value=0x1 pc=0x0800001A
+[00:00:00.000000000] [WARNING] rccguard: TVI1150-SPIKE RccGuard write offset=0x50 value=0x1000 pc=0x0800001E
+[00:00:00.000000000] [WARNING] rcc: Unhandled write to offset 0x50. Unhandled bits: [12] when writing value 0x1000. Tags: SPI123SEL (0x1).
+TVI1150-AFTER
+0xAF7E1150
+TVI1150-ISPR0
+0x02000000
+TVI1150-PSC-BEFORE-RESET
+0x00000005
+[00:00:00.000500000] [WARNING] rccguard: TVI1150-SPIKE RccGuard write offset=0x98 value=0x1 pc=none
+[00:00:00.000500000] [WARNING] rccguard: TVI1150-SPIKE RccGuard write offset=0x98 value=0x0 pc=none
+TVI1150-PSC-AFTER-TIM1RST
+0x00000000
+
+## vii-b3-beside-moved-hooked
+TVICHK at 0x40010000: sysbus.timer1 Antmicro.Renode.Peripherals.Timers.STM32_Timer
+TVICHK at 0x58024400: sysbus.rccguard Antmicro.Renode.Peripherals.Tviburi1150.RccGuard
+TVICHK at 0x40017000: - -
+TVICHK at 0x58027000: sysbus.rcc Antmicro.Renode.Peripherals.Miscellaneous.STM32H7_RCC
+TVICHK timer1: class Antmicro.Renode.Peripherals.Timers.STM32_Timer
+TVICHK timer1: parents sysbus
+TVICHK timer1: Frequency 250000000
+TVICHK timer1: Limit 65535
+TVICHK timer1: BreakInterrupt connected=True -> sysbus.nvic@24
+TVICHK timer1: UpdateInterrupt connected=True -> sysbus.nvic@25
+TVICHK timer1: TriggerInterrupt connected=True -> ?@0
+TVICHK timer1: CommutationInterrupt connected=True -> ?@1
+TVICHK timer1: CaptureCompareInterrupt connected=True -> sysbus.nvic@27
+TVICHK rcc: class Antmicro.Renode.Peripherals.Miscellaneous.STM32H7_RCC
+TVICHK rcc: parents sysbus
+TVICHK rcc: RCC registered 58: ADC12=sysbus.adcM1S2,ADC3=sysbus.adc3,BDMA=sysbus.bdma,CRC=sysbus.crc,DMA1=sysbus.dma1,DMA2=sysbus.dma2,DMA2D=sysbus.dma2d,ETH1MAC=sysbus.ethernet,GPIOA=sysbus.gpioPortA,GPIOB=sysbus.gpioPortB,GPIOC=sysbus.gpioPortC,GPIOD=sysbus.gpioPortD,GPIOE=sysbus.gpioPortE,GPIOF=sysbus.gpioPortF,GPIOG=sysbus.gpioPortG,GPIOH=sysbus.gpioPortH,GPIOI=sysbus.gpioPortI,GPIOJ=sysbus.gp
+TVICHK spiketimer: not in the machine
+TVICHK spikercc: not in the machine
+TVICHK tim1g: not in the machine
+TVICHK rccg: not in the machine
+TVICHK rccguard: class Antmicro.Renode.Peripherals.Tviburi1150.RccGuard
+TVICHK rccguard: parents sysbus
+TVICHK sealed: STM32H7_RCC=True STM32_Timer=False
+TVICHK-END
+[00:00:00.000000000] [INFO] rccguard: WriteUInt32 to 0x54 (unknown), value 0x0
+[00:00:00.000000000] [WARNING] rccguard: TVI1150-SPIKE RccGuard write offset=0x54 value=0x0 pc=none
+[00:00:00.000000000] [INFO] rccguard: [cpu: 0x800001A] WriteUInt32 to 0xF0 (unknown), value 0x1
+[00:00:00.000000000] [WARNING] rccguard: TVI1150-SPIKE RccGuard write offset=0xF0 value=0x1 pc=0x0800001A
+[00:00:00.000000000] [INFO] rccguard: [cpu: 0x800001E] WriteUInt32 to 0x50 (unknown), value 0x1000
+[00:00:00.000000000] [WARNING] rccguard: TVI1150-SPIKE RccGuard write offset=0x50 value=0x1000 pc=0x0800001E
+[00:00:00.000000000] [WARNING] rcc: Unhandled write to offset 0x50. Unhandled bits: [12] when writing value 0x1000. Tags: SPI123SEL (0x1).
+TVI1150-AFTER
+0xAF7E1150
+TVI1150-ISPR0
+0x02000000
+TVI1150-PSC-BEFORE-RESET
+0x00000005
+[00:00:00.000500000] [INFO] rccguard: WriteUInt32 to 0x98 (unknown), value 0x1
+[00:00:00.000500000] [WARNING] rccguard: TVI1150-SPIKE RccGuard write offset=0x98 value=0x1 pc=none
+[00:00:00.000500000] [INFO] rccguard: WriteUInt32 to 0x98 (unknown), value 0x0
+[00:00:00.000500000] [WARNING] rccguard: TVI1150-SPIKE RccGuard write offset=0x98 value=0x0 pc=none
+TVI1150-PSC-AFTER-TIM1RST
+0x00000000
+
+## vii-c1-hook-only
+TVICHK at 0x40010000: sysbus.timer1 Antmicro.Renode.Peripherals.Timers.STM32_Timer
+TVICHK at 0x58024400: sysbus.rcc Antmicro.Renode.Peripherals.Miscellaneous.STM32H7_RCC
+TVICHK at 0x40017000: - -
+TVICHK at 0x58027000: - -
+TVICHK timer1: class Antmicro.Renode.Peripherals.Timers.STM32_Timer
+TVICHK timer1: parents sysbus
+TVICHK timer1: Frequency 250000000
+TVICHK timer1: Limit 65535
+TVICHK timer1: BreakInterrupt connected=True -> sysbus.nvic@24
+TVICHK timer1: UpdateInterrupt connected=True -> sysbus.nvic@25
+TVICHK timer1: TriggerInterrupt connected=True -> ?@0
+TVICHK timer1: CommutationInterrupt connected=True -> ?@1
+TVICHK timer1: CaptureCompareInterrupt connected=True -> sysbus.nvic@27
+TVICHK rcc: class Antmicro.Renode.Peripherals.Miscellaneous.STM32H7_RCC
+TVICHK rcc: parents sysbus
+TVICHK rcc: RCC registered 58: ADC12=sysbus.adcM1S2,ADC3=sysbus.adc3,BDMA=sysbus.bdma,CRC=sysbus.crc,DMA1=sysbus.dma1,DMA2=sysbus.dma2,DMA2D=sysbus.dma2d,ETH1MAC=sysbus.ethernet,GPIOA=sysbus.gpioPortA,GPIOB=sysbus.gpioPortB,GPIOC=sysbus.gpioPortC,GPIOD=sysbus.gpioPortD,GPIOE=sysbus.gpioPortE,GPIOF=sysbus.gpioPortF,GPIOG=sysbus.gpioPortG,GPIOH=sysbus.gpioPortH,GPIOI=sysbus.gpioPortI,GPIOJ=sysbus.gp
+TVICHK spiketimer: not in the machine
+TVICHK spikercc: not in the machine
+TVICHK tim1g: not in the machine
+TVICHK rccg: not in the machine
+TVICHK rccguard: not in the machine
+TVICHK sealed: STM32H7_RCC=True STM32_Timer=False
+TVICHK-END
+[00:00:00.000000000] [WARNING] rcc: TVI1150-HOOK rcc write offset=0x54 value=0x0 pc=none
+[00:00:00.000000000] [WARNING] rcc: TVI1150-HOOK rcc write offset=0xF0 value=0x1 pc=0x0800001A
+[00:00:00.000000000] [WARNING] rcc: TVI1150-HOOK rcc write offset=0x50 value=0x1000 pc=0x0800001E
+[00:00:00.000000000] [WARNING] rcc: Unhandled write to offset 0x50. Unhandled bits: [12] when writing value 0x1000. Tags: SPI123SEL (0x1).
+TVI1150-AFTER
+0xAF7E1150
+TVI1150-ISPR0
+0x02000000
+TVI1150-PSC-BEFORE-RESET
+0x00000005
+[00:00:00.000500000] [WARNING] rcc: TVI1150-HOOK rcc write offset=0x98 value=0x1 pc=none
+[00:00:00.000500000] [WARNING] rcc: TVI1150-HOOK rcc write offset=0x98 value=0x0 pc=none
+TVI1150-PSC-AFTER-TIM1RST
+0x00000000
+
+## vii-c2-hook-then-logging
+TVICHK at 0x40010000: sysbus.timer1 Antmicro.Renode.Peripherals.Timers.STM32_Timer
+TVICHK at 0x58024400: sysbus.rcc Antmicro.Renode.Peripherals.Miscellaneous.STM32H7_RCC
+TVICHK at 0x40017000: - -
+TVICHK at 0x58027000: - -
+TVICHK timer1: class Antmicro.Renode.Peripherals.Timers.STM32_Timer
+TVICHK timer1: parents sysbus
+TVICHK timer1: Frequency 250000000
+TVICHK timer1: Limit 65535
+TVICHK timer1: BreakInterrupt connected=True -> sysbus.nvic@24
+TVICHK timer1: UpdateInterrupt connected=True -> sysbus.nvic@25
+TVICHK timer1: TriggerInterrupt connected=True -> ?@0
+TVICHK timer1: CommutationInterrupt connected=True -> ?@1
+TVICHK timer1: CaptureCompareInterrupt connected=True -> sysbus.nvic@27
+TVICHK rcc: class Antmicro.Renode.Peripherals.Miscellaneous.STM32H7_RCC
+TVICHK rcc: parents sysbus
+TVICHK rcc: RCC registered 58: ADC12=sysbus.adcM1S2,ADC3=sysbus.adc3,BDMA=sysbus.bdma,CRC=sysbus.crc,DMA1=sysbus.dma1,DMA2=sysbus.dma2,DMA2D=sysbus.dma2d,ETH1MAC=sysbus.ethernet,GPIOA=sysbus.gpioPortA,GPIOB=sysbus.gpioPortB,GPIOC=sysbus.gpioPortC,GPIOD=sysbus.gpioPortD,GPIOE=sysbus.gpioPortE,GPIOF=sysbus.gpioPortF,GPIOG=sysbus.gpioPortG,GPIOH=sysbus.gpioPortH,GPIOI=sysbus.gpioPortI,GPIOJ=sysbus.gp
+TVICHK spiketimer: not in the machine
+TVICHK spikercc: not in the machine
+TVICHK tim1g: not in the machine
+TVICHK rccg: not in the machine
+TVICHK rccguard: not in the machine
+TVICHK sealed: STM32H7_RCC=True STM32_Timer=False
+TVICHK-END
+[00:00:00.000000000] [INFO] rcc: WriteUInt32 to 0x54 (Domain2KernelClockConfigurationHigh), value 0x0
+[00:00:00.000000000] [WARNING] rcc: TVI1150-HOOK rcc write offset=0x54 value=0x0 pc=none
+[00:00:00.000000000] [INFO] rcc: [cpu: 0x800001A] WriteUInt32 to 0xF0 (APB2Clock), value 0x1
+[00:00:00.000000000] [WARNING] rcc: TVI1150-HOOK rcc write offset=0xF0 value=0x1 pc=0x0800001A
+[00:00:00.000000000] [INFO] rcc: [cpu: 0x800001E] WriteUInt32 to 0x50 (Domain2KernelClockConfigurationLow), value 0x1000
+[00:00:00.000000000] [WARNING] rcc: TVI1150-HOOK rcc write offset=0x50 value=0x1000 pc=0x0800001E
+[00:00:00.000000000] [WARNING] rcc: Unhandled write to offset 0x50. Unhandled bits: [12] when writing value 0x1000. Tags: SPI123SEL (0x1).
+TVI1150-AFTER
+0xAF7E1150
+TVI1150-ISPR0
+0x02000000
+TVI1150-PSC-BEFORE-RESET
+0x00000005
+[00:00:00.000500000] [INFO] rcc: WriteUInt32 to 0x98 (APB2Reset), value 0x1
+[00:00:00.000500000] [WARNING] rcc: TVI1150-HOOK rcc write offset=0x98 value=0x1 pc=none
+[00:00:00.000500000] [INFO] rcc: WriteUInt32 to 0x98 (APB2Reset), value 0x0
+[00:00:00.000500000] [WARNING] rcc: TVI1150-HOOK rcc write offset=0x98 value=0x0 pc=none
+TVI1150-PSC-AFTER-TIM1RST
+0x00000000
+
+## vii-c3-hook-then-second-hook
+TVICHK at 0x40010000: sysbus.timer1 Antmicro.Renode.Peripherals.Timers.STM32_Timer
+TVICHK at 0x58024400: sysbus.rcc Antmicro.Renode.Peripherals.Miscellaneous.STM32H7_RCC
+TVICHK at 0x40017000: - -
+TVICHK at 0x58027000: - -
+TVICHK timer1: class Antmicro.Renode.Peripherals.Timers.STM32_Timer
+TVICHK timer1: parents sysbus
+TVICHK timer1: Frequency 250000000
+TVICHK timer1: Limit 65535
+TVICHK timer1: BreakInterrupt connected=True -> sysbus.nvic@24
+TVICHK timer1: UpdateInterrupt connected=True -> sysbus.nvic@25
+TVICHK timer1: TriggerInterrupt connected=True -> ?@0
+TVICHK timer1: CommutationInterrupt connected=True -> ?@1
+TVICHK timer1: CaptureCompareInterrupt connected=True -> sysbus.nvic@27
+TVICHK rcc: class Antmicro.Renode.Peripherals.Miscellaneous.STM32H7_RCC
+TVICHK rcc: parents sysbus
+TVICHK rcc: RCC registered 58: ADC12=sysbus.adcM1S2,ADC3=sysbus.adc3,BDMA=sysbus.bdma,CRC=sysbus.crc,DMA1=sysbus.dma1,DMA2=sysbus.dma2,DMA2D=sysbus.dma2d,ETH1MAC=sysbus.ethernet,GPIOA=sysbus.gpioPortA,GPIOB=sysbus.gpioPortB,GPIOC=sysbus.gpioPortC,GPIOD=sysbus.gpioPortD,GPIOE=sysbus.gpioPortE,GPIOF=sysbus.gpioPortF,GPIOG=sysbus.gpioPortG,GPIOH=sysbus.gpioPortH,GPIOI=sysbus.gpioPortI,GPIOJ=sysbus.gp
+TVICHK spiketimer: not in the machine
+TVICHK spikercc: not in the machine
+TVICHK tim1g: not in the machine
+TVICHK rccg: not in the machine
+TVICHK rccguard: not in the machine
+TVICHK sealed: STM32H7_RCC=True STM32_Timer=False
+TVICHK-END
+[00:00:00.000000000] [WARNING] rcc: Unhandled write to offset 0x50. Unhandled bits: [12] when writing value 0x1000. Tags: SPI123SEL (0x1).
+TVI1150-AFTER
+0xAF7E1150
+TVI1150-ISPR0
+0x02000000
+TVI1150-PSC-BEFORE-RESET
+0x00000005
+TVI1150-PSC-AFTER-TIM1RST
+0x00000000
