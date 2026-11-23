@@ -8,7 +8,7 @@
   - no valid path refuses (both firmwares, all 15 boots);
   - the package is declared;
   - the memory is judged in CI per 18:30Z, and passes locally as a proxy (§3).
-- **STOPPED at 19:57Z: CI cannot meet the memory bound** (§3), as the 18:30Z ruling requires me to report.
+- **STOPPED at 19:57Z: CI could not meet the memory bound** (§3). **Measured as ruled at 20:20Z** (§3a); the decision is Scotty's.
 - **Ruled at 19:47Z:** F1 (follow-up `TVI-WO-1301a`), F5 kept, the harness deleted, rows (§5). The merge order: 1300a (#21) first, then `main` merged here, the suite rerun, and CI re-measuring the combined file.
 - Steering documents, `README.md`, `docs/reviews/` and Aethelgard are untouched. `model/Refusal.cs` changed only as granted at 19:08Z (Q1). One PR, left unmerged.
 
@@ -62,6 +62,22 @@
 **Mutants:** G01–G24, each killed by its named case (`tests/mutants.sh` on exports of `3ec764c` and `025b6e4`).
 
 **Suites:** see §7.
+
+## 3a. The memory, measured in CI as ruled (20:20Z)
+
+**CI run 45257810560, head `e831735`.** A temporary step, `tests/1301/ci-memory-gc.sh`, removed before READY, ran five full ArduPilot boots per configuration, interleaved. The ELF was `a799dfb6` again.
+
+| Configuration | Peaks (KiB), runs 1–5 | Wall (s) | 5 of 5 ≤ 1,015,808? |
+|---|---|---|---|
+| base: `main` `bf7fb36`'s one file, GPIO stock | 980,288; 969,316; 977,208; 960,768; 960,464 | 13.3–14.2 | yes (max 980,288) |
+| base-gc | 982,220; 981,004; 972,768; 978,728; 972,368 | 13.5–14.1 | yes (max 982,220) |
+| 1301 | 989,328; 978,280; 988,472; 989,224; 973,560 | 13.1–14.1 | yes (max 989,328) |
+| 1301-gc | 1,000,328; 1,000,212; 974,968; 973,636; 981,788 | 13.7–14.6 | yes (max 1,000,328) |
+
+- **The regular memory step** in the same run (1301) **passed**: 980,536; 981,432; 973,928; 972,420; 970,364 KiB.
+- **The GC settings:** `DOTNET_gcServer=0`, `DOTNET_gcConcurrent=0`, `DOTNET_GCConserveMemory=9`. Renode is a self-contained .NET 8 application, and its CoreCLR reads `DOTNET_*` at start. The runtime's own report, from inside Renode, shows them applied: `ServerGC=False ConcurrentGC=False GCConserveMem=9 LatencyMode=Batch`, where the default is `ConcurrentGC=True GCConserveMem=0 Interactive`. **They lower nothing:** the medians are equal or a few MiB higher.
+- **The same code failed a run earlier** (45249617507: 1,018,148 to 1,049,556 KiB at 18.9–20.3 s a boot). This runner took 13–14 s a boot, and every configuration, `main` included, peaked about 30–40 MiB lower. **The peak follows the runner's speed** (as §8 found on Furnace, r = 0.978). On this runner, 1301 costs about 10 MiB over `main` at the median, and the margin is about 26 MiB at the worst run.
+- **For Scotty (northstar §6; `RUL-09` (a)):** the bound is judged on whatever runner GitHub gives, and runners vary. `main` alone was not measured on the slow runner. **Inferred, not measured:** the slow run's 1301 peaks less about 10 MiB give about 1,007,900 to 1,039,300 KiB, so `main` alone would likely have failed the 32 MiB-spare limit there too.
 
 ## 4. The adversarial pass (WO §5)
 
