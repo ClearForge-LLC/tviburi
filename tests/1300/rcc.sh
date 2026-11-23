@@ -6,14 +6,14 @@
 #   TVIBURI_CI=1                      plain `podman run`, for a disposable CI runner only; elsewhere ~/bin/capped-run.
 # Exit 0 only if every selected case passed.
 #
-# The kernel-clock query is asked at SPI1's start by a test-only bus hook on spi1 (a CR1 write with SPE set calls
-# rcc.RequireKernelClock), because wiring it into the SPI guard is TVI-WO-1300a's. A hook is not a guard (RUL-07); here
-# it only exercises the query, with the store's own PC.
+# TVI-WO-1300a: SPI1's guard asks the RCC guard's query at its own start (TVI-SPI-KERNEL) and for its enable at every
+# access (TVI-SPI-ENABLE); the RCC guard refuses a write that stops a running SPI1's kernel clock (TVI-RCC-CLOCK). USART2
+# has no guard yet, so its case still asks the query through a test-only hook (a hook is not a guard, RUL-07).
 set -euo pipefail
 
 here=$(cd "$(dirname "$0")/../.." && pwd)
 IMAGE=$(sed -n 's/^IMAGE=//p' "$here/tests/spike.sh")
-CASES="scar switch stuck clocked switched alias field pll divq pllref divm0 sw width read usart2 uncovered fields reset resetfwd spi1rst alias17c registrations hse16 recorded recordedfield ardupilot gen-s03 gen-hc16 oscclear oscsys rsrbyte misaligned ledger"
+CASES="scar switch stuck clocked switched alias field pll divq pllref divm0 sw width read usart2 uncovered fields reset resetfwd spi1rst alias17c registrations hse16 recorded recordedfield ardupilot gen-s03 gen-hc16 oscclear oscsys rsrbyte misaligned ledger unenabled tim2 lost-pll lost-sel lost-en lost-osc lost-ckper stopped ckper-live blocked cfg2same sel5 divr pll1src kernelq"
 scratch=${TVIBURI_SCRATCH:-$HOME/.cache/tviburi}
 mkdir -p "$scratch"
 work=$(mktemp -d "$scratch/rcc.XXXXXX")
@@ -59,7 +59,7 @@ run_case() { # run_case <name> <firmware path or -> <monitor lines...>
     cargo build --quiet --offline --locked --manifest-path /repo/tools/tviburi-check/Cargo.toml --target-dir /out/target || exit 90
     if [ "$1" != - ]; then
       rustc --edition 2021 --target thumbv7em-none-eabihf -C opt-level=s -C panic=abort -C debuginfo=0 --cfg "path=\"$1\"" \
-        --check-cfg "cfg(path, values(\"clocked\",\"scar\",\"switch\",\"stuck\",\"switched\",\"alias\",\"field\",\"pll\",\"divq\",\"pllref\",\"divm0\",\"sw\",\"width\",\"read\",\"usart2\",\"ardupilot\",\"gen-s03\",\"gen-hc16\"))" \
+        --check-cfg "cfg(path, values(\"clocked\",\"scar\",\"switch\",\"stuck\",\"switched\",\"alias\",\"field\",\"pll\",\"divq\",\"pllref\",\"divm0\",\"sw\",\"width\",\"read\",\"usart2\",\"ardupilot\",\"gen-s03\",\"gen-hc16\",\"unenabled\",\"lost-pll\",\"lost-sel\",\"lost-en\",\"lost-osc\",\"lost-ckper\",\"stopped\",\"ckper-live\",\"blocked\",\"cfg2same\",\"sel5\",\"divr\"))" \
         -C link-arg=-T/repo/firmware/link.x -o /out/fw.elf /repo/firmware/rcc.rs || exit 91
     fi
     timeout 120 renode --disable-gui --console --plain /out/run.resc </dev/null >/out/renode.out 2>&1
@@ -79,7 +79,6 @@ sys.exit(0 if eval(sys.argv[2]) else 1)
 
 console() { "$src/scripts/monitor-output" "$work/$1/renode.out"; }
 
-hook='sysbus SetHookBeforePeripheralWrite sysbus.spi1 "offset == 0 and (value & 1) and machine[\"sysbus.rcc\"].RequireKernelClock(\"spi1\", \"CR1.SPE\")"'
 run='emulation RunFor "0.001"'
 after='sysbus ReadDoubleWord 0x20000104'
 
@@ -90,35 +89,35 @@ first_kernel() { # first_kernel <name> <python expr over r, the first refusal>
 for t in ${TVIBURI_TESTS:-$CASES}; do
   case $t in
   scar)
-    run_case scar scar "$hook" "$run"
-    check "scar: SPI1 started with SPI123SEL on pll1_q_ck and PLL1 off refuses, predicted-fault, naming the selector, the source and the pages" \
-      "[ \$rc = 3 ] && first_kernel scar 'r[\"rule\"] == \"TVI-RCC-KERNEL\" and r[\"kind\"] == \"predicted-fault\" and r[\"bit\"] == \"RCC_D2CCIP1R.SPI123SEL = 000\" and \"pll1_q_ck\" in r[\"condition\"] and \"PLL1ON = 0\" in r[\"condition\"] and \"p414\" in r[\"citation\"] and \"p371-372\" in r[\"citation\"] and r[\"access\"][\"pc\"] != \"none\"'" ;;
+    run_case scar scar "$run"
+    check "scar: SPI1 started with SPI123SEL on pll1_q_ck and PLL1 off refuses at SPI1 (TVI-SPI-KERNEL), predicted-fault, naming the selector, the source and the pages" \
+      "[ \$rc = 3 ] && first_kernel scar 'r[\"rule\"] == \"TVI-SPI-KERNEL\" and r[\"peripheral\"] == \"sysbus.spi1\" and r[\"kind\"] == \"predicted-fault\" and r[\"bit\"] == \"RCC_D2CCIP1R.SPI123SEL = 000\" and \"pll1_q_ck\" in r[\"condition\"] and \"PLL1ON = 0\" in r[\"condition\"] and \"p414\" in r[\"citation\"] and \"p371-372\" in r[\"citation\"] and r[\"access\"][\"pc\"] != \"none\"'" ;;
   switch)
-    run_case switch switch "$hook" "$run"
+    run_case switch switch "$run"
     check "switch: SPI123SEL to pll2_p_ck with PLL2 off: the mux cannot switch, predicted-fault (p371)" \
-      "[ \$rc = 3 ] && first_kernel switch 'r[\"kind\"] == \"predicted-fault\" and \"has not switched from pll1_q_ck\" in r[\"condition\"] and \"pll2_p_ck\" in r[\"condition\"]'" ;;
+      "[ \$rc = 3 ] && first_kernel switch 'r[\"rule\"] == \"TVI-SPI-KERNEL\" and r[\"kind\"] == \"predicted-fault\" and \"has not switched from pll1_q_ck\" in r[\"condition\"] and \"pll2_p_ck\" in r[\"condition\"]'" ;;
   stuck)
-    run_case stuck stuck "$hook" "$run"
+    run_case stuck stuck "$run"
     check "stuck: SPI123SEL to per_ck (running) while the input pll1_q_ck never ran: no clock, predicted-fault (p371-372)" \
-      "[ \$rc = 3 ] && first_kernel stuck 'r[\"kind\"] == \"predicted-fault\" and r[\"bit\"] == \"RCC_D2CCIP1R.SPI123SEL = 100\" and \"has not switched from pll1_q_ck\" in r[\"condition\"] and \"per_ck\" in r[\"condition\"]'" ;;
+      "[ \$rc = 3 ] && first_kernel stuck 'r[\"rule\"] == \"TVI-SPI-KERNEL\" and r[\"kind\"] == \"predicted-fault\" and r[\"bit\"] == \"RCC_D2CCIP1R.SPI123SEL = 100\" and \"has not switched from pll1_q_ck\" in r[\"condition\"] and \"per_ck\" in r[\"condition\"]'" ;;
   clocked)
-    run_case clocked clocked "$hook" "$run" 'echo "TVIBURI-MARK-AFTER"' "$after"
+    run_case clocked clocked "$run" 'echo "TVIBURI-MARK-AFTER"' "$after"
     check "clocked: PLL1 started, SPI1 starts on pll1_q_ck: a pass, the firmware past its last write" \
       "[ \$rc = 0 ] && grep -qx 'CHECK PASS' '$work/clocked.stdout' && console clocked | grep -A1 -x 'TVIBURI-MARK-AFTER' | tail -n1 | grep -qx '0xAF7E0002'" ;;
   switched)
-    run_case switched switched "$hook" "$run" 'echo "TVIBURI-MARK-AFTER"' "$after"
+    run_case switched switched "$run" 'echo "TVIBURI-MARK-AFTER"' "$after"
     check "switched: PLL1 running, then SPI123SEL to per_ck: the mux switches, a pass" \
       "[ \$rc = 0 ] && grep -qx 'CHECK PASS' '$work/switched.stdout' && console switched | grep -A1 -x 'TVIBURI-MARK-AFTER' | tail -n1 | grep -qx '0xAF7E0002'" ;;
   alias)
-    run_case alias alias "$hook" "$run" 'echo "TVIBURI-MARK-AFTER"' "$after"
+    run_case alias alias "$run" 'echo "TVIBURI-MARK-AFTER"' "$after"
     check "alias: SPI1EN through RCC_C1_APB2ENR (0x150) is the same register (p382): a pass" \
       "[ \$rc = 0 ] && grep -qx 'CHECK PASS' '$work/alias.stdout' && console alias | grep -A1 -x 'TVIBURI-MARK-AFTER' | tail -n1 | grep -qx '0xAF7E0002'" ;;
   field)
-    run_case field field "$hook" "$run"
+    run_case field field "$run"
     check "field: SPI123SEL = 011 (I2S_CKIN, not modeled) refuses, TVI-RCC-FIELD, unmodeled" \
       "[ \$rc = 3 ] && first_kernel field 'r[\"rule\"] == \"TVI-RCC-FIELD\" and r[\"kind\"] == \"unmodeled\" and \"SPI123SEL\" in r[\"bit\"]'" ;;
   pll)
-    run_case pll pll "$hook" "$run"
+    run_case pll pll "$run"
     check "pll: DIVQ1EN cleared while PLL1 is on refuses, TVI-RCC-PLL, predicted-fault (p401)" \
       "[ \$rc = 3 ] && first_kernel pll 'r[\"rule\"] == \"TVI-RCC-PLL\" and r[\"bit\"] == \"DIVP1EN/DIVQ1EN/DIVR1EN\" and r[\"kind\"] == \"predicted-fault\" and \"p400-401\" in r[\"citation\"]'" ;;
   fields)
@@ -133,13 +132,13 @@ for t in ${TVIBURI_TESTS:-$CASES}; do
       'sysbus WriteDoubleWord 0x58024498 0x1' 'sysbus WriteDoubleWord 0x58024498 0x0' 'echo "R-TIM1-AFTER"' 'sysbus ReadDoubleWord 0x40010028' \
       'sysbus SetHookBeforePeripheralWrite sysbus.rcc "print(\"R-HOOK\")"' 'sysbus LogPeripheralAccess sysbus.rcc true' \
       'sysbus WriteDoubleWord 0x58024454 0x00000100' 'echo "R-AFTER-HOOK"' 'sysbus ReadDoubleWord 0x58024454' \
-      'sysbus WriteDoubleWord 0x580244F0 0x0' 'sysbus WriteDoubleWord 0x40013010 0x40'
-    check "reset: TIM1RST through the guard resets TIM1 (PSC 5 -> 0; RM0433 Rev 9 §8.7.35 p442); a hook and logging on the guard do not displace it; an unclocked SPI1 locks" \
-      "[ \$rc = 0 ] && console reset | grep -A1 -x 'R-TIM1-BEFORE' | tail -n1 | grep -qx '0x00000005' && console reset | grep -A1 -x 'R-TIM1-AFTER' | tail -n1 | grep -qx '0x00000000' && console reset | grep -A1 -x 'R-AFTER-HOOK' | tail -n1 | grep -qx '0x00000100' && grep -q 'R-HOOK' '$work/reset/renode.out' && grep -q 'Tried to write a locked peripheral' '$work/reset/renode.out'" ;;
+      'sysbus WriteDoubleWord 0x580244F0 0x0' 'sysbus WriteDoubleWord 0x40010028 0x7' 'echo "R-TIM1-LOCKED"' 'sysbus ReadDoubleWord 0x40010028'
+    check "reset: TIM1RST through the guard resets TIM1 (PSC 5 -> 0; RM0433 Rev 9 §8.7.35 p442); a hook and logging on the guard do not displace it; TIM1 with TIM1EN cleared locks (reads 0, the write dropped)" \
+      "[ \$rc = 0 ] && console reset | grep -A1 -x 'R-TIM1-BEFORE' | tail -n1 | grep -qx '0x00000005' && console reset | grep -A1 -x 'R-TIM1-AFTER' | tail -n1 | grep -qx '0x00000000' && console reset | grep -A1 -x 'R-AFTER-HOOK' | tail -n1 | grep -qx '0x00000100' && grep -q 'R-HOOK' '$work/reset/renode.out' && console reset | grep -A1 -x 'R-TIM1-LOCKED' | tail -n1 | grep -qx '0x00000000' && grep -q 'Tried to write a locked peripheral: machine-0.timer1' '$work/reset/renode.out'" ;;
   divq)
-    run_case divq divq "$hook" "$run"
+    run_case divq divq "$run"
     check "divq: PLL1 started with DIVQ1EN = 0: pll1_q_ck is disabled, SPI1 starts with no kernel clock, predicted-fault (p401)" \
-      "[ \$rc = 3 ] && first_kernel divq 'r[\"kind\"] == \"predicted-fault\" and \"DIVQ1EN = 0\" in r[\"condition\"]'" ;;
+      "[ \$rc = 3 ] && first_kernel divq 'r[\"rule\"] == \"TVI-SPI-KERNEL\" and r[\"kind\"] == \"predicted-fault\" and \"DIVQ1EN = 0\" in r[\"condition\"]'" ;;
   pllref)
     run_case pllref pllref "$run"
     check "pllref: PLL1ON with PLLSRC = 11 (no clock) refuses, TVI-RCC-PLL-REF, unmodeled, at the firmware's store" \
@@ -183,9 +182,9 @@ for t in ${TVIBURI_TESTS:-$CASES}; do
     check "spi1rst: SPI1RST through the guard resets SPI1 (CR2.TSIZE 4 -> 0; RM0433 Rev 9 §8.7.35 p443)" \
       "[ \$rc = 0 ] && console spi1rst | grep -A1 -x 'R-CR2-BEFORE' | tail -n1 | grep -qx '0x00000004' && console spi1rst | grep -A1 -x 'R-CR2-AFTER' | tail -n1 | grep -qx '0x00000000'" ;;
   recorded)
-    PLATFORM=/repo/tests/1300/recorded.repl run_case recorded scar "$hook" "$run" 'echo "TVIBURI-MARK-AFTER"' "$after"
+    PLATFORM=/repo/tests/1300/recorded.repl run_case recorded scar "$run" 'echo "TVIBURI-MARK-AFTER"' "$after"
     check "recorded: the guard in recorded mode logs the scar as a would-refuse, the firmware runs on to its marker, and the check never passes it (RUL-19)" \
-      "[ \$rc = 1 ] && grep -q '\"tviburi\":\"would-refuse\".*TVI-RCC-KERNEL' '$work/recorded/renode-log.txt' && console recorded | grep -A1 -x 'TVIBURI-MARK-AFTER' | tail -n1 | grep -qx '0xAF7E0002'" ;;
+      "[ \$rc = 1 ] && grep -q '\"tviburi\":\"would-refuse\".*TVI-SPI-KERNEL' '$work/recorded/renode-log.txt' && console recorded | grep -A1 -x 'TVIBURI-MARK-AFTER' | tail -n1 | grep -qx '0xAF7E0002'" ;;
   recordedfield)
     PLATFORM=/repo/tests/1300/recorded.repl run_case recordedfield field "$run" 'echo "R-SEL"' 'sysbus ReadDoubleWord 0x58024450' 'echo "TVIBURI-MARK-AFTER"' "$after"
     check "recordedfield: in recorded mode, SPI123SEL = 011 is a would-refuse and the write still reaches the copy (reads 0x3000), as if no rule fired (RUL-19)" \
@@ -196,8 +195,13 @@ for t in ${TVIBURI_TESTS:-$CASES}; do
       'sysbus WriteDoubleWord 0x580244EC 0x0' 'sysbus WriteDoubleWord 0x580244F0 0x0' 'sysbus WriteDoubleWord 0x580244F4 0x10000')
     qs=(); for p in spi1 spi2 i2c1 usart1 rng; do qs+=("python \"print(\\\"Q \\\" + str(self.Machine[\\\"sysbus.rcc\\\"].QueryKernelClock(\\\"$p\\\")))\""); done
     run_case "$t" "$t" "${cold[@]}" "$run" 'echo "TVIBURI-MARK-AFTER"' "$after" "${qs[@]}"
-    check "$t: the measured RCC sequence, after the consumer's cold writes (pc none), passes enforcing (WO §2)" \
-      "[ \$rc = 0 ] && grep -qx 'CHECK PASS' '$work/$t.stdout' && console $t | grep -A1 -x 'TVIBURI-MARK-AFTER' | tail -n1 | grep -qx '0xAF7E0002'"
+    if [ $t = gen-s03 ]; then
+      check "gen-s03: sentinel-03's RCC sequence (Aethelgard 75da8053), then SPI1's start as generated: refused at SPI1, TVI-SPI-KERNEL, predicted-fault, naming SPI123SEL = 100 and p414, p371-372 (the per_ck scar; ruled 17:16Z)" \
+        "[ \$rc = 3 ] && records $t 'len(recs) == 1 and recs[0][\"rule\"] == \"TVI-SPI-KERNEL\" and recs[0][\"kind\"] == \"predicted-fault\" and recs[0][\"bit\"] == \"RCC_D2CCIP1R.SPI123SEL = 100\" and \"p414\" in recs[0][\"citation\"] and \"p371-372\" in recs[0][\"citation\"]'"
+    else
+      check "$t: the measured RCC sequence, after the consumer's cold writes (pc none)$([ $t = gen-hc16 ] && echo ', then SPI1'\''s start on pll1_q_ck'), passes enforcing (WO §2)" \
+        "[ \$rc = 0 ] && grep -qx 'CHECK PASS' '$work/$t.stdout' && console $t | grep -A1 -x 'TVIBURI-MARK-AFTER' | tail -n1 | grep -qx '0xAF7E0002'"
+    fi
     case $t in
       ardupilot) check "ardupilot: the query finds spi1, spi2, i2c1, usart1 and rng running (§5)" "[ \$(grep -c '^Q [a-z0-9]*: running' '$work/$t/renode.out') = 5 ]" ;;
       gen-s03) check "gen-s03: SPI1's mux has not left pll1_q_ck for per_ck: no kernel clock (§5, p371-372; not an RCC refusal)" "grep -q '^Q spi1: NOT running; the mux has not switched from pll1_q_ck' '$work/$t/renode.out'" ;;
@@ -224,7 +228,7 @@ for t in ${TVIBURI_TESTS:-$CASES}; do
   ledger)
     mkdir -p "$work/ledger"
     rc=0; container -v "$src:/repo:ro,Z" -v "$work/ledger:/out:Z" "$IMAGE" sh -c '/repo/scripts/build-release /repo /out/release >/dev/null' </dev/null >"$work/ledger.stdout" 2>&1 || rc=$?
-    check "ledger: the release carries the RCC guard's 677 field rows; each acknowledged row cites TVI-WO-1300.rm0433.md §8, never 0100b's; the RCC bench rows R1-R3 are in it, with the (rule, bit) the scar, stuck and pll cases emit (RUL-18)" \
+    check "ledger: the release carries the RCC guard's 677 field rows; each acknowledged row cites TVI-WO-1300.rm0433.md §8, never 0100b's; the RCC bench rows R1-R10 are in it, with the (rule, bit) the cases emit (RUL-18)" \
       "[ \$rc = 0 ] && python3 -I -c '
 import json, sys
 rows = [json.loads(l) for l in open(sys.argv[1]).read().splitlines()[1:]]
@@ -233,8 +237,11 @@ f = [r for r in rcc if r[\"row\"] == \"field\"]
 a = [r for r in f if r[\"state\"] == \"acknowledged\"]
 b = sorted(r[\"field\"] for r in rcc if r[\"row\"] == \"bench\")
 pairs = sorted((r[\"rule\"], r[\"bit\"]) for r in rcc if r[\"row\"] == \"bench\")
-want = [(\"TVI-RCC-KERNEL\", \"RCC_D2CCIP1R.SPI123SEL = 000\"), (\"TVI-RCC-KERNEL\", \"RCC_D2CCIP1R.SPI123SEL = 100\"), (\"TVI-RCC-PLL\", \"DIVP1EN/DIVQ1EN/DIVR1EN\")]
-sys.exit(0 if len(f) == 677 and a and all(r[\"reason\"].startswith(\"TVI-WO-1300.rm0433.md §8 A\") for r in a) and b == [\"R1\", \"R2\", \"R3\"] and pairs == want else 1)
+want = sorted([(\"TVI-RCC-KERNEL\", \"RCC_D2CCIP1R.SPI123SEL = 000\"), (\"TVI-RCC-KERNEL\", \"RCC_D2CCIP1R.SPI123SEL = 100\"), (\"TVI-RCC-PLL\", \"DIVP1EN/DIVQ1EN/DIVR1EN\"),
+  (\"TVI-RCC-CLOCK\", \"RCC_CR.PLL1ON (bit 24) = 0\"), (\"TVI-RCC-CLOCK\", \"RCC_D2CCIP1R.SPI123SEL (14:12) = 001\"), (\"TVI-RCC-CLOCK\", \"RCC_APB2ENR.SPI1EN (bit 12) = 0\"),
+  (\"TVI-RCC-CLOCK\", \"RCC_CR.HSEON (bit 16) = 0\"), (\"TVI-RCC-CLOCK\", \"RCC_D1CCIPR.CKPERSEL (29:28) = 01\"), (\"TVI-RCC-PLL\", \"DIVN1/DIVP1/DIVQ1/DIVR1\"),
+  (\"TVI-RCC-PLL-REF\", \"PLL1ON (bit 24) = 1\")])
+sys.exit(0 if len(f) == 677 and a and all(r[\"reason\"].startswith(\"TVI-WO-1300.rm0433.md §8 A\") for r in a) and b == sorted(\"R%d\" % i for i in range(1, 11)) and pairs == want else 1)
 ' '$work/ledger/release/LEDGER.jsonl'" ;;
   alias17c)
     run_case alias17c - 'echo "R-17C"' 'sysbus ReadDoubleWord 0x5802457C'
@@ -254,6 +261,55 @@ sys.exit(0 if len(f) == 677 and a and all(r[\"reason\"].startswith(\"TVI-WO-1300
       "grep -q 'HSE guard=16000000 stock=16000000' '$work/hse16/renode.out'"
     check "hse16-trap: an untyped rcc: update lands on the cancelled entry and the guard keeps 8 MHz (the consumer requirement, measured)" \
       "grep -q 'HSE guard=8000000 stock=8000000' '$work/hse16-trap/renode.out'" ;;
+  unenabled)
+    run_case unenabled unenabled "$run"
+    check "unenabled: SPI1 written with SPI1EN never set refuses at SPI1, TVI-SPI-ENABLE, predicted-fault, naming the enable bit and p373, at the firmware's store; 'clocked' (the same with the enable) passes" \
+      "[ \$rc = 3 ] && records unenabled 'len(recs) >= 1 and recs[0][\"rule\"] == \"TVI-SPI-ENABLE\" and recs[0][\"kind\"] == \"predicted-fault\" and recs[0][\"peripheral\"] == \"sysbus.spi1\" and recs[0][\"bit\"] == \"RCC_APB2ENR.SPI1EN = 0\" and \"p373\" in recs[0][\"citation\"] and recs[0][\"access\"][\"pc\"] != \"none\"'" ;;
+  tim2)
+    run_case tim2 - 'sysbus WriteDoubleWord 0x4000002C 0x1234' 'echo "R-OFF"' 'sysbus ReadDoubleWord 0x4000002C' \
+      'sysbus WriteDoubleWord 0x580244E8 0x00000001' 'echo "R-ON-RESET"' 'sysbus ReadDoubleWord 0x4000002C' 'sysbus WriteDoubleWord 0x4000002C 0x1234' 'echo "R-ON"' 'sysbus ReadDoubleWord 0x4000002C' \
+      'machine Reset' 'sysbus WriteDoubleWord 0x4000002C 0x5678' 'echo "R-RESET"' 'sysbus ReadDoubleWord 0x4000002C' 'echo "R-ENR"' 'sysbus ReadDoubleWord 0x580244E8'
+    check "tim2: an unguarded peripheral is locked from reset, as silicon ignores the write (p373): with TIM2EN never set, TIM2.ARR's write is dropped and it reads 0; with TIM2EN, ARR reads its reset 0xFFFFFFFF (the write never landed) and a write lands; after machine Reset it is locked again, and APB1LENR reads 0" \
+      "[ \$rc = 0 ] && grep -qx 'CHECK PASS' '$work/tim2.stdout' && console tim2 | grep -A1 -x 'R-OFF' | tail -n1 | grep -qx '0x00000000' && console tim2 | grep -A1 -x 'R-ON-RESET' | tail -n1 | grep -qx '0xFFFFFFFF' && console tim2 | grep -A1 -x 'R-ON' | tail -n1 | grep -qx '0x00001234' && console tim2 | grep -A1 -x 'R-RESET' | tail -n1 | grep -qx '0x00000000' && console tim2 | grep -A1 -x 'R-ENR' | tail -n1 | grep -qx '0x00000000' && [ \$(grep -c 'Tried to write a locked peripheral: machine-0.timer2' '$work/tim2/renode.out') = 2 ]" ;;
+  lost-pll|lost-sel|lost-en|lost-osc|lost-ckper)
+    run_case "$t" "$t" "$run"
+    case $t in
+      lost-pll) bit='RCC_CR.PLL1ON (bit 24) = 0'; page=p383 ;;
+      lost-sel) bit='RCC_D2CCIP1R.SPI123SEL (14:12) = 001'; page=p414 ;;
+      lost-en) bit='RCC_APB2ENR.SPI1EN (bit 12) = 0'; page=p376 ;;
+      lost-osc) bit='RCC_CR.HSEON (bit 16) = 0'; page=p384 ;;
+      lost-ckper) bit='RCC_D1CCIPR.CKPERSEL (29:28) = 01'; page=p412 ;;
+    esac
+    check "$t: with SPI1 running, $bit stops its kernel clock: refused at the RCC write, TVI-RCC-CLOCK, predicted-fault, citing p371 and $page" \
+      "[ \$rc = 3 ] && records $t 'len(recs) == 1 and recs[0][\"rule\"] == \"TVI-RCC-CLOCK\" and recs[0][\"kind\"] == \"predicted-fault\" and recs[0][\"peripheral\"] == \"sysbus.rcc\" and recs[0][\"bit\"] == \"$bit\" and \"p371\" in recs[0][\"citation\"] and \"$page\" in recs[0][\"citation\"] and \"spi1 is enabled\" in recs[0][\"condition\"] and recs[0][\"access\"][\"pc\"] != \"none\"'" ;;
+  stopped|ckper-live|blocked|cfg2same)
+    run_case "$t" "$t" "$run" 'echo "TVIBURI-MARK-AFTER"' "$after"
+    case $t in
+      stopped) what="SPI1 stopped (SPE = 0), then SPI123SEL changed: nothing runs, a valid order" ;;
+      ckper-live) what="SPI1 running on per_ck, CKPERSEL from hsi_ker_ck to hse_ck with both running: the mux switches (p371)" ;;
+      blocked) what="SPI1 running on per_ck (hsi_ker_ck), HSION cleared while HSI is the system clock: blocked (p386), the clock stays" ;;
+      cfg2same) what="SPI1 running, CFG2 written with the value it holds (TVI-WO-1300a (4), p2221)" ;;
+    esac
+    check "$t: $what; passes enforcing, past its last write" \
+      "[ \$rc = 0 ] && grep -qx 'CHECK PASS' '$work/$t.stdout' && console $t | grep -A1 -x 'TVIBURI-MARK-AFTER' | tail -n1 | grep -qx '0xAF7E0002'" ;;
+  sel5)
+    run_case sel5 sel5 "$run"
+    check "sel5: SPI123SEL = 101 (reserved, the kernel clock disabled, p414) refuses, TVI-RCC-FIELD, unmodeled (ruled 17:16Z)" \
+      "[ \$rc = 3 ] && records sel5 'len(recs) == 1 and recs[0][\"rule\"] == \"TVI-RCC-FIELD\" and recs[0][\"kind\"] == \"unmodeled\" and recs[0][\"bit\"].startswith(\"RCC_D2CCIP1R.SPI123SEL (14:12) = 101\") and \"p414\" in recs[0][\"citation\"]'" ;;
+  divr)
+    run_case divr divr "$run"
+    check "divr: RCC_PLL1DIVR changed while PLL1 is on refuses, TVI-RCC-PLL, predicted-fault (p403-404: silicon ignores it)" \
+      "[ \$rc = 3 ] && records divr 'len(recs) == 1 and recs[0][\"rule\"] == \"TVI-RCC-PLL\" and recs[0][\"kind\"] == \"predicted-fault\" and recs[0][\"bit\"] == \"DIVN1/DIVP1/DIVQ1/DIVR1\" and \"p403-404\" in recs[0][\"citation\"]'" ;;
+  pll1src)
+    run_case pll1src - 'sysbus WriteDoubleWord 0x58024400 0x00010001' 'sysbus WriteDoubleWord 0x58024410 0x2' 'sysbus WriteDoubleWord 0x58024400 0x01010001' \
+      'sysbus WriteDoubleWord 0x58024400 0x01010000'
+    check "pll1src (TVI-WO-1300a (5)): HSION cleared while HSI feeds PLL1 (on, not the system clock): RM0433 contradicts itself (p384-386 against p340-342), so TVI-RCC-PLL-REF, unmodeled, as 1300 ruled; bench row R10 asks the Nucleo" \
+      "[ \$rc = 3 ] && records pll1src 'len(recs) == 1 and recs[0][\"rule\"] == \"TVI-RCC-PLL-REF\" and recs[0][\"kind\"] == \"unmodeled\" and recs[0][\"bit\"] == \"PLL1ON (bit 24) = 1\"'" ;;
+  kernelq)
+    rq='python "self.Machine[\"sysbus.rcc\"].RequireKernelClock(\"spi1\", \"CR1.SPE\")"'
+    run_case kernelq - 'sysbus WriteDoubleWord 0x580244F0 0x00001000' "$rq" 'sysbus WriteDoubleWord 0x58024450 0x00004000' "$rq"
+    check "kernelq: the RCC guard's own query, asked from the monitor, refuses under rcc, TVI-RCC-KERNEL, predicted-fault: SPI123SEL = 000 with PLL1 off, then 100 with the mux stuck on pll1_q_ck (bench rows R1, R2)" \
+      "[ \$rc = 3 ] && records kernelq '[(r[\"rule\"], r[\"kind\"], r[\"peripheral\"], r[\"bit\"]) for r in recs] == [(\"TVI-RCC-KERNEL\", \"predicted-fault\", \"sysbus.rcc\", \"RCC_D2CCIP1R.SPI123SEL = 000\"), (\"TVI-RCC-KERNEL\", \"predicted-fault\", \"sysbus.rcc\", \"RCC_D2CCIP1R.SPI123SEL = 100\")]'" ;;
   *) echo "unknown case $t" >&2; exit 2 ;;
   esac
 done

@@ -263,7 +263,11 @@ t_conditions() {
  (\"TVI-SPI-READ\", \"unmodeled\", \"write-only register\", \"0x20\", 8),
  (\"TVI-SPI-READ\", \"unmodeled\", \"SR.RXP (bit 0) = 0, RXDR read\", \"0x30\", 8),
  (\"TVI-SPI-READ\", \"unmodeled\", \"SR.EOT (bit 3) set by the stock model at CSUSP\", \"0x14\", 32),
- (\"TVI-SPI-ORDER\", \"unmodeled\", \"CR1.CSUSP (bit 10) = 1 with SPE = 0\", \"0x0\", 32)]' \
+ (\"TVI-SPI-ORDER\", \"unmodeled\", \"CR1.CSUSP (bit 10) = 1 with SPE = 0\", \"0x0\", 32),
+ (\"TVI-SPI-ENABLE\", \"predicted-fault\", \"RCC_APB2ENR.SPI1EN = 0\", \"0xC\", 32),
+ (\"TVI-SPI-ENABLE\", \"predicted-fault\", \"RCC_APB2ENR.SPI1EN = 0\", \"0xC\", 32),
+ (\"TVI-SPI-KERNEL\", \"predicted-fault\", \"RCC_D2CCIP1R.SPI123SEL = 000\", \"0x0\", 32),
+ (\"TVI-SPI-KERNEL\", \"predicted-fault\", \"RCC_D2CCIP1R.SPI123SEL = 100\", \"0x0\", 32)]' \
       && grep -qx 'CHECK REFUSED' '$work/conditions.stdout'"
   check "every predicted-fault the conditions produce has a bench row in the release's ledger, and every bench row is produced (RUL-18)" \
     "python3 -I - '$work/conditions.stdout' '$work/conditions/release/LEDGER.jsonl' <<'EOF'
@@ -296,7 +300,7 @@ t_fields() {
   # before the allow-list, answers first; each must occur, so the list cannot go stale.
   need_check
   pod fields-cases "$src" -- sh -c '/repo/scripts/build-release >/dev/null &&
-    /out/release.target/debug/tviburi-release cases /out/release/LEDGER.jsonl Tviburi.GuardedSTM32H7_SPI 0x40013000 0x400 >/out/cases.txt'
+    /out/release.target/debug/tviburi-release cases /out/release/LEDGER.jsonl Tviburi.GuardedSTM32H7_SPI 0x40013000 0x400 0x580244F0 0x1000 >/out/cases.txt'
   { echo "include @/repo/scripts/prelude.resc"; cat "$work/fields-cases/cases.txt"; echo 'echo "TVIBURI-END"'; echo quit; } >"$work/fields.resc"
   renode_in fields "$src" /cases/fields.resc -v "$work/fields.resc:/cases/fields.resc:ro,Z"
   check "every ledger row: the disallowed value refuses by name, unmodeled; allowed values pass; no-register offsets refuse (gate clause 6)" \
@@ -442,7 +446,7 @@ t_recorded() {
           and recs[1][\"rule\"] == \"TVI-SPI-MODF\" and recs[1][\"kind\"] == \"predicted-fault\" and recs[-1][\"tviburi\"] == \"end\"
           and not any(r[\"tviburi\"] == \"refusal\" for r in recs))'"
   need_check
-  printf '%s\n' 'include @/repo/scripts/prelude.resc' 'sysbus WriteDoubleWord 0x4001300C 0x02000000' 'echo "READ-CFG2"' \
+  printf '%s\n' 'include @/repo/scripts/prelude.resc' 'sysbus WriteDoubleWord 0x580244F0 0x1000' 'sysbus WriteDoubleWord 0x4001300C 0x02000000' 'echo "READ-CFG2"' \
     'sysbus ReadDoubleWord 0x4001300C' 'sysbus WriteDoubleWord 0x40013020 0x41' 'sysbus WriteDoubleWord 0x40013000 0x400' \
     'echo "READ-SR"' 'sysbus ReadDoubleWord 0x40013014' 'echo "TVIBURI-END"' 'quit' >"$work/recorded-monitor.resc"
   renode_in recorded-monitor "$work/recorded.tree" /cases/r.resc -v "$work/recorded-monitor.resc:/cases/r.resc:ro,Z"

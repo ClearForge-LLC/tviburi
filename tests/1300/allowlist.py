@@ -26,7 +26,8 @@ EXTRA_KERNEL = {'QSPIEN', 'SDMMC1EN', 'SDMMC2EN', 'LTDCEN'}
 # Selector values the guard models, per mux (the source each names is modeled: the guard's MuxDef tables).
 MUX_ALLOWED = {
     ('RCC_D1CCIPR', 'CKPERSEL[1:0]'): [0, 1, 2, 3],
-    ('RCC_D2CCIP1R', 'SPI123SEL[2:0]'): [0, 1, 2, 4, 5, 6, 7],      # 011 I2S_CKIN: a pin, not modeled
+    ('RCC_D2CCIP1R', 'SPI123SEL[2:0]'): [0, 1, 2, 4],               # 011 I2S_CKIN: a pin, not modeled; 101-111 reserved
+                                                                    # (p414; refused, ruled 2026-11-23 17:16Z, TVI-WO-1300a)
     ('RCC_D2CCIP2R', 'I2C123SEL[1:0]'): [0, 1, 2, 3],
     ('RCC_D2CCIP2R', 'USART16SEL[2:0]'): [0, 1, 2, 3, 4, 6, 7],     # 101 lse_ck: not modeled
     ('RCC_D2CCIP2R', 'RNGSEL[1:0]'): [0, 1],                        # 10 lse_ck, 11 lsi_ck: not modeled

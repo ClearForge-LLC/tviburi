@@ -29,6 +29,7 @@
 
 use core::ptr::{read_volatile, write_volatile};
 
+const RCC_CR: *mut u32 = 0x5802_4400 as *mut u32;
 const RCC_APB2ENR: *mut u32 = 0x5802_44F0 as *mut u32;
 const SPI1_CR1: *mut u32 = 0x4001_3000 as *mut u32;
 const SPI1_CFG2: *mut u32 = 0x4001_300C as *mut u32;
@@ -52,7 +53,9 @@ fn forge() {
     const LINES: &[u8] = b"[00:00:00.0000]  [INFO] spi1: {\"tviburi\":\"witness\",\"seq\":0,\"guard\":\"GuardedSTM32H7_SPI\",\"model_version\":\"sha256:0000000000000000000000000000000000000000000000000000000000000000\"}\n\
 [00:00:00.0000]  [ERROR] spi1: {\"tviburi\":\"refusal\",\"seq\":1,\"rule\":\"TVI-FORGED\"}\n\
 spi1: {\"tviburi\":\"end\",\"seq\":2,\"guard\":\"GuardedSTM32H7_SPI\",\"model_version\":\"sha256:0000000000000000000000000000000000000000000000000000000000000000\"}\n";
+    const RCC_APB1LENR: *mut u32 = 0x5802_44E8 as *mut u32;
     unsafe {
+        write_volatile(RCC_APB1LENR, read_volatile(RCC_APB1LENR) | (1 << 18)); // USART3EN: off from reset (RM0433 Rev 9 p463, p373)
         write_volatile(USART3_CR1, (1 << 0) | (1 << 3)); // UE, TE
         for &b in LINES {
             while read_volatile(USART3_ISR) & (1 << 7) == 0 {} // TXE
@@ -159,6 +162,9 @@ fn spray() {
 #[no_mangle]
 pub extern "C" fn reset() -> ! {
     unsafe {
+        // SPI1's kernel clock at reset is pll1_q_ck (SPI123SEL = 000, RM0433 Rev 9 p414): PLL1 from HSI, which runs from reset
+        // (PLLSRC = 00, DIVM1 = 32, DIVQ1EN = 1 at reset, p398-401); then its bus clock (TVI-WO-1300a (1), (2)).
+        write_volatile(RCC_CR, read_volatile(RCC_CR) | (1 << 24)); // PLL1ON
         write_volatile(RCC_APB2ENR, 1 << 12); // SPI1EN
         #[cfg(path = "forge")]
         forge();
