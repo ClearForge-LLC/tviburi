@@ -117,7 +117,7 @@ C03-muxKeptOnReset	model/GuardedSTM32H7_RCC.cs	divr[off] = DivrReset;\n         
 C04-enableGates	model/GuardedSTM32H7_RCC.cs	if(!enabled)	if(false)	rcc-registrations
 C05-pllOutputEnable	model/GuardedSTM32H7_RCC.cs	return PllOn(n) && en && PllReference(n, cr);	return PllOn(n) && PllReference(n, cr);	rcc-divq
 C06-perCk	model/GuardedSTM32H7_RCC.cs	return per.Current == per.Selector && Running(PerMux.Sources[per.Current]);	return false;	rcc-switched
-C07-kernelKind	model/GuardedSTM32H7_RCC.cs	records.Refuse("TVI-RCC-KERNEL", PredictedFault,	records.Refuse("TVI-RCC-KERNEL", Unmodeled,	rcc-scar
+C07-kernelKind	model/GuardedSTM32H7_RCC.cs	records.Refuse("TVI-RCC-KERNEL", PredictedFault,	records.Refuse("TVI-RCC-KERNEL", Unmodeled,	rcc-kernelq
 C08-pllLocked	model/GuardedSTM32H7_RCC.cs	if((old & mask) != (value & mask) && PllOn(n))	if(false)	rcc-pll
 C09-pllReference	model/GuardedSTM32H7_RCC.cs	if((cr & on) != 0 && !PllReference(n, cr))	if(false)	rcc-pllref rcc-oscclear
 C10-divmZero	model/GuardedSTM32H7_RCC.cs	return false;   // "000000: prescaler disabled" (p398-399)	return true;   // mutant	rcc-divm0
