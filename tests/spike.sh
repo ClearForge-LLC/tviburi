@@ -365,13 +365,21 @@ t_adv-recorded() {
 }
 
 t_adv-noend() {
+  # The script quits cleanly without its end marker: Renode disposes (an end record), so the check
+  # passes, and only the runner's own end-of-script evidence can fail the run.
   fixture noend scripts/tviburi-spike 'echo "TVIBURI-END"
+quit' 'quit'
+  run adv-noend modeled "$work/noend.tree"
+  check "a script that ends before its end marker (Renode disposes cleanly) does not PASS (1)" \
+    "[ \$rc -eq 1 ] && grep -qx 'CHECK PASS' '$work/adv-noend.stdout'"
+  # A monitor error stops the script; Renode then exits on EOF, sometimes before it disposes (measured,
+  # TVI-WO-0100b FEEDBACK), so the check may pass or fail; the run must not PASS either way.
+  fixture noend-error scripts/tviburi-spike 'echo "TVIBURI-END"
 quit' 'no_such_monitor_command
 echo "TVIBURI-END"
 quit'
-  run adv-noend modeled "$work/noend.tree"
-  check "a script that stops before its end (Renode still disposes cleanly) does not PASS (1)" \
-    "[ \$rc -eq 1 ] && grep -qx 'CHECK PASS' '$work/adv-noend.stdout'"
+  run adv-noend-error modeled "$work/noend-error.tree"
+  check "a script stopped by a monitor error does not PASS (1)" '[ $rc -eq 1 ]'
 }
 
 for t in ${TVIBURI_TESTS:-acceptance}; do

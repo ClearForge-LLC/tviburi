@@ -69,3 +69,10 @@ Run twice: by me, and by an independent reviewer on Opus who had the code and no
   - the explicit `would-refuse` arm and its test (the architect asked for them by name);
   - two cuts that were taste, not reduction.
 - **Made earlier, at the advisor's suggestion:** the `CRCPOLY` copy, which could only ever hold `0x107`, became the constant.
+
+## 5. A flaky test from `0100a`, made deterministic
+
+`adv-noend` (`0100a`) failed once in about five runs on Furnace. Its fixture stops the script with an unknown monitor command. Renode then exits on standard input's EOF, and it sometimes exits before it disposes the machine: no `Disposed` line, no end record, exit 0. The check then fails as well, so the run was still not a PASS. But the test's claim, that the check passes and only the runner's end-of-script evidence catches the run, did not hold that time.
+- The strong claim now uses a script that quits cleanly without its end marker, which is deterministic and still kills `S04`.
+- The monitor-error route stays as its own case, asserting only that the run does not PASS.
+- Nothing was weakened: both claims are kept, each on a route that shows it every time.
