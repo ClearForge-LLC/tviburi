@@ -61,7 +61,7 @@ Evidence: `~/.cache/tvi-1300a/{m1,m2,m3,m3probe,m4,base}` (scripts, monitor outp
 
 ### 1.0 Baseline
 
-`tests/spike.sh` with `TVIBURI_TESTS=all`, on an export of `c7c592b` (code identical to `main` `604c3d6`): **112 ok, 0 FAIL, 299 s.** Every run whose check names `spi1 rcc` carried both end records (58 runs). The ten runs without both are the cases built to lack them (load failures, `crash`, the stock and no-overlay cases).
+`tests/spike.sh` with `TVIBURI_TESTS=all`, on an export of `c7c592b` (code identical to `main` `604c3d6`): **112 ok, 0 FAIL, 299 s.** 57 runs carried both witnesses, and every one of them both end records. The runs without both are the cases built to lack them: load failures, `crash`, `adv-loglevel-*`, and the stock and no-overlay cases.
 
 ### 1.1 M1: an access to a peripheral whose enable is 0
 
@@ -69,9 +69,9 @@ Evidence: `~/.cache/tvi-1300a/{m1,m2,m3,m3probe,m4,base}` (scripts, monitor outp
 
 | What | Result | Prediction |
 |---|---|---|
-| `*ENR` at reset | Each registered peripheral's bit reads 1. AHB3ENR `0x4010`, AHB1ENR `0x8023`, AHB2ENR `0x40`, AHB4ENR `0x032807FF`, APB3ENR `0x8`, APB1LENR `0xC0FE03FF`, APB1HENR `0`, APB2ENR `0x00072033`, APB4ENR `0x00011E8A`. RCC_BDCR reads `0x8000`, that is `RTCEN` = 1; silicon resets it to 0 (p427) | held (P1.1) |
+| `*ENR` at reset | Each registered peripheral's bit reads 1. AHB3ENR `0x4010`, AHB1ENR `0x8023`, AHB2ENR `0x40`, AHB4ENR `0x032807FF`, APB3ENR `0x8`, APB1LENR `0xC0FE03FF`, APB1HENR `0`, APB2ENR `0x00072033`, APB4ENR `0x00011E8A`. RCC_BDCR reads `0x8000`, that is `RTCEN` = 1; RM0433 resets it to 0 at a backup-domain reset (p427, `rm/fields.tsv`) | held (P1.1) |
 | 0 written to every `*ENR` and `BDCR` | Every enable bit reads 0, except APB4ENR `RTCAPBEN`, a stored flag with no callback | P1.2 held: the write locks although the bit read 1 |
-| A locked peripheral on each bus: DMA1 (AHB1), RNG (AHB2), QSPI (AHB3), GPIOA (AHB4), TIM2 (APB1L), TIM1 (APB2), LTDC (APB3), SYSCFG (APB4), RTC (`BDCR`) | Each read returns 0 and each write is ignored. Each logs `[WARNING] sysbus: Tried to read/write a locked peripheral: machine-0.<name>`, and nothing else. Identical on every bus. APB1H has no registered peripheral, so nothing on it can be locked | held (P1.1) |
+| A locked peripheral on each bus: DMA1 (AHB1), RNG (AHB2), QSPI (AHB3), GPIOA (AHB4), TIM2 (APB1L), TIM1 (APB2), LTDC (APB3), SYSCFG (APB4), RTC (`BDCR`) | Each read returns 0 and each write is ignored. Each logs `[WARNING] sysbus: Tried to read/write a locked peripheral: machine-0.<name>`, and nothing else. Identical on every bus. GPIOA's `MODER` reads 0 unlocked too (a stock value; silicon resets it to `0xABFFFFFF`), so for GPIOA the evidence is the WARNING line, not the value. APB1H has no registered peripheral, so nothing on it can be locked | held (P1.1) |
 | 32-, 16- and 8-bit monitor accesses | All dropped, reading 0 | held |
 | CPU `LDR`/`STR` (hand-placed Thumb at `0x24000000`) on locked TIM2.ARR | `r0` = 0 and the store is dropped. Unlocked, `r0` = `0xFFFFFFFF` and the store lands | held (P1.4) |
 | DMA1 stream 0, memory to TIM2.ARR, TIM2 locked | The transfer completes (`NDTR` 0), but the write is dropped (ARR stays `0xFFFFFFFF`). Unlocked, it lands (`0xA5A5`) | held (P1.4) |
@@ -84,7 +84,7 @@ Evidence: `~/.cache/tvi-1300a/{m1,m2,m3,m3probe,m4,base}` (scripts, monitor outp
 
 P1.3 is partly wrong. I named `spi2`/`spi3` (absent, not unregistered), and missed the seven above.
 
-**Stock enable bits against RM0433:** all 98 `*ENR`/`BDCR` flags with an enable callback (`m1/stock-enables.tsv`) sit at RM0433's bit, by name (p427, p452–473). Every one of the 59 registered aliases has one.
+**Stock enable bits against RM0433** (`1300`'s RM0433 field list, `rm/fields.tsv`, not the PDF directly): all 98 `*ENR`/`BDCR` flags with an enable callback (`m1/stock-enables.tsv`) sit at RM0433's bit, by name (p427, p452–473). Every one of the 59 registered aliases has one.
 
 **The guard today, on the Tviburi board** (`m1/tvi.resc`, HEAD):
 - **The false pass,** measured:
@@ -130,7 +130,7 @@ P1.3 is partly wrong. I named `spi2`/`spi3` (absent, not unregistered), and miss
 
 ### 1.3 M3: (3), each clock change under a running SPI1
 
-**RM0433** (read by a subagent into `~/.cache/tvi-1300a/m3/table.md`, every quote with its txt line; I re-checked L15437, L13721, L15028–15029 and L15102 against the text):
+**RM0433** (read by a subagent into `~/.cache/tvi-1300a/m3/table.md`, every quote with its txt line; I re-checked every quote this table uses against the text by `rmpage.sh`: L15437, L13721, L15028–15029, L15102, p383 L15407–15409, p371 L14952, p414 L16481/L16485–16486/L16493, p412 L16407, p398–399 L15894/15908/15924/15938, p401 L16006–16018, p403–410 L16094–16317, p2159 L84674, p2177 L85432, p2186 L85855, p386 L15506):
 
 | Change | RM0433 | Pages |
 |---|---|---|
@@ -162,13 +162,14 @@ P1.3 is partly wrong. I named `spi2`/`spi3` (absent, not unregistered), and miss
 | G1 | `HSION` = 0 under `per_ck` = `hsi_ker_ck` | NOT running | `TVI-RCC-PLL-REF` only, because PLL1 is also from HSI in this setup; the `per_ck` loss itself has no rule | takes it |
 | G2 | `CKPERSEL` → `hse_ck` (HSE on) | running (switched): a valid change | none | tag |
 | G3 | `CKPERSEL` → `csi_ker_ck` (CSI off) | NOT running (`per_ck` mux pending) | **none** | tag |
+| G4 | the same `per_ck` setup with **PLL1 from HSE** (`PLLSRC` = 10), then `HSION` = 0: the unconfounded case | NOT running | **none** | takes it (CR `0x03030020`) |
 | H | `HSEON` = 0 (HSE is `sys_ck`) | running | none | **blocks** (keeps `HSEON`) |
 | J | SPI1 stopped (`SPE` = 0), then `SPI123SEL` → `pll2_p_ck` | NOT running | none (valid: nothing runs) | tag |
 | K | `CFGR.SW` = PLL1, then `PLL1ON` = 0 | running | none | **blocks** (keeps `PLL1ON`) |
 
 - **P3.1 held** (H, K: the stock model blocks, and the guard mirrors it in `KeptCr`).
 - **P3.2 held, and incomplete:** `PLLxDIVR` is blocked too, with no guard rule.
-- **P3.3 held:** B, E, F and G3 lose the clock silently today.
+- **P3.3 held:** B, E, F, G3 and G4 lose the clock silently today.
 - **P3.4 held.**
 - **New:**
   - Clearing an oscillator that feeds only PLL2/PLL3 is silent in RM0433 (`TVI-RCC-PLL-REF` covers it, `unmodeled`);
@@ -188,7 +189,7 @@ P1.3 is partly wrong. I named `spi2`/`spi3` (absent, not unregistered), and miss
 | The same: `conditions.resc` | 60 | 0 | to 7.4 |
 | **Total** | **354** | **0** | |
 
-- **The rate is under about 0.85% per run** (3/354, the rule of three at 95%). No run in which Renode exited non-zero lost its end record either.
+- **The rate is under about 0.85% per run** (3/354, the rule of three at 95%). Renode exited 0 in every run.
 - The suites' runs without both end records are all built to lack one: `crash` kills Renode, and `adv-loglevel-*` raises the log level above INFO.
 - **The loops differ from the suite's shape:** the release and the check are built once, and Renode runs repeatedly in one container. Each run's log and output are checked as the suite checks them (`m4/loop.sh`, `m4/par.sh`).
 
@@ -211,7 +212,7 @@ On silicon those writes are ignored (p373), and ArduPilot flies. So:
 - if (1)'s refusal applies to every locked access, **ArduPilot's boot refuses at 0.92 ms**, a §7 stop;
 - if it applies to guarded peripherals only (`spi1`), ArduPilot never touches `spi1` unenabled, and nothing refuses.
 
-**(1), the generated boots.** Their `verify` JSON keeps no lock list, and `1300`'s Renode logs are gone (`~/.cache/tvi-1300` does not exist). **Not measured.**
+**(1), the generated boots.** The boards are as `1300` captured them at Aethelgard `75da8053`; Aethelgard `main` is now `1c32c8ea`, and I have not regenerated them. Their `verify` JSON keeps no lock list, and `1300`'s Renode logs are gone (`~/.cache/tvi-1300` does not exist). **Not measured.**
 
 **(2), the generated boots. A §7 stop.** `1300`'s order table (`draft/order.md`) shows nine generated boards starting SPI1 (and SPI2 on two) with no kernel clock: `SPI123SEL` → `per_ck` while the mux's input `pll1_q_ck` never ran (p371–372). Under (2) each is a `predicted-fault` at SPI1. The boards and their first start:
 
@@ -229,7 +230,15 @@ On silicon those writes are ignored (p373), and ArduPilot flies. So:
 
 `1300`'s architect ruled this not a stop for `1300` (13:45Z). This work order's §2 and §7 make it one. **I ask for the ruling and do not carry `1300`'s over.** ArduPilot's 55 SPI1 starts are all clocked (`pll1_q_ck` running).
 
-**(3), ArduPilot.** I could not check from disk whether any RCC write lands while SPI1 runs (between an `SPE` = 1 and its `SPE` = 0): `1300`'s per-write traces are not on disk. The order table shows ArduPilot's selectors and PLLs set once, before the first start. That is not proof, and §1.3 of the build re-runs the boot recorded.
+**(3), ArduPilot. Unresolved, and possibly a §7 item.**
+- `1300`'s field table (`TVI-WO-1300.rm0433.md` §4; 26,021 RCC writes in the 5 s boot) shows ArduPilot writing both 0 and 1 to:
+  - `SPI1EN`, `SPI2EN` and `I2C1EN`;
+  - `PLL1ON`, `PLL2ON`, `PLL3ON` and `HSI48ON`.
+- So ArduPilot clears SPI enables during the boot. Its 55 SPI1 and 7,062 SPI2 starts suggest a clock enable and disable per `spiStart`/`spiStop`.
+- **`SPE` is cleared before the stop.** The measured `spi_lld_stop` (`0100b`; `firmware/spi1.rs` `path="ardupilot"`) clears `SPE`, then zeroes `CR1`, `CR2`, `CFG1`, `CFG2` and `IER`.
+- **Whether the RCC disable always comes after that** is ChibiOS's `spi_lld_stop` order from memory, not measured. `1300`'s per-write traces are not on disk (`~/.cache/tvi-1300` is gone).
+- If ArduPilot ever clears `SPI1EN`/`SPI2EN`, or a selector or PLL, while `SPE` = 1, then Q2's case F (or B/E) refuses its boot.
+- **The first thing the build re-runs, recorded, before any (3) rule is kept.**
 
 ## 2. Predictions, scored
 
@@ -248,6 +257,11 @@ On silicon those writes are ignored (p373), and ArduPilot flies. So:
 - `1300`'s 13:45Z ruling covered `1300`, where only a test hook asked. This WO's §2 says "any such is a stop".
 - **Ask:** build on, with these boots expected to refuse at SPI1 as the firmware's defect for Aethelgard's queue? Or not?
 
+**Possibly a second §7 item, unresolved: ArduPilot under (3).**
+- ArduPilot clears `SPI1EN`/`SPI2EN` and `PLLxON` during its boot (§1.5). Whether any clear lands while `SPE` = 1 is not on disk.
+- If one does, Q2's case F or B refuses the boot.
+- I will measure it first in the build (a recorded boot) and stop if it fires.
+
 **Q1. The scope of (1)'s refusal.**
 - The stock lock is per peripheral and silent. Once a guarded peripheral is locked, its own guard never sees the access.
 - An unguarded peripheral has nothing in Tviburi that sees the access.
@@ -256,8 +270,16 @@ On silicon those writes are ignored (p373), and ArduPilot flies. So:
   - **(a) Lock every registered peripheral** by the sync (§1.1), as silicon does for a write, except the guarded ones. A guarded peripheral (`spi1`) stays enabled on the bus, and its guard asks the RCC guard for its enable at every access: `predicted-fault` naming `SPI1EN` and p373.
   - A write is "ignored" and a read "will return invalid data", both on p373.
   - ArduPilot and the generated firmware never touch `spi1` unenabled.
+  - **Generalised to every future guard, it would refuse ArduPilot at 164,652,020 ns once I2C1 is guarded:** that I2C1 `CR1` read and write happen with `I2C1EN` at 0 in the twin, inside the same quantum as the enable. **Ask:** is this rule SPI1's only, or general, with I2C's order measured when its guard comes?
 - **Not proposed:** refusing every locked access. ArduPilot would refuse at 0.92 ms on DMA writes that silicon ignores.
 - **Which kind for a guarded access with its enable at 0?** The `RUL-18` amendment (a write silicon ignores that changes nothing) applies to a write of the value already held. I propose `predicted-fault` for every guarded access with its enable at 0. A same-value write is not exempted, because the firmware believes the peripheral is running.
+
+**The other §7 conditions:**
+- **No rule proposed here needs a record field `0100b`'s contract lacks.** Each proposed refusal fills `Refuse(rule, kind, register, bit, condition, citation, state, offset, value, width)` (`model/Refusal.cs` L67), plus the `pc` and `virtual_time` it already adds:
+  - (1) names `SPI1EN` in `bit`;
+  - (2) names the selector and source in `bit`/`condition`, as `TVI-RCC-KERNEL` does;
+  - (3) is a write at the RCC.
+- **The one-file peak is not measured at §1.1.** `1300` measured 955,512–980,696 KiB against 1,048,576 KiB (66–91 MiB under). The build re-runs it.
 
 **Q2. Block or refuse, for (3).**
 - RM0433 blocks `DIVxyEN`, `PLLSRC` and `DIVMx` with the PLL on. `TVI-RCC-PLL` refuses those today, as `predicted-fault`. The block means the clock is *not* lost.
@@ -284,4 +306,7 @@ On silicon those writes are ignored (p373), and ArduPilot flies. So:
 
 **What I will build after the ruling,** per Q1–Q2 and the WO, fixing (§1.2):
 - `conditions.resc`, the `recorded` monitor script and `1200`'s sweep generator: `SPI1EN` after each `machine Reset`;
-- `firmware/spi1.rs` `forge`: `USART3EN` first.
+- `firmware/spi1.rs` `forge`: `USART3EN` first;
+- `rcc-reset`'s lock assertion. Under Q1 (a), `spi1` is no longer locked on the bus: its guard refuses instead.
+
+`tests/1300/smoke.resc` (a `1300` prototype that no test runs, and (6)'s to keep or delete) enables before each access, except its own lock check.
