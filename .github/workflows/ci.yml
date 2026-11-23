@@ -30,9 +30,17 @@ jobs:
       - name: Pull Aethelgard's pinned ArduPilot image, by digest
         run: podman pull "$(sed -n 's/^AP_IMAGE=//p' tests/1301/ci-memory.sh)"
       - name: Memory budget (this change against main, same job; median at most 32 MiB over, every boot under 1.5 GiB)
+        env:
+          TVIBURI_MAIN_SHA: ${{ github.event.pull_request.base.sha }}
         run: TVIBURI_SCRATCH="$RUNNER_TEMP/tviburi" tests/1301/ci-memory.sh
       - name: Memory budget's own tests (the judge; a planted 64 MiB branch refused by budget)
         run: TVIBURI_SCRATCH="$RUNNER_TEMP/tviburi" tests/1201/test-budget.sh
+      # TEMPORARY (TVI-WO-1201 §1.1; removed before READY): 1301's merged tree against the commit before it. A measurement.
+      - name: TEMPORARY 1301 (d598442) against the commit before it (b019105)
+        run: |
+          git fetch -q --no-tags --depth=1 origin b0191054146a317415a7f23e266ab9874c74e493 d5984421bb5c688db6f2062f3248e0b5076bf957
+          TVIBURI_SCRATCH="$RUNNER_TEMP/tviburi" TVIBURI_MEMORY_LABEL="§1.1 (temporary): 1301 d598442 against b019105" \
+            tests/1301/ci-memory.sh b0191054146a317415a7f23e266ab9874c74e493 d5984421bb5c688db6f2062f3248e0b5076bf957 || true
       - name: Adversarial cases
         run: TVIBURI_SCRATCH="$RUNNER_TEMP/tviburi" tests/adversarial.sh
       - name: Mutation run (one mutant per guard this change adds; each must be killed)

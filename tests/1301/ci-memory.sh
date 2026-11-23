@@ -4,7 +4,8 @@
 # aet-1c32c8ea-ardupilot/), on main's one-file overlay and on the branch's, in this one job, interleaved.
 #   MAIN, BRANCH  each a directory holding a source tree, or a commit of this checkout (extracted by `git archive`).
 #                 Default: HEAD^1 and HEAD. In CI on a pull request HEAD is GitHub's merge commit and HEAD^1 is main's
-#                 tip; on a push to main HEAD^1 is main before the push.
+#                 tip; on a push to main HEAD^1 is main before the push. TVIBURI_MAIN_SHA, when set (CI sets it to a
+#                 pull request's base), must be MAIN's commit.
 # Only the release comes from each tree, built once by that tree's own scripts/build-release; the harness
 # (replay-1301.sh), the captured run and the ELF are this checkout's, the same for both sides. The ELF is built from
 # Aethelgard's pinned ArduPilot image and must be a799dfb6… (the fixture's SOURCE.md).
@@ -74,7 +75,11 @@ for s in main branch; do
   else
     tree[$s]=$work/$s; mkdir "${tree[$s]}"
     git -C "$here" archive "$a" | tar -x -C "${tree[$s]}"
-    echo "$s: commit $(git -C "$here" rev-parse "$a") ($a)"
+    c=$(git -C "$here" rev-parse "$a")
+    echo "$s: commit $c ($a)"
+    # A pull request's main must be the base GitHub names, not whatever HEAD^1 happens to be (WO §5).
+    [ $s = branch ] || [ -z "${TVIBURI_MAIN_SHA:-}" ] || [ "$c" = "$TVIBURI_MAIN_SHA" ] \
+      || { echo "FAIL main is $c, but the pull request's base is $TVIBURI_MAIN_SHA"; exit 1; }
   fi
   mkdir "$work/rel-$s"
   hash[$s]=$(container -v "${tree[$s]}:/repo:ro" -v "$work/rel-$s:/out" "$IMAGE" sh /repo/scripts/build-release /repo /out/release \
@@ -130,8 +135,14 @@ for r in $(seq 1 "$runs"); do
     [ "${other:-0}" = 0 ] || why="$why $other witnesses of another release;"
     [ $s = main ] || [ "${would:-0}" = 0 ] || why="$why $would GPIO would-refuse;"
     status=${why:+${why# }}; status=${status:-ok}
-    printf '%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n' $s $r "${peak:-0}" "${wall:-none}" "$status" "$mine" "$avail" "$(cut -d' ' -f1-3 /proc/loadavg)" >> "$work/runs.tsv"
-    echo "$s boot $r: peak ${peak:-none} KiB, wall ${wall:-none} s, witnesses of its release $mine, host MemAvailable before $avail kB: $status"
+    # What the peak is made of (WO (4)): the Renode process's own breakdown at its peak sample, in KiB.
+    parts=$(awk '/^(RssAnon|RssFile|RssShmem|AnonHugePages|Threads):/ {v[$1] = $2}
+      END {printf "%s\t%s\t%s\t%s\t%s", v["RssAnon:"], v["RssFile:"], v["RssShmem:"], v["AnonHugePages:"], v["Threads:"]}' \
+      "$out/2-accept.peak-proc.txt" 2>/dev/null || true)
+    printf '%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n' $s $r "${peak:-0}" "${wall:-none}" "$status" "$mine" "$avail" \
+      "$(cut -d' ' -f1-3 /proc/loadavg)" "$parts" >> "$work/runs.tsv"
+    echo "$s boot $r: peak ${peak:-none} KiB, wall ${wall:-none} s, witnesses of its release $mine, host MemAvailable" \
+      "before $avail kB; at the peak RssAnon/RssFile/RssShmem/AnonHugePages/Threads $(tr '\t' / <<<"$parts"): $status"
   done
 done
 
@@ -146,9 +157,10 @@ if [ -n "${GITHUB_STEP_SUMMARY:-}" ]; then
     echo
     echo '```'; cat "$work/verdict.txt"; echo '```'
     echo
-    echo "| side | boot | peak (KiB) | wall (s) | counts? |"
-    echo "|---|---|---|---|---|"
-    awk -F'\t' '{printf "| %s | %s | %s | %s | %s |\n", $1, $2, $3, $4, $5}' "$work/runs.tsv"
+    echo "| side | boot | peak (KiB) | wall (s) | counts? | witnesses | RssAnon | RssFile | RssShmem | AnonHugePages | threads |"
+    echo "|---|---|---|---|---|---|---|---|---|---|---|"
+    awk -F'\t' '{printf "| %s | %s | %s | %s | %s | %s | %s | %s | %s | %s | %s |\n", $1, $2, $3, $4, $5, $6, $9, $10, $11, $12, $13}' \
+      "$work/runs.tsv"
     echo
     echo '```'; cat "$work/runner.txt"; echo '```'
   } >> "$GITHUB_STEP_SUMMARY"
