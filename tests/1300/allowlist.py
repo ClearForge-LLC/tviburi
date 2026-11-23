@@ -100,10 +100,14 @@ for r in tsv(H + 'rm/fields.tsv'):
         cls, allowed, behaves = 'inherited', None, 'the stock model (' + sk + '): ' + sb
     else:
         cls, allowed, behaves = 'tag', [rv], 'its reset value (stock ' + sk + ')'
+    if (reg, field) == ('RCC_CFGR', 'SW[2:0]'):
+        cls, allowed, behaves = 'inherited', [0, 1, 2, 3], 'the stock model (stored+callback); 100-111 are reserved (p393), and the stock model keeps the old value'
+    elif reg == 'RCC_BDCR' and acc not in ('r', '-') and field != 'Reserved':
+        cls, allowed, behaves = 'inherited', [rv or 0], 'its reset value only: RCC_BDCR is write-protected after a system reset until PWR_CR1.DBP = 1 (p427), which the twin does not model, and the RTC\'s kernel clock (RTCSEL, RTCEN) is not modeled'
     ack = ACKED.get((reg, field)) or ACKED.get((reg, field, msb)) or (ACKED_RSTR if reg.endswith('RSTR') and field == 'Reserved' else None)
     if ack:
         allowed, a, why = ack
-        cls, behaves = 'acknowledged', why + f' (A{a})'
+        cls, behaves = 'acknowledged', why + f' (TVI-WO-1300 A{a})'
     rows.append(dict(reg=reg, off=off, field=field, msb=msb, lsb=lsb, acc=acc, reset=rv, page=page, cls=cls,
                      allowed=allowed, behaves=behaves, stock=sk))
 

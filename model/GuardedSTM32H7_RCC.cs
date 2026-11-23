@@ -18,14 +18,20 @@
 //
 // Rules, in the order they are evaluated. A refused access is not passed to the stock model.
 //   TVI-LOAD        (Records) the model version could not be computed: every access refuses.
-//   TVI-RCC-WIDTH   any access other than an aligned 32-bit one (RM0433 §8.7 states no other width; both firmwares use
-//                   only 32-bit, TVI-WO-1300.rm0433.md §4).
+//   TVI-RCC-WIDTH   a misaligned access; and a half-word or byte access to any register but RCC_BDCR, RCC_CSR and RCC_RSR,
+//                   for which alone §8.7 states "word, half-word and byte access" (p427, p429, p450). Those three take
+//                   sub-word accesses, each checked as the 32-bit word it makes. Both firmwares use only 32-bit (§4).
 //   TVI-RCC-READ    a read of an offset with no register (Table 84, p496-505).
 //   TVI-RCC-PLL     a write silicon ignores because a PLL is on: PLLSRC with any PLL on (p399), DIVMx with PLLx on
 //                   (p398-399), DIVPx/DIVQx/DIVRxEN with PLLx on (p400-401). predicted-fault.
-//   TVI-RCC-PLL-REF a write that sets PLLxON while the PLL has no reference clock: PLLSRC = 11 ("No clock send to
-//                   DIVMx divider and PLLs", p399), its source off, or DIVMx = 0 ("prescaler disabled", p398-399). The
-//                   stock model would report PLLxRDY = 1 at once; silicon cannot lock. unmodeled (ruled 14:35Z).
+//   TVI-RCC-PLL-REF a CR write after which an enabled PLL has no reference clock: PLLxON set while PLLSRC = 11 ("No clock
+//                   send to DIVMx divider and PLLs", p399), its source off, or DIVMx = 0 ("prescaler disabled",
+//                   p398-399); or the source of an enabled PLL cleared. The stock model reports PLLxRDY = PLLxON
+//                   whatever the reference; silicon cannot lock. For PLL1's source, RM0433 contradicts itself: the
+//                   register descriptions say it "cannot be cleared if ... selected as reference clock for PLL1 with
+//                   PLL1 enabled" (p384-386), §8.5.2 adds "and selected to provide the system clock" (p340-342), and the
+//                   stock model follows §8.5.2. Either way the twin cannot say, so it is unmodeled (ruled 14:35Z), judged
+//                   on the RCC_CR value the stock model keeps (it reverts a clear of the system clock's source).
 //   TVI-RCC-SW      a CFGR write that switches SW to a source that is not running: silicon switches "only if the target
 //                   clock source is ready" (p350; SW p393), while the stock model switches at once (and, for PLL1 with
 //                   DIVM1 = 0, divides by zero). unmodeled.
@@ -133,6 +139,12 @@ namespace Antmicro.Renode.Peripherals.Tviburi
         // the clock runs; false when a refusal (or, in recorded mode, a would-refuse) was emitted.
         public bool RequireKernelClock(string peripheral, string start)
         {
+            if(records.LoadFailed)
+            {
+                records.Refuse("TVI-LOAD", Unmodeled, "none", peripheral + " kernel clock", "the guard did not load: no query is answered",
+                    Records.LoadCitation, "none", 0, 0, 0);
+                return false;
+            }
             var k = QueryKernelClock(peripheral);
             if(!k.Modeled)
             {
@@ -187,6 +199,11 @@ namespace Antmicro.Renode.Peripherals.Tviburi
                     Records.LoadCitation, State(), offset, 0, 32);
                 return 0;
             }
+            if((offset & 3) != 0)
+            {
+                Width(offset, 0, 32, "read");
+                return records.Recorded ? Served(Base(offset & ~3L)) : 0;
+            }
             var b = Base(offset);
             if(!Fields.Any(f => f.Offset == b))
             {
@@ -212,48 +229,76 @@ namespace Antmicro.Renode.Peripherals.Tviburi
 
         public ushort ReadWord(long offset)
         {
-            Width(offset, 0, 16, "read");
-            return records.Recorded ? (ushort)(Served(Base(offset & ~3L)) >> (int)(8 * (offset & 3))) : (ushort)0;
+            return (ushort)SubRead(offset, 16);
         }
 
         public void WriteWord(long offset, ushort value)
         {
-            Width(offset, value, 16, "write");
-            if(records.Recorded)
-            {
-                Merge(offset, value, 0xFFFFu);
-            }
+            SubWrite(offset, value, 16);
         }
 
         public byte ReadByte(long offset)
         {
-            Width(offset, 0, 8, "read");
-            return records.Recorded ? (byte)(Served(Base(offset & ~3L)) >> (int)(8 * (offset & 3))) : (byte)0;
+            return (byte)SubRead(offset, 8);
         }
 
         public void WriteByte(long offset, byte value)
         {
-            Width(offset, value, 8, "write");
-            if(records.Recorded)
+            SubWrite(offset, value, 8);
+        }
+
+        // RCC_BDCR, RCC_CSR and RCC_RSR take half-word and byte accesses (p427, p429, p450); no other register states it.
+        private static bool SubWordAllowed(long b)
+        {
+            return b == BdcrOffset || b == CsrOffset || b == RsrOffset;
+        }
+
+        private uint SubRead(long offset, int width)
+        {
+            var b = Base(offset & ~3L);
+            if(records.LoadFailed || (offset & (width / 8 - 1)) != 0 || !SubWordAllowed(b))
             {
-                Merge(offset, value, 0xFFu);
+                Width(offset, 0, width, "read");
+                if(!records.Recorded)
+                {
+                    return 0;
+                }
             }
+            return Served(b) >> (int)(8 * (offset & 3));
+        }
+
+        private void SubWrite(long offset, uint value, int width)
+        {
+            var b = Base(offset & ~3L);
+            var mask = width == 16 ? 0xFFFFu : 0xFFu;
+            var shift = (int)(8 * (offset & 3));
+            var word = (Served(b) & ~(mask << shift)) | ((value & mask) << shift);
+            if(records.LoadFailed || (offset & (width / 8 - 1)) != 0 || !SubWordAllowed(b))
+            {
+                Width(offset, value, width, "write");
+                if(!records.Recorded)
+                {
+                    return;
+                }
+            }
+            else if(RefusedField(b, b, word) && !records.Recorded)
+            {
+                return;
+            }
+            Pass(b, word);
         }
 
         private void Width(long offset, ulong value, int width, string what)
         {
-            records.Refuse("TVI-RCC-WIDTH", Unmodeled, RegisterAt(offset), width + "-bit " + what,
-                "a " + width + "-bit RCC " + what + ": RM0433 §8.7 states no access width, so the twin cannot say what silicon does with it",
-                "RM0433 Rev 9 §8.7 p382-495", State(), offset, value, width);
-        }
-
-        // Recorded mode only: a sub-word write goes on as Renode's own translation would make it (from memory: read the
-        // double word, merge, write it back).
-        private void Merge(long offset, uint value, uint mask)
-        {
-            var b = Base(offset & ~3L);
-            var shift = (int)(8 * (offset & 3));
-            Pass(b, (Served(b) & ~(mask << shift)) | ((value & mask) << shift));
+            if(records.LoadFailed)
+            {
+                records.Refuse("TVI-LOAD", Unmodeled, RegisterAt(offset & ~3L), "none", "the guard did not load: every access refuses",
+                    Records.LoadCitation, State(), offset, value, width);
+                return;
+            }
+            records.Refuse("TVI-RCC-WIDTH", Unmodeled, RegisterAt(offset & ~3L), ((offset & (width / 8 - 1)) != 0 ? "misaligned " : "") + width + "-bit " + what,
+                "a " + width + "-bit RCC " + what + " at offset 0x" + offset.ToString("X") + ": §8.7 states half-word and byte access only for RCC_BDCR, RCC_CSR and RCC_RSR, and an aligned access for every register, so the twin cannot say what silicon does with it",
+                "RM0433 Rev 9 §8.7 p382-495; p427 (RCC_BDCR), p429 (RCC_CSR), p450 (RCC_RSR): \"word, half-word and byte access\"", State(), offset, value, width);
         }
 
         // What a read returns: the copy's bits for a copied register, the stock model's for the rest.
@@ -274,6 +319,11 @@ namespace Antmicro.Renode.Peripherals.Tviburi
             {
                 records.Refuse("TVI-LOAD", Unmodeled, RegisterAt(offset), "none", "the guard did not load: every access refuses",
                     Records.LoadCitation, State(), offset, value, 32);
+                return true;
+            }
+            if((offset & 3) != 0)
+            {
+                Width(offset, value, 32, "write");
                 return true;
             }
             var b = Base(offset);
@@ -334,16 +384,17 @@ namespace Antmicro.Renode.Peripherals.Tviburi
             {
                 return false;
             }
-            var old = inner.ReadDoubleWord(CrOffset);
+            var cr = KeptCr(value);
             for(var n = 1; n <= 3; n++)
             {
                 var on = 1u << (24 + 2 * (n - 1));
-                if((value & on) != 0 && (old & on) == 0 && !PllReference(n, value))
+                if((cr & on) != 0 && !PllReference(n, cr))
                 {
                     records.Refuse("TVI-RCC-PLL-REF", Unmodeled, "RCC_CR", "PLL" + n + "ON (bit " + (24 + 2 * (n - 1)) + ") = 1",
-                        "PLL" + n + " enabled with no reference clock (" + Condition("pll" + n + "_p_ck") + "): the stock model reports PLL" + n
-                            + "RDY = 1 at once, while silicon has nothing to lock to; the twin cannot say what silicon does",
-                        "RM0433 Rev 9 §8.7.2 p383 (PLLxON, PLLxRDY); §8.7.11 p398-399 (PLLSRC, DIVMx); §8.5.5 p347-349",
+                        "PLL" + n + " enabled with no reference clock after this write (RCC_CR would be 0x" + cr.ToString("X8") + "; PLLSRC = "
+                            + Bin(Copy(PllckselrOffset) & 0x3, 2) + ", DIVM" + n + " = " + ((Copy(PllckselrOffset) >> DivmShift[n]) & 0x3F)
+                            + "): the stock model reports PLL" + n + "RDY = PLL" + n + "ON, while silicon has nothing to lock to; the twin cannot say what silicon does",
+                        "RM0433 Rev 9 §8.7.2 p383-386 (PLLxON, PLLxRDY; the sources' clear rules, which §8.5.2 p340-342 words differently for PLL1); §8.7.11 p398-399 (PLLSRC, DIVMx); §8.5.5 p347-349",
                         State(), b, value, 32);
                     return true;
                 }
@@ -374,6 +425,29 @@ namespace Antmicro.Renode.Peripherals.Tviburi
                 "the system clock switched to " + target + ", which is not running: silicon switches \"only if the target clock source is ready\" and keeps the old sys_ck until then, while the stock model switches at once",
                 "RM0433 Rev 9 §8.5.6 p350 (system clock switch); §8.7.7 p393 (SW, SWS)", State(), b, value, 32);
             return true;
+        }
+
+        // The RCC_CR value the stock model keeps after a write: it reverts a clear of HSION, CSION or HSEON while that
+        // oscillator is the system clock or PLL1's source with PLL1 the system clock, and of PLL1ON while PLL1 is the
+        // system clock (STM32H7_RCC.cs, the RCC_CR write callbacks).
+        private uint KeptCr(uint value)
+        {
+            var old = inner.ReadDoubleWord(CrOffset);
+            var sw = inner.ReadDoubleWord(CfgrOffset) & 0x7;
+            var src = Copy(PllckselrOffset) & 0x3;
+            var kept = value;
+            foreach(var (bit, sel) in new[] { (CrHsion, 0u), (CrCsion, 1u), (CrHseon, 2u) })
+            {
+                if((old & bit) != 0 && (value & bit) == 0 && (sw == sel || (sw == 3 && src == sel)))
+                {
+                    kept |= bit;
+                }
+            }
+            if((old & (1u << 24)) != 0 && sw == 3)
+            {
+                kept |= 1u << 24;
+            }
+            return kept;
         }
 
         private bool RefusePll(long b, uint value, string field, string condition, string citation)
@@ -689,6 +763,9 @@ namespace Antmicro.Renode.Peripherals.Tviburi
 
         private const long CrOffset = 0x000;
         private const long CfgrOffset = 0x010;
+        private const long BdcrOffset = 0x070;
+        private const long CsrOffset = 0x074;
+        private const long RsrOffset = 0x0D0;
         private const long PllckselrOffset = 0x028;
         private const long PllcfgrOffset = 0x02C;
         private const uint CrHsion = 1u << 0;
@@ -706,7 +783,7 @@ namespace Antmicro.Renode.Peripherals.Tviburi
 
         // ---- the allow-list (RUL-17): every RM0433 field of every RCC register, keyed by its names (RUL-16) ---------
         // Generated by tests/1300/allowlist.py from RM0433 Rev 9's field list and the stock model's kinds, with the guard's
-        // own fields overriding, and the architect's acknowledgements (A1)-(A6) of TVI-WO-1300.rm0433.md §6.1 (14:35Z).
+        // own fields overriding, and the architect's acknowledgements (TVI-WO-1300 A1)-(A6) of TVI-WO-1300.rm0433.md §6.1 and §8 (14:35Z).
         // One row of the allow-list: an RM0433 field, the values the model implements (null: any value),
         // its class (guard, inherited and unaudited, acknowledged by name, tag, reserved), and what the
         // model behaves as. Rows are the measured table of TVI-WO-0100b.rm0433.md §2 as ruled (§4).
@@ -776,7 +853,7 @@ namespace Antmicro.Renode.Peripherals.Tviburi
             R("RCC_CR", 0x000, "§8.7.2", "PLL1ON", 24, 24, Any, "inherited, unaudited (acknowledged by name)", "the stock model (stored+callback): stored; write 0 reverted to 1 (Warning) while SW==PLL", 383),
             R("RCC_CR", 0x000, "§8.7.2", "Res23_20", 23, 20, Zero, "reserved", "reserved: dropped, reads its reset value", 383),
             R("RCC_CR", 0x000, "§8.7.2", "HSECSSON", 19, 19, Any, "inherited, unaudited (acknowledged by name)", "the stock model (stored): FieldMode Read|Set: write 1 sets, write 0 cannot clear; no CSS behaviour", 384),
-            R("RCC_CR", 0x000, "§8.7.2", "HSEBYP", 18, 18, Any, "acknowledged by name", "the twin has no oscillator: bypass and crystal behave alike (A3)", 384),
+            R("RCC_CR", 0x000, "§8.7.2", "HSEBYP", 18, 18, Any, "acknowledged by name", "the twin has no oscillator: bypass and crystal behave alike (TVI-WO-1300 A3)", 384),
             R("RCC_CR", 0x000, "§8.7.2", "HSERDY", 17, 17, Any, "read-only", "ignored (read-only; stock computed-read)", 384),
             R("RCC_CR", 0x000, "§8.7.2", "HSEON", 16, 16, Any, "inherited, unaudited (acknowledged by name)", "the stock model (stored+callback): stored; write 0 reverted if SW==HSE or PLL1 selected with PLLSRC==HSE", 384),
             R("RCC_CR", 0x000, "§8.7.2", "D2CKRDY", 15, 15, Any, "read-only", "ignored (read-only; stock tag)", 384),
@@ -804,17 +881,17 @@ namespace Antmicro.Renode.Peripherals.Tviburi
             R("RCC_CSICFGR", 0x00C, "§8.7.6", "Res23_10", 23, 10, Zero, "reserved", "reserved: dropped, reads its reset value", 390),
             R("RCC_CSICFGR", 0x00C, "§8.7.6", "CSICAL", 9, 0, Any, "read-only", "ignored (read-only; stock undefined)", 390),
             R("RCC_CFGR", 0x010, "§8.7.7", "MCO2", 31, 29, Zero, "tag", "its reset value (stock tag)", 391),
-            R("RCC_CFGR", 0x010, "§8.7.7", "MCO2PRE", 28, 25, Any, "acknowledged by name", "no MCO pin and no RTC clock are modeled; with MCOx at reset no pin is driven (A2)", 391),
+            R("RCC_CFGR", 0x010, "§8.7.7", "MCO2PRE", 28, 25, Any, "acknowledged by name", "no MCO pin and no RTC clock are modeled; with MCOx at reset no pin is driven (TVI-WO-1300 A2)", 391),
             R("RCC_CFGR", 0x010, "§8.7.7", "MCO1", 24, 22, Zero, "tag", "its reset value (stock tag)", 391),
-            R("RCC_CFGR", 0x010, "§8.7.7", "MCO1PRE", 21, 18, Any, "acknowledged by name", "no MCO pin and no RTC clock are modeled; with MCOx at reset no pin is driven (A2)", 392),
+            R("RCC_CFGR", 0x010, "§8.7.7", "MCO1PRE", 21, 18, Any, "acknowledged by name", "no MCO pin and no RTC clock are modeled; with MCOx at reset no pin is driven (TVI-WO-1300 A2)", 392),
             R("RCC_CFGR", 0x010, "§8.7.7", "Res17_16", 17, 16, Zero, "reserved", "reserved: dropped, reads its reset value", 392),
             R("RCC_CFGR", 0x010, "§8.7.7", "TIMPRE", 15, 15, Any, "inherited, unaudited (acknowledged by name)", "the stock model (stored): stored; selects timer kernel clock divisor (LookupHclkDivisorForTimersKernelClock)", 392),
             R("RCC_CFGR", 0x010, "§8.7.7", "HRTIMSEL", 14, 14, Zero, "tag", "its reset value (stock tag)", 392),
-            R("RCC_CFGR", 0x010, "§8.7.7", "RTCPRE", 13, 8, Any, "acknowledged by name", "no MCO pin and no RTC clock are modeled; with MCOx at reset no pin is driven (A2)", 392),
+            R("RCC_CFGR", 0x010, "§8.7.7", "RTCPRE", 13, 8, Any, "acknowledged by name", "no MCO pin and no RTC clock are modeled; with MCOx at reset no pin is driven (TVI-WO-1300 A2)", 392),
             R("RCC_CFGR", 0x010, "§8.7.7", "STOPKERWUCK", 7, 7, Zero, "tag", "its reset value (stock tag)", 392),
             R("RCC_CFGR", 0x010, "§8.7.7", "STOPWUCK", 6, 6, Zero, "tag", "its reset value (stock tag)", 393),
             R("RCC_CFGR", 0x010, "§8.7.7", "SWS", 5, 3, Any, "read-only", "ignored (read-only; stock computed-read)", 393),
-            R("RCC_CFGR", 0x010, "§8.7.7", "SW", 2, 0, Any, "inherited, unaudited (acknowledged by name)", "the stock model (stored+callback): stored enum (Hsi,Csi,Hse,Pll); written values >3 reverted to previous; feeds SysCkBaseFrequency (PropagateClock via regi", 393),
+            R("RCC_CFGR", 0x010, "§8.7.7", "SW", 2, 0, new uint[] { 0, 1, 2, 3 }, "inherited, unaudited (acknowledged by name)", "the stock model (stored+callback); 100-111 are reserved (p393), and the stock model keeps the old value", 393),
             R("RCC_D1CFGR", 0x018, "§8.7.8", "Res31_12", 31, 12, Zero, "reserved", "reserved: dropped, reads its reset value", 394),
             R("RCC_D1CFGR", 0x018, "§8.7.8", "D1CPRE", 11, 8, Any, "inherited, unaudited (acknowledged by name)", "the stock model (stored+callback): stored; changeCallback derives d1CpreDivider (core/systick divider)", 394),
             R("RCC_D1CFGR", 0x018, "§8.7.8", "Res7", 7, 7, Zero, "reserved", "reserved: dropped, reads its reset value", 395),
@@ -847,15 +924,15 @@ namespace Antmicro.Renode.Peripherals.Tviburi
             R("RCC_PLLCFGR", 0x02C, "§8.7.12", "DIVQ1EN", 17, 17, Any, "modeled by the guard", "the guard's copy (the kernel clock query)", 401),
             R("RCC_PLLCFGR", 0x02C, "§8.7.12", "DIVP1EN", 16, 16, Any, "modeled by the guard", "the guard's copy (the kernel clock query)", 401),
             R("RCC_PLLCFGR", 0x02C, "§8.7.12", "Res15_12", 15, 12, Zero, "reserved", "reserved: dropped, reads its reset value", 401),
-            R("RCC_PLLCFGR", 0x02C, "§8.7.12", "PLL3RGE", 11, 10, Any, "acknowledged by name", "no PLL frequency is modeled beyond PLL1's integer one: the field sets range or mode, not whether an output runs (A1)", 401),
-            R("RCC_PLLCFGR", 0x02C, "§8.7.12", "PLL3VCOSEL", 9, 9, Any, "acknowledged by name", "no PLL frequency is modeled beyond PLL1's integer one: the field sets range or mode, not whether an output runs (A1)", 401),
-            R("RCC_PLLCFGR", 0x02C, "§8.7.12", "PLL3FRACEN", 8, 8, Any, "acknowledged by name", "no PLL frequency is modeled beyond PLL1's integer one: the field sets range or mode, not whether an output runs (A1)", 401),
-            R("RCC_PLLCFGR", 0x02C, "§8.7.12", "PLL2RGE", 7, 6, Any, "acknowledged by name", "no PLL frequency is modeled beyond PLL1's integer one: the field sets range or mode, not whether an output runs (A1)", 402),
+            R("RCC_PLLCFGR", 0x02C, "§8.7.12", "PLL3RGE", 11, 10, Any, "acknowledged by name", "no PLL frequency is modeled beyond PLL1's integer one: the field sets range or mode, not whether an output runs (TVI-WO-1300 A1)", 401),
+            R("RCC_PLLCFGR", 0x02C, "§8.7.12", "PLL3VCOSEL", 9, 9, Any, "acknowledged by name", "no PLL frequency is modeled beyond PLL1's integer one: the field sets range or mode, not whether an output runs (TVI-WO-1300 A1)", 401),
+            R("RCC_PLLCFGR", 0x02C, "§8.7.12", "PLL3FRACEN", 8, 8, Any, "acknowledged by name", "no PLL frequency is modeled beyond PLL1's integer one: the field sets range or mode, not whether an output runs (TVI-WO-1300 A1)", 401),
+            R("RCC_PLLCFGR", 0x02C, "§8.7.12", "PLL2RGE", 7, 6, Any, "acknowledged by name", "no PLL frequency is modeled beyond PLL1's integer one: the field sets range or mode, not whether an output runs (TVI-WO-1300 A1)", 402),
             R("RCC_PLLCFGR", 0x02C, "§8.7.12", "PLL2VCOSEL", 5, 5, Any, "inherited, unaudited (acknowledged by name)", "the stock model (stored): plain stored flag (WithFlag, not tagged)", 402),
-            R("RCC_PLLCFGR", 0x02C, "§8.7.12", "PLL2FRACEN", 4, 4, Any, "acknowledged by name", "no PLL frequency is modeled beyond PLL1's integer one: the field sets range or mode, not whether an output runs (A1)", 402),
-            R("RCC_PLLCFGR", 0x02C, "§8.7.12", "PLL1RGE", 3, 2, Any, "acknowledged by name", "no PLL frequency is modeled beyond PLL1's integer one: the field sets range or mode, not whether an output runs (A1)", 402),
-            R("RCC_PLLCFGR", 0x02C, "§8.7.12", "PLL1VCOSEL", 1, 1, Any, "acknowledged by name", "no PLL frequency is modeled beyond PLL1's integer one: the field sets range or mode, not whether an output runs (A1)", 402),
-            R("RCC_PLLCFGR", 0x02C, "§8.7.12", "PLL1FRACEN", 0, 0, Any, "acknowledged by name", "no PLL frequency is modeled beyond PLL1's integer one: the field sets range or mode, not whether an output runs (A1)", 402),
+            R("RCC_PLLCFGR", 0x02C, "§8.7.12", "PLL2FRACEN", 4, 4, Any, "acknowledged by name", "no PLL frequency is modeled beyond PLL1's integer one: the field sets range or mode, not whether an output runs (TVI-WO-1300 A1)", 402),
+            R("RCC_PLLCFGR", 0x02C, "§8.7.12", "PLL1RGE", 3, 2, Any, "acknowledged by name", "no PLL frequency is modeled beyond PLL1's integer one: the field sets range or mode, not whether an output runs (TVI-WO-1300 A1)", 402),
+            R("RCC_PLLCFGR", 0x02C, "§8.7.12", "PLL1VCOSEL", 1, 1, Any, "acknowledged by name", "no PLL frequency is modeled beyond PLL1's integer one: the field sets range or mode, not whether an output runs (TVI-WO-1300 A1)", 402),
+            R("RCC_PLLCFGR", 0x02C, "§8.7.12", "PLL1FRACEN", 0, 0, Any, "acknowledged by name", "no PLL frequency is modeled beyond PLL1's integer one: the field sets range or mode, not whether an output runs (TVI-WO-1300 A1)", 402),
             R("RCC_PLL1DIVR", 0x030, "§8.7.13", "Res31", 31, 31, Zero, "reserved", "reserved: dropped, reads its reset value", 403),
             R("RCC_PLL1DIVR", 0x030, "§8.7.13", "DIVR1", 30, 24, Any, "inherited, unaudited (acknowledged by name)", "the stock model (stored+callback): stored; change reverted if PLL1ON; no frequency use", 403),
             R("RCC_PLL1DIVR", 0x030, "§8.7.13", "Res23", 23, 23, Zero, "reserved", "reserved: dropped, reads its reset value", 403),
@@ -966,58 +1043,58 @@ namespace Antmicro.Renode.Peripherals.Tviburi
             R("RCC_CICR", 0x068, "§8.7.25", "LSERDYC", 1, 1, Zero, "tag", "its reset value (stock tag)", 426),
             R("RCC_CICR", 0x068, "§8.7.25", "LSIRDYC", 0, 0, Zero, "tag", "its reset value (stock tag)", 426),
             R("RCC_BDCR", 0x070, "§8.7.26", "Res31_17", 31, 17, Zero, "reserved", "reserved: dropped, reads its reset value", 427),
-            R("RCC_BDCR", 0x070, "§8.7.26", "BDRST", 16, 16, Any, "inherited, unaudited (acknowledged by name)", "the stock model (stored): stored 1-bit value field, no effect (no reset of RTC)", 427),
-            R("RCC_BDCR", 0x070, "§8.7.26", "RTCEN", 15, 15, Any, "inherited, unaudited (acknowledged by name)", "the stock model (computed-read): write: if RTC registered in RCC -> sysbus.SetPeripheralEnabled(peri,value) (lock/unlock on bus), else no-op (Noisy log);", 427),
+            R("RCC_BDCR", 0x070, "§8.7.26", "BDRST", 16, 16, Zero, "inherited, unaudited (acknowledged by name)", "its reset value only: RCC_BDCR is write-protected after a system reset until PWR_CR1.DBP = 1 (p427), which the twin does not model, and the RTC's kernel clock (RTCSEL, RTCEN) is not modeled", 427),
+            R("RCC_BDCR", 0x070, "§8.7.26", "RTCEN", 15, 15, Zero, "inherited, unaudited (acknowledged by name)", "its reset value only: RCC_BDCR is write-protected after a system reset until PWR_CR1.DBP = 1 (p427), which the twin does not model, and the RTC's kernel clock (RTCSEL, RTCEN) is not modeled", 427),
             R("RCC_BDCR", 0x070, "§8.7.26", "Res14_10", 14, 10, Zero, "reserved", "reserved: dropped, reads its reset value", 427),
-            R("RCC_BDCR", 0x070, "§8.7.26", "RTCSEL", 9, 8, Any, "inherited, unaudited (acknowledged by name)", "the stock model (stored): stored 2-bit, no effect", 427),
+            R("RCC_BDCR", 0x070, "§8.7.26", "RTCSEL", 9, 8, Zero, "inherited, unaudited (acknowledged by name)", "its reset value only: RCC_BDCR is write-protected after a system reset until PWR_CR1.DBP = 1 (p427), which the twin does not model, and the RTC's kernel clock (RTCSEL, RTCEN) is not modeled", 427),
             R("RCC_BDCR", 0x070, "§8.7.26", "Res7", 7, 7, Zero, "reserved", "reserved: dropped, reads its reset value", 427),
             R("RCC_BDCR", 0x070, "§8.7.26", "LSECSSD", 6, 6, Any, "read-only", "ignored (read-only; stock tag)", 428),
-            R("RCC_BDCR", 0x070, "§8.7.26", "LSECSSON", 5, 5, Zero, "tag", "its reset value (stock tag)", 428),
-            R("RCC_BDCR", 0x070, "§8.7.26", "LSEDRV", 4, 3, Zero, "tag", "its reset value (stock tag)", 428),
-            R("RCC_BDCR", 0x070, "§8.7.26", "LSEBYP", 2, 2, Any, "inherited, unaudited (acknowledged by name)", "the stock model (stored): stored 1-bit value field, no effect", 428),
+            R("RCC_BDCR", 0x070, "§8.7.26", "LSECSSON", 5, 5, Zero, "inherited, unaudited (acknowledged by name)", "its reset value only: RCC_BDCR is write-protected after a system reset until PWR_CR1.DBP = 1 (p427), which the twin does not model, and the RTC's kernel clock (RTCSEL, RTCEN) is not modeled", 428),
+            R("RCC_BDCR", 0x070, "§8.7.26", "LSEDRV", 4, 3, Zero, "inherited, unaudited (acknowledged by name)", "its reset value only: RCC_BDCR is write-protected after a system reset until PWR_CR1.DBP = 1 (p427), which the twin does not model, and the RTC's kernel clock (RTCSEL, RTCEN) is not modeled", 428),
+            R("RCC_BDCR", 0x070, "§8.7.26", "LSEBYP", 2, 2, Zero, "inherited, unaudited (acknowledged by name)", "its reset value only: RCC_BDCR is write-protected after a system reset until PWR_CR1.DBP = 1 (p427), which the twin does not model, and the RTC's kernel clock (RTCSEL, RTCEN) is not modeled", 428),
             R("RCC_BDCR", 0x070, "§8.7.26", "LSERDY", 1, 1, Any, "read-only", "ignored (read-only; stock computed-read)", 428),
-            R("RCC_BDCR", 0x070, "§8.7.26", "LSEON", 0, 0, Any, "inherited, unaudited (acknowledged by name)", "the stock model (stored): stored (local var)", 428),
+            R("RCC_BDCR", 0x070, "§8.7.26", "LSEON", 0, 0, Zero, "inherited, unaudited (acknowledged by name)", "its reset value only: RCC_BDCR is write-protected after a system reset until PWR_CR1.DBP = 1 (p427), which the twin does not model, and the RTC's kernel clock (RTCSEL, RTCEN) is not modeled", 428),
             R("RCC_CSR", 0x074, "§8.7.27", "Res31_2", 31, 2, Zero, "reserved", "reserved: dropped, reads its reset value", 429),
             R("RCC_CSR", 0x074, "§8.7.27", "LSIRDY", 1, 1, Any, "read-only", "ignored (read-only; stock computed-read)", 429),
             R("RCC_CSR", 0x074, "§8.7.27", "LSION", 0, 0, Any, "inherited, unaudited (acknowledged by name)", "the stock model (stored): stored (local var)", 429),
-            R("RCC_AHB3RSTR", 0x07C, "§8.7.28", "Res31_17", 31, 17, Any, "acknowledged by name", "reserved: no flop on either side; written 1 by all-ones resets (A4)", 430),
+            R("RCC_AHB3RSTR", 0x07C, "§8.7.28", "Res31_17", 31, 17, Any, "acknowledged by name", "reserved: no flop on either side; written 1 by all-ones resets (TVI-WO-1300 A4)", 430),
             R("RCC_AHB3RSTR", 0x07C, "§8.7.28", "SDMMC1RST", 16, 16, Any, "inherited, unaudited (acknowledged by name)", "the stock model (stored+callback): stored (reads back as written, never self-clears); on any write of 1 -> RegisteredPeripherals[SDMMC1].Reset() if registe", 430),
-            R("RCC_AHB3RSTR", 0x07C, "§8.7.28", "Res15", 15, 15, Any, "acknowledged by name", "reserved: no flop on either side; written 1 by all-ones resets (A4)", 430),
+            R("RCC_AHB3RSTR", 0x07C, "§8.7.28", "Res15", 15, 15, Any, "acknowledged by name", "reserved: no flop on either side; written 1 by all-ones resets (TVI-WO-1300 A4)", 430),
             R("RCC_AHB3RSTR", 0x07C, "§8.7.28", "QSPIRST", 14, 14, Any, "inherited, unaudited (acknowledged by name)", "the stock model (stored+callback): stored (reads back as written, never self-clears); on any write of 1 -> RegisteredPeripherals[QSPI].Reset() if registere", 430),
-            R("RCC_AHB3RSTR", 0x07C, "§8.7.28", "Res13", 13, 13, Any, "acknowledged by name", "reserved: no flop on either side; written 1 by all-ones resets (A4)", 430),
+            R("RCC_AHB3RSTR", 0x07C, "§8.7.28", "Res13", 13, 13, Any, "acknowledged by name", "reserved: no flop on either side; written 1 by all-ones resets (TVI-WO-1300 A4)", 430),
             R("RCC_AHB3RSTR", 0x07C, "§8.7.28", "FMCRST", 12, 12, Any, "inherited, unaudited (acknowledged by name)", "the stock model (stored+callback): stored (reads back as written, never self-clears); on any write of 1 -> RegisteredPeripherals[FMC].Reset() if registered", 430),
-            R("RCC_AHB3RSTR", 0x07C, "§8.7.28", "Res11_6", 11, 6, Any, "acknowledged by name", "reserved: no flop on either side; written 1 by all-ones resets (A4)", 430),
+            R("RCC_AHB3RSTR", 0x07C, "§8.7.28", "Res11_6", 11, 6, Any, "acknowledged by name", "reserved: no flop on either side; written 1 by all-ones resets (TVI-WO-1300 A4)", 430),
             R("RCC_AHB3RSTR", 0x07C, "§8.7.28", "JPGDECRST", 5, 5, Any, "inherited, unaudited (acknowledged by name)", "the stock model (stored+callback): stored (reads back as written, never self-clears); on any write of 1 -> RegisteredPeripherals[JPGDEC].Reset() if registe", 430),
             R("RCC_AHB3RSTR", 0x07C, "§8.7.28", "DMA2DRST", 4, 4, Any, "inherited, unaudited (acknowledged by name)", "the stock model (stored+callback): stored (reads back as written, never self-clears); on any write of 1 -> RegisteredPeripherals[DMA2D].Reset() if register", 431),
-            R("RCC_AHB3RSTR", 0x07C, "§8.7.28", "Res3_1", 3, 1, Any, "acknowledged by name", "reserved: no flop on either side; written 1 by all-ones resets (A4)", 431),
+            R("RCC_AHB3RSTR", 0x07C, "§8.7.28", "Res3_1", 3, 1, Any, "acknowledged by name", "reserved: no flop on either side; written 1 by all-ones resets (TVI-WO-1300 A4)", 431),
             R("RCC_AHB3RSTR", 0x07C, "§8.7.28", "MDMARST", 0, 0, Any, "inherited, unaudited (acknowledged by name)", "the stock model (stored+callback): stored (reads back as written, never self-clears); on any write of 1 -> RegisteredPeripherals[MDMA].Reset() if registere", 431),
-            R("RCC_AHB1RSTR", 0x080, "§8.7.29", "Res31_28", 31, 28, Any, "acknowledged by name", "reserved: no flop on either side; written 1 by all-ones resets (A4)", 432),
+            R("RCC_AHB1RSTR", 0x080, "§8.7.29", "Res31_28", 31, 28, Any, "acknowledged by name", "reserved: no flop on either side; written 1 by all-ones resets (TVI-WO-1300 A4)", 432),
             R("RCC_AHB1RSTR", 0x080, "§8.7.29", "USB2OTGRST", 27, 27, Any, "inherited, unaudited (acknowledged by name)", "the stock model (stored+callback): stored (reads back as written, never self-clears); on any write of 1 -> RegisteredPeripherals[USB2OTGHS].Reset() if regi", 432),
-            R("RCC_AHB1RSTR", 0x080, "§8.7.29", "Res26", 26, 26, Any, "acknowledged by name", "reserved: no flop on either side; written 1 by all-ones resets (A4)", 432),
+            R("RCC_AHB1RSTR", 0x080, "§8.7.29", "Res26", 26, 26, Any, "acknowledged by name", "reserved: no flop on either side; written 1 by all-ones resets (TVI-WO-1300 A4)", 432),
             R("RCC_AHB1RSTR", 0x080, "§8.7.29", "USB1OTGRST", 25, 25, Any, "inherited, unaudited (acknowledged by name)", "the stock model (stored+callback): stored (reads back as written, never self-clears); on any write of 1 -> RegisteredPeripherals[USB2OTGHS].Reset() if regi", 432),
-            R("RCC_AHB1RSTR", 0x080, "§8.7.29", "Res24_16", 24, 16, Any, "acknowledged by name", "reserved: no flop on either side; written 1 by all-ones resets (A4)", 432),
+            R("RCC_AHB1RSTR", 0x080, "§8.7.29", "Res24_16", 24, 16, Any, "acknowledged by name", "reserved: no flop on either side; written 1 by all-ones resets (TVI-WO-1300 A4)", 432),
             R("RCC_AHB1RSTR", 0x080, "§8.7.29", "ETH1MACRST", 15, 15, Any, "inherited, unaudited (acknowledged by name)", "the stock model (stored+callback): stored (reads back as written, never self-clears); on any write of 1 -> RegisteredPeripherals[ETH1MAC].Reset() if regist", 432),
-            R("RCC_AHB1RSTR", 0x080, "§8.7.29", "Res14_6", 14, 6, Any, "acknowledged by name", "reserved: no flop on either side; written 1 by all-ones resets (A4)", 432),
+            R("RCC_AHB1RSTR", 0x080, "§8.7.29", "Res14_6", 14, 6, Any, "acknowledged by name", "reserved: no flop on either side; written 1 by all-ones resets (TVI-WO-1300 A4)", 432),
             R("RCC_AHB1RSTR", 0x080, "§8.7.29", "ADC12RST", 5, 5, Any, "inherited, unaudited (acknowledged by name)", "the stock model (stored+callback): stored (reads back as written, never self-clears); on any write of 1 -> RegisteredPeripherals[ADC12].Reset() if register", 432),
-            R("RCC_AHB1RSTR", 0x080, "§8.7.29", "Res4_2", 4, 2, Any, "acknowledged by name", "reserved: no flop on either side; written 1 by all-ones resets (A4)", 433),
+            R("RCC_AHB1RSTR", 0x080, "§8.7.29", "Res4_2", 4, 2, Any, "acknowledged by name", "reserved: no flop on either side; written 1 by all-ones resets (TVI-WO-1300 A4)", 433),
             R("RCC_AHB1RSTR", 0x080, "§8.7.29", "DMA2RST", 1, 1, Any, "inherited, unaudited (acknowledged by name)", "the stock model (stored+callback): stored (reads back as written, never self-clears); on any write of 1 -> RegisteredPeripherals[DMA2].Reset() if registere", 433),
             R("RCC_AHB1RSTR", 0x080, "§8.7.29", "DMA1RST", 0, 0, Any, "inherited, unaudited (acknowledged by name)", "the stock model (stored+callback): stored (reads back as written, never self-clears); on any write of 1 -> RegisteredPeripherals[DMA1].Reset() if registere", 433),
-            R("RCC_AHB2RSTR", 0x084, "§8.7.30", "Res31_10", 31, 10, Any, "acknowledged by name", "reserved: no flop on either side; written 1 by all-ones resets (A4)", 434),
+            R("RCC_AHB2RSTR", 0x084, "§8.7.30", "Res31_10", 31, 10, Any, "acknowledged by name", "reserved: no flop on either side; written 1 by all-ones resets (TVI-WO-1300 A4)", 434),
             R("RCC_AHB2RSTR", 0x084, "§8.7.30", "SDMMC2RST", 9, 9, Any, "inherited, unaudited (acknowledged by name)", "the stock model (stored+callback): stored (reads back as written, never self-clears); on any write of 1 -> RegisteredPeripherals[SDMMC2].Reset() if registe", 434),
-            R("RCC_AHB2RSTR", 0x084, "§8.7.30", "Res8_7", 8, 7, Any, "acknowledged by name", "reserved: no flop on either side; written 1 by all-ones resets (A4)", 434),
+            R("RCC_AHB2RSTR", 0x084, "§8.7.30", "Res8_7", 8, 7, Any, "acknowledged by name", "reserved: no flop on either side; written 1 by all-ones resets (TVI-WO-1300 A4)", 434),
             R("RCC_AHB2RSTR", 0x084, "§8.7.30", "RNGRST", 6, 6, Any, "inherited, unaudited (acknowledged by name)", "the stock model (stored+callback): stored (reads back as written, never self-clears); on any write of 1 -> RegisteredPeripherals[RNG].Reset() if registered", 434),
             R("RCC_AHB2RSTR", 0x084, "§8.7.30", "HASHRST", 5, 5, Any, "inherited, unaudited (acknowledged by name)", "the stock model (stored+callback): stored (reads back as written, never self-clears); on any write of 1 -> RegisteredPeripherals[HASH].Reset() if registere", 434),
             R("RCC_AHB2RSTR", 0x084, "§8.7.30", "CRYPTRST", 4, 4, Any, "inherited, unaudited (acknowledged by name)", "the stock model (stored+callback): stored (reads back as written, never self-clears); on any write of 1 -> RegisteredPeripherals[CRYPT].Reset() if register", 434),
-            R("RCC_AHB2RSTR", 0x084, "§8.7.30", "Res3_1", 3, 1, Any, "acknowledged by name", "reserved: no flop on either side; written 1 by all-ones resets (A4)", 434),
+            R("RCC_AHB2RSTR", 0x084, "§8.7.30", "Res3_1", 3, 1, Any, "acknowledged by name", "reserved: no flop on either side; written 1 by all-ones resets (TVI-WO-1300 A4)", 434),
             R("RCC_AHB2RSTR", 0x084, "§8.7.30", "DCMIRST", 0, 0, Any, "inherited, unaudited (acknowledged by name)", "the stock model (stored+callback): stored (reads back as written, never self-clears); on any write of 1 -> RegisteredPeripherals[DCMI].Reset() if registere", 434),
-            R("RCC_AHB4RSTR", 0x088, "§8.7.31", "Res31_26", 31, 26, Any, "acknowledged by name", "reserved: no flop on either side; written 1 by all-ones resets (A4)", 435),
+            R("RCC_AHB4RSTR", 0x088, "§8.7.31", "Res31_26", 31, 26, Any, "acknowledged by name", "reserved: no flop on either side; written 1 by all-ones resets (TVI-WO-1300 A4)", 435),
             R("RCC_AHB4RSTR", 0x088, "§8.7.31", "HSEMRST", 25, 25, Any, "inherited, unaudited (acknowledged by name)", "the stock model (stored+callback): stored (reads back as written, never self-clears); on any write of 1 -> RegisteredPeripherals[HSEM].Reset() if registere", 435),
             R("RCC_AHB4RSTR", 0x088, "§8.7.31", "ADC3RST", 24, 24, Any, "inherited, unaudited (acknowledged by name)", "the stock model (stored+callback): stored (reads back as written, never self-clears); on any write of 1 -> RegisteredPeripherals[ADC3].Reset() if registere", 435),
-            R("RCC_AHB4RSTR", 0x088, "§8.7.31", "Res23_22", 23, 22, Any, "acknowledged by name", "reserved: no flop on either side; written 1 by all-ones resets (A4)", 435),
+            R("RCC_AHB4RSTR", 0x088, "§8.7.31", "Res23_22", 23, 22, Any, "acknowledged by name", "reserved: no flop on either side; written 1 by all-ones resets (TVI-WO-1300 A4)", 435),
             R("RCC_AHB4RSTR", 0x088, "§8.7.31", "BDMARST", 21, 21, Any, "inherited, unaudited (acknowledged by name)", "the stock model (stored+callback): stored (reads back as written, never self-clears); on any write of 1 -> RegisteredPeripherals[BDMA].Reset() if registere", 435),
-            R("RCC_AHB4RSTR", 0x088, "§8.7.31", "Res20", 20, 20, Any, "acknowledged by name", "reserved: no flop on either side; written 1 by all-ones resets (A4)", 435),
+            R("RCC_AHB4RSTR", 0x088, "§8.7.31", "Res20", 20, 20, Any, "acknowledged by name", "reserved: no flop on either side; written 1 by all-ones resets (TVI-WO-1300 A4)", 435),
             R("RCC_AHB4RSTR", 0x088, "§8.7.31", "CRCRST", 19, 19, Any, "inherited, unaudited (acknowledged by name)", "the stock model (stored+callback): stored (reads back as written, never self-clears); on any write of 1 -> RegisteredPeripherals[CRC].Reset() if registered", 435),
-            R("RCC_AHB4RSTR", 0x088, "§8.7.31", "Res18_11", 18, 11, Any, "acknowledged by name", "reserved: no flop on either side; written 1 by all-ones resets (A4)", 435),
+            R("RCC_AHB4RSTR", 0x088, "§8.7.31", "Res18_11", 18, 11, Any, "acknowledged by name", "reserved: no flop on either side; written 1 by all-ones resets (TVI-WO-1300 A4)", 435),
             R("RCC_AHB4RSTR", 0x088, "§8.7.31", "GPIOKRST", 10, 10, Any, "inherited, unaudited (acknowledged by name)", "the stock model (stored+callback): stored (reads back as written, never self-clears); on any write of 1 -> RegisteredPeripherals[GPIOK].Reset() if register", 435),
             R("RCC_AHB4RSTR", 0x088, "§8.7.31", "GPIOJRST", 9, 9, Any, "inherited, unaudited (acknowledged by name)", "the stock model (stored+callback): stored (reads back as written, never self-clears); on any write of 1 -> RegisteredPeripherals[GPIOJ].Reset() if register", 435),
             R("RCC_AHB4RSTR", 0x088, "§8.7.31", "GPIOIRST", 8, 8, Any, "inherited, unaudited (acknowledged by name)", "the stock model (stored+callback): stored (reads back as written, never self-clears); on any write of 1 -> RegisteredPeripherals[GPIOI].Reset() if register", 436),
@@ -1029,15 +1106,15 @@ namespace Antmicro.Renode.Peripherals.Tviburi
             R("RCC_AHB4RSTR", 0x088, "§8.7.31", "GPIOCRST", 2, 2, Any, "inherited, unaudited (acknowledged by name)", "the stock model (stored+callback): stored (reads back as written, never self-clears); on any write of 1 -> RegisteredPeripherals[GPIOC].Reset() if register", 436),
             R("RCC_AHB4RSTR", 0x088, "§8.7.31", "GPIOBRST", 1, 1, Any, "inherited, unaudited (acknowledged by name)", "the stock model (stored+callback): stored (reads back as written, never self-clears); on any write of 1 -> RegisteredPeripherals[GPIOB].Reset() if register", 436),
             R("RCC_AHB4RSTR", 0x088, "§8.7.31", "GPIOARST", 0, 0, Any, "inherited, unaudited (acknowledged by name)", "the stock model (stored+callback): stored (reads back as written, never self-clears); on any write of 1 -> RegisteredPeripherals[GPIOA].Reset() if register", 436),
-            R("RCC_APB3RSTR", 0x08C, "§8.7.32", "Res31_4", 31, 4, Any, "acknowledged by name", "reserved: no flop on either side; written 1 by all-ones resets (A4)", 437),
+            R("RCC_APB3RSTR", 0x08C, "§8.7.32", "Res31_4", 31, 4, Any, "acknowledged by name", "reserved: no flop on either side; written 1 by all-ones resets (TVI-WO-1300 A4)", 437),
             R("RCC_APB3RSTR", 0x08C, "§8.7.32", "LTDCRST", 3, 3, Any, "inherited, unaudited (acknowledged by name)", "the stock model (stored+callback): stored (reads back as written, never self-clears); on any write of 1 -> RegisteredPeripherals[LTDC].Reset() if registere", 437),
-            R("RCC_APB3RSTR", 0x08C, "§8.7.32", "Res2_0", 2, 0, Any, "acknowledged by name", "reserved: no flop on either side; written 1 by all-ones resets (A4)", 437),
+            R("RCC_APB3RSTR", 0x08C, "§8.7.32", "Res2_0", 2, 0, Any, "acknowledged by name", "reserved: no flop on either side; written 1 by all-ones resets (TVI-WO-1300 A4)", 437),
             R("RCC_APB1LRSTR", 0x090, "§8.7.33", "UART8RST", 31, 31, Any, "inherited, unaudited (acknowledged by name)", "the stock model (stored+callback): stored (reads back as written, never self-clears); on any write of 1 -> RegisteredPeripherals[UART8].Reset() if register", 438),
             R("RCC_APB1LRSTR", 0x090, "§8.7.33", "UART7RST", 30, 30, Any, "inherited, unaudited (acknowledged by name)", "the stock model (stored+callback): stored (reads back as written, never self-clears); on any write of 1 -> RegisteredPeripherals[UART7].Reset() if register", 438),
             R("RCC_APB1LRSTR", 0x090, "§8.7.33", "DAC12RST", 29, 29, Any, "inherited, unaudited (acknowledged by name)", "the stock model (stored+callback): stored (reads back as written, never self-clears); on any write of 1 -> RegisteredPeripherals[DAC12].Reset() if register", 438),
-            R("RCC_APB1LRSTR", 0x090, "§8.7.33", "Res28", 28, 28, Any, "acknowledged by name", "reserved: no flop on either side; written 1 by all-ones resets (A4)", 438),
+            R("RCC_APB1LRSTR", 0x090, "§8.7.33", "Res28", 28, 28, Any, "acknowledged by name", "reserved: no flop on either side; written 1 by all-ones resets (TVI-WO-1300 A4)", 438),
             R("RCC_APB1LRSTR", 0x090, "§8.7.33", "CECRST", 27, 27, Any, "inherited, unaudited (acknowledged by name)", "the stock model (stored+callback): stored (reads back as written, never self-clears); on any write of 1 -> RegisteredPeripherals[CEC].Reset() if registered", 438),
-            R("RCC_APB1LRSTR", 0x090, "§8.7.33", "Res26_24", 26, 24, Any, "acknowledged by name", "reserved: no flop on either side; written 1 by all-ones resets (A4)", 438),
+            R("RCC_APB1LRSTR", 0x090, "§8.7.33", "Res26_24", 26, 24, Any, "acknowledged by name", "reserved: no flop on either side; written 1 by all-ones resets (TVI-WO-1300 A4)", 438),
             R("RCC_APB1LRSTR", 0x090, "§8.7.33", "I2C3RST", 23, 23, Any, "inherited, unaudited (acknowledged by name)", "the stock model (stored+callback): stored (reads back as written, never self-clears); on any write of 1 -> RegisteredPeripherals[I2C3].Reset() if registere", 438),
             R("RCC_APB1LRSTR", 0x090, "§8.7.33", "I2C2RST", 22, 22, Any, "inherited, unaudited (acknowledged by name)", "the stock model (stored+callback): stored (reads back as written, never self-clears); on any write of 1 -> RegisteredPeripherals[I2C2].Reset() if registere", 438),
             R("RCC_APB1LRSTR", 0x090, "§8.7.33", "I2C1RST", 21, 21, Any, "inherited, unaudited (acknowledged by name)", "the stock model (stored+callback): stored (reads back as written, never self-clears); on any write of 1 -> RegisteredPeripherals[I2C1].Reset() if registere", 439),
@@ -1048,7 +1125,7 @@ namespace Antmicro.Renode.Peripherals.Tviburi
             R("RCC_APB1LRSTR", 0x090, "§8.7.33", "SPDIFRXRST", 16, 16, Any, "inherited, unaudited (acknowledged by name)", "the stock model (stored+callback): stored (reads back as written, never self-clears); on any write of 1 -> RegisteredPeripherals[SPDIFRX].Reset() if regist", 439),
             R("RCC_APB1LRSTR", 0x090, "§8.7.33", "SPI3RST", 15, 15, Any, "inherited, unaudited (acknowledged by name)", "the stock model (stored+callback): stored (reads back as written, never self-clears); on any write of 1 -> RegisteredPeripherals[SPI3].Reset() if registere", 439),
             R("RCC_APB1LRSTR", 0x090, "§8.7.33", "SPI2RST", 14, 14, Any, "inherited, unaudited (acknowledged by name)", "the stock model (stored+callback): stored (reads back as written, never self-clears); on any write of 1 -> RegisteredPeripherals[SPI2].Reset() if registere", 439),
-            R("RCC_APB1LRSTR", 0x090, "§8.7.33", "Res13_10", 13, 10, Any, "acknowledged by name", "reserved: no flop on either side; written 1 by all-ones resets (A4)", 439),
+            R("RCC_APB1LRSTR", 0x090, "§8.7.33", "Res13_10", 13, 10, Any, "acknowledged by name", "reserved: no flop on either side; written 1 by all-ones resets (TVI-WO-1300 A4)", 439),
             R("RCC_APB1LRSTR", 0x090, "§8.7.33", "LPTIM1RST", 9, 9, Any, "inherited, unaudited (acknowledged by name)", "the stock model (stored+callback): stored (reads back as written, never self-clears); on any write of 1 -> RegisteredPeripherals[LPTIM1].Reset() if registe", 439),
             R("RCC_APB1LRSTR", 0x090, "§8.7.33", "TIM14RST", 8, 8, Any, "inherited, unaudited (acknowledged by name)", "the stock model (stored+callback): stored (reads back as written, never self-clears); on any write of 1 -> RegisteredPeripherals[TIM14].Reset() if register", 439),
             R("RCC_APB1LRSTR", 0x090, "§8.7.33", "TIM13RST", 7, 7, Any, "inherited, unaudited (acknowledged by name)", "the stock model (stored+callback): stored (reads back as written, never self-clears); on any write of 1 -> RegisteredPeripherals[TIM13].Reset() if register", 439),
@@ -1059,57 +1136,57 @@ namespace Antmicro.Renode.Peripherals.Tviburi
             R("RCC_APB1LRSTR", 0x090, "§8.7.33", "TIM4RST", 2, 2, Any, "inherited, unaudited (acknowledged by name)", "the stock model (stored+callback): stored (reads back as written, never self-clears); on any write of 1 -> RegisteredPeripherals[TIM4].Reset() if registere", 440),
             R("RCC_APB1LRSTR", 0x090, "§8.7.33", "TIM3RST", 1, 1, Any, "inherited, unaudited (acknowledged by name)", "the stock model (stored+callback): stored (reads back as written, never self-clears); on any write of 1 -> RegisteredPeripherals[TIM3].Reset() if registere", 440),
             R("RCC_APB1LRSTR", 0x090, "§8.7.33", "TIM2RST", 0, 0, Any, "inherited, unaudited (acknowledged by name)", "the stock model (stored+callback): stored (reads back as written, never self-clears); on any write of 1 -> RegisteredPeripherals[TIM2].Reset() if registere", 440),
-            R("RCC_APB1HRSTR", 0x094, "§8.7.34", "Res31_9", 31, 9, Any, "acknowledged by name", "reserved: no flop on either side; written 1 by all-ones resets (A4)", 441),
+            R("RCC_APB1HRSTR", 0x094, "§8.7.34", "Res31_9", 31, 9, Any, "acknowledged by name", "reserved: no flop on either side; written 1 by all-ones resets (TVI-WO-1300 A4)", 441),
             R("RCC_APB1HRSTR", 0x094, "§8.7.34", "FDCANRST", 8, 8, Any, "inherited, unaudited (acknowledged by name)", "the stock model (stored+callback): stored (reads back as written, never self-clears); on any write of 1 -> RegisteredPeripherals[FDCAN].Reset() if register", 441),
-            R("RCC_APB1HRSTR", 0x094, "§8.7.34", "Res7_6", 7, 6, Any, "acknowledged by name", "reserved: no flop on either side; written 1 by all-ones resets (A4)", 441),
+            R("RCC_APB1HRSTR", 0x094, "§8.7.34", "Res7_6", 7, 6, Any, "acknowledged by name", "reserved: no flop on either side; written 1 by all-ones resets (TVI-WO-1300 A4)", 441),
             R("RCC_APB1HRSTR", 0x094, "§8.7.34", "MDIOSRST", 5, 5, Any, "inherited, unaudited (acknowledged by name)", "the stock model (stored+callback): stored (reads back as written, never self-clears); on any write of 1 -> RegisteredPeripherals[MDIOS].Reset() if register", 441),
             R("RCC_APB1HRSTR", 0x094, "§8.7.34", "OPAMPRST", 4, 4, Any, "inherited, unaudited (acknowledged by name)", "the stock model (stored+callback): stored (reads back as written, never self-clears); on any write of 1 -> RegisteredPeripherals[OPAMP].Reset() if register", 441),
-            R("RCC_APB1HRSTR", 0x094, "§8.7.34", "Res3", 3, 3, Any, "acknowledged by name", "reserved: no flop on either side; written 1 by all-ones resets (A4)", 441),
+            R("RCC_APB1HRSTR", 0x094, "§8.7.34", "Res3", 3, 3, Any, "acknowledged by name", "reserved: no flop on either side; written 1 by all-ones resets (TVI-WO-1300 A4)", 441),
             R("RCC_APB1HRSTR", 0x094, "§8.7.34", "SWPRST", 2, 2, Any, "inherited, unaudited (acknowledged by name)", "the stock model (stored+callback): stored (reads back as written, never self-clears); on any write of 1 -> RegisteredPeripherals[SWP].Reset() if registered", 441),
             R("RCC_APB1HRSTR", 0x094, "§8.7.34", "CRSRST", 1, 1, Any, "inherited, unaudited (acknowledged by name)", "the stock model (stored+callback): stored (reads back as written, never self-clears); on any write of 1 -> RegisteredPeripherals[CRS].Reset() if registered", 441),
-            R("RCC_APB1HRSTR", 0x094, "§8.7.34", "Res0", 0, 0, Any, "acknowledged by name", "reserved: no flop on either side; written 1 by all-ones resets (A4)", 441),
-            R("RCC_APB2RSTR", 0x098, "§8.7.35", "Res31_30", 31, 30, Any, "acknowledged by name", "reserved: no flop on either side; written 1 by all-ones resets (A4)", 442),
+            R("RCC_APB1HRSTR", 0x094, "§8.7.34", "Res0", 0, 0, Any, "acknowledged by name", "reserved: no flop on either side; written 1 by all-ones resets (TVI-WO-1300 A4)", 441),
+            R("RCC_APB2RSTR", 0x098, "§8.7.35", "Res31_30", 31, 30, Any, "acknowledged by name", "reserved: no flop on either side; written 1 by all-ones resets (TVI-WO-1300 A4)", 442),
             R("RCC_APB2RSTR", 0x098, "§8.7.35", "HRTIMRST", 29, 29, Any, "inherited, unaudited (acknowledged by name)", "the stock model (stored+callback): stored (reads back as written, never self-clears); on any write of 1 -> RegisteredPeripherals[HRTIM].Reset() if register", 442),
             R("RCC_APB2RSTR", 0x098, "§8.7.35", "DFSDM1RST", 28, 28, Any, "inherited, unaudited (acknowledged by name)", "the stock model (stored+callback): stored (reads back as written, never self-clears); on any write of 1 -> RegisteredPeripherals[DFSDM1].Reset() if registe", 442),
-            R("RCC_APB2RSTR", 0x098, "§8.7.35", "Res27_25", 27, 25, Any, "acknowledged by name", "reserved: no flop on either side; written 1 by all-ones resets (A4)", 442),
+            R("RCC_APB2RSTR", 0x098, "§8.7.35", "Res27_25", 27, 25, Any, "acknowledged by name", "reserved: no flop on either side; written 1 by all-ones resets (TVI-WO-1300 A4)", 442),
             R("RCC_APB2RSTR", 0x098, "§8.7.35", "SAI3RST", 24, 24, Any, "inherited, unaudited (acknowledged by name)", "the stock model (stored+callback): stored (reads back as written, never self-clears); on any write of 1 -> RegisteredPeripherals[SAI3].Reset() if registere", 442),
             R("RCC_APB2RSTR", 0x098, "§8.7.35", "SAI2RST", 23, 23, Any, "inherited, unaudited (acknowledged by name)", "the stock model (stored+callback): stored (reads back as written, never self-clears); on any write of 1 -> RegisteredPeripherals[SAI2].Reset() if registere", 442),
             R("RCC_APB2RSTR", 0x098, "§8.7.35", "SAI1RST", 22, 22, Any, "inherited, unaudited (acknowledged by name)", "the stock model (stored+callback): stored (reads back as written, never self-clears); on any write of 1 -> RegisteredPeripherals[SAI1].Reset() if registere", 442),
-            R("RCC_APB2RSTR", 0x098, "§8.7.35", "Res21", 21, 21, Any, "acknowledged by name", "reserved: no flop on either side; written 1 by all-ones resets (A4)", 442),
+            R("RCC_APB2RSTR", 0x098, "§8.7.35", "Res21", 21, 21, Any, "acknowledged by name", "reserved: no flop on either side; written 1 by all-ones resets (TVI-WO-1300 A4)", 442),
             R("RCC_APB2RSTR", 0x098, "§8.7.35", "SPI5RST", 20, 20, Any, "inherited, unaudited (acknowledged by name)", "the stock model (stored+callback): stored (reads back as written, never self-clears); on any write of 1 -> RegisteredPeripherals[SPI5].Reset() if registere", 442),
-            R("RCC_APB2RSTR", 0x098, "§8.7.35", "Res19", 19, 19, Any, "acknowledged by name", "reserved: no flop on either side; written 1 by all-ones resets (A4)", 442),
+            R("RCC_APB2RSTR", 0x098, "§8.7.35", "Res19", 19, 19, Any, "acknowledged by name", "reserved: no flop on either side; written 1 by all-ones resets (TVI-WO-1300 A4)", 442),
             R("RCC_APB2RSTR", 0x098, "§8.7.35", "TIM17RST", 18, 18, Any, "inherited, unaudited (acknowledged by name)", "the stock model (stored+callback): stored (reads back as written, never self-clears); on any write of 1 -> RegisteredPeripherals[TIM17].Reset() if register", 443),
             R("RCC_APB2RSTR", 0x098, "§8.7.35", "TIM16RST", 17, 17, Any, "inherited, unaudited (acknowledged by name)", "the stock model (stored+callback): stored (reads back as written, never self-clears); on any write of 1 -> RegisteredPeripherals[TIM16].Reset() if register", 443),
             R("RCC_APB2RSTR", 0x098, "§8.7.35", "TIM15RST", 16, 16, Any, "inherited, unaudited (acknowledged by name)", "the stock model (stored+callback): stored (reads back as written, never self-clears); on any write of 1 -> RegisteredPeripherals[TIM15].Reset() if register", 443),
-            R("RCC_APB2RSTR", 0x098, "§8.7.35", "Res15_14", 15, 14, Any, "acknowledged by name", "reserved: no flop on either side; written 1 by all-ones resets (A4)", 443),
+            R("RCC_APB2RSTR", 0x098, "§8.7.35", "Res15_14", 15, 14, Any, "acknowledged by name", "reserved: no flop on either side; written 1 by all-ones resets (TVI-WO-1300 A4)", 443),
             R("RCC_APB2RSTR", 0x098, "§8.7.35", "SPI4RST", 13, 13, Any, "inherited, unaudited (acknowledged by name)", "the stock model (stored+callback): stored (reads back as written, never self-clears); on any write of 1 -> RegisteredPeripherals[SPI4].Reset() if registere", 443),
             R("RCC_APB2RSTR", 0x098, "§8.7.35", "SPI1RST", 12, 12, Any, "inherited, unaudited (acknowledged by name)", "the stock model (stored+callback): stored (reads back as written, never self-clears); on any write of 1 -> RegisteredPeripherals[SPI1].Reset() if registere", 443),
-            R("RCC_APB2RSTR", 0x098, "§8.7.35", "Res11_6", 11, 6, Any, "acknowledged by name", "reserved: no flop on either side; written 1 by all-ones resets (A4)", 443),
+            R("RCC_APB2RSTR", 0x098, "§8.7.35", "Res11_6", 11, 6, Any, "acknowledged by name", "reserved: no flop on either side; written 1 by all-ones resets (TVI-WO-1300 A4)", 443),
             R("RCC_APB2RSTR", 0x098, "§8.7.35", "USART6RST", 5, 5, Any, "inherited, unaudited (acknowledged by name)", "the stock model (stored+callback): stored (reads back as written, never self-clears); on any write of 1 -> RegisteredPeripherals[USART6].Reset() if registe", 443),
             R("RCC_APB2RSTR", 0x098, "§8.7.35", "USART1RST", 4, 4, Any, "inherited, unaudited (acknowledged by name)", "the stock model (stored+callback): stored (reads back as written, never self-clears); on any write of 1 -> RegisteredPeripherals[USART1].Reset() if registe", 443),
-            R("RCC_APB2RSTR", 0x098, "§8.7.35", "Res3_2", 3, 2, Any, "acknowledged by name", "reserved: no flop on either side; written 1 by all-ones resets (A4)", 443),
+            R("RCC_APB2RSTR", 0x098, "§8.7.35", "Res3_2", 3, 2, Any, "acknowledged by name", "reserved: no flop on either side; written 1 by all-ones resets (TVI-WO-1300 A4)", 443),
             R("RCC_APB2RSTR", 0x098, "§8.7.35", "TIM8RST", 1, 1, Any, "inherited, unaudited (acknowledged by name)", "the stock model (stored+callback): stored (reads back as written, never self-clears); on any write of 1 -> RegisteredPeripherals[TIM8].Reset() if registere", 443),
             R("RCC_APB2RSTR", 0x098, "§8.7.35", "TIM1RST", 0, 0, Any, "inherited, unaudited (acknowledged by name)", "the stock model (stored+callback): stored (reads back as written, never self-clears); on any write of 1 -> RegisteredPeripherals[TIM1].Reset() if registere", 443),
-            R("RCC_APB4RSTR", 0x09C, "§8.7.36", "Res31_26", 31, 26, Any, "acknowledged by name", "reserved: no flop on either side; written 1 by all-ones resets (A4)", 444),
-            R("RCC_APB4RSTR", 0x09C, "§8.7.36", "Res25_22", 25, 22, Any, "acknowledged by name", "reserved: no flop on either side; written 1 by all-ones resets (A4)", 444),
+            R("RCC_APB4RSTR", 0x09C, "§8.7.36", "Res31_26", 31, 26, Any, "acknowledged by name", "reserved: no flop on either side; written 1 by all-ones resets (TVI-WO-1300 A4)", 444),
+            R("RCC_APB4RSTR", 0x09C, "§8.7.36", "Res25_22", 25, 22, Any, "acknowledged by name", "reserved: no flop on either side; written 1 by all-ones resets (TVI-WO-1300 A4)", 444),
             R("RCC_APB4RSTR", 0x09C, "§8.7.36", "SAI4RST", 21, 21, Any, "inherited, unaudited (acknowledged by name)", "the stock model (stored+callback): stored (reads back as written, never self-clears); on any write of 1 -> RegisteredPeripherals[SAI4].Reset() if registere", 444),
-            R("RCC_APB4RSTR", 0x09C, "§8.7.36", "Res20_16", 20, 16, Any, "acknowledged by name", "reserved: no flop on either side; written 1 by all-ones resets (A4)", 444),
+            R("RCC_APB4RSTR", 0x09C, "§8.7.36", "Res20_16", 20, 16, Any, "acknowledged by name", "reserved: no flop on either side; written 1 by all-ones resets (TVI-WO-1300 A4)", 444),
             R("RCC_APB4RSTR", 0x09C, "§8.7.36", "VREFRST", 15, 15, Any, "inherited, unaudited (acknowledged by name)", "the stock model (stored+callback): stored (reads back as written, never self-clears); on any write of 1 -> RegisteredPeripherals[VREF].Reset() if registere", 444),
             R("RCC_APB4RSTR", 0x09C, "§8.7.36", "COMP12RST", 14, 14, Any, "inherited, unaudited (acknowledged by name)", "the stock model (stored+callback): stored (reads back as written, never self-clears); on any write of 1 -> RegisteredPeripherals[COMP12].Reset() if registe", 444),
-            R("RCC_APB4RSTR", 0x09C, "§8.7.36", "Res13", 13, 13, Any, "acknowledged by name", "reserved: no flop on either side; written 1 by all-ones resets (A4)", 444),
+            R("RCC_APB4RSTR", 0x09C, "§8.7.36", "Res13", 13, 13, Any, "acknowledged by name", "reserved: no flop on either side; written 1 by all-ones resets (TVI-WO-1300 A4)", 444),
             R("RCC_APB4RSTR", 0x09C, "§8.7.36", "LPTIM5RST", 12, 12, Any, "inherited, unaudited (acknowledged by name)", "the stock model (stored+callback): stored (reads back as written, never self-clears); on any write of 1 -> RegisteredPeripherals[LPTIM5].Reset() if registe", 444),
             R("RCC_APB4RSTR", 0x09C, "§8.7.36", "LPTIM4RST", 11, 11, Any, "inherited, unaudited (acknowledged by name)", "the stock model (stored+callback): stored (reads back as written, never self-clears); on any write of 1 -> RegisteredPeripherals[LPTIM4].Reset() if registe", 444),
             R("RCC_APB4RSTR", 0x09C, "§8.7.36", "LPTIM3RST", 10, 10, Any, "inherited, unaudited (acknowledged by name)", "the stock model (stored+callback): stored (reads back as written, never self-clears); on any write of 1 -> RegisteredPeripherals[LPTIM3].Reset() if registe", 444),
             R("RCC_APB4RSTR", 0x09C, "§8.7.36", "LPTIM2RST", 9, 9, Any, "inherited, unaudited (acknowledged by name)", "the stock model (stored+callback): stored (reads back as written, never self-clears); on any write of 1 -> RegisteredPeripherals[LPTIM2].Reset() if registe", 445),
-            R("RCC_APB4RSTR", 0x09C, "§8.7.36", "Res8", 8, 8, Any, "acknowledged by name", "reserved: no flop on either side; written 1 by all-ones resets (A4)", 445),
+            R("RCC_APB4RSTR", 0x09C, "§8.7.36", "Res8", 8, 8, Any, "acknowledged by name", "reserved: no flop on either side; written 1 by all-ones resets (TVI-WO-1300 A4)", 445),
             R("RCC_APB4RSTR", 0x09C, "§8.7.36", "I2C4RST", 7, 7, Any, "inherited, unaudited (acknowledged by name)", "the stock model (stored+callback): stored (reads back as written, never self-clears); on any write of 1 -> RegisteredPeripherals[I2C4].Reset() if registere", 445),
-            R("RCC_APB4RSTR", 0x09C, "§8.7.36", "Res6", 6, 6, Any, "acknowledged by name", "reserved: no flop on either side; written 1 by all-ones resets (A4)", 445),
+            R("RCC_APB4RSTR", 0x09C, "§8.7.36", "Res6", 6, 6, Any, "acknowledged by name", "reserved: no flop on either side; written 1 by all-ones resets (TVI-WO-1300 A4)", 445),
             R("RCC_APB4RSTR", 0x09C, "§8.7.36", "SPI6RST", 5, 5, Any, "inherited, unaudited (acknowledged by name)", "the stock model (stored+callback): stored (reads back as written, never self-clears); on any write of 1 -> RegisteredPeripherals[SPI6].Reset() if registere", 445),
-            R("RCC_APB4RSTR", 0x09C, "§8.7.36", "Res4", 4, 4, Any, "acknowledged by name", "reserved: no flop on either side; written 1 by all-ones resets (A4)", 445),
+            R("RCC_APB4RSTR", 0x09C, "§8.7.36", "Res4", 4, 4, Any, "acknowledged by name", "reserved: no flop on either side; written 1 by all-ones resets (TVI-WO-1300 A4)", 445),
             R("RCC_APB4RSTR", 0x09C, "§8.7.36", "LPUART1RST", 3, 3, Any, "inherited, unaudited (acknowledged by name)", "the stock model (stored+callback): stored (reads back as written, never self-clears); on any write of 1 -> RegisteredPeripherals[LPUART1].Reset() if regist", 445),
-            R("RCC_APB4RSTR", 0x09C, "§8.7.36", "Res2", 2, 2, Any, "acknowledged by name", "reserved: no flop on either side; written 1 by all-ones resets (A4)", 445),
+            R("RCC_APB4RSTR", 0x09C, "§8.7.36", "Res2", 2, 2, Any, "acknowledged by name", "reserved: no flop on either side; written 1 by all-ones resets (TVI-WO-1300 A4)", 445),
             R("RCC_APB4RSTR", 0x09C, "§8.7.36", "SYSCFGRST", 1, 1, Any, "inherited, unaudited (acknowledged by name)", "the stock model (stored+callback): stored (reads back as written, never self-clears); on any write of 1 -> RegisteredPeripherals[SYSCFG].Reset() if registe", 445),
-            R("RCC_APB4RSTR", 0x09C, "§8.7.36", "Res0", 0, 0, Any, "acknowledged by name", "reserved: no flop on either side; written 1 by all-ones resets (A4)", 445),
+            R("RCC_APB4RSTR", 0x09C, "§8.7.36", "Res0", 0, 0, Any, "acknowledged by name", "reserved: no flop on either side; written 1 by all-ones resets (TVI-WO-1300 A4)", 445),
             R("RCC_GCR", 0x0A0, "§8.7.37", "Res31_1", 31, 1, Zero, "reserved", "reserved: dropped, reads its reset value", 446),
             R("RCC_GCR", 0x0A0, "§8.7.37", "WW1RSC", 0, 0, Zero, "tag", "its reset value (stock tag)", 446),
             R("RCC_D3AMR", 0x0A8, "§8.7.38", "Res31_30", 31, 30, Zero, "reserved", "reserved: dropped, reads its reset value", 447),
@@ -1152,7 +1229,7 @@ namespace Antmicro.Renode.Peripherals.Tviburi
             R("RCC_RSR", 0x0D0, "§8.7.39", "BORRSTF", 21, 21, Any, "read-only", "ignored (read-only; stock stored)", 451),
             R("RCC_RSR", 0x0D0, "§8.7.39", "D2RSTF", 20, 20, Any, "read-only", "ignored (read-only; stock stored)", 451),
             R("RCC_RSR", 0x0D0, "§8.7.39", "D1RSTF", 19, 19, Any, "read-only", "ignored (read-only; stock stored)", 451),
-            R("RCC_RSR", 0x0D0, "§8.7.39", "Res18", 18, 18, new uint[] { 0, 1 }, "acknowledged by name", "reserved, reset 1 by the register's 0x00FE0000: written 0 with RMVF, ignored by both (A5)", 451),
+            R("RCC_RSR", 0x0D0, "§8.7.39", "Res18", 18, 18, new uint[] { 0, 1 }, "acknowledged by name", "reserved, reset 1 by the register's 0x00FE0000: written 0 with RMVF, ignored by both (TVI-WO-1300 A5)", 451),
             R("RCC_RSR", 0x0D0, "§8.7.39", "CPURSTF", 17, 17, Any, "read-only", "ignored (read-only; stock stored)", 451),
             R("RCC_RSR", 0x0D0, "§8.7.39", "RMVF", 16, 16, Any, "inherited, unaudited (acknowledged by name)", "the stock model (write-only-action): FieldMode.WriteOneToClear: always reads 0; write 1 clears C1RSTF,C2RSTF,D1RSTF,D2RSTF,BORRSTF,PINRSTF,PORRSTF (not the t", 451),
             R("RCC_RSR", 0x0D0, "§8.7.39", "Res15_0", 15, 0, Zero, "reserved", "reserved: dropped, reads its reset value", 451),
@@ -1326,7 +1403,7 @@ namespace Antmicro.Renode.Peripherals.Tviburi
             R("RCC_AHB1LPENR", 0x100, "§8.7.50", "Res14_6", 14, 6, new uint[] { 256 }, "reserved", "reserved: dropped, reads its reset value", 477),
             R("RCC_AHB1LPENR", 0x100, "§8.7.50", "ADC12LPEN", 5, 5, new uint[] { 1 }, "tag", "its reset value (stock tag)", 477),
             R("RCC_AHB1LPENR", 0x100, "§8.7.50", "Res4_2", 4, 2, Zero, "reserved", "reserved: dropped, reads its reset value", 477),
-            R("RCC_AHB1LPENR", 0x100, "§8.7.50", "DMA2LPEN", 1, 1, new uint[] { 0, 1 }, "acknowledged by name", "the twin does not model CSleep: the clock runs while the CPU sleeps, whatever this bit says (backlog) (A6)", 477),
+            R("RCC_AHB1LPENR", 0x100, "§8.7.50", "DMA2LPEN", 1, 1, new uint[] { 0, 1 }, "acknowledged by name", "the twin does not model CSleep: the clock runs while the CPU sleeps, whatever this bit says (backlog) (TVI-WO-1300 A6)", 477),
             R("RCC_AHB1LPENR", 0x100, "§8.7.50", "DMA1LPEN", 0, 0, new uint[] { 1 }, "tag", "its reset value (stock tag)", 477),
             R("RCC_AHB2LPENR", 0x104, "§8.7.51", "SRAM3LPEN", 31, 31, new uint[] { 1 }, "tag", "its reset value (stock tag)", 478),
             R("RCC_AHB2LPENR", 0x104, "§8.7.51", "SRAM2LPEN", 30, 30, new uint[] { 1 }, "tag", "its reset value (stock tag)", 478),
@@ -1334,7 +1411,7 @@ namespace Antmicro.Renode.Peripherals.Tviburi
             R("RCC_AHB2LPENR", 0x104, "§8.7.51", "Res28_10", 28, 10, Zero, "reserved", "reserved: dropped, reads its reset value", 478),
             R("RCC_AHB2LPENR", 0x104, "§8.7.51", "SDMMC2LPEN", 9, 9, new uint[] { 1 }, "tag", "its reset value (stock tag)", 478),
             R("RCC_AHB2LPENR", 0x104, "§8.7.51", "Res8_7", 8, 7, Zero, "reserved", "reserved: dropped, reads its reset value", 478),
-            R("RCC_AHB2LPENR", 0x104, "§8.7.51", "RNGLPEN", 6, 6, new uint[] { 0, 1 }, "acknowledged by name", "the twin does not model CSleep: the clock runs while the CPU sleeps, whatever this bit says (backlog) (A6)", 478),
+            R("RCC_AHB2LPENR", 0x104, "§8.7.51", "RNGLPEN", 6, 6, new uint[] { 0, 1 }, "acknowledged by name", "the twin does not model CSleep: the clock runs while the CPU sleeps, whatever this bit says (backlog) (TVI-WO-1300 A6)", 478),
             R("RCC_AHB2LPENR", 0x104, "§8.7.51", "HASHLPEN", 5, 5, new uint[] { 1 }, "tag", "its reset value (stock tag)", 479),
             R("RCC_AHB2LPENR", 0x104, "§8.7.51", "CRYPTLPEN", 4, 4, new uint[] { 1 }, "tag", "its reset value (stock tag)", 479),
             R("RCC_AHB2LPENR", 0x104, "§8.7.51", "Res3_1", 3, 1, Zero, "reserved", "reserved: dropped, reads its reset value", 479),
@@ -1380,7 +1457,7 @@ namespace Antmicro.Renode.Peripherals.Tviburi
             R("RCC_APB1LLPENR", 0x110, "§8.7.54", "USART2LPEN", 17, 17, new uint[] { 1 }, "tag", "its reset value (stock tag)", 485),
             R("RCC_APB1LLPENR", 0x110, "§8.7.54", "SPDIFRXLPEN", 16, 16, new uint[] { 1 }, "tag", "its reset value (stock tag)", 485),
             R("RCC_APB1LLPENR", 0x110, "§8.7.54", "SPI3LPEN", 15, 15, new uint[] { 1 }, "tag", "its reset value (stock tag)", 486),
-            R("RCC_APB1LLPENR", 0x110, "§8.7.54", "SPI2LPEN", 14, 14, new uint[] { 0, 1 }, "acknowledged by name", "the twin does not model CSleep: the clock runs while the CPU sleeps, whatever this bit says (backlog) (A6)", 486),
+            R("RCC_APB1LLPENR", 0x110, "§8.7.54", "SPI2LPEN", 14, 14, new uint[] { 0, 1 }, "acknowledged by name", "the twin does not model CSleep: the clock runs while the CPU sleeps, whatever this bit says (backlog) (TVI-WO-1300 A6)", 486),
             R("RCC_APB1LLPENR", 0x110, "§8.7.54", "Res13_10", 13, 10, new uint[] { 2 }, "reserved", "reserved: dropped, reads its reset value", 486),
             R("RCC_APB1LLPENR", 0x110, "§8.7.54", "LPTIM1LPEN", 9, 9, new uint[] { 1 }, "tag", "its reset value (stock tag)", 486),
             R("RCC_APB1LLPENR", 0x110, "§8.7.54", "TIM14LPEN", 8, 8, new uint[] { 1 }, "tag", "its reset value (stock tag)", 486),
@@ -1416,7 +1493,7 @@ namespace Antmicro.Renode.Peripherals.Tviburi
             R("RCC_APB2LPENR", 0x118, "§8.7.56", "TIM15LPEN", 16, 16, new uint[] { 1 }, "tag", "its reset value (stock tag)", 491),
             R("RCC_APB2LPENR", 0x118, "§8.7.56", "Res15_14", 15, 14, Zero, "reserved", "reserved: dropped, reads its reset value", 491),
             R("RCC_APB2LPENR", 0x118, "§8.7.56", "SPI4LPEN", 13, 13, new uint[] { 1 }, "tag", "its reset value (stock tag)", 491),
-            R("RCC_APB2LPENR", 0x118, "§8.7.56", "SPI1LPEN", 12, 12, new uint[] { 0, 1 }, "acknowledged by name", "the twin does not model CSleep: the clock runs while the CPU sleeps, whatever this bit says (backlog) (A6)", 491),
+            R("RCC_APB2LPENR", 0x118, "§8.7.56", "SPI1LPEN", 12, 12, new uint[] { 0, 1 }, "acknowledged by name", "the twin does not model CSleep: the clock runs while the CPU sleeps, whatever this bit says (backlog) (TVI-WO-1300 A6)", 491),
             R("RCC_APB2LPENR", 0x118, "§8.7.56", "Res11_6", 11, 6, Zero, "reserved", "reserved: dropped, reads its reset value", 491),
             R("RCC_APB2LPENR", 0x118, "§8.7.56", "USART6LPEN", 5, 5, new uint[] { 1 }, "tag", "its reset value (stock tag)", 491),
             R("RCC_APB2LPENR", 0x118, "§8.7.56", "USART1LPEN", 4, 4, new uint[] { 1 }, "tag", "its reset value (stock tag)", 492),

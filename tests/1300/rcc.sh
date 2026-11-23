@@ -13,7 +13,7 @@ set -euo pipefail
 
 here=$(cd "$(dirname "$0")/../.." && pwd)
 IMAGE=$(sed -n 's/^IMAGE=//p' "$here/tests/spike.sh")
-CASES="scar switch stuck clocked switched alias field pll divq pllref divm0 sw width read usart2 uncovered fields reset resetfwd spi1rst alias17c registrations hse16 recorded recordedfield ardupilot gen-s03 gen-hc16"
+CASES="scar switch stuck clocked switched alias field pll divq pllref divm0 sw width read usart2 uncovered fields reset resetfwd spi1rst alias17c registrations hse16 recorded recordedfield ardupilot gen-s03 gen-hc16 oscclear oscsys rsrbyte misaligned ledger"
 scratch=${TVIBURI_SCRATCH:-$HOME/.cache/tviburi}
 mkdir -p "$scratch"
 work=$(mktemp -d "$scratch/rcc.XXXXXX")
@@ -203,6 +203,37 @@ for t in ${TVIBURI_TESTS:-$CASES}; do
       gen-s03) check "gen-s03: SPI1's mux has not left pll1_q_ck for per_ck: no kernel clock (§5, p371-372; not an RCC refusal)" "grep -q '^Q spi1: NOT running; the mux has not switched from pll1_q_ck' '$work/$t/renode.out'" ;;
       gen-hc16) check "gen-hc16: SPI1 runs on pll1_q_ck (§5)" "grep -q '^Q spi1: running; pll1_q_ck' '$work/$t/renode.out'" ;;
     esac ;;
+  oscclear)
+    run_case oscclear - 'sysbus WriteDoubleWord 0x58024428 0x02020202' 'sysbus WriteDoubleWord 0x58024400 0x00010001' \
+      'sysbus WriteDoubleWord 0x58024400 0x04010001' 'sysbus WriteDoubleWord 0x58024400 0x04000001'
+    check "oscclear: PLL2 running on the HSE, then HSEON cleared with PLL2ON kept: PLL2 has no reference, TVI-RCC-PLL-REF, unmodeled (p384; p399)" \
+      "[ \$rc = 3 ] && records oscclear 'len(recs) == 1 and recs[0][\"rule\"] == \"TVI-RCC-PLL-REF\" and recs[0][\"kind\"] == \"unmodeled\" and \"PLL2ON\" in recs[0][\"bit\"]'" ;;
+  oscsys)
+    run_case oscsys - 'sysbus WriteDoubleWord 0x58024430 0x0103038F' 'sysbus WriteDoubleWord 0x58024400 0x01000001' \
+      'sysbus WriteDoubleWord 0x58024400 0x01000000' 'echo "R-CR"' 'sysbus ReadDoubleWord 0x58024400'
+    check "oscsys: HSION cleared while the HSI is the system clock (SW = 000) and PLL1's source: the stock model keeps it (p386), so PLL1 keeps its reference and nothing refuses" \
+      "[ \$rc = 0 ] && grep -qx 'CHECK PASS' '$work/oscsys.stdout' && console oscsys | grep -A1 -x 'R-CR' | tail -n1 | grep -q '^0x03000025\$'" ;;
+  rsrbyte)
+    run_case rsrbyte - 'sysbus WriteByte 0x580244D2 0x01' 'sysbus WriteWord 0x58024474 0x0000'
+    check "rsrbyte: a byte write to RCC_RSR (RMVF) and a half-word write to RCC_CSR are valid (p450, p429: word, half-word and byte access) and pass" \
+      "[ \$rc = 0 ] && grep -qx 'CHECK PASS' '$work/rsrbyte.stdout'" ;;
+  misaligned)
+    run_case misaligned - 'sysbus WriteDoubleWord 0x580244F2 0x0'
+    check "misaligned: a 32-bit RCC write at 0xF2 refuses, TVI-RCC-WIDTH, unmodeled" \
+      "[ \$rc = 3 ] && first_kernel misaligned 'r[\"rule\"] == \"TVI-RCC-WIDTH\" and \"misaligned\" in r[\"bit\"]'" ;;
+  ledger)
+    mkdir -p "$work/ledger"
+    rc=0; container -v "$src:/repo:ro,Z" -v "$work/ledger:/out:Z" "$IMAGE" sh -c '/repo/scripts/build-release /repo /out/release >/dev/null' </dev/null >"$work/ledger.stdout" 2>&1 || rc=$?
+    check "ledger: the release carries the RCC guard's 677 field rows; each acknowledged row cites TVI-WO-1300.rm0433.md §8, never 0100b's; the RCC bench rows R1-R3 are in it" \
+      "[ \$rc = 0 ] && python3 -I -c '
+import json, sys
+rows = [json.loads(l) for l in open(sys.argv[1]).read().splitlines()[1:]]
+rcc = [r for r in rows if r.get(\"peripheral\") == \"Tviburi.GuardedSTM32H7_RCC\"]
+f = [r for r in rcc if r[\"row\"] == \"field\"]
+a = [r for r in f if r[\"state\"] == \"acknowledged\"]
+b = sorted(r[\"field\"] for r in rcc if r[\"row\"] == \"bench\")
+sys.exit(0 if len(f) == 677 and a and all(r[\"reason\"].startswith(\"TVI-WO-1300.rm0433.md §8 A\") for r in a) and b == [\"R1\", \"R2\", \"R3\"] else 1)
+' '$work/ledger/release/LEDGER.jsonl'" ;;
   alias17c)
     run_case alias17c - 'echo "R-17C"' 'sysbus ReadDoubleWord 0x5802457C'
     check "alias17c: RCC_C1_APB4LPENR (0x17C) reads RCC_APB4LPENR's reset 0x0421DEAA, where the stock model overflows its stack (p382; p493)" \

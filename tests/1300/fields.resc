@@ -59,6 +59,9 @@ machine Reset
 # FIELD RCC_CFGR.STOPWUCK (bit 6)
 sysbus WriteDoubleWord 0x58024410 0x00000040
 machine Reset
+# FIELD RCC_CFGR.SW (2:0)
+sysbus WriteDoubleWord 0x58024410 0x00000004
+machine Reset
 # FIELD RCC_D1CFGR.Res31_12 (31:12)
 sysbus WriteDoubleWord 0x58024418 0x00001000
 machine Reset
@@ -290,8 +293,17 @@ machine Reset
 # FIELD RCC_BDCR.Res31_17 (31:17)
 sysbus WriteDoubleWord 0x58024470 0x00020000
 machine Reset
+# FIELD RCC_BDCR.BDRST (bit 16)
+sysbus WriteDoubleWord 0x58024470 0x00010000
+machine Reset
+# FIELD RCC_BDCR.RTCEN (bit 15)
+sysbus WriteDoubleWord 0x58024470 0x00008000
+machine Reset
 # FIELD RCC_BDCR.Res14_10 (14:10)
 sysbus WriteDoubleWord 0x58024470 0x00000400
+machine Reset
+# FIELD RCC_BDCR.RTCSEL (9:8)
+sysbus WriteDoubleWord 0x58024470 0x00000100
 machine Reset
 # FIELD RCC_BDCR.Res7 (bit 7)
 sysbus WriteDoubleWord 0x58024470 0x00000080
@@ -301,6 +313,12 @@ sysbus WriteDoubleWord 0x58024470 0x00000020
 machine Reset
 # FIELD RCC_BDCR.LSEDRV (4:3)
 sysbus WriteDoubleWord 0x58024470 0x00000008
+machine Reset
+# FIELD RCC_BDCR.LSEBYP (bit 2)
+sysbus WriteDoubleWord 0x58024470 0x00000004
+machine Reset
+# FIELD RCC_BDCR.LSEON (bit 0)
+sysbus WriteDoubleWord 0x58024470 0x00000001
 machine Reset
 # FIELD RCC_CSR.Res31_2 (31:2)
 sysbus WriteDoubleWord 0x58024474 0x00000004

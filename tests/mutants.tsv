@@ -130,3 +130,8 @@ C16-servedFromCopy	model/GuardedSTM32H7_RCC.cs	return (c & mask) | (inner.ReadDo
 C17-copiesTakeWrites	model/GuardedSTM32H7_RCC.cs	if(copies.ContainsKey(b))	if(false)	rcc-clocked
 C18-recordedPassesOn	model/GuardedSTM32H7_RCC.cs	if(Refused(offset, value) && !records.Recorded)	if(Refused(offset, value))	rcc-recordedfield
 C19-apb4enrReset	model/GuardedSTM32H7_RCC.cs	case 0x0F4: return 0x00010000;	case 0x0F4: return 0;	rcc-registrations
+C20-subWordRegisters	model/GuardedSTM32H7_RCC.cs	return b == BdcrOffset || b == CsrOffset || b == RsrOffset;	return false;	rcc-rsrbyte
+C21-misalignedWrite	model/GuardedSTM32H7_RCC.cs	Width(offset, value, 32, "write");\n                return true;	return false;	rcc-misaligned
+C22-sourceCleared	model/GuardedSTM32H7_RCC.cs	if((cr & on) != 0 && !PllReference(n, cr))	if((cr & on) != 0 && (inner.ReadDoubleWord(CrOffset) & on) == 0 && !PllReference(n, cr))	rcc-oscclear
+C23-keptCr	model/GuardedSTM32H7_RCC.cs	kept |= bit;	;	rcc-oscsys
+F02-ack1300	tools/tviburi-release/src/main.rs	("(TVI-WO-1300 A", "TVI-WO-1300.rm0433.md	("(TVI-WO-1300 A", "TVI-WO-0100b.rm0433.md	unit rcc-ledger
