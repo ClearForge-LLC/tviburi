@@ -9,7 +9,7 @@ set -euo pipefail
 
 here=$(cd "$(dirname "$0")/../.." && pwd)
 IMAGE=$(sed -n 's/^IMAGE=//p' "$here/tests/spike.sh")
-CASES="valid blank blankfirst afterwards afrh package packageinput pc2 nopackage pupdr lckr brr read bsrr bsrrhalf otyper ardupilot gen-s03 recorded config query registrations reset misaligned fields ledger"
+CASES="valid blank blankfirst afterwards afrh package packageinput pc2 nopackage pupdr lckr brr read bsrr bsrrhalf otyper ardupilot gen-s03 recorded config query registrations reset misaligned fields ledger adv-monitor"
 GUARDS="spi1 rcc gpioPortA gpioPortB gpioPortC gpioPortD gpioPortE gpioPortF gpioPortG gpioPortH gpioPortI gpioPortJ gpioPortK"
 PATHS='"valid","blank","blankfirst","afterwards","afrh","package","packageinput","pc2","pupdr","lckr","brr","read","bsrr","bsrrhalf","otyper","ardupilot","gen-s03"'
 scratch=${TVIBURI_SCRATCH:-$HOME/.cache/tviburi}
@@ -168,7 +168,7 @@ tviburiGpioA:\
     q() { echo "python \"print('Q$1 ' + str(self.Machine['sysbus.gpioPortA'].$2($1)))\""; }
     run_case query valid "$run" "$(q 5 WhichSignal)" "$(q 5 WhichSignalCitation)" "$(q 0 WhichSignal)" "$(q 13 WhichSignal)"
     check "query: PA5 carries SPI1_SCK/I2S1_CK (p89); PA0 is analog (silicon's reset, p541); PA13 is AF0 JTMS-SWDIO" \
-      "grep -qx 'Q5 SPI1_SCK/I2S1_CK' '$work/query/renode.out' && grep -q '^Q5 DS12117 Rev 10 Table 9 p89' '$work/query/renode.out' && grep -qx 'Q0 analog' '$work/query/renode.out' && grep -qx 'Q13 JTMS-SWDIO' '$work/query/renode.out'" ;;
+      "q=\$(tr -d '\\r' < '$work/query/renode.out') && grep -qx 'Q5 SPI1_SCK/I2S1_CK' <<<\"\$q\" && grep -q '^Q5 DS12117 Rev 10 Table 9 p89' <<<\"\$q\" && grep -qx 'Q0 analog' <<<\"\$q\" && grep -qx 'Q13 JTMS-SWDIO' <<<\"\$q\"" ;;
   registrations)
     run_case registrations - 'peripherals' 'include @/repo/tests/1301/checks.py' 'sysbus WriteDoubleWord 0x58020418 0x1' 'echo "R-GREEN"' 'sysbus.gpioPortB.GreenLED State'
     check "registrations: the 11 ports are the guard, no stock port remains, the timers' AF routes reach the guards, and GreenLED follows BSRR" \
@@ -200,6 +200,10 @@ f = [r for r in g if r[\"row\"] == \"field\"]
 pairs = sorted((r[\"field\"], r[\"rule\"], r[\"bit\"]) for r in g if r[\"row\"] == \"bench\")
 sys.exit(0 if len(f) == 31 and len({r[\"register\"] for r in f}) == 10 and pairs == [(\"G1\", \"TVI-GPIO-AF\", \"PA5 AF6\"), (\"G2\", \"TVI-GPIO-PACKAGE\", \"PH2 MODER = 01\")] else 1)
 ' '$work/ledger/release/LEDGER.jsonl'" ;;
+  adv-monitor)
+    run_case adv-monitor - 'sysbus.gpioPortA WriteDoubleWord 0x20 0x00600000' 'sysbus.gpioPortA WriteDoubleWord 0x0 0xABFFFBFF'
+    check "adv-monitor: the monitor's own WriteDoubleWord on the port (not through sysbus) reaches the guard: PA5 AF6 in AF mode refuses TVI-GPIO-AF (WO §5)" \
+      "[ \$rc = 3 ] && first adv-monitor 'r[\"rule\"] == \"TVI-GPIO-AF\" and r[\"bit\"] == \"PA5 AF6\"'" ;;
   *) echo "unknown case $t" >&2; exit 2 ;;
   esac
 done
