@@ -124,7 +124,7 @@ C10-divmZero	model/GuardedSTM32H7_RCC.cs	return false;   // "000000: prescaler d
 C11-switch	model/GuardedSTM32H7_RCC.cs	if(ready)	if(true)	rcc-sw
 C12-allowList	model/GuardedSTM32H7_RCC.cs	if(f.Allowed != null && !f.Allowed.Contains(v))	if(false)	rcc-field rcc-fields
 C13-alias	model/GuardedSTM32H7_RCC.cs	return offset >= 0x130 && offset <= 0x17C ? offset - 0x60 : offset;	return offset;	rcc-alias rcc-alias17c
-C14-width	model/GuardedSTM32H7_RCC.cs	Width(offset, value, 16, "write");	(empty)	rcc-width
+C14-width	model/GuardedSTM32H7_RCC.cs	Width(offset, value, width, "write");\n                if(!records.Recorded)	if(false)	rcc-width
 C15-noRegisterRead	model/GuardedSTM32H7_RCC.cs	if(!Fields.Any(f => f.Offset == b))	if(false)	rcc-read
 C16-servedFromCopy	model/GuardedSTM32H7_RCC.cs	return (c & mask) | (inner.ReadDoubleWord(b) & ~mask);	return inner.ReadDoubleWord(b);	rcc-resetfwd
 C17-copiesTakeWrites	model/GuardedSTM32H7_RCC.cs	if(copies.ContainsKey(b))	if(false)	rcc-clocked
