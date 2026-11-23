@@ -7,7 +7,9 @@
 #   `timerN: k -> gpioPortX#pin@af`; a port's pins into the timers, `gpioPortX: k -> timerN@m`): restated with every
 #   `gpioPortX` replaced by the guard's variable `tviburiGpioX`.
 # Usage: awk -v sha=<sha256 of stm32h7.repl> -v type=<guard type> -v props=<extra property lines, "\n"-separated>
-#        -f gpio-restate.awk stm32h7.repl
+#        [-v resets=1] -f gpio-restate.awk stm32h7.repl
+# resets=1 adds silicon's reset values, which the stock file does not pass (RM0433 Rev 9 p541 MODER, p542 OSPEEDR and
+# PUPDR): port A 0xABFFFFFF / 0x0C000000 / 0x64000000; port B 0xFFFFFEBF / 0x000000C0 / 0x00000100; others 0xFFFFFFFF / 0 / 0.
 function flush(   i, b) {
     if (kind == "port") {
         print name ": @none"
@@ -18,6 +20,12 @@ function flush(   i, b) {
         printf "%s", b
         print "    } as \"gpioPort" letter "\""
         if (props != "") printf "%s\n", props
+        if (resets) {
+            m = letter == "A" ? "0xABFFFFFF" : letter == "B" ? "0xFFFFFEBF" : "0xFFFFFFFF"
+            o = letter == "A" ? "0x0C000000" : letter == "B" ? "0x000000C0" : "0x0"
+            u = letter == "A" ? "0x64000000" : letter == "B" ? "0x00000100" : "0x0"
+            print "    modeResetValue: " m; print "    outputSpeedResetValue: " o; print "    pullUpPullDownResetValue: " u
+        }
         printf "%s", tail
         print ""
         ports++

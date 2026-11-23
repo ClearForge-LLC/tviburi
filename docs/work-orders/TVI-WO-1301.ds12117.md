@@ -28,9 +28,13 @@
 
 **A blank cell is data.** The page prints `-` in it, and the file keeps `-`. AF0 is not a default: 139 of 168 pins print `-` at AF0.
 
-**Never read while transcribing:** Aethelgard's pin data, ArduPilot's, Renode's. **Disclosures on the order:**
-- The mechanical file's hash was frozen at 16:36:57Z. That was one command after the stock `stm32h7.repl`'s timer-to-pin wiring (Renode's pin data) had been displayed to me. The file was produced at 16:35Z, and its bytes are those of the commit.
-- The comparison with ST's data (§3) **was run before the table was committed** (16:46Z against the commit at 16:48Z). The table was committed byte-identical to what was compared, and no edit followed from the comparison.
+**Never read while transcribing:** Aethelgard's pin data, ArduPilot's, Renode's. **Disclosures on the order** (times from the files' mtimes):
+- `model/ds12117-rev10-table9.tsv` was written at **16:35:40Z**.
+- After it, two things were displayed to me before its hash was frozen at 16:36:57Z:
+  - `spike/1150/data/queue-ap.tsv`'s GPIO rows, which are ArduPilot's AFSEL and MODER values by field;
+  - the stock `stm32h7.repl`'s timer-to-pin wiring (Renode's pin data).
+  The visual transcription was finished at 16:37:13Z by an agent that saw neither.
+- The comparison with ST's data (§3) **ran at 16:38:53Z, before the table was committed** (`154d6cf`, 16:48:33Z). The table was committed byte-identical to what was compared, and no edit followed from the comparison.
 
 ## 3. The comparison with ST's open pin data
 

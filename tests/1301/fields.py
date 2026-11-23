@@ -25,6 +25,7 @@ LINE = re.compile(r'TVI1301-T \d+ P([A-K]) ([RW])(\d+) off=0x([0-9A-F]+) val=0x(
 vals = defaultdict(lambda: defaultdict(set))     # (reg, field) -> source -> values
 widths = defaultdict(lambda: defaultdict(int))   # (reg, op, width) -> source -> count
 cold = defaultdict(list)
+rulefires = defaultdict(list)                     # independent of the prototype: AF mode on a blank cell, after any write
 order = []                                        # pins put in AF mode: (source, pin, AF at the MODER write, AF final, first-AF-mode seq)
 final_af = {}
 for arg in sys.argv[2:]:
@@ -49,6 +50,9 @@ for arg in sys.argv[2:]:
             mode = (moder >> 2 * pin) & 3
             af = ((afrl if pin < 8 else afrh) >> 4 * (pin & 7)) & 0xF
             key = f'P{port}{pin}'
+            cell = table.get((key, af))
+            if mode == 2 and cell is not None and cell[0] == '-' and last.get(key) != (mode, af):
+                rulefires[src].append((key, af, cell[1], REG.get(aligned, ('?', 0))[0]))
             if mode == 2 and afmode.get(key) is None:
                 afmode[key] = (aligned, af)
             if mode != 2: afmode.pop(key, None)
@@ -58,6 +62,7 @@ for arg in sys.argv[2:]:
         if mode == 2:
             first = afmode.get(key)
             order.append((src, key, first, af))
+print('## The AF rule, evaluated here at every write (AF mode on a blank cell): ' + (', '.join(f'{s}: {v}' for s, v in rulefires.items()) or 'never, on any source'))
 print('## Access widths (register, op, width, byte offset: count per source)')
 for k in sorted(widths): print('\t'.join(map(str, k)), dict(widths[k]))
 print('## Cold writes (pc none)')

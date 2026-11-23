@@ -12,6 +12,9 @@
 #              the consumer's own references to a port moved onto the guard's variable (its untyped `gpioPortX:`
 #              blocks, re-appended after the restatement; `@ gpioPortX` and `-> gpioPortX` repointed); console gzipped
 #   cost       as trace, with /ovl/gpio-restate-cost.repl (trace off): the one file's cost with the GPIO guard
+#   traceclk   as trace, with `sysbus LogPeripheralAccess sysbus.rcc true` before RunFor: the GPIO accesses in order with the
+#              RCC's (RCC_AHB4ENR's GPIOxEN, for TVI-WO-1300a's lock)
+#   tracesi    as trace, with /ovl/gpio-restate-tracesi.repl: the ports reset to silicon's values (gpio-restate.awk resets=1)
 set -u
 n=$1; shift
 for mode in "$@"; do
@@ -26,7 +29,7 @@ for mode in "$@"; do
     c=${args[$((i + 1))]}
     case $mode in
       pure) ;;
-      base|trace|cost)
+      base|trace|cost|tracesi|traceclk)
         [ -s /tmp/release/Tviburi.cs ] || /repo/scripts/build-release /repo /tmp/release > /out/$n-$mode.release.txt 2>&1 || { echo "replay-1301: release build failed" >&2; exit 3; }
         sed -i 's/^\(spi[0-9]*\): SPI\.STM32H7_SPI @ {/\1: Tviburi.GuardedSTM32H7_SPI @ {/' "$plat"
         sed -i '/RegistrationPeripheralAlias\.SPI[0-9]*$/{n;s/^    }$/    }\n    mode: "recorded"/}' "$plat"
@@ -41,12 +44,13 @@ for mode in "$@"; do
           awk '/^gpioPort[A-K]:$/{f=1; next} f && /^ /{next} {f=0; print}' "$plat" > "$plat.new" && cat "$plat.new" > "$plat" && rm "$plat.new"
           grep -n '@ gpioPort[A-K]\|-> gpioPort[A-K]' "$plat" > /out/$n-$mode.repointed-gpio.txt
           sed -i 's/@ gpioPort\([A-K]\)/@ tviburiGpio\1/; s/-> gpioPort\([A-K]\)/-> tviburiGpio\1/g' "$plat"
-          { echo; cat /ovl/gpio-restate-$mode.repl; echo; cat /out/$n-$mode.moved-gpio.txt; } >> "$plat"
+          { echo; cat /ovl/gpio-restate-${mode/traceclk/trace}.repl; echo; cat /out/$n-$mode.moved-gpio.txt; } >> "$plat"
           [ -s /tmp/onefile-$mode.cs ] || bash /repo/tests/1300/onefile.sh /tmp/onefile-$mode.cs /tmp/release/Tviburi.cs /ovl/GpioProto1301.cs
           one=/tmp/onefile-$mode.cs
         fi
         c=${c/'mach create; '/"include @$one; mach create; "}
-        if [ $mode = trace ]; then
+        [ $mode = traceclk ] && c=${c/'; emulation RunFor '/'; sysbus LogPeripheralAccess sysbus.rcc true; emulation RunFor '}
+        if [ ${mode#trace} != $mode ]; then
           sed -i 's/^collapse-repeated-log-entries = True/collapse-repeated-log-entries = False/' "$cfg"
         fi ;;
       *) echo "replay-1301: mode $mode?" >&2; exit 2 ;;
@@ -58,7 +62,7 @@ for mode in "$@"; do
   cd "$d"
   start=$(date +%s.%N)
   envs=(HOME="$d" TMPDIR="$d" DOTNET_EnableDiagnostics=0 DOTNET_EnableWriteXorExecute=0)
-  if [ $mode = trace ]; then
+  if [ ${mode#trace} != $mode ]; then
     env -i "${envs[@]}" /opt/renode/renode "${args[@]}" < /dev/null 2>&1 | gzip -1 > /out/$n-$mode.console.txt.gz &
   else
     env -i "${envs[@]}" /opt/renode/renode "${args[@]}" < /dev/null > /out/$n-$mode.console.txt 2>&1 &

@@ -1,0 +1,19 @@
+logFile @/out/renode-log.txt
+include @/out/onefile.cs
+emulation SetSeed 1
+mach create
+machine LoadPlatformDescription @/proto/nucleo-1301.repl
+echo "CASE1 PA5 AF6 then MODER=10: expect one would-refuse"
+sysbus WriteDoubleWord 0x58020020 0x00600000
+sysbus WriteDoubleWord 0x58020000 0x00000800
+python "print('TVICHK signal PA5 ' + monitor.Machine['sysbus.gpioPortA'].WhichSignal(5))"
+echo "CASE2 PA5 AF5 (SPI1_SCK), MODER=10 again: expect none"
+sysbus WriteDoubleWord 0x58020020 0x00500000
+sysbus WriteDoubleWord 0x58020000 0x00000800
+python "print('TVICHK signal PA5 ' + monitor.Machine['sysbus.gpioPortA'].WhichSignal(5))"
+echo "CASE3 PA6 MODER=10 with AFSEL 0 (blank): expect one would-refuse at the MODER write"
+sysbus WriteDoubleWord 0x58020000 0x00002800
+echo "CASE4 PA6 AF5 (SPI1_MISO): expect none"
+sysbus WriteDoubleWord 0x58020020 0x05500000
+echo "TVIBURI-END"
+quit

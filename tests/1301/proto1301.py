@@ -12,11 +12,11 @@ table = ',\n'.join('            new Cell[] { ' + ', '.join(f'C({cs(c)}, {pg})' f
 index = ', '.join(cs(p) for p in order)
 # the allow-list's shape (rows as RCC's R(...)); this prototype only carries them, for the compile's cost
 fields = []
-for reg, off, page, per, w, kind in [('GPIOx_MODER', 0x00, 543, 16, 2, 'guard copy'), ('GPIOx_OTYPER', 0x04, 543, 16, 1, 'tag'),
-        ('GPIOx_OSPEEDR', 0x08, 544, 16, 2, 'inherited'), ('GPIOx_PUPDR', 0x0C, 544, 16, 2, 'inherited'),
-        ('GPIOx_IDR', 0x10, 545, 16, 1, 'read-only'), ('GPIOx_ODR', 0x14, 545, 16, 1, 'inherited'),
-        ('GPIOx_BSRR', 0x18, 545, 32, 1, 'guard'), ('GPIOx_LCKR', 0x1C, 545, 17, 1, 'refused'),
-        ('GPIOx_AFRL', 0x20, 546, 8, 4, 'guard copy'), ('GPIOx_AFRH', 0x24, 546, 8, 4, 'guard copy')]:
+for reg, off, page, per, w, kind in [('GPIOx_MODER', 0x00, 541, 16, 2, 'guard copy'), ('GPIOx_OTYPER', 0x04, 541, 16, 1, 'tag'),
+        ('GPIOx_OSPEEDR', 0x08, 542, 16, 2, 'inherited'), ('GPIOx_PUPDR', 0x0C, 542, 16, 2, 'inherited'),
+        ('GPIOx_IDR', 0x10, 543, 16, 1, 'read-only'), ('GPIOx_ODR', 0x14, 543, 16, 1, 'inherited'),
+        ('GPIOx_BSRR', 0x18, 544, 32, 1, 'guard'), ('GPIOx_LCKR', 0x1C, 544, 17, 1, 'refused'),
+        ('GPIOx_AFRL', 0x20, 545, 8, 4, 'guard copy'), ('GPIOx_AFRH', 0x24, 546, 8, 4, 'guard copy')]:
     for i in range(per):
         lsb = i * w
         fields.append(f'            R({cs(reg)}, 0x{off:03X}, "§11.4", {cs(reg.split("_")[1] + str(i))}, {lsb + w - 1}, {lsb}, Any, {cs(kind)}, "prototype", {page})')
@@ -77,7 +77,7 @@ namespace Antmicro.Renode.Peripherals.Tviburi
         {{
             var aligned = offset & ~3L;
             var shift = (int)(8 * (offset & 3));
-            // BSRR is write-only (reads 0): a sub-word write to it is the half it names, not a merge (RM0433 Rev 9 p545)
+            // BSRR is write-only (reads 0): a sub-word write to it is the half it names, not a merge (RM0433 Rev 9 p544)
             var merged = aligned == 0x18 ? (uint)value << shift : (base.ReadDoubleWord(aligned) & ~(0xFFFFu << shift)) | ((uint)value << shift);
             base.WriteDoubleWord(aligned, merged);
             Trace("W", 16, offset, value);
@@ -130,7 +130,7 @@ namespace Antmicro.Renode.Peripherals.Tviburi
                 {{
                     records.Refuse("TVI-GPIO-AF", "predicted-fault", offset == 0x00 ? "GPIOx_MODER" : pin < 8 ? "GPIOx_AFRL" : "GPIOx_AFRH",
                         "P" + Port + pin + " AF" + af, "pin P" + Port + pin + " in alternate-function mode (MODER = 10) selects AF" + af
-                        + ", which has no function on that pin", "DS12117 Rev 10 Table 9 p" + cell.Page + "; RM0433 Rev 9 p543, p546",
+                        + ", which has no function on that pin", "DS12117 Rev 10 Table 9 p" + cell.Page + "; RM0433 Rev 9 p541 (MODER), p545-546 (AFRL, AFRH)",
                         "MODER=0x" + moder.ToString("X8"), offset, 0, 32);
                 }}
                 faulted = bad ? faulted | (1 << pin) : faulted & ~(1 << pin);

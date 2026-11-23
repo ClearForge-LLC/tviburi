@@ -1,6 +1,8 @@
 # TVI-WO-1301 §1.1 — the GPIO field table measured against both firmwares, the stock port, the restatement, and the memory
 
-**Status:** measured 2026-11-23; **stopped at §1.1**. One §7 condition has also fired: **the platform names no package** (§6.1).
+**Status:** measured 2026-11-23; **stopped at §1.1**. **Two §7 conditions have also fired:**
+- **the platform names no package** (§6.1);
+- **the one-file peak exceeded 1,048,576 KiB once in 20 runs** on ArduPilot's full boot with the GPIO prototype (§5).
 - No model, script or firmware file is changed on this branch. `tests/1301/` holds the measurement harness and a scratch prototype.
 - The table is `model/ds12117-rev10-table9.tsv` (its own document is `TVI-WO-1301.ds12117.md`).
 - §6 lists what the architect is asked to acknowledge or rule.
@@ -28,7 +30,7 @@
 Every access either firmware makes to a GPIO port. **There are no cold writes to GPIO** (no `pc: none` access in any of the 15 boots).
 
 **Widths.**
-- Every access is 32-bit, except ArduPilot's `BSRR`. It writes 16-bit halves: 2,371 to `BS` (offset `0x18`) and 4,740 to `BR` (offset `0x1A`).
+- Every access is 32-bit, except ArduPilot's `BSRR`, and one 32-bit **read** of `BSRR` by `d1-drv8876` (it reads 0). It writes 16-bit halves: 2,371 to `BS` (offset `0x18`) and 4,740 to `BR` (offset `0x1A`).
 - RM0433 allows it: "The peripheral registers can be written in word, half word or byte mode" (p541), and the ports "have to be accessed as 32-bit words, half-words or bytes" (p531).
 - The exception is `LCKR`: "Only word access (32-bit long) is allowed during this locking sequence" (p544).
 
@@ -36,7 +38,7 @@ Every access either firmware makes to a GPIO port. **There are no cold writes to
 |---|---|---|---|---|
 | `MODER` (p541) | enum fields, stored; `10` connects the pin's AF receiver (L141–145, L161–165) | `0xABFFFFFF` (A), `0xFFFFFEBF` (B), `0xFFFFFFFF` (others), i.e. analog. **Stock: 0 (input) on every port**: the stock `.repl` passes no `modeResetValue` | `00`, `01`, `10`, 4,867 writes; reads it 4,918 times | `00`, `01`, `10`, `11` (`11` once: PF3, `d1-drv8876`) |
 | `OTYPER` (p541) | **16 tagged flags** (L166–184): a write is dropped, and a read gives 0 | 0 | `OT6`, `OT7` = 1 on PB6/PB7 (I2C1); reads it 4,916 times | `OT` = 1 on PB6/PB7 (12 boards) and PB10/PB11 (3 boards) |
-| `OSPEEDR` (p542) | enum fields, stored; no effect | `0x0C000000` (A), `0x000000C0` (B), 0. **Stock: 0** | `10` on every pin of every port (board init, PK8–PK15 included), `01` on PA5/PA7 | `00`, `01` (PA5, PA7) |
+| `OSPEEDR` (p542) | enum fields, stored; no effect | `0x0C000000` (A), `0x000000C0` (B), 0. **Stock: 0** | `10` on most pins, PK8–PK15 included (board init: `0xAAAAAAAA` to port K; not PA0, PA1, PA5–PA7, PA9, PA10, PB6, PB7, PB13–PB15), `01` on PA5/PA7 | `00`, `01` (PA5, PA7) |
 | `PUPDR` (p542) | enum fields, stored (`11`, reserved, too); no effect on `IDR` | `0x64000000` (A), `0x00000100` (B), 0. **Stock: 0** | `01` on PA9, PA10 | `01` on PA13, PA15, PB4; `10` on PA14 (14 boards) |
 | `IDR` (p543) | read-only; returns the **output** state `State`, not the pin's input (L195–198) | input | read 58 times, all GPIOB, reading `0xFFFF` | read once (`d1-drv8876`) |
 | `ODR` (p543) | stored as `State`; drives the pins' connections (L199–202) | 0 | `0xFFFF` once to each of the 11 ports (board init) | none |
@@ -48,14 +50,35 @@ Every access either firmware makes to a GPIO port. **There are no cold writes to
 **The order, measured.** Every pin either firmware leaves in AF mode was put there with its AF already selected. ArduPilot's board init writes whole words: `OTYPER`, `OSPEEDR`, `PUPDR`, `ODR`, `AFRL`, `AFRH`, then `MODER`. The generated firmware also writes AFSEL first.
 - **153 pin end-states** across the 15 boots, **none on a blank cell, none whose AF changed after AF mode began.**
 - **ArduPilot's 10 AF pins:** PA5/PA6/PA7 AF5 (`SPI1_SCK`, `MISO`, `MOSI`, p89); PA9/PA10 AF7 (`USART1_TX`/`RX`); PB6/PB7 AF4 (`I2C1_SCL`/`SDA`, p90); PB13/PB14/PB15 AF5 (`SPI2`, p91).
-- **The AF rule, recorded on all 15 boots** (every write, every pin): **0 `would-refuse`**.
+- **The AF rule, recorded on all 15 boots** (every write, every pin): **0 `would-refuse`**. `fields.py`'s own evaluation at every write agrees.
+- **The rule does fire** (`tests/1301/smoke/afrule.resc`, on Tviburi's board):
+  - PA5 with AF6 (`-`, p89), then `MODER` = 10, gives one `would-refuse` naming `PA5 AF6`, `GPIOx_MODER`, p89;
+  - AF5 (`SPI1_SCK`) gives none;
+  - PA6 put in AF mode first, on AF0 (`-`), gives one at the `MODER` write;
+  - then AF5 (`SPI1_MISO`) gives none.
+- **The port clocks (for 1300a's lock, the architect's 17:16Z note):** in `traceclk` mode the GPIO accesses are logged in order with `RCC_AHB4ENR`'s writes. **No access to a port while its `GPIOxEN` is clear:**
+  - ArduPilot: 0 of 56,117; it writes `AHB4ENR` = `0x7FF`, all 11 ports, before its first GPIO access;
+  - the generated firmware: 0 on all 14 boards (`0x3`, `0x7`, `0xB`, `0x17`, `0x23` as they go).
+  So the GPIO guard can refuse an access to an unclocked port without refusing either firmware. With 1300a's lock, though, the bus drops that access before the guard sees it, as for SPI1. **Proposed:** the GPIO guard does not add its own rule for it.
 
-**Reads, and why they matter.** Both firmwares read-modify-write `MODER`, `OTYPER`, `OSPEEDR` and `PUPDR` after board init (ArduPilot about 4,900 reads of each). On the stock port:
+**Reads, and why they matter.** ArduPilot read-modify-writes `MODER`, `OTYPER`, `OSPEEDR` and `PUPDR` after board init (about 4,900 reads of each). The generated firmware reads `MODER`, `OSPEEDR`, `AFRL` and `AFRH`, never `OTYPER` or `PUPDR`. On the stock port:
 - `MODER`, `OSPEEDR` and `PUPDR` read the stock reset (0) where silicon reads its reset;
 - `OTYPER` reads 0 always;
 - `IDR` reads the output state.
 
-So the values ArduPilot writes after board init carry whatever the stock port returned. This is `RUL-17`'s case for serving those fields from the guard's copy.
+So the values written after a read carry whatever the stock port returned. This is `RUL-17`'s case for serving those fields from the guard's copy.
+
+**Measured again with the ports reset to silicon's values** (`replay-1301.sh tracesi`: the stock constructor's `modeResetValue`, `outputSpeedResetValue` and `pullUpPullDownResetValue`, p541–542, emitted by `gpio-restate.awk resets=1`), on all 15 boots:
+- **The AF rule still fires on no boot** (the prototype, and `fields.py`'s own count at every write).
+- **The values change:**
+  - the generated firmware now writes `MODER` = `11` on most untouched pins, carried from the analog reset (stock reset: only PF3, once);
+  - it writes `OSPEEDR` = `11` on PA13 and PB3, the reset's "very high";
+  - ArduPilot's later read-modify-writes carry the reset pulls of PA13–PA15 and PB4 (`PUPDR` `01`/`10`).
+  So the allow-list must take `MODER` `11` and `OSPEEDR` `11` on a valid path (A2, A4 below).
+- **The consumer's boot block changes on every board** (`sysbus ReadDoubleWord` of `MODER`, `AFRx` and `PUPDR` of A, B and others):
+  - ArduPilot: `PUPDR` A `0x00140000` → `0x64140000`;
+  - each generated board: `MODER` A and B, for example `sentinel-03` `0x002AA8A1` → `0xABEAABAD` and `0xA9A0A000` → `0xA9AFAEBF`.
+  Every value that changes is silicon's reset carried through, so A5 is a consumer-visible change, as 1300's `AHB2ENR` was.
 
 ## 3. The stock port, measured
 
@@ -85,27 +108,30 @@ So the values ArduPilot writes after board init carry whatever the stock port re
   - `GreenLED` follows `BSRR` through the guard;
   - the RCC guard's registry maps `GPIOA`…`GPIOK` to the guards (59 entries, as 1300's).
   **The RCC restatement's untyped `gpioPortX: @ { … tviburiRcc … }` updates bind to the cancelled entries, harmlessly:** the guard's own declaration carries the registration.
+- **Phantom inputs.** A cancelled port's connections survive as inert inputs of Renode's `CombinedInput` (an OR; the cancelled port is never built, so they never drive). The guard reaches each destination through the combiner. Measured with the RCC restatement first and the GPIO restatement after it; **no other order was measured.**
 - **On the consumer's 15 platforms:**
   - ArduPilot's boot block is identical to today's one file's, and differs from stock only in 1300's accepted `AHB2ENR` (`0xE0000040`).
-  - Its console, minus records, differs from today's one file's in nothing but the `include` line.
+  - Its console, minus records, differs from today's one file's only in the `include` line and the 11 ports' class names in the `peripherals` listing.
   - All 14 generated boots' boot blocks are identical to stock, and so are their motor-observer lines (`pa8obs` and on: timer, then pin, then LED).
 
-## 5. The one-file overlay's memory on ArduPilot's full boot
+## 5. The one-file overlay's memory on ArduPilot's full boot — **the bound was exceeded once**
 
-ArduPilot's 5 s foreign boot, replayed in one container, the modes interleaved, peak tree `VmRSS` as 1300 measured it:
+ArduPilot's 5 s foreign boot, replayed with the modes interleaved, peak tree `VmRSS` as 1300 measured it. Two sessions: 9 runs at 17:00Z and 24 at 17:16Z.
 
-| Mode | What compiles | Peak (KiB), each run | Under 1,048,576 by |
+| Mode | What compiles | Runs | Peak (KiB): min, median, max |
 |---|---|---|---|
-| `pure` | stock | 858,264; 868,484 | — |
-| `base` | today's one file (the SPI and RCC guards, the release built from this branch) | 968,736; 968,804; 977,852 | 69–78 MiB |
-| `cost` | today's one file **plus the GPIO prototype**, 11 ports restated | **997,900; 1,020,420; 1,028,332; 1,032,992** | **15–49 MiB** |
+| `pure` | stock | 2 | 858,264; —; 868,484 |
+| `base` | today's one file (the SPI and RCC guards, the release built from this branch) | 11 | 958,432; 968,804; 983,156 |
+| `cost` | today's one file **plus the GPIO prototype**, 11 ports restated | 20 | 983,288; 1,019,896; **1,065,516** |
 
-- **The GPIO guard costs about 29–55 MiB over today's one file,** in one compilation. The `trace` run, which also logs, peaked at 1,020,504.
-- **Not a stop: the peak does not exceed 1,048,576 KiB.** But the worst margin is 15 MiB, and 1300a adds to the same file.
+- **One `cost` run of 20 peaked at 1,065,516 KiB, 16,940 KiB over the bound,** at host load 4.22 (the last of the second session). The next highest is 1,036,712. Every run, that one included, finished the boot (`AETHELGARD-BOOT-END` in all 24 consoles of the second session).
+- **§7 stop:** "The one-file peak exceeds 1,048,576 KiB on ArduPilot's full boot." I report it as fired: the bound is a per-run reaper limit in the consumer, so one run in twenty over it is a boot the consumer would kill.
+- **What the guard costs:** about 50 MiB over today's one file at the median (1,019,896 against 968,804), in one compilation.
 - **What could shrink it** (none measured):
   - the table as one string, parsed at load, instead of 2,688 object initialisers;
   - the allow-list as a short table of per-register rules, instead of 161 rows;
-  - a single port class with no per-port state beyond the copies.
+  - one port class with no per-port state beyond the copies.
+- **Load matters:** `base` and `pure` spread by about 25 MiB and 10 MiB across runs too. 1300a adds to the same file.
 
 ## 6. For the architect: what to rule, and what to acknowledge
 
@@ -114,7 +140,8 @@ ArduPilot's 5 s foreign boot, replayed in one container, the modes interleaved, 
 - **No package anywhere in the platforms.** Not in stock `stm32h753.repl`, `stm32h7.repl`, `nucleo_h753zi.repl`, Tviburi's board, or any of the consumer's 15 emitted platforms.
 - **Only the consumer's specification names the part:** `"mcu": {"part": "STM32H753ZITx"}`. ST's `STM32H753ZITx.xml` (Aethelgard `1c32c8ea`) gives `Package="LQFP144"`, 114 I/O pins.
 - **Which pins a package bonds is a second DS12117 transcription** (the pin/ball definition table and its package columns). It is not started.
-- **A finding for "configured":** ArduPilot's board init writes `OSPEEDR` = `10` and `ODR` = `0xFFFF` to every pin of all 11 ports, including PK8–PK15, which exist on no package (Table 9 lists PK0–PK7). If "configured" means any write, the package rule refuses ArduPilot's boot on a valid path.
+- **A finding for "configured":** ArduPilot's board init writes `OTYPER`, `OSPEEDR` (`0xAAAAAAAA` on port K), `PUPDR`, `ODR` = `0xFFFF`, `AFRL`, `AFRH` and `MODER` (input) for all 11 ports, PK8–PK15 included, which exist on no package (Table 9 lists PK0–PK7). If "configured" means any write, the package rule refuses ArduPilot's boot on a valid path.
+- **The pins ArduPilot puts in output or AF mode:** 12 of them. PA0 and PA1 are output (the chip selects); PA5 is output and AF; PA6, PA7, PA9, PA10, PB6, PB7, PB14 and PB15 are AF; PB13 is AF and output. All are ports A and B, which LQFP144 bonds in full (from memory; the bonding table is not transcribed).
 - **To rule:**
   - where the package comes from: a property on the guards' entries, emitted by the consumer from `mcu.part`, or another source;
   - what "configured" means: `MODER` output or AF, measured as above;
@@ -130,10 +157,10 @@ ArduPilot's 5 s foreign boot, replayed in one container, the modes interleaved, 
 | # | Field, value | Who writes it | The stock port | Proposed |
 |---|---|---|---|---|
 | A1 | `OTYPER.OTy` = 1 (open-drain) | both (PB6/7, PB10/11) | a tag: dropped, reads 0 | acknowledged: no electrical model (WO: not the pins' electrical behaviour); the guard keeps a copy and serves reads |
-| A2 | `OSPEEDR` = `01`, `10` | both | stored, no effect | acknowledged, inherited; no timing model |
+| A2 | `OSPEEDR` = `01`, `10`, and `11` (carried from silicon's reset on PA13, PB3) | both | stored, no effect | acknowledged, inherited; no timing model |
 | A3 | `PUPDR` = `01`, `10` | both | stored, no effect on `IDR` | acknowledged, inherited; `11` (reserved, p542) refused |
-| A4 | `MODER` = `11` (analog) | generated (PF3, `d1-drv8876`) | stored; nothing analog | acknowledged (WO: "analog mode beyond the allow-list" is out of scope) |
-| A5 | `MODER`, `OSPEEDR`, `PUPDR` reset values | — | 0 where silicon is analog, and A/B differ (p541–542) | the guard's copies reset to silicon's and are served on read (`RUL-17`). This changes the consumer's boot block (`MODER` reads, as `AHB2ENR` did in 1300) |
+| A4 | `MODER` = `11` (analog) | generated (PF3 under the stock reset; most untouched pins under silicon's) | stored; nothing analog | acknowledged (WO: "analog mode beyond the allow-list" is out of scope) |
+| A5 | `MODER`, `OSPEEDR`, `PUPDR` reset values | — | 0 where silicon is analog, and A/B differ (p541–542) | the guard's copies reset to silicon's and are served on read (`RUL-17`). **Measured (§2): this changes the consumer's boot block on all 15 boards** |
 | A6 | `IDR` reads | ArduPilot (58, GPIOB) | the output state, not the input | a read rule to rule: served by the stock port (inherited, acknowledged), or refused. No pull model exists either way |
 | A7 | `BSRR` with BS and BR set for one pin | nobody | BR wins; silicon BS (p544) | the guard gives BS priority (a cited model), or refuses `unmodeled` |
 | A8 | `LCKR`, any write | nobody | modeled partly | **refused `unmodeled`** ("LCKR … modeled or refused"; pp544–545). Modelling waits for a firmware that writes it |
@@ -164,7 +191,12 @@ Each consumer platform refers to the ports in up to three ways, and each must na
 
 `replay-1301.sh` moves (1) after the restatement and repoints (2).
 
-### 6.7 The bench row, for the build
+### 6.7 The memory stop (§5)
+
+- **Raise the bound, or shrink the guard:** the consumer's decision (`RUL-09` (a)), or the three reductions in §5 measured first.
+- **Or split:** a guard for only the ports the boards use.
+
+### 6.8 The bench row, for the build
 
 **`TVI-GPIO-AF`, `predicted-fault`.** On a NUCLEO-H753ZI:
 - **Procedure:** PA5 in AF mode with AF6 (`-` on p89), SPI1 started.
