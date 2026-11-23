@@ -6,8 +6,8 @@
 # Per ledger row it appends: model peripheral, model class, firmware write count at the register, the
 # field's last written value, what covers the field in the model (tag | field/mode | undefined bits | no
 # register | no register collection), and `dropped`: yes when the model cannot hold what was written
-# (a tag holds its reset value; undefined bits and an absent register hold nothing; a field without a write
-# mode ignores the write), no when it stores it, `-` when the firmware never wrote the register.
+# on any write, not only the last (a tag holds its reset value; undefined bits and an absent register hold
+# nothing), no when it stores it, `-` when the firmware never wrote the register.
 # out2 receives firmware writes the model drops (non-reset value into a tag, a non-zero value into undefined
 # bits, any write to an absent register) that no ledger row of this board covers: the view-(2)-only rows.
 function hx(s) { return strtonum(s) }
@@ -31,6 +31,10 @@ FILENAME == ARGV[2] {
   wm = ($6 == "Byte") ? 0xFF : ($6 == "Word" || $6 == "UInt16") ? 0xFFFF : 0xFFFFFFFF
   k = $5 SUBSEP off; m = lshift(wm, sh); v = lshift(hx($8), sh)
   last[k] = or(and(last[k], compl(m) % 4294967296), and(v, m)); wmask[k] = or(wmask[k], m); cnt[k]++
+  # Every write counts, not only the last: a tag set by one write and cleared by a later one (ADC_CR.ADCAL)
+  # was still dropped. orv: bits any write set; andv: bits every write kept set.
+  if (!(k in andv)) andv[k] = 0xFFFFFFFF
+  orv[k] = or(orv[k], and(v, m)); andv[k] = and(andv[k], or(and(v, m), compl(m) % 4294967296))
   if (!(k in fpc)) fpc[k] = $9; lpc[k] = $9; fseq[k] = (k in fseq) ? fseq[k] : $3
   wk[k] = 1; next
 }
@@ -53,7 +57,8 @@ $1 != board { next }
         tr = em[k, e]; sub(/.*reset=/, "", tr)
         cover = cover (cover ? "; " : "") "tag " en[k, e] " [" ep[k, e] "+" ew[k, e] "] reset " tr
         ov = and(em2, fm)   # only this row's bits of the tag
-        if (n && fv != "-" && and(last[k], ov) != and(lshift(hx(tr), ep[k, e]), ov)) drop = "yes"
+        rb = and(lshift(hx(tr), ep[k, e]), ov)   # the tag reset bits within this row
+        if (n && fv != "-" && (and(orv[k], and(ov, compl(rb) % 4294967296)) || and(and(compl(andv[k]) % 4294967296, ov), rb))) drop = "yes"
         else if (n && drop != "yes") drop = "no (tag; written value equals its reset)"
       } else {
         cover = cover (cover ? "; " : "") "field " en[k, e] " [" ep[k, e] "+" ew[k, e] "] " em[k, e]
@@ -61,7 +66,7 @@ $1 != board { next }
       }
     }
     und = and(fm, compl(defined[k]) % 4294967296)
-    if (und) { cover = cover (cover ? "; " : "") sprintf("undefined bits 0x%X", und); if (n && and(last[k], und)) drop = "yes"; else if (n && drop == "no") drop = "no (undefined bits written 0)" }
+    if (und) { cover = cover (cover ? "; " : "") sprintf("undefined bits 0x%X", und); if (n && and(orv[k], und)) drop = "yes"; else if (n && drop == "no") drop = "no (undefined bits written 0)" }
   }
   print $0, p, cls[p], n, fv, cover, drop
   covered[k] = or(covered[k], fm)
@@ -77,9 +82,10 @@ END {
       if (ek[k, e] != "tag") continue
       em2 = mask(ep[k, e], ew[k, e]); if (!and(em2, unc)) continue
       tr = em[k, e]; sub(/.*reset=/, "", tr); tv = and(rshift(last[k], ep[k, e]), mask(0, ew[k, e]))
-      if (tv != hx(tr)) print board, p, cls[p], sprintf("0x%X", base[p] + off), sprintf("0x%X", off), "tag " en[k, e] " [" ep[k, e] "+" ew[k, e] "]", sprintf("0x%X", tv), cnt[k], fpc[k], "tag holds reset " tr > out2
+      ob = and(orv[k], em2); ab = and(compl(andv[k]) % 4294967296, em2); rb = lshift(hx(tr), ep[k, e])
+      if (and(ob, compl(rb) % 4294967296) || and(ab, rb)) print board, p, cls[p], sprintf("0x%X", base[p] + off), sprintf("0x%X", off), "tag " en[k, e] " [" ep[k, e] "+" ew[k, e] "]", sprintf("0x%X", tv), cnt[k], fpc[k], "tag holds reset " tr > out2
     }
     und = and(unc, compl(defined[k]) % 4294967296)
-    if (and(last[k], und)) print board, p, cls[p], sprintf("0x%X", base[p] + off), sprintf("0x%X", off), sprintf("undefined bits 0x%X", und), sprintf("0x%X", and(last[k], und)), cnt[k], fpc[k], "bits with no field or tag" > out2
+    if (and(orv[k], und)) print board, p, cls[p], sprintf("0x%X", base[p] + off), sprintf("0x%X", off), sprintf("undefined bits 0x%X", und), sprintf("0x%X", and(orv[k], und)), cnt[k], fpc[k], "bits with no field or tag" > out2
   }
 }

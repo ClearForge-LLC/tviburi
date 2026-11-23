@@ -1,0 +1,14 @@
+board	spec	verify verdict (exit)	ledger rows	ignored-by-model	same-source	judged with "also ignored"	firmware writes	judge writes	control (boot block lines, pure = logged)	motors
+sentinel-01-minimal	examples/sentinel-01-minimal.json	pass (0)	301	80	83	48	95	17	identical, 48	-
+sentinel-01	examples/sentinel-01.json	pass (0)	354	80	107	63	105	17	identical, 49	-
+motors-dshot600	crates/aethelgard-cli/tests/fixtures/motors-dshot600.json	pass (0)	339	81	109	48	90	17	identical, 58	MOTOR1,MOTOR2,MOTOR3,MOTOR4
+sentinel-03	crates/aethelgard-cli/tests/fixtures/sentinel-03.json	pass (0)	710	218	223	88	288	33	identical, 91	MOTOR1,MOTOR2,MOTOR3,MOTOR4
+sentinel-02-shaped	crates/aethelgard-cli/tests/fixtures/sentinel-02-shaped.json	fail, fails extract (1)	505	154	150	73	247	35	identical, 85	MOTOR1,MOTOR2,MOTOR3,MOTOR4
+motors-pwm	crates/aethelgard-cli/tests/fixtures/motors-pwm.json	pass (0)	339	81	109	48	89	17	identical, 58	MOTOR1,MOTOR2,MOTOR3,MOTOR4
+serial-dshot-9600	crates/aethelgard-cli/tests/fixtures/serial-dshot-9600.json	pass (0)	393	113	124	48	121	17	identical, 63	MOTOR1,MOTOR2,MOTOR3,MOTOR4
+hse-external-8	crates/aethelgard-cli/tests/fixtures/hse-external-8.json	not_verified (DrawsNoBoard) (7)	623	197	184	85	264	35	identical, 98	MOTOR1,MOTOR2,MOTOR3,MOTOR4
+hse-crystal-16	crates/aethelgard-cli/tests/fixtures/hse-crystal-16.json	fail, fails extract (1)	623	197	184	85	263	35	identical, 98	MOTOR1,MOTOR2,MOTOR3,MOTOR4
+driver-judges-nothing	crates/aethelgard-cli/tests/fixtures/driver-judges-nothing.json	pass (0)	306	125	124	0	73	11	identical, 65	HB_IN1,HB_IN2,SERVO1,SERVO2
+d1-drv8876	crates/aethelgard-ir/tests/fixtures/d1-drv8876.json	not_verified (DrawsNoBoard) (7)	443	153	143	0	90	11	identical, 71	DRV_EN,DRV_PH,SERVO1
+sentinel-02-bench	examples/sentinel-02-bench.json	pass (0)	280	64	85	48	125	29	identical, 56	-
+sentinel-01-ext-bmp581	examples/sentinel-01-ext-bmp581.json	fail, fails extract (1)	354	80	107	63	125	24	identical, 56	-
