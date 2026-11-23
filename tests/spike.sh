@@ -225,8 +225,8 @@ t_conditions() {
   check "reads return silicon's value: CR1.SSI from the copy, CFG2 from the copy" \
     "[ \"\$(grep -A1 -x READ-CR1 <<<\"\$console\" | tail -n1)\" = 0x00001000 ] && [ \"\$(grep -A1 -x READ-CFG2 <<<\"\$console\" | tail -n1)\" = 0x10000000 ]"
   local r; r() { grep -A1 -x "$1" <<<"$console" | tail -n1; }
-  check "reads from the copies: IOLOCK from the latch (L2), CFG1 and CRCPOLY at reset, MASRX (C2, C4)" \
-    '[ "$(r READ-CR1-L2)" = 0x00001001 ] && [ "$(r READ-CFG1)" = 0x00070007 ] && [ "$(r READ-CRCPOLY)" = 0x00000107 ] && [ "$(r READ-CR1-MASRX)" = 0x00000100 ]'
+  check "reads from the copies: IOLOCK from the latch (L2), CFG1 and CRCPOLY at reset, MASRX, IER.OVRIE (C2, C4)" \
+    '[ "$(r READ-CR1-L2)" = 0x00001001 ] && [ "$(r READ-CFG1)" = 0x00070007 ] && [ "$(r READ-CRCPOLY)" = 0x00000107 ] && [ "$(r READ-CR1-MASRX)" = 0x00000100 ] && [ "$(r READ-IER)" = 0x00000041 ]'
 }
 
 t_fields() {

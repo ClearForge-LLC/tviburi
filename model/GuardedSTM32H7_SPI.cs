@@ -13,7 +13,8 @@
 //
 // Copies, served on read (RUL-17; ruling C2): the stock model drops tags and reads CFG1 as 0 after reset
 // and CFG2.MASTER as 1 (measured, TVI-WO-0100b.rm0433.md §1.3), so the guard keeps whole copies of CR1,
-// CFG1, CFG2 and CRCPOLY as last passed, at RM0433's reset values, and serves those reads from them.
+// CFG1, CFG2, IER (OVRIE is an acknowledged tag) and CRCPOLY as last passed, at RM0433's reset values,
+// and serves those reads from them.
 // CR1's SPE, CSTART and CSUSP are read from the stock model, which drives them. CR1.IOLOCK is read
 // from the guard's latch. A CR1 read while the latch is set refuses: the clear on SPE 1->0 (p2215) is
 // not modeled. A CFG2 read refuses while MASTER may have been cleared by a mode fault.
@@ -60,6 +61,7 @@ namespace Antmicro.Renode.Peripherals.Tviburi
             cr1 = 0;
             cfg1 = Cfg1Reset;
             cfg2 = 0;
+            ier = 0;
             crcPoly = CrcPolyReset;
             ioLock = false;
             ioLockCertain = false;
@@ -104,6 +106,9 @@ namespace Antmicro.Renode.Peripherals.Tviburi
                 cfg2 = value;
                 masterUnknown = false;
                 NoteMasterState();
+                break;
+            case IerOffset:
+                ier = value;
                 break;
             case IfcrOffset:
                 if((value & IfcrModfc) != 0 && history != null)
@@ -166,6 +171,8 @@ namespace Antmicro.Renode.Peripherals.Tviburi
                     return value;
                 }
                 return cfg2;
+            case IerOffset:
+                return ier;
             case CrcPolyOffset:
                 return crcPoly;
             }
@@ -577,6 +584,7 @@ namespace Antmicro.Renode.Peripherals.Tviburi
         private uint cr1;
         private uint cfg1;
         private uint cfg2;
+        private uint ier;
         private uint crcPoly;
         private bool ioLock;
         private bool ioLockCertain;
@@ -591,6 +599,7 @@ namespace Antmicro.Renode.Peripherals.Tviburi
         private const long Cr1Offset = 0x00;
         private const long Cfg1Offset = 0x08;
         private const long Cfg2Offset = 0x0C;
+        private const long IerOffset = 0x10;
         private const long IfcrOffset = 0x18;
         private const long TxdrOffset = 0x20;
         private const long RxdrOffset = 0x30;
