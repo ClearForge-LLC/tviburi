@@ -8,12 +8,15 @@
 #   3  REFUSED - the check found a refusal record (its exit 3). A refusal latches.
 #   0  PASS    - the check passed (a witness, an end record, no refusal), Renode exited 0, the
 #                script reached its end, and the firmware's after-the-last-write marker is present.
-#   1  FAIL    - anything else: a build failure, a check failure (no witness: the guard did not
-#                load; no end record: Renode crashed), a Renode error or timeout, missing evidence.
+#   1  FAIL    - anything else: a build failure (the release refused included), a check failure (no
+#                witness: the guard did not load; no end record: Renode crashed), a Renode error or
+#                timeout, a Renode build other than the release names, missing evidence.
+# The expected version is the release hash of the release built from /repo (scripts/build-release);
+# no environment variable or path is the model's identity (RUL-10).
 # Renode's own exit status is not trusted: a failed monitor command still exits 0 (measured).
 set -uo pipefail
 
-variants="modeled modf cfg2first iolock forge spray rmw"  # the firmware's --cfg path values
+variants="modeled modf cfg2first iolock forge spray rmw ardupilot generated field"  # the firmware's --cfg path values
 variant=
 for v in $variants; do [ "${1:-}" = "$v" ] && variant=$v; done
 [ -n "$variant" ] || { echo "usage: tviburi-spike <${variants// /|}>" >&2; exit 1; }
@@ -21,7 +24,6 @@ for v in $variants; do [ "${1:-}" = "$v" ] && variant=$v; done
 
 root=/repo
 out=/out
-export TVIBURI_MODEL_DIR=$root/model
 [ -d "$out" ] && [ -z "$(ls -A "$out")" ] || { echo "FAIL: $out must be an empty directory" >&2; exit 1; }
 
 export PATH=/opt/cargo/bin:$PATH RUSTUP_HOME=/opt/rustup CARGO_HOME=$out/cargo-home
@@ -31,6 +33,9 @@ rustc --edition 2021 --target thumbv7em-none-eabihf -C opt-level=s -C panic=abor
   || { echo "VERDICT FAIL (firmware build)"; exit 1; }
 cargo build --quiet --offline --locked --manifest-path "$root/tools/tviburi-check/Cargo.toml" --target-dir "$out/target" \
   || { echo "VERDICT FAIL (check build)"; exit 1; }
+version=$("$root/scripts/build-release") || { echo "VERDICT FAIL (release build)"; exit 1; }
+build=$(sed -n 's/^build renode //p' "$out/release/MANIFEST")
+renode --version 2>/dev/null | grep -qxF "  build: $build" || { echo "VERDICT FAIL (Renode is not the build the release names: $build)"; exit 1; }
 
 cat > "$out/run.resc" <<EOF2
 include @$root/scripts/prelude.resc
@@ -48,7 +53,7 @@ EOF2
 timeout 120 renode --disable-gui --console --plain "$out/run.resc" </dev/null >"$out/renode.out" 2>&1
 rc=$?
 
-"$out/target/debug/tviburi-check" "$out/renode-log.txt" spi1 >"$out/check.txt"
+"$out/target/debug/tviburi-check" "$version" "$out/renode-log.txt" spi1 >"$out/check.txt"
 crc=$?
 cat "$out/check.txt"
 if [ $crc -eq 3 ]; then

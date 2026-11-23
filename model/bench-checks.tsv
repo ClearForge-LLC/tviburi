@@ -1,0 +1,9 @@
+# Bench checks, one per predicted-fault refusal (RUL-18), moved here from TVI-WO-0100b.FEEDBACK.md §1 (B1-B4) by
+# TVI-WO-1200. Each runs on NUCLEO-H753ZI SPI1 with its kernel clock on, from reset, and reads back what silicon did.
+# tools/tviburi-release reads this file into the ledgers bench rows. Tab-separated, nine columns, none empty:
+# guard, id, rule, bit (as the refusal names it), procedure, confirms (the result that confirms the kind), refutes,
+# citation (RM0433 Rev 9), result ("not run" until it is run on silicon).
+Tviburi.GuardedSTM32H7_SPI	B1	TVI-SPI-MODF	CR1.SSI (bit 12) = 0	the modf firmware: CFG2 = MASTER|SSM, then CR1 = SPE; read SR, CFG2, CR1	SR.MODF = 1, CFG2.MASTER = 0, CR1.SPE = 0	MODF = 0 with SPE = 1	RM0433 Rev 9 §50.5.2 p2184	not run
+Tviburi.GuardedSTM32H7_SPI	B2	TVI-SPI-CFG2-SPE	CR1.SPE (bit 0) = 1	enable as the modeled firmware does, write CFG2 with SSIOP = 1, read CFG2	CFG2 unchanged	SSIOP reads 1	RM0433 Rev 9 §50.11.1 p2217; §50.11.4 p2221	not run
+Tviburi.GuardedSTM32H7_SPI	B3	TVI-SPI-IOLOCK	CR1.IOLOCK (bit 16) = 1	the iolock firmware: CFG2 = MASTER, CR1 = IOLOCK, CFG2 = MASTER|SSM; read CFG2, CR1	CFG2 = MASTER only; CR1.IOLOCK = 1	SSM reads 1	RM0433 Rev 9 §50.11.1 p2215	not run
+Tviburi.GuardedSTM32H7_SPI	B4	TVI-SPI-CFG1-SPE	CR1.SPE (bit 0) = 1	enable, write CFG1 with MBR changed, read CFG1	MBR unchanged	MBR reads the new value	RM0433 Rev 9 §50.11.1 p2217; §50.11.3 p2218	not run

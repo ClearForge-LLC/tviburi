@@ -3,28 +3,31 @@
 // Every guarded model owns one Records channel. It emits three kinds of record, each one JSON
 // object on one line, through Renode's logger under the guarded peripheral's own name:
 //   witness - once, when the peripheral is named on the bus: the guard is loaded, with its model
-//             version. A run with no witness is not a pass.
-//   refusal - a path the model does not model (northstar invariants 1 and 5). Logged at Error,
+//             version and its mode (RUL-19). A run with no witness is not a pass.
+//   refusal - a path the model does not model (northstar invariants 1 and 5), with its kind (RUL-18):
+//             predicted-fault or unmodeled. Logged at Error,
 //             which `logLevel` cannot suppress (measured: `logLevel 4` is rejected). Latches
 //             (RUL-08): after it, nothing the run does is claimed.
+//             In recorded mode (RUL-19) the same record is a `would-refuse`: nothing pauses, and the
+//             guard passes the access on as if no rule had fired. A recorded run is never a pass.
 //   end     - from Dispose, when Renode tears the machine down cleanly. A crash (an unhandled
 //             exception, SIGKILL) leaves none (measured). SIGTERM still disposes, so an end record
 //             shows a clean teardown, not that the consumer's script completed.
 // Each record carries a per-peripheral `seq` from 0. Renode collapses identical consecutive messages
 // into "msg (2)" (measured), so the sequence also keeps every record distinct.
 //
+// The model version is TviburiRelease.ManifestSha256: the release hash, compiled in from the release's
+// one file (RUL-10 (b), (e)). No environment variable, path or name is read (RUL-10 (c)).
+// The mode is a constructor argument from the platform description (RUL-19): "enforcing", the default,
+// or "recorded". Any other value is a load failure.
+//
 // Why the witness waits for the name: a log call from a model's constructor carries no source name
 // (measured), and the consumer accepts records only from the guarded peripheral's name (RUL-11).
-// A failure to compute the model version at construction is held until then and emitted as a
-// refusal (rule TVI-LOAD) in place of the witness; the guard then refuses every write.
+// A load failure is held until then and emitted as a refusal (rule TVI-LOAD) in place of the
+// witness; the guard then refuses every access, in either mode.
 //
 // The halt after a refusal is best-effort: the rest of the translation block may run (RUL-08).
 
-using System;
-using System.IO;
-using System.Linq;
-using System.Reflection;
-using System.Security.Cryptography;
 using System.Text;
 using Antmicro.Renode.Core;
 using Antmicro.Renode.Logging;
@@ -35,28 +38,33 @@ namespace Antmicro.Renode.Peripherals.Tviburi
 {
     public sealed class Records
     {
-        public Records(IMachine machine, IPeripheral owner, string guard)
+        public Records(IMachine machine, IPeripheral owner, string guard, string mode)
         {
             this.machine = machine;
             this.owner = owner;
             this.guard = guard;
-            try
+            this.mode = mode;
+            if(mode != Enforcing && mode != RecordedMode)
             {
-                version = ModelVersion.Value;
-            }
-            catch(Exception e)
-            {
-                loadFailure = e.Message;
+                loadFailure = "mode must be \"" + Enforcing + "\" or \"" + RecordedMode + "\", not " + (mode == null ? "null" : Json(mode));
             }
             machine.PeripheralsChanged += OnPeripheralsChanged;
         }
 
         public const string LoadCitation = "Tviburi records contract (RUL-12); northstar invariant 5";
 
-        // True when the model version could not be computed: the guard must refuse every access.
+        public const string Enforcing = "enforcing";
+        public const string RecordedMode = "recorded";
+
+        // True when the guard failed to load: it must refuse every access, in either mode.
         public bool LoadFailed => loadFailure != null;
 
-        public void Refuse(string rule, string register, string bit, string condition, string citation,
+        // True in recorded mode (RUL-19): after a rule fires and Refuse records it, the guard passes the
+        // access on to the stock model and to its copies as if no rule had fired, and evaluates no further
+        // rule for that access. Never true while LoadFailed: a load failure is a mode other than these two.
+        public bool Recorded => mode == RecordedMode;
+
+        public void Refuse(string rule, string kind, string register, string bit, string condition, string citation,
             string state, long offset, ulong value, int width)
         {
             var pc = "none";
@@ -64,12 +72,13 @@ namespace Antmicro.Renode.Peripherals.Tviburi
             {
                 pc = "0x" + cpu.PC.RawValue.ToString("X8");
             }
-            Emit(LogLevel.Error, "refusal", ",\"rule\":" + Json(rule)
+            Emit(LogLevel.Error, Recorded ? "would-refuse" : "refusal", ",\"rule\":" + Json(rule)
+                + ",\"kind\":" + Json(kind)
                 + ",\"peripheral\":" + Json(machine.GetAnyNameOrTypeName(owner))
                 + ",\"register\":" + Json(register)
                 + ",\"bit\":" + Json(bit)
                 + ",\"condition\":" + Json(condition)
-                + ",\"model_version\":" + Json(version ?? "unavailable")
+                + ",\"model_version\":" + Json(version)
                 + ",\"citation\":" + Json(citation)
                 + ",\"state\":" + Json(state)
                 + ",\"access\":{\"offset\":" + Json("0x" + offset.ToString("X"))
@@ -77,6 +86,10 @@ namespace Antmicro.Renode.Peripherals.Tviburi
                 + ",\"width\":" + width
                 + ",\"pc\":" + Json(pc)
                 + ",\"virtual_time\":" + Json(machine.ElapsedVirtualTime.TimeElapsed.ToString()) + "}");
+            if(Recorded)
+            {
+                return;
+            }
             (cpu as TranslationCPU)?.RequestReturn();
             machine.PauseAndRequestEmulationPause(true);
         }
@@ -85,7 +98,7 @@ namespace Antmicro.Renode.Peripherals.Tviburi
         {
             if(named)
             {
-                Emit(LogLevel.Info, "end", ",\"guard\":" + Json(guard) + ",\"model_version\":" + Json(version ?? "unavailable"));
+                Emit(LogLevel.Info, "end", ",\"guard\":" + Json(guard) + ",\"model_version\":" + Json(version));
             }
         }
 
@@ -98,11 +111,11 @@ namespace Antmicro.Renode.Peripherals.Tviburi
             named = true;
             if(loadFailure == null)
             {
-                Emit(LogLevel.Info, "witness", ",\"guard\":" + Json(guard) + ",\"model_version\":" + Json(version));
+                Emit(LogLevel.Info, "witness", ",\"guard\":" + Json(guard) + ",\"model_version\":" + Json(version) + ",\"mode\":" + Json(mode));
             }
             else
             {
-                Refuse("TVI-LOAD", "none", "none", "the guard's model version could not be computed at load: " + loadFailure
+                Refuse("TVI-LOAD", "unmodeled", "none", "none", "the guard could not load: " + loadFailure
                     + "; the guard refuses every access to this peripheral", LoadCitation,
                     "no witness emitted", 0, 0, 0);
             }
@@ -115,52 +128,6 @@ namespace Antmicro.Renode.Peripherals.Tviburi
                 owner.Log(level, "{\"tviburi\":" + Json(kind) + ",\"seq\":" + seq + fields + "}");
                 seq++;
             }
-        }
-
-        // sha256 over every file under $TVIBURI_MODEL_DIR (relative path + content hash, ordinal
-        // order) plus the Renode and Infrastructure build strings. Throws if any input is missing.
-        // Known gap, kept as built (TVI-WO-0100a; RUL-10 is TVI-WO-1200's): it hashes the files an
-        // environment variable names, not the bytes that were compiled.
-        private static readonly Lazy<string> ModelVersion = new Lazy<string>(() =>
-        {
-            var dir = Environment.GetEnvironmentVariable("TVIBURI_MODEL_DIR");
-            if(string.IsNullOrEmpty(dir) || !Directory.Exists(dir))
-            {
-                throw new InvalidOperationException("TVIBURI_MODEL_DIR is unset or missing");
-            }
-            var root = Path.GetFullPath(dir);
-            var files = Directory.GetFiles(root, "*", SearchOption.AllDirectories)
-                .Select(f => Path.GetRelativePath(root, f).Replace('\\', '/'))
-                .OrderBy(f => f, StringComparer.Ordinal)
-                .ToList();
-            if(files.Count == 0)
-            {
-                throw new InvalidOperationException("TVIBURI_MODEL_DIR holds no files");
-            }
-            var manifest = new StringBuilder();
-            foreach(var rel in files)
-            {
-                manifest.Append(rel).Append('\0').Append(Sha256(File.ReadAllBytes(Path.Combine(root, rel)))).Append('\n');
-            }
-            manifest.Append("renode\0").Append(BuildString("Renode")).Append('\n');
-            manifest.Append("infrastructure\0").Append(BuildString("Infrastructure")).Append('\n');
-            return "sha256:" + Sha256(Encoding.UTF8.GetBytes(manifest.ToString()));
-        });
-
-        private static string BuildString(string assembly)
-        {
-            var asm = AppDomain.CurrentDomain.GetAssemblies().FirstOrDefault(a => a.GetName().Name == assembly);
-            var version = asm?.GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion;
-            if(string.IsNullOrEmpty(version))
-            {
-                throw new InvalidOperationException("no build string for assembly " + assembly);
-            }
-            return version;
-        }
-
-        private static string Sha256(byte[] bytes)
-        {
-            return Convert.ToHexString(SHA256.HashData(bytes)).ToLowerInvariant();
         }
 
         private static string Json(string s)
@@ -178,7 +145,8 @@ namespace Antmicro.Renode.Peripherals.Tviburi
         private readonly IMachine machine;
         private readonly IPeripheral owner;
         private readonly string guard;
-        private readonly string version;
+        private readonly string version = TviburiRelease.ManifestSha256;
+        private readonly string mode;
         private readonly string loadFailure;
         private readonly object sync = new object();
         private bool named;

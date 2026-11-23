@@ -1,16 +1,23 @@
-//! tviburi-check <log-file> <peripheral>... — the consumer-side reference check of Tviburi's
-//! records contract (RUL-11, RUL-12, northstar invariant 8).
+//! tviburi-check <expected-model-version> <log-file> <peripheral>... — the consumer-side reference
+//! check of Tviburi's records contract (RUL-10 (d), RUL-11, RUL-12, RUL-19, northstar invariant 8).
 //!
-//! It reads only a Renode log file (the `logFile` backend) and accepts a record only from a line
-//! whose source is one of the named guarded peripherals:
-//!   [HH:MM:SS.ffff] <spaces> [LEVEL] <peripheral>: {"tviburi":<kind>,"seq":<n>,...}
-//! Anything else, a firmware UART line included (`usart3: [host: …] …`), is ignored. A named
-//! peripheral's line that starts with `{` but is not a well-formed record fails the run.
+//! It reads a Renode log in either framing of RUL-11 (`split_line`): a `logFile`, or a console
+//! captured as Aethelgard runs Renode (TVI-WO-1150 (ii)'s fixture). A record is the message text after
+//! `<source>: `, one JSON object:
+//!   <stamp> <spaces> [LEVEL] <source>: {"tviburi":<kind>,"seq":<n>,...}
+//! A record is accepted only from a named guarded peripheral. A record from any other source fails
+//! the run: a guarded peripheral nobody named, or an imitation. Lines that are not records, a
+//! firmware UART line included (`usart3: [host: …] …`), are ignored. A named peripheral's line that
+//! starts with `{` but is not a well-formed record fails the run.
+//! A witness passes only with the expected model version, given as `sha256:<64 hex>`, and with
+//! `"mode":"enforcing"`: a recorded-mode or mode-less witness is never a pass (RUL-19). The version
+//! is the release hash, the sha256 of the release's MANIFEST (RUL-10; TVI-WO-1200).
 //!
 //! Exit status:
 //!   3  REFUSED - any named peripheral emitted a refusal record. Checked first.
-//!   0  PASS    - every named peripheral emitted exactly one witness, then an end record, with an
-//!                unbroken sequence from 0, and no refusal.
+//!   0  PASS    - every named peripheral emitted exactly one enforcing witness with the expected
+//!                version, then an end record, with an unbroken sequence from 0; no refusal; and no
+//!                record from any other source.
 //!   1  FAIL    - anything else: no witness (the guard did not load), no end (the simulator crashed
 //!                or was killed), a malformed or out-of-sequence record, or bad arguments.
 //! An end record shows that Renode tore the machine down cleanly. SIGTERM also tears it down
@@ -44,13 +51,19 @@ struct Channel {
 
 const LEVELS: [&str; 5] = ["NOISY", "DEBUG", "INFO", "WARNING", "ERROR"];
 
-/// The source and message of a logFile line, or None if the line is not in that format.
+/// The source and message of a record line, or None if the line is not in a framing the check reads
+/// (RUL-11, amended): a stamp, one or more spaces, `[LEVEL] `, then `<source>: `. The stamp is the
+/// `logFile` backend's host stamp `[HH:MM:SS.ffff]`, or the virtual stamp `[hh:mm:ss.nnnnnnnnn]`
+/// that Aethelgard's configuration (`log-timestamps-type = Virtual`) gives on the console (one space)
+/// and in a `logFile` (two spaces). A carriage return the console leaves before or after a line
+/// (TVI-WO-1150 (ii)) is not part of it.
 fn split_line(line: &str) -> Option<(&str, &str)> {
+    let line = line.trim_matches('\r');
+    let close = line.find(']')?;
     let b = line.as_bytes();
-    let stamp_ok = b.len() > 15
-        && b[0] == b'['
-        && b[14] == b']'
-        && b[1..14].iter().enumerate().all(|(i, c)| match i {
+    let stamp_ok = b[0] == b'['
+        && (close == 14 || close == 19)
+        && b[1..close].iter().enumerate().all(|(i, c)| match i {
             2 | 5 => *c == b':',
             8 => *c == b'.',
             _ => c.is_ascii_digit(),
@@ -58,9 +71,10 @@ fn split_line(line: &str) -> Option<(&str, &str)> {
     if !stamp_ok {
         return None;
     }
-    let rest = line[15..].trim_start_matches(' ');
-    if rest.len() == line.len() - 15 {
-        return None; // no space after the timestamp
+    let after = &line[close + 1..];
+    let rest = after.trim_start_matches(' ');
+    if rest.len() == after.len() {
+        return None; // no space after the stamp
     }
     let rest = rest.strip_prefix('[')?;
     let (level, rest) = rest.split_once("] ")?;
@@ -70,14 +84,30 @@ fn split_line(line: &str) -> Option<(&str, &str)> {
     rest.split_once(": ")
 }
 
-pub fn check(log: &str, peripherals: &[String]) -> Report {
+/// Is `v` a model version as the witness writes it: `sha256:` and 64 hex digits.
+fn is_version(v: &str) -> bool {
+    v.len() == 71 && v.starts_with("sha256:") && v[7..].bytes().all(|c| c.is_ascii_hexdigit())
+}
+
+pub fn check(log: &str, expected_version: &str, peripherals: &[String]) -> Report {
     let mut channels: BTreeMap<&str, Channel> =
         peripherals.iter().map(|p| (p.as_str(), Channel::default())).collect();
     let mut refusals = Vec::new();
     let mut problems = Vec::new();
     for (n, line) in log.lines().enumerate() {
-        let Some((source, message)) = split_line(line) else { continue };
-        let Some(ch) = channels.get_mut(source) else { continue };
+        let Some((source, message)) = split_line(line) else {
+            // Fail closed: a record the check cannot frame might be a refusal it would otherwise miss.
+            if line.contains("{\"tviburi\"") {
+                problems.push(format!("line {}: a record the check cannot frame", n + 1));
+            }
+            continue;
+        };
+        let Some(ch) = channels.get_mut(source) else {
+            if message.starts_with('{') && message.contains("\"tviburi\"") {
+                problems.push(format!("line {}: {source}: a record from a source not named on the command line", n + 1));
+            }
+            continue;
+        };
         if !message.starts_with('{') {
             continue; // the stock model's own log lines
         }
@@ -102,6 +132,9 @@ pub fn check(log: &str, peripherals: &[String]) -> Report {
         };
         if kind == "refusal" {
             refusals.push(message.to_string());
+            if !matches!(record.get("kind"), Some(Value::Str(k)) if k == "predicted-fault" || k == "unmodeled") {
+                problems.push(fail("refusal without a kind (predicted-fault or unmodeled)"));
+            }
         }
         match record.get("seq") {
             Some(Value::Number(s)) if s.parse::<u64>() == Ok(ch.next_seq) => ch.next_seq += 1,
@@ -112,17 +145,18 @@ pub fn check(log: &str, peripherals: &[String]) -> Report {
         }
         match kind {
             "witness" => {
-                let version_ok = matches!(record.get("model_version"), Some(Value::Str(v))
-                    if v.len() == 71 && v.starts_with("sha256:") && v[7..].bytes().all(|c| c.is_ascii_hexdigit()));
                 if ch.witness {
                     problems.push(fail("second witness"));
-                } else if !version_ok {
-                    problems.push(fail("witness without a sha256 model_version"));
+                } else if !matches!(record.get("model_version"), Some(Value::Str(v)) if v == expected_version) {
+                    problems.push(fail(&format!("witness model_version is not the expected {expected_version}")));
+                } else if !matches!(record.get("mode"), Some(Value::Str(m)) if m == "enforcing") {
+                    problems.push(fail("witness is not in enforcing mode (recorded, or no mode): never a pass"));
                 }
                 ch.witness = true;
             }
             "refusal" => {}
             "end" => ch.end = true,
+            "would-refuse" => problems.push(fail("a would-refuse record: a recorded-mode run is never a pass (RUL-19)")),
             other => problems.push(fail(&format!("unknown record kind {other:?}"))),
         }
     }
@@ -144,20 +178,27 @@ pub fn check(log: &str, peripherals: &[String]) -> Report {
     Report { verdict, refusals, problems }
 }
 
+/// The arguments are an expected version, a log file and at least one peripheral, and no flags: a
+/// call without the version (the 0100a form) is refused, never read as a version-less pass.
+fn usage_ok(args: &[String]) -> bool {
+    args.len() >= 3 && !args.iter().any(|a| a.starts_with('-')) && is_version(&args[0])
+}
+
 fn main() -> ExitCode {
     let args: Vec<String> = std::env::args().skip(1).collect();
-    if args.len() < 2 || args.iter().any(|a| a.starts_with('-')) {
-        eprintln!("usage: tviburi-check <renode-log-file> <guarded-peripheral>...");
+    if !usage_ok(&args) {
+        eprintln!("usage: tviburi-check <expected-model-version sha256:...> <renode-log-file> <guarded-peripheral>...");
+        println!("CHECK FAIL: usage");
         return ExitCode::from(1);
     }
-    let log = match std::fs::read(&args[0]) {
+    let log = match std::fs::read(&args[1]) {
         Ok(bytes) => String::from_utf8_lossy(&bytes).into_owned(),
         Err(e) => {
-            println!("CHECK FAIL: cannot read {}: {e}", args[0]);
+            println!("CHECK FAIL: cannot read {}: {e}", args[1]);
             return ExitCode::from(1);
         }
     };
-    let report = check(&log, &args[1..]);
+    let report = check(&log, &args[0], &args[2..]);
     for r in &report.refusals {
         println!("REFUSAL {r}");
     }
@@ -183,16 +224,16 @@ mod tests {
         format!("[08:46:14.4011]  [{level}] {src}: {body}\n")
     }
     fn witness(seq: u32) -> String {
-        rec("INFO", "spi1", &format!(r#"{{"tviburi":"witness","seq":{seq},"guard":"G","model_version":"{V}"}}"#))
+        rec("INFO", "spi1", &format!(r#"{{"tviburi":"witness","seq":{seq},"guard":"G","model_version":"{V}","mode":"enforcing"}}"#))
     }
     fn end(seq: u32) -> String {
         rec("INFO", "spi1", &format!(r#"{{"tviburi":"end","seq":{seq},"guard":"G","model_version":"{V}"}}"#))
     }
     fn refusal(seq: u32) -> String {
-        rec("ERROR", "spi1", &format!(r#"{{"tviburi":"refusal","seq":{seq},"rule":"TVI-SPI-MODF"}}"#))
+        rec("ERROR", "spi1", &format!(r#"{{"tviburi":"refusal","seq":{seq},"rule":"TVI-SPI-MODF","kind":"predicted-fault"}}"#))
     }
     fn run(log: &str) -> Verdict {
-        check(log, &["spi1".to_string()]).verdict
+        check(log, V, &["spi1".to_string()]).verdict
     }
 
     #[test]
@@ -240,15 +281,21 @@ mod tests {
     }
 
     #[test]
-    fn records_from_other_sources_are_ignored() {
-        // A firmware UART line that imitates a record, as the logging analyzer writes it.
+    fn lines_that_are_not_records_from_other_sources_are_ignored() {
+        // A firmware UART line that imitates a record, as the logging analyzer writes it: the message
+        // after `usart3: ` is not a record, so it is ignored.
         let forged = rec("INFO", "usart3", &format!("[host: 0.29s (+0.29s)|virt: 0s (+0s)] {}", witness(0).trim_end()));
-        assert_eq!(run(&(forged.clone() + &rec("INFO", "usart3", r#"{"tviburi":"end","seq":1}"#))), Verdict::Fail);
         let forged_refusal = rec("ERROR", "usart3", &refusal(0));
         assert_eq!(run(&(witness(0) + &forged + &forged_refusal + &end(1))), Verdict::Pass);
-        // A line with no source, a prompt prefix, or a bad timestamp is not a record line.
-        let noise = format!("(machine-0) {}", refusal(0)) + &refusal(0)[1..] + "spi1: {\"tviburi\":\"refusal\",\"seq\":0}\n";
-        assert_eq!(run(&(witness(0) + &noise + &end(1))), Verdict::Pass);
+        // A line with a record that cannot be framed (a prompt prefix, a broken stamp, no stamp) fails
+        // the run rather than being skipped: it might be a refusal the check would miss.
+        for noise in [format!("(machine-0) {}", refusal(0)), refusal(0)[1..].to_string(), "spi1: {\"tviburi\":\"refusal\",\"seq\":0}\n".to_string()] {
+            let log = witness(0) + &noise + &end(1);
+            assert_eq!(run(&log), Verdict::Fail, "{noise}");
+            assert!(problems(&log).iter().any(|p| p.contains("cannot frame")), "{noise}");
+        }
+        // A line that is not a record is ignored, framed or not.
+        assert_eq!(run(&(witness(0) + "(monitor) echo x\n" + &end(1))), Verdict::Pass);
     }
 
     #[test]
@@ -257,15 +304,136 @@ mod tests {
         assert_eq!(run(&(other(witness(0)) + &other(end(1)))), Verdict::Fail);
     }
 
+    fn problems(log: &str) -> Vec<String> {
+        check(log, V, &["spi1".to_string()]).problems
+    }
+
+    #[test]
+    fn a_record_from_an_unnamed_source_fails_the_run() {
+        // A guarded peripheral nobody named (A8), and an imitation printed as a source's whole message.
+        let unnamed = |line: String| line.replace("] spi1: ", "] spi2: ");
+        for extra in [unnamed(witness(0)), unnamed(refusal(0)), rec("INFO", "usart3", r#"{"tviburi":"end","seq":1}"#)] {
+            let log = witness(0) + &extra + &end(1);
+            assert_eq!(run(&log), Verdict::Fail, "{extra}");
+            assert!(problems(&log).iter().any(|p| p.contains("not named")), "{extra}");
+        }
+        // A non-record JSON line from another source is not a record.
+        assert_eq!(run(&(witness(0) + &rec("INFO", "usart3", r#"{"x":1}"#) + &end(1))), Verdict::Pass);
+    }
+
+    #[test]
+    fn a_witness_with_another_version_fails() {
+        let other = witness(0).replace(&V[7..15], "00000000");
+        assert_eq!(run(&(other + &end(1))), Verdict::Fail);
+        assert_eq!(check(&(witness(0) + &end(1)), &V.replace('8', "9"), &["spi1".to_string()]).verdict, Verdict::Fail);
+    }
+
+    #[test]
+    fn a_witness_not_in_enforcing_mode_fails() {
+        let recorded = witness(0).replace(r#""mode":"enforcing""#, r#""mode":"recorded""#);
+        let modeless = witness(0).replace(r#","mode":"enforcing""#, "");
+        let other = witness(0).replace(r#""mode":"enforcing""#, r#""mode":1"#);
+        let case = witness(0).replace(r#""mode":"enforcing""#, r#""mode":"Enforcing""#);
+        let twice = witness(0).replace(r#""mode":"enforcing""#, r#""mode":"recorded","mode":"enforcing""#);
+        for w in [recorded, modeless, other, case, twice] {
+            assert_eq!(run(&(w.clone() + &end(1))), Verdict::Fail, "{w}");
+        }
+    }
+
+    #[test]
+    fn a_recorded_mode_run_is_never_a_pass() {
+        // RUL-19: a would-refuse record fails the run, whatever the witness says; a recorded witness
+        // fails with no would-refuse at all.
+        let would = rec("ERROR", "spi1", r#"{"tviburi":"would-refuse","seq":1,"rule":"TVI-SPI-MODF","kind":"predicted-fault"}"#);
+        let log = witness(0) + &would + &end(2);
+        assert_eq!(run(&log), Verdict::Fail);
+        assert!(problems(&log).iter().any(|p| p.contains("would-refuse")));
+        let recorded = witness(0).replace(r#""mode":"enforcing""#, r#""mode":"recorded""#);
+        assert_eq!(run(&(recorded + &would + &end(2))), Verdict::Fail);
+    }
+
+    #[test]
+    fn a_refusal_without_a_kind_is_a_problem_and_still_refused() {
+        let kindless = refusal(1).replace(r#","kind":"predicted-fault""#, "");
+        let log = witness(0) + &kindless + &end(2);
+        assert_eq!(run(&log), Verdict::Refused);
+        assert!(problems(&log).iter().any(|p| p.contains("without a kind")));
+        let unknown = refusal(1).replace("predicted-fault", "fault");
+        assert!(problems(&(witness(0) + &unknown + &end(2))).iter().any(|p| p.contains("without a kind")));
+    }
+
+    #[test]
+    fn a_call_without_the_expected_version_is_refused() {
+        let a = |v: &[&str]| v.iter().map(|s| s.to_string()).collect::<Vec<_>>();
+        assert!(usage_ok(&a(&[V, "log", "spi1"])));
+        assert!(!usage_ok(&a(&["log", "spi1"])));
+        assert!(!usage_ok(&a(&["log", "spi1", "spi2"])));
+        assert!(!usage_ok(&a(&[V, "log"])));
+        assert!(!usage_ok(&a(&[V, "log", "spi1", "--no-refuse"])));
+    }
+
+    #[test]
+    fn the_expected_version_argument_is_a_version() {
+        assert!(is_version(V));
+        for bad in ["", "sha256:", &V[..70], &V.replace("sha256:", "sha512:"), &V.replace('a', "g")] {
+            assert!(!is_version(bad), "{bad}");
+        }
+    }
+
     #[test]
     fn every_named_peripheral_needs_its_own_witness() {
         let log = witness(0) + &end(1);
         let names = ["spi1".to_string(), "spi2".to_string()];
-        assert_eq!(check(&log, &names).verdict, Verdict::Fail);
+        assert_eq!(check(&log, V, &names).verdict, Verdict::Fail);
+    }
+
+    // TVI-WO-1150 (ii)'s fixtures: 0100a's records, framed as Aethelgard's console and logFile give them.
+    const FX: &str = "sha256:bfdbc2a486ed6cafc8354972bccb684aad280e0e9d0f48057e9ccd658b95eb49";
+    fn fx(log: &str) -> Report {
+        check(log, FX, &["spi1".to_string()])
+    }
+
+    #[test]
+    fn the_console_fixture_is_read_in_both_framings() {
+        let modeled = fx(include_str!("../tests/fixtures/aet-7dec1d7b/modeled.modeldir.console.txt"));
+        // The witness and the end record (after a CR) are both found; 0100a's witness has no mode, so
+        // the run is not a pass (RUL-19), and that is the only problem.
+        assert_eq!(modeled.verdict, Verdict::Fail);
+        assert_eq!(modeled.problems.len(), 1, "{:?}", modeled.problems);
+        assert!(modeled.problems[0].contains("not in enforcing mode"));
+        for log in [
+            include_str!("../tests/fixtures/aet-7dec1d7b/modf.modeldir.console.txt"),
+            include_str!("../tests/fixtures/aet-7dec1d7b/modf.modeldir.both.logfile.txt"),
+        ] {
+            let r = fx(log);
+            assert_eq!(r.verdict, Verdict::Refused);
+            assert_eq!(r.refusals.len(), 1);
+            assert!(r.refusals[0].contains("\"rule\":\"TVI-SPI-MODF\""));
+        }
+        // Aethelgard's empty environment: 0100a's guard refuses at load (review A2).
+        let empty = fx(include_str!("../tests/fixtures/aet-7dec1d7b/modeled.empty.console.txt"));
+        assert_eq!(empty.verdict, Verdict::Refused);
+        assert!(empty.refusals[0].contains("\"rule\":\"TVI-LOAD\""));
+    }
+
+    #[test]
+    fn forged_records_on_the_console_are_not_records() {
+        // usart3's analyzer prints imitation records; after `usart3: ` the message is not a record.
+        let r = fx(include_str!("../tests/fixtures/aet-7dec1d7b/forge.modeldir.analyzer.console.txt"));
+        assert!(r.refusals.is_empty());
+        assert_eq!(r.problems.len(), 1, "{:?}", r.problems);
+        assert!(r.problems[0].contains("not in enforcing mode"));
     }
 
     #[test]
     fn line_format() {
+        let v = "[00:00:00.001000000] [INFO] spi1: {}";
+        assert_eq!(split_line(v), Some(("spi1", "{}")));
+        assert_eq!(split_line(&format!("\r{v}\r")), Some(("spi1", "{}")));
+        assert_eq!(split_line("[00:00:00.000000000]  [ERROR] spi1: x"), Some(("spi1", "x")));
+        assert_eq!(split_line("[00:00:00.00000000] [INFO] spi1: x"), None);
+        assert_eq!(split_line("[00:00:00.0000000000] [INFO] spi1: x"), None);
+        assert_eq!(split_line("x[00:00:00.000000000] [INFO] spi1: x"), None);
         assert_eq!(split_line("[08:46:14.4011]  [ERROR] spi1: {}"), Some(("spi1", "{}")));
         assert_eq!(split_line("[08:46:14.4011] [INFO] spi1: x"), Some(("spi1", "x")));
         assert_eq!(split_line("[08:46:14.4011][INFO] spi1: x"), None);

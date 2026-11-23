@@ -10,31 +10,30 @@ M05-ssiop	model/GuardedSTM32H7_SPI.cs	if((cfg2 & Cfg2Ssiop) != 0)	if(false)	cond
 M06-ssi	model/GuardedSTM32H7_SPI.cs	if((cr1 & Cr1Ssi) == 0)	if(false)	modf
 M07-historyCheck	model/GuardedSTM32H7_SPI.cs	if(failure == null && history != null)	if(false)	cfg2first
 M08-historyNote	model/GuardedSTM32H7_SPI.cs	if(history == null && (cfg2 & Cfg2Master) != 0 && FirstFailingBranch(cfg2, cr1) != null)	if(false)	cfg2first
-M09-speGate	model/GuardedSTM32H7_SPI.cs	if((value & Cr1Spe) != 0 && !EnablePasses(value))	if(false)	modf
-M10-iolockCheck	model/GuardedSTM32H7_SPI.cs	if(ioLock)\n                {\n                    records.Refuse("TVI-SPI-IOLOCK", "SPI_CFG2"	if(false)\n                {\n                    records.Refuse("TVI-SPI-IOLOCK", "SPI_CFG2"	iolock
-M11-iolockLatch	model/GuardedSTM32H7_SPI.cs	ioLock |= (value & Cr1IoLock) != 0;	(empty)	iolock
+M09-speGate	model/GuardedSTM32H7_SPI.cs	return offset == Cr1Offset && (value & Cr1Spe) != 0 && !EnablePasses(value);	return false;	modf
+M10-iolockCheck	model/GuardedSTM32H7_SPI.cs	if(ioLock)\n                {\n                    // Certain only if	if(false)\n                {\n                    // Certain only if	iolock
+M11-iolockLatch	model/GuardedSTM32H7_SPI.cs	                    ioLock = true;\n	(empty)	iolock
 M12-cfg2WhileEnabled	model/GuardedSTM32H7_SPI.cs	if((cr1 & Cr1Spe) != 0)	if(false)	conditions
 M13-i2smod	model/GuardedSTM32H7_SPI.cs	if((value & I2sMod) != 0)	if(false)	conditions
-M14-widthI2scfgr	model/GuardedSTM32H7_SPI.cs	, (I2sCfgrOffset, "SPI_I2SCFGR") };	 };	conditions
 M15-resetIolock	model/GuardedSTM32H7_SPI.cs	ioLock = false;	(empty)	conditions
-M16-resetHistory	model/GuardedSTM32H7_SPI.cs	history = null;	(empty)	conditions
+M16-resetHistory	model/GuardedSTM32H7_SPI.cs	            history = null;\n            masterUnknown = false;	            masterUnknown = false;	conditions
 M17-resetCfg2	model/GuardedSTM32H7_SPI.cs	            cfg2 = 0;\n	(empty)	conditions
 M18-resetCr1	model/GuardedSTM32H7_SPI.cs	            cr1 = 0;\n	(empty)	conditions
 M19-loadRefuses	model/GuardedSTM32H7_SPI.cs	            if(records.LoadFailed)\n            {\n                records.Refuse("TVI-LOAD"	            if(false)\n            {\n                records.Refuse("TVI-LOAD"	load
-M20-witness	model/Refusal.cs	                Emit(LogLevel.Info, "witness", ",\\"guard\\":" + Json(guard) + ",\\"model_version\\":" + Json(version));\n	(empty)	modeled
+M20-witness	model/Refusal.cs	                Emit(LogLevel.Info, "witness", ",\\"guard\\":" + Json(guard) + ",\\"model_version\\":" + Json(version) + ",\\"mode\\":" + Json(mode));\n	(empty)	modeled
 M21-end	model/Refusal.cs	if(named)	if(false)	modeled
-M22-refusalAtError	model/Refusal.cs	Emit(LogLevel.Error, "refusal"	Emit(LogLevel.Info, "refusal"	adv-loglevel
+M22-refusalAtError	model/Refusal.cs	Emit(LogLevel.Error, Recorded ? "would-refuse" : "refusal"	Emit(LogLevel.Info, Recorded ? "would-refuse" : "refusal"	adv-loglevel
 M23-seq	model/Refusal.cs	seq++;	(empty)	modeled
-M24-readCr1Ssi	model/GuardedSTM32H7_SPI.cs	return (value & ~Cr1Ssi) | (cr1 & Cr1Ssi);	return value;	modeled
+M24-readCr1Ssi	model/GuardedSTM32H7_SPI.cs	return (value & Cr1Stock) | (cr1 & ~Cr1Stock & ~Cr1IoLock);	return value;	modeled
 M25-readCfg2Copy	model/GuardedSTM32H7_SPI.cs	return cfg2;	return value;	rmw
-M26-readIolock	model/GuardedSTM32H7_SPI.cs	if(ioLock)\n                {\n                    records.Refuse("TVI-SPI-IOLOCK", "SPI_CR1"	if(false)\n                {\n                    records.Refuse("TVI-SPI-IOLOCK", "SPI_CR1"	conditions
-M27-subwordAtRegister	model/GuardedSTM32H7_SPI.cs	!(width == 32 && Guarded.Any(r => r.Offset == offset))	!Guarded.Any(r => r.Offset == offset)	conditions
-M28-unaligned	model/GuardedSTM32H7_SPI.cs	if(Guarded.Any(r => Overlaps(offset, width / 8, r.Offset)) && 	if(width != 32 && Guarded.Any(r => Overlaps(offset, width / 8, r.Offset)) && 	conditions
+M26-readIolock	model/GuardedSTM32H7_SPI.cs	if(ioLock && !fired)\n                {\n                    records.Refuse("TVI-SPI-IOLOCK", Unmodeled, "SPI_CR1"	if(false)\n                {\n                    records.Refuse("TVI-SPI-IOLOCK", Unmodeled, "SPI_CR1"	conditions
+M27-subwordAtRegister	model/GuardedSTM32H7_SPI.cs	if(width != 32 || offset % 4 != 0)	if(offset % 4 != 0)	conditions
+M28-unaligned	model/GuardedSTM32H7_SPI.cs	if(width != 32 || offset % 4 != 0)	if(width != 32)	conditions
 R01-refusalFirst	tools/tviburi-check/src/main.rs	let verdict = if !refusals.is_empty() {	let verdict = if !refusals.is_empty() && problems.is_empty() {	unit
-R02-sourceFilter	tools/tviburi-check/src/main.rs	let Some(ch) = channels.get_mut(source) else { continue };	let Some(ch) = channels.values_mut().next() else { continue };	unit
-R03-timestamp	tools/tviburi-check/src/main.rs	let stamp_ok = b.len() > 15	let stamp_ok = true || b.len() > 15	unit
+R02-sourceFilter	tools/tviburi-check/src/main.rs	let Some(ch) = channels.get_mut(source) else {	let Some(ch) = channels.values_mut().next() else {	unit
+R03-timestamp	tools/tviburi-check/src/main.rs	let stamp_ok = b[0] == b'['	let stamp_ok = true || b[0] == b'['	unit
 R04-sequence	tools/tviburi-check/src/main.rs	Some(Value::Number(s)) if s.parse::<u64>() == Ok(ch.next_seq) => ch.next_seq += 1,	Some(Value::Number(_)) => ch.next_seq += 1,	unit
-R05-witnessVersion	tools/tviburi-check/src/main.rs	} else if !version_ok {	} else if false {	unit
+R05-witnessVersion	tools/tviburi-check/src/main.rs	} else if !matches!(record.get("model_version"), Some(Value::Str(v)) if v == expected_version) {	} else if false {	unit
 R06-endRequired	tools/tviburi-check/src/main.rs	if !ch.end {	if false {	unit
 R07-witnessRequired	tools/tviburi-check/src/main.rs	if !ch.witness {	if false {	unit
 R08-afterEnd	tools/tviburi-check/src/main.rs	if ch.end {	if false {	unit
@@ -47,6 +46,67 @@ S03-oneArgument	scripts/tviburi-spike	[ $# -eq 1 ] ||	true ||	adv-extra-arg
 S04-scriptEnd	scripts/tviburi-spike	grep -qx 'TVIBURI-END' <<<"$console" && 	(empty)	adv-noend
 S05-afterMarker	scripts/tviburi-spike	 && [ "$after" = "0xAF7E0002" ]	(empty)	nomark
 S06-variantMustMatch	scripts/tviburi-spike	[ -n "$variant" ] ||	true ||	adv-bad-variant
-M31-cfg2ReadAfterHistory	model/GuardedSTM32H7_SPI.cs	                if(history != null)\n                {\n                    records.Refuse(Modf, "SPI_CFG2"	                if(false)\n                {\n                    records.Refuse(Modf, "SPI_CFG2"	conditions
-M32-loadRefusalAtNaming	model/Refusal.cs	                Refuse("TVI-LOAD", "none", "none"	                if(false) Refuse("TVI-LOAD", "none", "none"	load
-S07-modelDirOverride	scripts/tviburi-spike	export TVIBURI_MODEL_DIR=$root/model\n	(empty)	adv-env
+M31-cfg2ReadAfterHistory	model/GuardedSTM32H7_SPI.cs	if(doubt != null && !fired)	if(false)	conditions
+M32-loadRefusalAtNaming	model/Refusal.cs	                Refuse("TVI-LOAD", "unmodeled", "none", "none"	                if(false) Refuse("TVI-LOAD", "unmodeled", "none", "none"	load
+N01-noteMasterStateAfterCr1	model/GuardedSTM32H7_SPI.cs	                cr1 = value;\n                NoteMasterState();	                cr1 = value;	conditions
+N02-fieldAllowList	model/GuardedSTM32H7_SPI.cs	if(f.Allowed != null && !f.Allowed.Contains(v))	if(false)	fields
+N03-noRegister	model/GuardedSTM32H7_SPI.cs	if(rows.Length == 0)	if(false)	fields
+N04-dsizeAtEnable	model/GuardedSTM32H7_SPI.cs	if(dsize != DsizeModeled)	if(false)	conditions
+N05-masterUnknownAtEnable	model/GuardedSTM32H7_SPI.cs	var failure = masterUnknown ? new Branch(	var failure = false ? new Branch(	conditions
+N06-modfcClears	model/GuardedSTM32H7_SPI.cs	if((value & IfcrModfc) != 0 && history != null)	if(false)	conditions
+N07-modfcNeedsHistory	model/GuardedSTM32H7_SPI.cs	if((value & IfcrModfc) != 0 && history != null)	if((value & IfcrModfc) != 0)	conditions
+N08-cfg2KnowsMaster	model/GuardedSTM32H7_SPI.cs	                masterUnknown = false;\n                NoteMasterState();	                NoteMasterState();	conditions
+N09-cfg2ReadMasterUnknown	model/GuardedSTM32H7_SPI.cs	: masterUnknown ? "IFCR.MODFC written after such a state, and CFG2 not written since" : null;	: null;	conditions
+N10-iolockOnlyFromSpe0	model/GuardedSTM32H7_SPI.cs	&& !wasEnabled && !ioLock)	&& !ioLock)	conditions
+N11-iolockKind	model/GuardedSTM32H7_SPI.cs	certain ? PredictedFault : Unmodeled, "SPI_CFG2"	PredictedFault, "SPI_CFG2"	conditions
+N12-iolockUncertainAfterDisable	model/GuardedSTM32H7_SPI.cs	                    ioLockCertain = false; // silicon clears IOLOCK on SPE 1->0 (p2215); not modeled\n	(empty)	conditions
+N13-iolockCertainty	model/GuardedSTM32H7_SPI.cs	ioLockCertain = (value & Cr1Spe) == 0;	ioLockCertain = true;	conditions
+N14-readIolockFromLatch	model/GuardedSTM32H7_SPI.cs	(cr1 & ~Cr1Stock & ~Cr1IoLock)	(cr1 & ~Cr1Stock)	conditions
+N15-readCfg1Copy	model/GuardedSTM32H7_SPI.cs	                return cfg1;	                return value;	conditions
+N16-cfg1Reset	model/GuardedSTM32H7_SPI.cs	            cfg1 = Cfg1Reset;	            cfg1 = 0;	conditions
+N17-readCrcPolyReset	model/GuardedSTM32H7_SPI.cs	                return CrcPolyReset; // the only value the allow-list lets CRCPOLY hold	                return value;	conditions
+N18-cfg1WhileEnabled	model/GuardedSTM32H7_SPI.cs	if((cr1 & Cr1Spe) != 0 && value != cfg1)	if(false)	conditions
+N19-cfg1Kind	model/GuardedSTM32H7_SPI.cs	protectedChange ? PredictedFault : Unmodeled, "SPI_CFG1"	Unmodeled, "SPI_CFG1"	conditions
+N20-dataWidth	model/GuardedSTM32H7_SPI.cs	if(width != frame)	if(false)	conditions
+N21-ssoePasses	model/GuardedSTM32H7_SPI.cs	                return null;\n            }\n            if((cfg2 & Cfg2Ssiop) != 0)	                return new Branch(Unmodeled, "SSOE", "x", "x");\n            }\n            if((cfg2 & Cfg2Ssiop) != 0)	ardupilot
+N22-recordKind	model/Refusal.cs	                + ",\\"kind\\":" + Json(kind)\n	(empty)	conditions
+R12-witnessMode	tools/tviburi-check/src/main.rs	} else if !matches!(record.get("mode"), Some(Value::Str(m)) if m == "enforcing") {	} else if false {	unit
+R13-unnamedSource	tools/tviburi-check/src/main.rs	if message.starts_with('{') && message.contains("\\"tviburi\\"") {	if false {	unit
+R14-refusalKind	tools/tviburi-check/src/main.rs	if !matches!(record.get("kind"), Some(Value::Str(k)) if k == "predicted-fault" || k == "unmodeled") {	if false {	unit
+R15-usageVersion	tools/tviburi-check/src/main.rs	args.len() >= 3 && !args.iter().any(|a| a.starts_with('-')) && is_version(&args[0])	args.len() >= 2 && !args.iter().any(|a| a.starts_with('-'))	unit
+N23-readIerCopy	model/GuardedSTM32H7_SPI.cs	                return ier;	                return value;	conditions
+N24-orderTxdr	model/GuardedSTM32H7_SPI.cs	if(offset == TxdrOffset && !enabled)	if(false)	conditions
+N25-orderCr2	model/GuardedSTM32H7_SPI.cs	else if(offset == Cr2Offset && enabled)	else if(false)	conditions
+N26-orderCstart	model/GuardedSTM32H7_SPI.cs	else if(offset == Cr1Offset && !enabled && (value & Cr1Cstart) != 0)	else if(false)	conditions
+R16-consoleCr	tools/tviburi-check/src/main.rs	let line = line.trim_matches('\\r');	let line = line.trim_end_matches('\\r');	unit
+R17-virtualStamp	tools/tviburi-check/src/main.rs	&& (close == 14 || close == 19)	&& close == 14	unit
+R18-wouldRefuse	tools/tviburi-check/src/main.rs	"would-refuse" => problems.push(fail("a would-refuse record: a recorded-mode run is never a pass (RUL-19)")),	"would-refuse" => {}	unit
+N27-iolockKindAtRefusal	model/GuardedSTM32H7_SPI.cs	var certain = ioLockCertain && history == null && !masterUnknown;	var certain = ioLockCertain;	conditions
+M33-resetMasterUnknown	model/GuardedSTM32H7_SPI.cs	            masterUnknown = false;\n            eotBySuspend = false;	            eotBySuspend = false;	conditions
+M34-resetIer	model/GuardedSTM32H7_SPI.cs	            ier = 0;\n	(empty)	conditions
+N28-readNoRegister	model/GuardedSTM32H7_SPI.cs	if(!Fields.Any(f => f.Offset == offset))	if(false)	conditions
+N29-readWriteOnly	model/GuardedSTM32H7_SPI.cs	else if(offset == TxdrOffset || offset == IfcrOffset)	else if(false)	conditions
+N30-readRxdrEmpty	model/GuardedSTM32H7_SPI.cs	else if(offset == RxdrOffset && (base.ReadDoubleWord(SrOffset) & SrRxp) == 0)	else if(false)	conditions
+N31-readSrAfterSuspend	model/GuardedSTM32H7_SPI.cs	else if(offset == SrOffset && eotBySuspend)	else if(false)	conditions
+N32-suspendSetsFlag	model/GuardedSTM32H7_SPI.cs	if((value & Cr1Csusp) != 0 && ((stockSr & SrEot) == 0 || cstartRises))	if(false)	conditions
+N33-eotcClearsFlag	model/GuardedSTM32H7_SPI.cs	                if((value & IfcrEotc) != 0)\n                {\n                    eotBySuspend = false;\n                }\n	(empty)	conditions
+N34-orderCsusp	model/GuardedSTM32H7_SPI.cs	else if(offset == Cr1Offset && !enabled && (value & Cr1Csusp) != 0)	else if(false)	conditions
+R19-unframedRecord	tools/tviburi-check/src/main.rs	if line.contains("{\\"tviburi\\"") {	if false {	unit
+M35-resetEotBySuspend	model/GuardedSTM32H7_SPI.cs	            eotBySuspend = false;\n        }	        }	conditions
+T01-modeChecked	model/Refusal.cs	if(mode != Enforcing && mode != RecordedMode)	if(false)	load
+T02-recordedKind	model/Refusal.cs	Recorded ? "would-refuse" : "refusal"	"refusal"	recorded
+T03-witnessMode	model/Refusal.cs	+ ",\\"mode\\":" + Json(mode));	+ ",\\"mode\\":" + Json(Enforcing));	recorded
+T05-recordedPassesWrite	model/GuardedSTM32H7_SPI.cs	|| RefusedWrite(offset, value)) && !records.Recorded)	|| RefusedWrite(offset, value)))	recorded
+T06-recordedPassesRead	model/GuardedSTM32H7_SPI.cs	if(fired && !records.Recorded)	if(fired)	recorded
+T07-versionIsTheConstant	model/Refusal.cs	private readonly string version = TviburiRelease.ManifestSha256;	private readonly string version = "sha256:0000000000000000000000000000000000000000000000000000000000000000";	modeled
+U01-bitOverlap	tools/tviburi-release/src/main.rs	if entry.1 & mask != 0 {	if false {	unit
+U02-bitGap	tools/tviburi-release/src/main.rs	.find(|(_, (_, m))| *m != 0xFFFF_FFFF)	.find(|_| false)	unit
+U03-usingAfterDeclaration	tools/tviburi-release/src/overlay.rs	Using::Namespace(ns) if header =>	Using::Namespace(ns) =>	unit
+U04-verifyBody	tools/tviburi-release/src/main.rs	 && sha256::hex(&shipped[..len]) == h	(empty)	verify
+U05-verifyConstant	tools/tviburi-release/src/main.rs	 && shipped[len..] == *filled.as_bytes()	(empty)	verify
+U06-ledgerOrder	tools/tviburi-release/src/ledger.rs	if last.as_ref().is_some_and(|l| *l >= k) {	if false {	unit
+U07-sourcesInManifest	tools/tviburi-release/src/main.rs	        m += &format!("source {} {}\\n", sha256::hex(&src.bytes), src.path);\n	(empty)	identity
+U08-stockPin	tools/tviburi-release/src/stock.rs	if got != pin.sha256 {	if false {	adv-release
+U09-runnerRenodeBuild	scripts/tviburi-spike	renode --version 2>/dev/null | grep -qxF "  build: $build" ||	true ||	adv-release
+F01-allowedList	tools/tviburi-release/src/fields.rs	return list.split(',').map(	return list.split(',').take(1).map(	unit
+U10-ledgerRowsBound	tools/tviburi-release/src/main.rs	(Ok(n), Some(h)) if t.split_once('\\n')	(Ok(n), Some(h)) if true || t.split_once('\\n')	verify
