@@ -85,7 +85,7 @@ The wrapper prototype (`tests/1300/RccProto1300.cs`) on the Nucleo board, under 
 
 Sources, as §1: **ArduPilot** is the full 5 s boot (26,021 RCC writes, all 32-bit; 39,005 reads, all 32-bit). **Cold writes** are the consumer's monitor writes (`pc: none`), the same nine `*ENR` values for both firmwares. **Generated firmware** is the 14 boards captured at `75da8053`. The 13 that 1100 also ran have RCC writes byte-identical to its rows (Aethelgard `f42a0c88`). Every RCC write and read of the generated firmware is 32-bit. Each boot's boot block, with the trace's own lines removed, is byte-identical to the same boot without the wrapper (15 of 15).
 
-**Class:** `guard`, modeled by the guard (the query, or its copy); `guard-copy`, a selector the guard stores and serves on read, whose peripherals the query does not cover; `inherited`, the stock model's (unaudited, northstar invariant 2); `tag` or `reserved`, dropped by the stock model, which behaves as the field's reset value; `read-only`, ignored by silicon and by the model; `kernel-unmodeled`, the enable of a kernel-clocked peripheral the query does not cover (WO (4)). **Allowed** is the draft allow-list. **outside** marks a value given that the draft does not allow (§6).
+**Class:** `guard`, modeled by the guard (the query, or its copy); `guard-copy`, a selector the guard stores and serves on read, whose peripherals the query does not cover; `inherited`, the stock model's (unaudited, northstar invariant 2); `tag` or `reserved`, dropped by the stock model, which behaves as the field's reset value; `read-only`, ignored by silicon and by the model; `kernel-unmodeled`, the enable of a kernel-clocked peripheral the query does not cover (WO (4)). **Allowed** is the allow-list as ruled (§8): the table the guard holds. **outside** marks a value given that it does not allow: after the rulings, only `ADC3EN` on `d1-drv8876` (F8, ruled `unmodeled`). The classes `guard`, `inherited` and `acknowledged` are written to the ledger as "modeled by the guard", "inherited, unaudited (acknowledged by name)" and "acknowledged by name"; a `kernel-unmodeled` enable as inherited with only 0 allowed.
 | Register | Offset | Field | Bits | Page | Class | Allowed | ArduPilot | Cold writes | Generated firmware |
 |---|---|---|---|---|---|---|---|---|---|
 | `RCC_CR` | `0x000` | `CSIKERON` | 9:9 | 385 | tag | 0x0 | `0x0` | — | `0x0` (hse-crystal-16, hse-external-8, sentinel-02-bench-hse8) |
@@ -93,7 +93,7 @@ Sources, as §1: **ArduPilot** is the full 5 s boot (26,021 RCC writes, all 32-b
 | `RCC_CR` | `0x000` | `CSIRDY` | 8:8 | 385 | read-only | any | `0x0` | — | `0x0` (hse-crystal-16, hse-external-8, sentinel-02-bench-hse8) |
 | `RCC_CR` | `0x000` | `D1CKRDY` | 14:14 | 384 | read-only | any | `0x0` | — | `0x0` (hse-crystal-16, hse-external-8, sentinel-02-bench-hse8) |
 | `RCC_CR` | `0x000` | `D2CKRDY` | 15:15 | 384 | read-only | any | `0x0` | — | `0x0` (hse-crystal-16, hse-external-8, sentinel-02-bench-hse8) |
-| `RCC_CR` | `0x000` | `HSEBYP` | 18:18 | 384 | tag **outside** | 0x0 | `0x0` | — | `0x0` (hse-crystal-16); `0x1` (hse-external-8, sentinel-02-bench-hse8) |
+| `RCC_CR` | `0x000` | `HSEBYP` | 18:18 | 384 | acknowledged | any | `0x0` | — | `0x0` (hse-crystal-16); `0x1` (hse-external-8, sentinel-02-bench-hse8) |
 | `RCC_CR` | `0x000` | `HSECSSON` | 19:19 | 384 | inherited | any | `0x0` | — | `0x0` (hse-crystal-16, hse-external-8, sentinel-02-bench-hse8); `0x1` (hse-crystal-16, hse-external-8, sentinel-02-bench-hse8) |
 | `RCC_CR` | `0x000` | `HSEON` | 16:16 | 384 | inherited | any | `0x0` | — | `0x0` (hse-external-8, sentinel-02-bench-hse8); `0x1` (hse-crystal-16, hse-external-8, sentinel-02-bench-hse8) |
 | `RCC_CR` | `0x000` | `HSERDY` | 17:17 | 384 | read-only | any | `0x0` | — | `0x0` (hse-crystal-16, hse-external-8, sentinel-02-bench-hse8) |
@@ -118,17 +118,12 @@ Sources, as §1: **ArduPilot** is the full 5 s boot (26,021 RCC writes, all 32-b
 | `RCC_HSICFGR` | `0x004` | `HSITRIM[6:0]` | 30:24 | 388 | tag | 0x40 | `0x40` | — | — |
 | `RCC_HSICFGR` | `0x004` | `Reserved` | 31:31 | 388 | reserved | 0x0 | `0x0` | — | — |
 | `RCC_HSICFGR` | `0x004` | `Reserved` | 23:12 | 388 | reserved | 0x0 | `0x0` | — | — |
-| `RCC_ICSCR` | `0x004` | `CSICAL[7:0]` | 25:18 | 387 | read-only | any | `0x0` | — | — |
-| `RCC_ICSCR` | `0x004` | `CSITRIM[4:0]` | 30:26 | 387 | tag | 0x10 | `0x10` | — | — |
-| `RCC_ICSCR` | `0x004` | `HSICAL[11:0]` | 11:0 | 387 | read-only | any | `0x0` | — | — |
-| `RCC_ICSCR` | `0x004` | `HSITRIM[5:0]` | 17:12 | 387 | tag | 0x0 | `0x0` | — | — |
-| `RCC_ICSCR` | `0x004` | `Reserved` | 31:31 | 387 | reserved | 0x0 | `0x0` | — | — |
 | `RCC_CFGR` | `0x010` | `HRTIMSEL` | 14:14 | 392 | tag | 0x0 | `0x0` | — | `0x0` (hse-crystal-16, hse-external-8, sentinel-02-bench-hse8) |
-| `RCC_CFGR` | `0x010` | `MCO1PRE[3:0]` | 21:18 | 392 | tag **outside** | 0x0 | `0x0`, `0x4` | — | `0x0` (hse-crystal-16, hse-external-8, sentinel-02-bench-hse8) |
+| `RCC_CFGR` | `0x010` | `MCO1PRE[3:0]` | 21:18 | 392 | acknowledged | any | `0x0`, `0x4` | — | `0x0` (hse-crystal-16, hse-external-8, sentinel-02-bench-hse8) |
 | `RCC_CFGR` | `0x010` | `MCO1[2:0]` | 24:22 | 391 | tag | 0x0 | `0x0` | — | `0x0` (hse-crystal-16, hse-external-8, sentinel-02-bench-hse8) |
-| `RCC_CFGR` | `0x010` | `MCO2PRE[3:0]` | 28:25 | 391 | tag **outside** | 0x0 | `0x0`, `0x4` | — | `0x0` (hse-crystal-16, hse-external-8, sentinel-02-bench-hse8) |
+| `RCC_CFGR` | `0x010` | `MCO2PRE[3:0]` | 28:25 | 391 | acknowledged | any | `0x0`, `0x4` | — | `0x0` (hse-crystal-16, hse-external-8, sentinel-02-bench-hse8) |
 | `RCC_CFGR` | `0x010` | `MCO2[2:0]` | 31:29 | 391 | tag | 0x0 | `0x0` | — | `0x0` (hse-crystal-16, hse-external-8, sentinel-02-bench-hse8) |
-| `RCC_CFGR` | `0x010` | `RTCPRE[5:0]` | 13:8 | 392 | tag **outside** | 0x0 | `0x0`, `0x8` | — | `0x0` (hse-crystal-16, hse-external-8, sentinel-02-bench-hse8) |
+| `RCC_CFGR` | `0x010` | `RTCPRE[5:0]` | 13:8 | 392 | acknowledged | any | `0x0`, `0x8` | — | `0x0` (hse-crystal-16, hse-external-8, sentinel-02-bench-hse8) |
 | `RCC_CFGR` | `0x010` | `Reserved` | 17:16 | 392 | reserved | 0x0 | `0x0` | — | `0x0` (hse-crystal-16, hse-external-8, sentinel-02-bench-hse8) |
 | `RCC_CFGR` | `0x010` | `STOPKERWUCK` | 7:7 | 392 | tag | 0x0 | `0x0` | — | `0x0` (hse-crystal-16, hse-external-8, sentinel-02-bench-hse8) |
 | `RCC_CFGR` | `0x010` | `STOPWUCK` | 6:6 | 393 | tag | 0x0 | `0x0` | — | `0x0` (hse-crystal-16, hse-external-8, sentinel-02-bench-hse8) |
@@ -165,15 +160,15 @@ Sources, as §1: **ArduPilot** is the full 5 s boot (26,021 RCC writes, all 32-b
 | `RCC_PLLCFGR` | `0x02C` | `DIVR1EN` | 18:18 | 401 | guard | any | `0x1` | — | `0x0` (hse-crystal-16, hse-external-8, sentinel-02-bench-hse8) |
 | `RCC_PLLCFGR` | `0x02C` | `DIVR2EN` | 21:21 | 400 | guard | any | `0x1` | — | `0x0` (hse-crystal-16, hse-external-8, sentinel-02-bench-hse8) |
 | `RCC_PLLCFGR` | `0x02C` | `DIVR3EN` | 24:24 | 400 | guard | any | `0x1` | — | `0x0` (hse-crystal-16, hse-external-8, sentinel-02-bench-hse8) |
-| `RCC_PLLCFGR` | `0x02C` | `PLL1FRACEN` | 0:0 | 402 | tag **outside** | 0x0 | `0x0`, `0x1` | — | `0x0` (hse-crystal-16, hse-external-8, sentinel-02-bench-hse8) |
-| `RCC_PLLCFGR` | `0x02C` | `PLL1RGE[1:0]` | 3:2 | 402 | tag **outside** | 0x0 | `0x0`, `0x3` | — | `0x0` (hse-external-8, sentinel-02-bench-hse8); `0x1` (hse-crystal-16) |
-| `RCC_PLLCFGR` | `0x02C` | `PLL1VCOSEL` | 1:1 | 402 | tag **outside** | 0x0 | `0x0` | — | `0x0` (hse-crystal-16); `0x1` (hse-external-8, sentinel-02-bench-hse8) |
-| `RCC_PLLCFGR` | `0x02C` | `PLL2FRACEN` | 4:4 | 402 | tag **outside** | 0x0 | `0x0`, `0x1` | — | `0x0` (hse-crystal-16, hse-external-8, sentinel-02-bench-hse8) |
-| `RCC_PLLCFGR` | `0x02C` | `PLL2RGE[1:0]` | 7:6 | 402 | tag **outside** | 0x0 | `0x0`, `0x3` | — | `0x0` (hse-crystal-16, hse-external-8, sentinel-02-bench-hse8) |
+| `RCC_PLLCFGR` | `0x02C` | `PLL1FRACEN` | 0:0 | 402 | acknowledged | any | `0x0`, `0x1` | — | `0x0` (hse-crystal-16, hse-external-8, sentinel-02-bench-hse8) |
+| `RCC_PLLCFGR` | `0x02C` | `PLL1RGE[1:0]` | 3:2 | 402 | acknowledged | any | `0x0`, `0x3` | — | `0x0` (hse-external-8, sentinel-02-bench-hse8); `0x1` (hse-crystal-16) |
+| `RCC_PLLCFGR` | `0x02C` | `PLL1VCOSEL` | 1:1 | 402 | acknowledged | any | `0x0` | — | `0x0` (hse-crystal-16); `0x1` (hse-external-8, sentinel-02-bench-hse8) |
+| `RCC_PLLCFGR` | `0x02C` | `PLL2FRACEN` | 4:4 | 402 | acknowledged | any | `0x0`, `0x1` | — | `0x0` (hse-crystal-16, hse-external-8, sentinel-02-bench-hse8) |
+| `RCC_PLLCFGR` | `0x02C` | `PLL2RGE[1:0]` | 7:6 | 402 | acknowledged | any | `0x0`, `0x3` | — | `0x0` (hse-crystal-16, hse-external-8, sentinel-02-bench-hse8) |
 | `RCC_PLLCFGR` | `0x02C` | `PLL2VCOSEL` | 5:5 | 402 | inherited | any | `0x0`, `0x1` | — | `0x0` (hse-crystal-16, hse-external-8, sentinel-02-bench-hse8) |
-| `RCC_PLLCFGR` | `0x02C` | `PLL3FRACEN` | 8:8 | 401 | tag **outside** | 0x0 | `0x0`, `0x1` | — | `0x0` (hse-crystal-16, hse-external-8, sentinel-02-bench-hse8) |
-| `RCC_PLLCFGR` | `0x02C` | `PLL3RGE[1:0]` | 11:10 | 401 | tag **outside** | 0x0 | `0x0`, `0x3` | — | `0x0` (hse-crystal-16, hse-external-8, sentinel-02-bench-hse8) |
-| `RCC_PLLCFGR` | `0x02C` | `PLL3VCOSEL` | 9:9 | 401 | tag **outside** | 0x0 | `0x0`, `0x1` | — | `0x0` (hse-crystal-16, hse-external-8, sentinel-02-bench-hse8) |
+| `RCC_PLLCFGR` | `0x02C` | `PLL3FRACEN` | 8:8 | 401 | acknowledged | any | `0x0`, `0x1` | — | `0x0` (hse-crystal-16, hse-external-8, sentinel-02-bench-hse8) |
+| `RCC_PLLCFGR` | `0x02C` | `PLL3RGE[1:0]` | 11:10 | 401 | acknowledged | any | `0x0`, `0x3` | — | `0x0` (hse-crystal-16, hse-external-8, sentinel-02-bench-hse8) |
+| `RCC_PLLCFGR` | `0x02C` | `PLL3VCOSEL` | 9:9 | 401 | acknowledged | any | `0x0`, `0x1` | — | `0x0` (hse-crystal-16, hse-external-8, sentinel-02-bench-hse8) |
 | `RCC_PLLCFGR` | `0x02C` | `Reserved` | 31:25 | 400 | reserved | 0x0 | `0x0` | — | `0x0` (hse-crystal-16, hse-external-8, sentinel-02-bench-hse8) |
 | `RCC_PLLCFGR` | `0x02C` | `Reserved` | 15:12 | 401 | reserved | 0x0 | `0x0` | — | `0x0` (hse-crystal-16, hse-external-8, sentinel-02-bench-hse8) |
 | `RCC_PLL1DIVR` | `0x030` | `DIVN1[8:0]` | 8:0 | 404 | inherited | any | `0x31` | — | `0x4f` (hse-crystal-16); `0x9f` (hse-external-8, sentinel-02-bench-hse8) |
@@ -236,7 +231,7 @@ Sources, as §1: **ArduPilot** is the full 5 s boot (26,021 RCC writes, all 32-b
 | `RCC_D2CCIP2R` | `0x054` | `Reserved` | 11:10 | 417 | reserved | 0x0 | `0x0` | — | — |
 | `RCC_D2CCIP2R` | `0x054` | `Reserved` | 7:6 | 417 | reserved | 0x0 | `0x0` | — | — |
 | `RCC_D2CCIP2R` | `0x054` | `USART16SEL[2:0]` | 5:3 | 417 | guard | 0x0,0x1,0x2,0x3,0x4,0x6,0x7 | `0x1` | — | — |
-| `RCC_D2CCIP2R` | `0x054` | `USART234578SEL[2:0]` | 2:0 | 417 | guard-copy | any | `0x1` | — | — |
+| `RCC_D2CCIP2R` | `0x054` | `USART234578SEL[2:0]` | 2:0 | 417 | guard | 0x0,0x1,0x2,0x3,0x4,0x6,0x7 | `0x1` | — | — |
 | `RCC_D2CCIP2R` | `0x054` | `USBSEL[1:0]` | 21:20 | 416 | guard-copy | any | `0x2` | — | — |
 | `RCC_D3CCIPR` | `0x058` | `ADCSEL[1:0]` | 17:16 | 419 | guard-copy | any | `0x1` | — | — |
 | `RCC_D3CCIPR` | `0x058` | `I2C4SEL[1:0]` | 9:8 | 420 | guard-copy | any | `0x1` | — | — |
@@ -258,30 +253,30 @@ Sources, as §1: **ArduPilot** is the full 5 s boot (26,021 RCC writes, all 32-b
 | `RCC_AHB3RSTR` | `0x07C` | `JPGDECRST` | 5:5 | 430 | inherited | any | `0x0`, `0x1` | — | — |
 | `RCC_AHB3RSTR` | `0x07C` | `MDMARST` | 0:0 | 431 | inherited | any | `0x0`, `0x1` | — | — |
 | `RCC_AHB3RSTR` | `0x07C` | `QSPIRST` | 14:14 | 430 | inherited | any | `0x0`, `0x1` | — | — |
-| `RCC_AHB3RSTR` | `0x07C` | `Reserved` | 31:17 | 430 | reserved **outside** | 0x0 | `0x0`, `0x3fff` | — | — |
-| `RCC_AHB3RSTR` | `0x07C` | `Reserved` | 15:15 | 430 | reserved **outside** | 0x0 | `0x0`, `0x1` | — | — |
-| `RCC_AHB3RSTR` | `0x07C` | `Reserved` | 13:13 | 430 | reserved **outside** | 0x0 | `0x0`, `0x1` | — | — |
-| `RCC_AHB3RSTR` | `0x07C` | `Reserved` | 11:6 | 430 | reserved **outside** | 0x0 | `0x0`, `0x3f` | — | — |
-| `RCC_AHB3RSTR` | `0x07C` | `Reserved` | 3:1 | 431 | reserved **outside** | 0x0 | `0x0`, `0x7` | — | — |
+| `RCC_AHB3RSTR` | `0x07C` | `Reserved` | 31:17 | 430 | acknowledged | any | `0x0`, `0x3fff` | — | — |
+| `RCC_AHB3RSTR` | `0x07C` | `Reserved` | 15:15 | 430 | acknowledged | any | `0x0`, `0x1` | — | — |
+| `RCC_AHB3RSTR` | `0x07C` | `Reserved` | 13:13 | 430 | acknowledged | any | `0x0`, `0x1` | — | — |
+| `RCC_AHB3RSTR` | `0x07C` | `Reserved` | 11:6 | 430 | acknowledged | any | `0x0`, `0x3f` | — | — |
+| `RCC_AHB3RSTR` | `0x07C` | `Reserved` | 3:1 | 431 | acknowledged | any | `0x0`, `0x7` | — | — |
 | `RCC_AHB3RSTR` | `0x07C` | `SDMMC1RST` | 16:16 | 430 | inherited | any | `0x0`, `0x1` | — | — |
 | `RCC_AHB1RSTR` | `0x080` | `ADC12RST` | 5:5 | 432 | inherited | any | `0x0`, `0x1` | — | — |
 | `RCC_AHB1RSTR` | `0x080` | `DMA1RST` | 0:0 | 433 | inherited | any | `0x0`, `0x1` | — | — |
 | `RCC_AHB1RSTR` | `0x080` | `DMA2RST` | 1:1 | 433 | inherited | any | `0x0`, `0x1` | — | — |
 | `RCC_AHB1RSTR` | `0x080` | `ETH1MACRST` | 15:15 | 432 | inherited | any | `0x0`, `0x1` | — | — |
-| `RCC_AHB1RSTR` | `0x080` | `Reserved` | 31:28 | 432 | reserved **outside** | 0x0 | `0x0`, `0x7` | — | — |
-| `RCC_AHB1RSTR` | `0x080` | `Reserved` | 26:26 | 432 | reserved **outside** | 0x0 | `0x0`, `0x1` | — | — |
-| `RCC_AHB1RSTR` | `0x080` | `Reserved` | 24:16 | 432 | reserved **outside** | 0x0 | `0x0`, `0x1ff` | — | — |
-| `RCC_AHB1RSTR` | `0x080` | `Reserved` | 14:6 | 432 | reserved **outside** | 0x0 | `0x0`, `0x1ff` | — | — |
-| `RCC_AHB1RSTR` | `0x080` | `Reserved` | 4:2 | 433 | reserved **outside** | 0x0 | `0x0`, `0x7` | — | — |
+| `RCC_AHB1RSTR` | `0x080` | `Reserved` | 31:28 | 432 | acknowledged | any | `0x0`, `0x7` | — | — |
+| `RCC_AHB1RSTR` | `0x080` | `Reserved` | 26:26 | 432 | acknowledged | any | `0x0`, `0x1` | — | — |
+| `RCC_AHB1RSTR` | `0x080` | `Reserved` | 24:16 | 432 | acknowledged | any | `0x0`, `0x1ff` | — | — |
+| `RCC_AHB1RSTR` | `0x080` | `Reserved` | 14:6 | 432 | acknowledged | any | `0x0`, `0x1ff` | — | — |
+| `RCC_AHB1RSTR` | `0x080` | `Reserved` | 4:2 | 433 | acknowledged | any | `0x0`, `0x7` | — | — |
 | `RCC_AHB1RSTR` | `0x080` | `USB1OTGRST` | 25:25 | 432 | inherited | any | `0x0`, `0x1` | — | — |
 | `RCC_AHB1RSTR` | `0x080` | `USB2OTGRST` | 27:27 | 432 | inherited | any | `0x0`, `0x1` | — | — |
 | `RCC_AHB2RSTR` | `0x084` | `CRYPTRST` | 4:4 | 434 | inherited | any | `0x0`, `0x1` | — | — |
 | `RCC_AHB2RSTR` | `0x084` | `DCMIRST` | 0:0 | 434 | inherited | any | `0x0`, `0x1` | — | — |
 | `RCC_AHB2RSTR` | `0x084` | `HASHRST` | 5:5 | 434 | inherited | any | `0x0`, `0x1` | — | — |
 | `RCC_AHB2RSTR` | `0x084` | `RNGRST` | 6:6 | 434 | inherited | any | `0x0`, `0x1` | — | — |
-| `RCC_AHB2RSTR` | `0x084` | `Reserved` | 31:10 | 434 | reserved **outside** | 0x0 | `0x0`, `0x3fffff` | — | — |
-| `RCC_AHB2RSTR` | `0x084` | `Reserved` | 8:7 | 434 | reserved **outside** | 0x0 | `0x0`, `0x3` | — | — |
-| `RCC_AHB2RSTR` | `0x084` | `Reserved` | 3:1 | 434 | reserved **outside** | 0x0 | `0x0`, `0x7` | — | — |
+| `RCC_AHB2RSTR` | `0x084` | `Reserved` | 31:10 | 434 | acknowledged | any | `0x0`, `0x3fffff` | — | — |
+| `RCC_AHB2RSTR` | `0x084` | `Reserved` | 8:7 | 434 | acknowledged | any | `0x0`, `0x3` | — | — |
+| `RCC_AHB2RSTR` | `0x084` | `Reserved` | 3:1 | 434 | acknowledged | any | `0x0`, `0x7` | — | — |
 | `RCC_AHB2RSTR` | `0x084` | `SDMMC2RST` | 9:9 | 434 | inherited | any | `0x0`, `0x1` | — | — |
 | `RCC_AHB4RSTR` | `0x088` | `ADC3RST` | 24:24 | 435 | inherited | any | `0x0`, `0x1` | — | — |
 | `RCC_AHB4RSTR` | `0x088` | `BDMARST` | 21:21 | 435 | inherited | any | `0x0`, `0x1` | — | — |
@@ -298,22 +293,22 @@ Sources, as §1: **ArduPilot** is the full 5 s boot (26,021 RCC writes, all 32-b
 | `RCC_AHB4RSTR` | `0x088` | `GPIOJRST` | 9:9 | 435 | inherited | any | `0x0`, `0x1` | — | — |
 | `RCC_AHB4RSTR` | `0x088` | `GPIOKRST` | 10:10 | 435 | inherited | any | `0x0`, `0x1` | — | — |
 | `RCC_AHB4RSTR` | `0x088` | `HSEMRST` | 25:25 | 435 | inherited | any | `0x0`, `0x1` | — | — |
-| `RCC_AHB4RSTR` | `0x088` | `Reserved` | 31:26 | 435 | reserved **outside** | 0x0 | `0x0`, `0x3f` | — | — |
-| `RCC_AHB4RSTR` | `0x088` | `Reserved` | 23:22 | 435 | reserved **outside** | 0x0 | `0x0`, `0x3` | — | — |
-| `RCC_AHB4RSTR` | `0x088` | `Reserved` | 20:20 | 435 | reserved **outside** | 0x0 | `0x0`, `0x1` | — | — |
-| `RCC_AHB4RSTR` | `0x088` | `Reserved` | 18:11 | 435 | reserved **outside** | 0x0 | `0x0`, `0xff` | — | — |
+| `RCC_AHB4RSTR` | `0x088` | `Reserved` | 31:26 | 435 | acknowledged | any | `0x0`, `0x3f` | — | — |
+| `RCC_AHB4RSTR` | `0x088` | `Reserved` | 23:22 | 435 | acknowledged | any | `0x0`, `0x3` | — | — |
+| `RCC_AHB4RSTR` | `0x088` | `Reserved` | 20:20 | 435 | acknowledged | any | `0x0`, `0x1` | — | — |
+| `RCC_AHB4RSTR` | `0x088` | `Reserved` | 18:11 | 435 | acknowledged | any | `0x0`, `0xff` | — | — |
 | `RCC_APB3RSTR` | `0x08C` | `LTDCRST` | 3:3 | 437 | inherited | any | `0x0`, `0x1` | — | — |
-| `RCC_APB3RSTR` | `0x08C` | `Reserved` | 31:4 | 437 | reserved **outside** | 0x0 | `0x0`, `0xfffffff` | — | — |
-| `RCC_APB3RSTR` | `0x08C` | `Reserved` | 2:0 | 437 | reserved **outside** | 0x0 | `0x0`, `0x7` | — | — |
+| `RCC_APB3RSTR` | `0x08C` | `Reserved` | 31:4 | 437 | acknowledged | any | `0x0`, `0xfffffff` | — | — |
+| `RCC_APB3RSTR` | `0x08C` | `Reserved` | 2:0 | 437 | acknowledged | any | `0x0`, `0x7` | — | — |
 | `RCC_APB1LRSTR` | `0x090` | `CECRST` | 27:27 | 438 | inherited | any | `0x0`, `0x1` | — | — |
 | `RCC_APB1LRSTR` | `0x090` | `DAC12RST` | 29:29 | 438 | inherited | any | `0x0`, `0x1` | — | — |
 | `RCC_APB1LRSTR` | `0x090` | `I2C1RST` | 21:21 | 439 | inherited | any | `0x0`, `0x1` | — | — |
 | `RCC_APB1LRSTR` | `0x090` | `I2C2RST` | 22:22 | 438 | inherited | any | `0x0`, `0x1` | — | — |
 | `RCC_APB1LRSTR` | `0x090` | `I2C3RST` | 23:23 | 438 | inherited | any | `0x0`, `0x1` | — | — |
 | `RCC_APB1LRSTR` | `0x090` | `LPTIM1RST` | 9:9 | 439 | inherited | any | `0x0`, `0x1` | — | — |
-| `RCC_APB1LRSTR` | `0x090` | `Reserved` | 28:28 | 438 | reserved **outside** | 0x0 | `0x0`, `0x1` | — | — |
-| `RCC_APB1LRSTR` | `0x090` | `Reserved` | 26:24 | 438 | reserved **outside** | 0x0 | `0x0`, `0x7` | — | — |
-| `RCC_APB1LRSTR` | `0x090` | `Reserved` | 13:10 | 439 | reserved **outside** | 0x0 | `0x0`, `0xf` | — | — |
+| `RCC_APB1LRSTR` | `0x090` | `Reserved` | 28:28 | 438 | acknowledged | any | `0x0`, `0x1` | — | — |
+| `RCC_APB1LRSTR` | `0x090` | `Reserved` | 26:24 | 438 | acknowledged | any | `0x0`, `0x7` | — | — |
+| `RCC_APB1LRSTR` | `0x090` | `Reserved` | 13:10 | 439 | acknowledged | any | `0x0`, `0xf` | — | — |
 | `RCC_APB1LRSTR` | `0x090` | `SPDIFRXRST` | 16:16 | 439 | inherited | any | `0x0`, `0x1` | — | — |
 | `RCC_APB1LRSTR` | `0x090` | `SPI2RST` | 14:14 | 439 | inherited | any | `0x0`, `0x1` | — | — |
 | `RCC_APB1LRSTR` | `0x090` | `SPI3RST` | 15:15 | 439 | inherited | any | `0x0`, `0x1` | — | — |
@@ -336,20 +331,20 @@ Sources, as §1: **ArduPilot** is the full 5 s boot (26,021 RCC writes, all 32-b
 | `RCC_APB1HRSTR` | `0x094` | `FDCANRST` | 8:8 | 441 | inherited | any | `0x0`, `0x1` | — | — |
 | `RCC_APB1HRSTR` | `0x094` | `MDIOSRST` | 5:5 | 441 | inherited | any | `0x0`, `0x1` | — | — |
 | `RCC_APB1HRSTR` | `0x094` | `OPAMPRST` | 4:4 | 441 | inherited | any | `0x0`, `0x1` | — | — |
-| `RCC_APB1HRSTR` | `0x094` | `Reserved` | 31:9 | 441 | reserved **outside** | 0x0 | `0x0`, `0x7fffff` | — | — |
-| `RCC_APB1HRSTR` | `0x094` | `Reserved` | 7:6 | 441 | reserved **outside** | 0x0 | `0x0`, `0x3` | — | — |
-| `RCC_APB1HRSTR` | `0x094` | `Reserved` | 3:3 | 441 | reserved **outside** | 0x0 | `0x0`, `0x1` | — | — |
-| `RCC_APB1HRSTR` | `0x094` | `Reserved` | 0:0 | 441 | reserved **outside** | 0x0 | `0x0`, `0x1` | — | — |
+| `RCC_APB1HRSTR` | `0x094` | `Reserved` | 31:9 | 441 | acknowledged | any | `0x0`, `0x7fffff` | — | — |
+| `RCC_APB1HRSTR` | `0x094` | `Reserved` | 7:6 | 441 | acknowledged | any | `0x0`, `0x3` | — | — |
+| `RCC_APB1HRSTR` | `0x094` | `Reserved` | 3:3 | 441 | acknowledged | any | `0x0`, `0x1` | — | — |
+| `RCC_APB1HRSTR` | `0x094` | `Reserved` | 0:0 | 441 | acknowledged | any | `0x0`, `0x1` | — | — |
 | `RCC_APB1HRSTR` | `0x094` | `SWPRST` | 2:2 | 441 | inherited | any | `0x0`, `0x1` | — | — |
 | `RCC_APB2RSTR` | `0x098` | `DFSDM1RST` | 28:28 | 442 | inherited | any | `0x0`, `0x1` | — | — |
 | `RCC_APB2RSTR` | `0x098` | `HRTIMRST` | 29:29 | 442 | inherited | any | `0x0`, `0x1` | — | — |
-| `RCC_APB2RSTR` | `0x098` | `Reserved` | 31:30 | 442 | reserved **outside** | 0x0 | `0x0`, `0x3` | — | — |
-| `RCC_APB2RSTR` | `0x098` | `Reserved` | 27:25 | 442 | reserved **outside** | 0x0 | `0x0`, `0x7` | — | — |
-| `RCC_APB2RSTR` | `0x098` | `Reserved` | 21:21 | 442 | reserved **outside** | 0x0 | `0x0`, `0x1` | — | — |
-| `RCC_APB2RSTR` | `0x098` | `Reserved` | 19:19 | 442 | reserved **outside** | 0x0 | `0x0`, `0x1` | — | — |
-| `RCC_APB2RSTR` | `0x098` | `Reserved` | 15:14 | 443 | reserved **outside** | 0x0 | `0x0`, `0x3` | — | — |
-| `RCC_APB2RSTR` | `0x098` | `Reserved` | 11:6 | 443 | reserved **outside** | 0x0 | `0x0`, `0x3f` | — | — |
-| `RCC_APB2RSTR` | `0x098` | `Reserved` | 3:2 | 443 | reserved **outside** | 0x0 | `0x0`, `0x3` | — | — |
+| `RCC_APB2RSTR` | `0x098` | `Reserved` | 31:30 | 442 | acknowledged | any | `0x0`, `0x3` | — | — |
+| `RCC_APB2RSTR` | `0x098` | `Reserved` | 27:25 | 442 | acknowledged | any | `0x0`, `0x7` | — | — |
+| `RCC_APB2RSTR` | `0x098` | `Reserved` | 21:21 | 442 | acknowledged | any | `0x0`, `0x1` | — | — |
+| `RCC_APB2RSTR` | `0x098` | `Reserved` | 19:19 | 442 | acknowledged | any | `0x0`, `0x1` | — | — |
+| `RCC_APB2RSTR` | `0x098` | `Reserved` | 15:14 | 443 | acknowledged | any | `0x0`, `0x3` | — | — |
+| `RCC_APB2RSTR` | `0x098` | `Reserved` | 11:6 | 443 | acknowledged | any | `0x0`, `0x3f` | — | — |
+| `RCC_APB2RSTR` | `0x098` | `Reserved` | 3:2 | 443 | acknowledged | any | `0x0`, `0x3` | — | — |
 | `RCC_APB2RSTR` | `0x098` | `SAI1RST` | 22:22 | 442 | inherited | any | `0x0`, `0x1` | — | — |
 | `RCC_APB2RSTR` | `0x098` | `SAI2RST` | 23:23 | 442 | inherited | any | `0x0`, `0x1` | — | — |
 | `RCC_APB2RSTR` | `0x098` | `SAI3RST` | 24:24 | 442 | inherited | any | `0x0`, `0x1` | — | — |
@@ -370,15 +365,15 @@ Sources, as §1: **ArduPilot** is the full 5 s boot (26,021 RCC writes, all 32-b
 | `RCC_APB4RSTR` | `0x09C` | `LPTIM4RST` | 11:11 | 444 | inherited | any | `0x0`, `0x1` | — | — |
 | `RCC_APB4RSTR` | `0x09C` | `LPTIM5RST` | 12:12 | 444 | inherited | any | `0x0`, `0x1` | — | — |
 | `RCC_APB4RSTR` | `0x09C` | `LPUART1RST` | 3:3 | 445 | inherited | any | `0x0`, `0x1` | — | — |
-| `RCC_APB4RSTR` | `0x09C` | `Reserved` | 31:26 | 444 | reserved **outside** | 0x0 | `0x0`, `0x3f` | — | — |
-| `RCC_APB4RSTR` | `0x09C` | `Reserved` | 25:22 | 444 | reserved **outside** | 0x0 | `0x0`, `0xf` | — | — |
-| `RCC_APB4RSTR` | `0x09C` | `Reserved` | 20:16 | 444 | reserved **outside** | 0x0 | `0x0`, `0x1f` | — | — |
-| `RCC_APB4RSTR` | `0x09C` | `Reserved` | 13:13 | 444 | reserved **outside** | 0x0 | `0x0`, `0x1` | — | — |
-| `RCC_APB4RSTR` | `0x09C` | `Reserved` | 8:8 | 445 | reserved **outside** | 0x0 | `0x0`, `0x1` | — | — |
-| `RCC_APB4RSTR` | `0x09C` | `Reserved` | 6:6 | 445 | reserved **outside** | 0x0 | `0x0`, `0x1` | — | — |
-| `RCC_APB4RSTR` | `0x09C` | `Reserved` | 4:4 | 445 | reserved **outside** | 0x0 | `0x0`, `0x1` | — | — |
-| `RCC_APB4RSTR` | `0x09C` | `Reserved` | 2:2 | 445 | reserved **outside** | 0x0 | `0x0`, `0x1` | — | — |
-| `RCC_APB4RSTR` | `0x09C` | `Reserved` | 0:0 | 445 | reserved **outside** | 0x0 | `0x0`, `0x1` | — | — |
+| `RCC_APB4RSTR` | `0x09C` | `Reserved` | 31:26 | 444 | acknowledged | any | `0x0`, `0x3f` | — | — |
+| `RCC_APB4RSTR` | `0x09C` | `Reserved` | 25:22 | 444 | acknowledged | any | `0x0`, `0xf` | — | — |
+| `RCC_APB4RSTR` | `0x09C` | `Reserved` | 20:16 | 444 | acknowledged | any | `0x0`, `0x1f` | — | — |
+| `RCC_APB4RSTR` | `0x09C` | `Reserved` | 13:13 | 444 | acknowledged | any | `0x0`, `0x1` | — | — |
+| `RCC_APB4RSTR` | `0x09C` | `Reserved` | 8:8 | 445 | acknowledged | any | `0x0`, `0x1` | — | — |
+| `RCC_APB4RSTR` | `0x09C` | `Reserved` | 6:6 | 445 | acknowledged | any | `0x0`, `0x1` | — | — |
+| `RCC_APB4RSTR` | `0x09C` | `Reserved` | 4:4 | 445 | acknowledged | any | `0x0`, `0x1` | — | — |
+| `RCC_APB4RSTR` | `0x09C` | `Reserved` | 2:2 | 445 | acknowledged | any | `0x0`, `0x1` | — | — |
+| `RCC_APB4RSTR` | `0x09C` | `Reserved` | 0:0 | 445 | acknowledged | any | `0x0`, `0x1` | — | — |
 | `RCC_APB4RSTR` | `0x09C` | `SAI4RST` | 21:21 | 444 | inherited | any | `0x0`, `0x1` | — | — |
 | `RCC_APB4RSTR` | `0x09C` | `SPI6RST` | 5:5 | 445 | inherited | any | `0x0`, `0x1` | — | — |
 | `RCC_APB4RSTR` | `0x09C` | `SYSCFGRST` | 1:1 | 445 | inherited | any | `0x0` | — | — |
@@ -396,7 +391,7 @@ Sources, as §1: **ArduPilot** is the full 5 s boot (26,021 RCC writes, all 32-b
 | `RCC_RSR` | `0x0D0` | `Reserved` | 29:29 | 450 | reserved | 0x0 | `0x0` | — | — |
 | `RCC_RSR` | `0x0D0` | `Reserved` | 27:27 | 450 | reserved | 0x0 | `0x0` | — | — |
 | `RCC_RSR` | `0x0D0` | `Reserved` | 25:25 | 450 | reserved | 0x0 | `0x0` | — | — |
-| `RCC_RSR` | `0x0D0` | `Reserved` | 18:18 | 451 | reserved **outside** | 0x1 | `0x0` | — | — |
+| `RCC_RSR` | `0x0D0` | `Reserved` | 18:18 | 451 | acknowledged | 0x0,0x1 | `0x0` | — | — |
 | `RCC_RSR` | `0x0D0` | `Reserved` | 15:0 | 451 | reserved | 0x0 | `0x0` | — | — |
 | `RCC_RSR` | `0x0D0` | `SFTRSTF` | 24:24 | 451 | read-only | any | `0x0` | — | — |
 | `RCC_RSR` | `0x0D0` | `WWDG1RSTF` | 28:28 | 450 | read-only | any | `0x0` | — | — |
@@ -487,8 +482,8 @@ Sources, as §1: **ArduPilot** is the full 5 s boot (26,021 RCC writes, all 32-b
 | `RCC_APB1LENR` | `0x0E8` | `UART5EN` | 20:20 | 463 | kernel-unmodeled | 0x0 | `0x0` | `0x0` | `0x0` (all) |
 | `RCC_APB1LENR` | `0x0E8` | `UART7EN` | 30:30 | 462 | kernel-unmodeled | 0x0 | `0x0` | `0x0` | `0x0` (all) |
 | `RCC_APB1LENR` | `0x0E8` | `UART8EN` | 31:31 | 462 | kernel-unmodeled | 0x0 | `0x0` | `0x0` | `0x0` (all) |
-| `RCC_APB1LENR` | `0x0E8` | `USART2EN` | 17:17 | 463 | kernel-unmodeled **outside** | 0x0 | `0x0` | `0x0` | `0x0` (all); `0x1` (hse-crystal-16, hse-external-8, sentinel-02-shaped, sentinel-03) |
-| `RCC_APB1LENR` | `0x0E8` | `USART3EN` | 18:18 | 463 | kernel-unmodeled **outside** | 0x0 | `0x0` | `0x0` | `0x0` (all); `0x1` (hse-crystal-16, hse-external-8, sentinel-02-shaped, sentinel-03) |
+| `RCC_APB1LENR` | `0x0E8` | `USART2EN` | 17:17 | 463 | guard | any | `0x0` | `0x0` | `0x0` (all); `0x1` (hse-crystal-16, hse-external-8, sentinel-02-shaped, sentinel-03) |
+| `RCC_APB1LENR` | `0x0E8` | `USART3EN` | 18:18 | 463 | guard | any | `0x0` | `0x0` | `0x0` (all); `0x1` (hse-crystal-16, hse-external-8, sentinel-02-shaped, sentinel-03) |
 | `RCC_APB1HENR` | `0x0EC` | `CRSEN` | 1:1 | 467 | inherited | any | — | `0x0` | — |
 | `RCC_APB1HENR` | `0x0EC` | `FDCANEN` | 8:8 | 466 | kernel-unmodeled | 0x0 | — | `0x0` | — |
 | `RCC_APB1HENR` | `0x0EC` | `MDIOSEN` | 5:5 | 466 | inherited | any | — | `0x0` | — |
@@ -543,7 +538,7 @@ Sources, as §1: **ArduPilot** is the full 5 s boot (26,021 RCC writes, all 32-b
 | `RCC_APB4ENR` | `0x0F4` | `VREFEN` | 15:15 | 471 | inherited | any | `0x0` | `0x0` | — |
 | `RCC_AHB1LPENR` | `0x100` | `ADC12LPEN` | 5:5 | 477 | tag | 0x1 | `0x1` | — | — |
 | `RCC_AHB1LPENR` | `0x100` | `DMA1LPEN` | 0:0 | 477 | tag | 0x1 | `0x1` | — | — |
-| `RCC_AHB1LPENR` | `0x100` | `DMA2LPEN` | 1:1 | 477 | tag **outside** | 0x1 | `0x0`, `0x1` | — | — |
+| `RCC_AHB1LPENR` | `0x100` | `DMA2LPEN` | 1:1 | 477 | acknowledged | 0x0,0x1 | `0x0`, `0x1` | — | — |
 | `RCC_AHB1LPENR` | `0x100` | `ETH1MACLPEN` | 15:15 | 477 | tag | 0x1 | `0x1` | — | — |
 | `RCC_AHB1LPENR` | `0x100` | `ETH1RXLPEN` | 17:17 | 477 | tag | 0x1 | `0x1` | — | — |
 | `RCC_AHB1LPENR` | `0x100` | `ETH1TXLPEN` | 16:16 | 477 | tag | 0x1 | `0x1` | — | — |
@@ -558,7 +553,7 @@ Sources, as §1: **ArduPilot** is the full 5 s boot (26,021 RCC writes, all 32-b
 | `RCC_AHB2LPENR` | `0x104` | `CRYPTLPEN` | 4:4 | 479 | tag | 0x1 | `0x1` | — | — |
 | `RCC_AHB2LPENR` | `0x104` | `DCMILPEN` | 0:0 | 479 | tag | 0x1 | `0x1` | — | — |
 | `RCC_AHB2LPENR` | `0x104` | `HASHLPEN` | 5:5 | 479 | tag | 0x1 | `0x1` | — | — |
-| `RCC_AHB2LPENR` | `0x104` | `RNGLPEN` | 6:6 | 478 | tag **outside** | 0x1 | `0x0`, `0x1` | — | — |
+| `RCC_AHB2LPENR` | `0x104` | `RNGLPEN` | 6:6 | 478 | acknowledged | 0x0,0x1 | `0x0`, `0x1` | — | — |
 | `RCC_AHB2LPENR` | `0x104` | `Reserved` | 28:10 | 478 | reserved | 0x0 | `0x0` | — | — |
 | `RCC_AHB2LPENR` | `0x104` | `Reserved` | 8:7 | 478 | reserved | 0x0 | `0x0` | — | — |
 | `RCC_AHB2LPENR` | `0x104` | `Reserved` | 3:1 | 479 | reserved | 0x0 | `0x0` | — | — |
@@ -597,7 +592,7 @@ Sources, as §1: **ArduPilot** is the full 5 s boot (26,021 RCC writes, all 32-b
 | `RCC_APB1LLPENR` | `0x110` | `Reserved` | 26:24 | 484 | reserved | 0x0 | `0x0` | — | — |
 | `RCC_APB1LLPENR` | `0x110` | `Reserved` | 13:10 | 486 | reserved | 0x2 | `0x2` | — | — |
 | `RCC_APB1LLPENR` | `0x110` | `SPDIFRXLPEN` | 16:16 | 485 | tag | 0x1 | `0x1` | — | — |
-| `RCC_APB1LLPENR` | `0x110` | `SPI2LPEN` | 14:14 | 486 | tag **outside** | 0x1 | `0x0`, `0x1` | — | — |
+| `RCC_APB1LLPENR` | `0x110` | `SPI2LPEN` | 14:14 | 486 | acknowledged | 0x0,0x1 | `0x0`, `0x1` | — | — |
 | `RCC_APB1LLPENR` | `0x110` | `SPI3LPEN` | 15:15 | 486 | tag | 0x1 | `0x1` | — | — |
 | `RCC_APB1LLPENR` | `0x110` | `TIM12LPEN` | 6:6 | 486 | tag | 0x1 | `0x1` | — | — |
 | `RCC_APB1LLPENR` | `0x110` | `TIM13LPEN` | 7:7 | 486 | tag | 0x1 | `0x1` | — | — |
@@ -626,7 +621,7 @@ Sources, as §1: **ArduPilot** is the full 5 s boot (26,021 RCC writes, all 32-b
 | `RCC_APB2LPENR` | `0x118` | `SAI1LPEN` | 22:22 | 491 | tag | 0x1 | `0x1` | — | — |
 | `RCC_APB2LPENR` | `0x118` | `SAI2LPEN` | 23:23 | 490 | tag | 0x1 | `0x1` | — | — |
 | `RCC_APB2LPENR` | `0x118` | `SAI3LPEN` | 24:24 | 490 | tag | 0x1 | `0x1` | — | — |
-| `RCC_APB2LPENR` | `0x118` | `SPI1LPEN` | 12:12 | 491 | tag **outside** | 0x1 | `0x0`, `0x1` | — | — |
+| `RCC_APB2LPENR` | `0x118` | `SPI1LPEN` | 12:12 | 491 | acknowledged | 0x0,0x1 | `0x0`, `0x1` | — | — |
 | `RCC_APB2LPENR` | `0x118` | `SPI4LPEN` | 13:13 | 491 | tag | 0x1 | `0x1` | — | — |
 | `RCC_APB2LPENR` | `0x118` | `SPI5LPEN` | 20:20 | 491 | tag | 0x1 | `0x1` | — | — |
 | `RCC_APB2LPENR` | `0x118` | `TIM15LPEN` | 16:16 | 491 | tag | 0x1 | `0x1` | — | — |
@@ -771,3 +766,24 @@ The one file is the release constant (1150's template), 0100b's `Refusal.cs` wit
 | one file without the RCC wrapper (SPI guard only) | 985,024 | 93.9 % | 88,058,789 |
 
 The RCC wrapper adds nothing measurable beyond the one compilation. Host load was 2.0–2.2. The built guard (the allow-list's 682 rows and the mux model) is measured again at acceptance.
+
+## 8. The rulings, and what the build does with each
+
+| Ruled (architect) | In the build |
+|---|---|
+| 13:10Z: p371–372 is part of the rule | each mux's current input (`MuxState.Current`), switched only when both inputs run, kept across `machine Reset`; cases `stuck`, `switch`, `switched`, `resetfwd`; mutants C01–C03 |
+| 13:10Z: the `RCC_C1_*` aliases are their base registers | `Base()`; cases `alias`, `alias17c`; mutant C13 |
+| 13:45Z: the per_ck boards are not a stop | §5; case `gen-s03` records that SPI1 has no kernel clock there, without an RCC refusal |
+| 14:35Z F1–F6, acknowledged by name | rows of class "acknowledged by name" whose `behaves as` ends `(A1)`…`(A6)`: **A1** = F1, **A2** = F2, **A3** = F3, **A4** = F4, **A5** = F5, **A6** = F6 (A6 carries the backlog row: CSleep is not modeled) |
+| 14:35Z F7: the query covers USART2 and USART3 | `USART234578SEL` (p417) as a sixth mux; `usart2`/`usart3` in the query; case `usart2` |
+| 14:35Z F8: `ADC3EN` `unmodeled` | the row allows 0 only; `d1-drv8876`'s generated firmware therefore refuses at `AHB4ENR = 0x01000023` |
+| 14:35Z: the 22 non-query selectors stored and served | rows "modeled by the guard", any value; their peripherals' enables allow 0 only |
+| 14:35Z: the kinds; `PLLxON` with no reference `unmodeled` | `TVI-RCC-FIELD`, `-WIDTH`, `-READ`, `-PLL-REF`, `-SW` (`unmodeled`); `TVI-RCC-PLL`, `TVI-RCC-KERNEL` (`predicted-fault`). `TVI-RCC-SW` was added in the build (§8.1) |
+| 14:35Z: `hseFrequency` must reach the wrapper | the guard takes every property the stock RCC takes and passes it to the owned stock model; `tests/1300/hse16.repl` (16 MHz on `tviburiRcc`) reads 16 MHz back. `hse16-trap.repl` (the consumer's untyped `rcc:` form) still lands on the cancelled entry with no error: **the consumer requirement for Phase 2, RUL-09 (b): every RCC property goes on the guard's entry** |
+| 14:35Z: the runner checks `spi1 rcc` | `scripts/tviburi-spike` |
+
+### 8.1 Found in the build
+
+- **`TVI-RCC-SW`** (`unmodeled`): `CFGR.SW` switched to a source that is not running. Silicon switches "only if the target clock source is ready" (§8.5.6 p350; `SW` p393). The stock model switches at once, and with PLL1 selected and `DIVM1` = 0 it divides by zero (`STM32H7_RCC.cs` L108–114). Neither firmware's sequence does it.
+- **One register per offset:** the release's ledger requires it. 0x004 is `RCC_HSICFGR` (revision V; from memory, the revision of current H753 silicon). `RCC_ICSCR` (revision Y, what the stock model defines) is not a row; both firmwares write 0x004's shared reset value, `0x40000000`.
+- **`RCC_CSICFGR`'s Reserved range is 23:10,** not the printed 23:8, which overlaps `CSICAL[9:0]` (p390).

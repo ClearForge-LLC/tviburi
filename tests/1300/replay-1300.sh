@@ -12,6 +12,11 @@
 #               `sysbus LogPeripheralAccess` on spi1, spi2, i2c1, i2c2, usart1, rng before RunFor; console gzipped
 #   cost        as trace, with /ovl/restate-cost.repl (trace off) and no access logging: the one-file overlay's cost
 #   cost-spi    /ovl/OverlaySpi.cs (the same one file without the RCC guard), spi1/spi2 re-typed, stock rcc
+#   accept      the built guard (acceptance, WO §2): the release built from /repo (scripts/build-release) and its one
+#               Tviburi.cs included before `mach create`; spi1/spi2 re-typed to the guarded SPI, recorded; the committed
+#               model/stm32h7-rcc-restate.repl appended with `tviburiRcc: mode: "recorded"`; each `rcc RegistrationPeripheralAlias`
+#               repointed, and an untyped `rcc:` block's properties moved onto `tviburiRcc` (the consumer requirement,
+#               RUL-09 (b); TVI-WO-1300.rm0433.md §6.4). Needs /repo mounted.
 set -u
 n=$1; shift
 for mode in "$@"; do
@@ -26,6 +31,17 @@ for mode in "$@"; do
     c=${args[$((i + 1))]}
     case $mode in
       pure) ;;
+      accept)
+        /repo/scripts/build-release /repo /tmp/release > /out/$n-accept.release.txt 2>&1 || { echo "replay-1300: release build failed" >&2; exit 3; }
+        sed -i 's/^\(spi[0-9]*\): SPI\.STM32H7_SPI @ {/\1: Tviburi.GuardedSTM32H7_SPI @ {/' "$plat"
+        sed -i '/RegistrationPeripheralAlias\.SPI[0-9]*$/{n;s/^    }$/    }\n    mode: "recorded"/}' "$plat"
+        grep -n '^ *rcc RegistrationPeripheralAlias' "$plat" > /out/$n-$mode.repointed.txt
+        sed -i 's/^\( *\)rcc RegistrationPeripheralAlias/\1tviburiRcc RegistrationPeripheralAlias/' "$plat"
+        props=$(awk '/^rcc:$/{f=1; next} f && /^ /{print; next} {f=0}' "$plat")
+        awk '/^rcc:$/{f=1; next} f && /^ /{next} {f=0; print}' "$plat" > "$plat.new" && cat "$plat.new" > "$plat" && rm "$plat.new"
+        { cat /repo/model/stm32h7-rcc-restate.repl; printf '\ntviburiRcc:\n    mode: "recorded"\n'; [ -n "$props" ] && printf '%s\n' "$props"; } >> "$plat"
+        echo "$props" > /out/$n-$mode.moved-props.txt
+        c=${c/'mach create; '/'include @/tmp/release/Tviburi.cs; mach create; '} ;;
       trace|cost|cost-spi)
         sed -i 's/^\(spi[0-9]*\): SPI\.STM32H7_SPI @ {/\1: Tviburi.GuardedSTM32H7_SPI @ {/' "$plat"
         if [ $mode = cost-spi ]; then

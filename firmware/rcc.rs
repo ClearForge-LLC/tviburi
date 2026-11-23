@@ -22,7 +22,9 @@
 //!   path="read"      - a read of RCC offset 0x014, where RM0433 has no register: refused by TVI-RCC-READ, unmodeled.
 //!   path="usart2"    - USART234578SEL written 001 (pll2_q_ck) with PLL2 off, USART2EN, then USART2 CR1.UE: the test asks
 //!                      for USART2's kernel clock there; predicted-fault (p417, p371).
-//! These six end at their own access, with no SPI start.
+//!   path="ardupilot", "gen-s03", "gen-hc16" - the RCC write sequences of ArduPilot and of two generated boards, as
+//!                      measured (SEQ below), with no SPI start: each passes, enforcing (WO §2).
+//! These end at their own access, with no SPI start.
 //! Bits: RM0433 Rev 9 §8.7 (RCC_CR p383-386, PLLCFGR p400-401, PLL1DIVR p403-404, D2CCIP1R p414, APB2ENR p469).
 #![no_std]
 #![no_main]
@@ -73,8 +75,61 @@ unsafe fn spi1_start() {
     write_volatile(SPI1_CR1, read_volatile(SPI1_CR1) | 1); // SPE: the start
 }
 
+
+// RCC write sequences measured in TVI-WO-1300 §1.1, replayed by the paths of the same name. (offset, value).
+#[cfg(path = "ardupilot")]
+// ArduPilot Copter-4.7.2 (a799dfb6...) on sentinel-02-own: its 26,012 RCC writes' 71 distinct (offset, value) pairs in first-occurrence order (TVI-WO-1300.rm0433.md §4, §5)
+static SEQ: [(u32, u32); 71] = [
+    (0x088, 0x000007FF), (0x088, 0x00000000), (0x0E0, 0x000007FF), (0x108, 0x312807FF),
+    (0x0F4, 0x00010002), (0x11C, 0x0421DEAA), (0x000, 0x00000025), (0x010, 0x00000000),
+    (0x000, 0x00000001), (0x004, 0x40000000), (0x074, 0x00000000), (0x02C, 0x01FF0000),
+    (0x010, 0x08108800), (0x000, 0x00001025), (0x028, 0x00408040), (0x034, 0x00000000),
+    (0x030, 0x01090231), (0x03C, 0x00000000), (0x038, 0x0704022C), (0x044, 0x00000000),
+    (0x040, 0x07040E0E), (0x02C, 0x01BF0FFD), (0x000, 0x15003025), (0x018, 0x00000048),
+    (0x01C, 0x00000440), (0x020, 0x00000040), (0x04C, 0x00000020), (0x050, 0x10010000),
+    (0x054, 0x00E01009), (0x058, 0x10010100), (0x010, 0x00008003), (0x0DC, 0x20000000),
+    (0x104, 0xE0000271), (0x0DC, 0x40000000), (0x0DC, 0x80000000), (0x080, 0x7FFFFFFF),
+    (0x080, 0x00000000), (0x084, 0xFFFFFFFF), (0x084, 0x00000000), (0x07C, 0x7FFFEFFF),
+    (0x07C, 0x00000000), (0x088, 0xFFFFF800), (0x090, 0xFFFFFFFF), (0x090, 0x00000000),
+    (0x094, 0xFFFFFFFF), (0x094, 0x00000000), (0x098, 0xFFFFFFFF), (0x098, 0x00000000),
+    (0x08C, 0xFFFFFFFF), (0x08C, 0x00000000), (0x09C, 0xFFFFFFFD), (0x09C, 0x00000000),
+    (0x0E8, 0x00000008), (0x110, 0xE8FFCBFF), (0x0DC, 0x00000040), (0x104, 0xE0000231),
+    (0x0D0, 0x00010000), (0x0D8, 0x00000001), (0x100, 0x1E03C023), (0x0F0, 0x00000010),
+    (0x118, 0x31D73033), (0x0D8, 0x00000003), (0x098, 0x00001000), (0x0F0, 0x00001010),
+    (0x100, 0x1E03C021), (0x118, 0x31D72033), (0x090, 0x00200000), (0x0E8, 0x00200008),
+    (0x090, 0x00004000), (0x0E8, 0x00204008), (0x110, 0xE8FF8BFF),
+];
+#[cfg(path = "gen-s03")]
+// the generated firmware for sentinel-03 (Aethelgard 75da8053): its RCC writes in order
+static SEQ: [(u32, u32); 13] = [
+    (0x050, 0x00004000), (0x0E0, 0x00000001), (0x0E0, 0x00000003), (0x0E0, 0x00000007),
+    (0x0E0, 0x00000017), (0x0E8, 0x00200000), (0x0E8, 0x00600000), (0x0F0, 0x00001000),
+    (0x0E8, 0x00604000), (0x0F0, 0x00001001), (0x0F0, 0x00001011), (0x0E8, 0x00624000),
+    (0x0E8, 0x00664000),
+];
+#[cfg(path = "gen-hc16")]
+// the generated firmware for hse-crystal-16 (Aethelgard 75da8053): its RCC writes in order
+static SEQ: [(u32, u32); 16] = [
+    (0x000, 0x00010001), (0x000, 0x00090001), (0x028, 0x00000052), (0x02C, 0x00030004),
+    (0x030, 0x0103064F), (0x000, 0x01090001), (0x010, 0x00000003), (0x0E0, 0x00000001),
+    (0x0E0, 0x00000003), (0x0E8, 0x00200000), (0x0F0, 0x00001000), (0x0E8, 0x00204000),
+    (0x0F0, 0x00001001), (0x0E8, 0x00204001), (0x0E8, 0x00224001), (0x0E8, 0x00264001),
+];
+
 #[no_mangle]
 pub unsafe extern "C" fn reset() -> ! {
+    #[cfg(any(path = "ardupilot", path = "gen-s03", path = "gen-hc16"))]
+    {
+        for &(off, v) in SEQ.iter() {
+            write_volatile((RCC + off as usize) as *mut u32, v);
+            if off == 0x000 {
+                // as the firmwares do after a CR write: wait for every PLL it turned on (PLLxRDY = PLLxON, bits 25/27/29)
+                while (read_volatile(RCC_CR) >> 1) & v & 0x1500_0000 != v & 0x1500_0000 {}
+            }
+        }
+        write_volatile(MARK_AFTER, 0xAF7E_0002);
+        loop {}
+    }
     #[cfg(path = "pllref")]
     {
         write_volatile(RCC_PLLCKSELR, read_volatile(RCC_PLLCKSELR) | 0b11); // PLLSRC = 11: no clock to the PLLs

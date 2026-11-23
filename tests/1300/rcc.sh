@@ -13,7 +13,7 @@ set -euo pipefail
 
 here=$(cd "$(dirname "$0")/../.." && pwd)
 IMAGE=$(sed -n 's/^IMAGE=//p' "$here/tests/spike.sh")
-CASES="scar switch stuck clocked switched alias field pll divq pllref divm0 sw width read usart2 uncovered fields reset resetfwd spi1rst alias17c registrations hse16 recorded recordedfield"
+CASES="scar switch stuck clocked switched alias field pll divq pllref divm0 sw width read usart2 uncovered fields reset resetfwd spi1rst alias17c registrations hse16 recorded recordedfield ardupilot gen-s03 gen-hc16"
 scratch=${TVIBURI_SCRATCH:-$HOME/.cache/tviburi}
 mkdir -p "$scratch"
 work=$(mktemp -d "$scratch/rcc.XXXXXX")
@@ -59,7 +59,7 @@ run_case() { # run_case <name> <firmware path or -> <monitor lines...>
     cargo build --quiet --offline --locked --manifest-path /repo/tools/tviburi-check/Cargo.toml --target-dir /out/target || exit 90
     if [ "$1" != - ]; then
       rustc --edition 2021 --target thumbv7em-none-eabihf -C opt-level=s -C panic=abort -C debuginfo=0 --cfg "path=\"$1\"" \
-        --check-cfg "cfg(path, values(\"clocked\",\"scar\",\"switch\",\"stuck\",\"switched\",\"alias\",\"field\",\"pll\",\"divq\",\"pllref\",\"divm0\",\"sw\",\"width\",\"read\",\"usart2\"))" \
+        --check-cfg "cfg(path, values(\"clocked\",\"scar\",\"switch\",\"stuck\",\"switched\",\"alias\",\"field\",\"pll\",\"divq\",\"pllref\",\"divm0\",\"sw\",\"width\",\"read\",\"usart2\",\"ardupilot\",\"gen-s03\",\"gen-hc16\"))" \
         -C link-arg=-T/repo/firmware/link.x -o /out/fw.elf /repo/firmware/rcc.rs || exit 91
     fi
     timeout 120 renode --disable-gui --console --plain /out/run.resc </dev/null >/out/renode.out 2>&1
@@ -190,6 +190,19 @@ for t in ${TVIBURI_TESTS:-$CASES}; do
     PLATFORM=/repo/tests/1300/recorded.repl run_case recordedfield field "$run" 'echo "R-SEL"' 'sysbus ReadDoubleWord 0x58024450' 'echo "TVIBURI-MARK-AFTER"' "$after"
     check "recordedfield: in recorded mode, SPI123SEL = 011 is a would-refuse and the write still reaches the copy (reads 0x3000), as if no rule fired (RUL-19)" \
       "[ \$rc = 1 ] && grep -q '\"tviburi\":\"would-refuse\".*TVI-RCC-FIELD' '$work/recordedfield/renode-log.txt' && console recordedfield | grep -A1 -x 'R-SEL' | tail -n1 | grep -qx '0x00003000'" ;;
+  ardupilot|gen-s03|gen-hc16)
+    cold=('sysbus WriteDoubleWord 0x580244D4 0x0' 'sysbus WriteDoubleWord 0x580244D8 0x0' 'sysbus WriteDoubleWord 0x580244DC 0x0'
+      'sysbus WriteDoubleWord 0x580244E0 0x0' 'sysbus WriteDoubleWord 0x580244E4 0x0' 'sysbus WriteDoubleWord 0x580244E8 0x0'
+      'sysbus WriteDoubleWord 0x580244EC 0x0' 'sysbus WriteDoubleWord 0x580244F0 0x0' 'sysbus WriteDoubleWord 0x580244F4 0x10000')
+    qs=(); for p in spi1 spi2 i2c1 usart1 rng; do qs+=("python \"print(\\\"Q \\\" + str(self.Machine[\\\"sysbus.rcc\\\"].QueryKernelClock(\\\"$p\\\")))\""); done
+    run_case "$t" "$t" "${cold[@]}" "$run" 'echo "TVIBURI-MARK-AFTER"' "$after" "${qs[@]}"
+    check "$t: the measured RCC sequence, after the consumer's cold writes (pc none), passes enforcing (WO §2)" \
+      "[ \$rc = 0 ] && grep -qx 'CHECK PASS' '$work/$t.stdout' && console $t | grep -A1 -x 'TVIBURI-MARK-AFTER' | tail -n1 | grep -qx '0xAF7E0002'"
+    case $t in
+      ardupilot) check "ardupilot: the query finds spi1, spi2, i2c1, usart1 and rng running (§5)" "[ \$(grep -c '^Q [a-z0-9]*: running' '$work/$t/renode.out') = 5 ]" ;;
+      gen-s03) check "gen-s03: SPI1's mux has not left pll1_q_ck for per_ck: no kernel clock (§5, p371-372; not an RCC refusal)" "grep -q '^Q spi1: NOT running; the mux has not switched from pll1_q_ck' '$work/$t/renode.out'" ;;
+      gen-hc16) check "gen-hc16: SPI1 runs on pll1_q_ck (§5)" "grep -q '^Q spi1: running; pll1_q_ck' '$work/$t/renode.out'" ;;
+    esac ;;
   alias17c)
     run_case alias17c - 'echo "R-17C"' 'sysbus ReadDoubleWord 0x5802457C'
     check "alias17c: RCC_C1_APB4LPENR (0x17C) reads RCC_APB4LPENR's reset 0x0421DEAA, where the stock model overflows its stack (p382; p493)" \
