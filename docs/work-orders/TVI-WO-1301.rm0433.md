@@ -219,7 +219,7 @@ Each consumer platform refers to the ports in up to three ways, and each must na
 
 ## 8. The reductions on the combined one file, as ruled — **stopped again**
 
-**Method** (`tests/1301/memory-1301.sh`, 18:02–18:38Z):
+**Method** (`tests/1301/memory-1301.sh`, 17:53–18:20Z):
 - **The base is 1300a's latest tree.** A read-only copy of its `git archive` export at `~/.cache/tvi-1300a/m3src` (17:44Z): `GuardedSTM32H7_RCC.cs` `b8f89469…`, `GuardedSTM32H7_SPI.cs` `69809b7e…`, `Refusal.cs` `bb1ab829…`. Its release was built in the image, and to that one file each variant's GPIO C# was appended, `using` lines hoisted.
 - **The variants** (`tests/1301/proto1301.py`):
 
@@ -262,7 +262,7 @@ Each consumer platform refers to the ports in up to three ways, and each must na
 | `V1` | +18.4 MiB | |
 | `V0` | +24.5 MiB | |
 
-   The 2,688 object initialisers cost about 14 MiB more than the string. The 161 rows cost about 8 MiB more than 10 rules. **`V2` is the only GPIO variant whose unslowed runs keep 32 MiB** (41.0 MiB, n = 13).
+   The 2,688 object initialisers cost about 6 MiB more than the string (V0 against V1). The 161 rows cost about 8 MiB more than 10 rules (V1 against V2). **`V2` is the only GPIO variant whose unslowed runs keep 32 MiB** (41.0 MiB, n = 13).
 3. **Contention here is heavier than CI's.** The 4 pinned CPUs were shared with the rest of the host. A GitHub runner's 4 vCPUs are not shared, so the unslowed runs are the closer proxy for CI. A faithful "CI-like" peak needs an unshared 4-CPU host, or the measurement run in CI itself.
 
 **For the architect and Scotty (northstar §6):**
