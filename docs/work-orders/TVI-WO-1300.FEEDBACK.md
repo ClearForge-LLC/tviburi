@@ -41,11 +41,11 @@
 - **`scripts/tviburi-spike`:** the check names `spi1 rcc` (granted 14:35Z). The one `prelude.resc` line granted earlier is unused: 1200's prelude includes the release's one file.
 - **`firmware/rcc.rs`:** 18 planted paths. They cover the scar, the mux cases, the alias, every refusal at a firmware store, USART2, and ArduPilot's and two generated boards' measured RCC sequences.
 - **`tests/1300/`:**
-  - `rcc.sh`: 28 cases, each a `spike.sh` test `rcc-<case>` in the acceptance group, so CI runs them;
-  - `fields.resc`: gate clause 6, 357 cases;
+  - `rcc.sh`: 33 cases, each a `spike.sh` test `rcc-<case>` in the acceptance group, so CI runs them;
+  - `fields.resc`: gate clause 6, 363 cases;
   - the `hseFrequency` platforms;
   - the measurement harness and its analysis.
-- **`tests/spike.sh`:** its board fixtures follow the board, and its direct check calls name `spi1 rcc`. `t_load`'s no-witness assertion names `spi1`. **`tests/mutants.tsv`:** C01–C19.
+- **`tests/spike.sh`:** its board fixtures follow the board, and its direct check calls name `spi1 rcc`. `t_load`'s no-witness assertion names `spi1`. **`tests/mutants.tsv`:** C01–C23 and F02. **Tools (granted 15:15Z):** the RCC class row in `pins.tsv`; `(TVI-WO-1300 A<n>)` resolved to this WO's document, with a unit test. **`model/bench-checks.tsv`:** R1–R3.
 
 ## 3. Acceptance (WO §2)
 
@@ -54,17 +54,17 @@
 | ArduPilot's full 5 s boot, recorded, with the guard: no `would-refuse` under `rcc` outside the table; peak under 1,048,576 KiB in the one-file shape | `tests/1300/replay-1300.sh 2 accept` | **0 `would-refuse`** (from any guard); 88,058,789 instructions; peaks **955,512; 959,276; 980,696 KiB** (stock 856,520; 865,148), **under by 66–91 MiB**, at host load 7–9 |
 | The generated firmware's RCC sequence passes, enforcing | `rcc-gen-s03`, `rcc-gen-hc16` (planted), and the 14 boots replayed | pass, except **`d1-drv8876`**, which refuses at `ADC3EN` as F8 rules |
 | The scar: `SPI123SEL` on a source that is not running refuses `predicted-fault`, naming the selector, the source and the pages; with a running source it passes | `rcc-scar`, `rcc-switch`, `rcc-stuck`, `rcc-divq`; `rcc-clocked`, `rcc-switched` | as stated. The query is asked at SPI1's start by a test-only hook; 1300a wires it into the SPI guard |
-| Every field outside the allow-list refuses `unmodeled` (gate clause 6) | `rcc-fields` (357 cases), `rcc-field` (firmware) | all refuse by name |
+| Every field outside the allow-list refuses `unmodeled` (gate clause 6) | `rcc-fields` (363 cases), `rcc-field` (firmware) | all refuse by name |
 | The 58 registrations resolve on the guard; `TIM1RST`, `SPI1RST`; an unclocked peripheral still locks; a hook and logging do not displace it | `rcc-registrations` (59 = 58 + `spi1`), `rcc-reset`, `rcc-spi1rst` | as stated |
 | CI green | the PR | see the PR |
 
-**Mutants:** C01–C19 all killed, each by its named case (`tests/mutants.sh` on an export of `8705133` with the C rows). **Suites:** `tests/spike.sh` and `tests/adversarial.sh` ALL PASS on `4c80448`.
+**Mutants:** C01–C23 and F02 all killed, each by its named case (`tests/mutants.sh` on exports of `637b22a` and `33651c7` with those rows; C09 and C14 were retargeted after the review's rewrite). **Suites on `637b22a`:** `tests/adversarial.sh` ALL PASS; `tests/spike.sh` 77 of 78 checks, with the one failure a teardown flake, below (§5.5). Six reruns of that case all passed.
 
 **The bench row** (RUL-18): the scar on silicon, NUCLEO-H753ZI SPI1.
 - **Procedure:** from reset, `SPI123SEL` = `100` (per_ck) with PLL1 never started, `SPI1EN`, then SPI1's modeled start.
 - **Confirms:** no SCK and no `TXC`/`EOT`.
 - **Refutes:** SPI1 clocks.
-- **Status:** not run. The architect has asked Scotty for a Nucleo check (13:45Z). It goes in `model/bench-checks.tsv` once the class row is granted (§5.1).
+- **Status:** not run. The architect has asked Scotty for a Nucleo check (13:45Z). It is `model/bench-checks.tsv` R1, with R2 (the per_ck boards' order, p371–372) and R3 (`TVI-RCC-PLL`).
 
 ## 4. The adversarial pass (WO §5)
 
@@ -105,11 +105,11 @@ Two passes. Mine runs through the build, as WO §5's list. An **independent** on
 
 ## 5. Findings and questions for the architect
 
-### 5.1 Outside my fence, created by 1200's release (asked 14:28Z; evidence 14:52Z)
+### 5.1 Outside my fence, created by 1200's release (asked 14:28Z; granted 15:15Z; built)
 
-1. **`tools/tviburi-release/pins.tsv`:** the `class Miscellaneous.STM32H7_RCC Tviburi.GuardedSTM32H7_RCC` row. Without it the RCC table never reaches the ledger. Dry-run: with the row, the release builds and the strict reader accepts all 677 rows.
-2. **`model/bench-checks.tsv`:** the RCC's bench rows (§3), which need 1.
-3. **The ledger reader cites every `(A<n>)` as `TVI-WO-0100b.rm0433.md §4 A<n>`.** The RCC's A1–A6 are this WO's. Dry-run: `RCC_AHB1LPENR.DMA2LPEN` reads "TVI-WO-0100b.rm0433.md §4 A6".
+1. **`tools/tviburi-release/pins.tsv`:** the RCC class row. Without it the RCC table never reached the ledger. With it the strict reader accepts all 677 rows (`rcc-ledger`).
+2. **`model/bench-checks.tsv`:** R1–R3. The RUL-18 bench test in `tests/spike.sh` now pairs SPI's rows with SPI's faults, and `rcc-ledger` pairs the RCC's with the records its cases emit. `rel-bench` uses a guard name outside the class map.
+3. **The ledger reader** resolves `(TVI-WO-1300 A<n>)` to `TVI-WO-1300.rm0433.md §8 A<n>`. Before, every `(A<n>)` went to 0100b's document (dry-run: `RCC_AHB1LPENR.DMA2LPEN` cited "TVI-WO-0100b.rm0433.md §4 A6").
 
 ### 5.2 The stock RCC, measured (for the record; ruled 13:45Z into FEEDBACK)
 
@@ -129,6 +129,12 @@ Two passes. Mine runs through the build, as WO §5's list. An **independent** on
 4. **The stock RCC's 2,403 warnings on ArduPilot's boot become sourceless.**
 5. **The boot block's `AHB2ENR` changes** on ArduPilot (`0x40` → `0xE0000040`, silicon's value).
 
+### 5.5 A teardown flake, measured
+
+Once in the suite on `637b22a`, `rcc-gen-hc16` FAILed with "no end record" for `spi1`. Renode ran the whole script: the firmware reached its marker, every query printed, `quit` ran, and `rcc`'s end record was written, but `spi1`'s never was. Renode exited 0. Six reruns of the same case passed.
+
+It fails closed (a FAIL, never a PASS). But now that the check needs two end records per run (`spi1` and `rcc`), every run is exposed twice. This is not 0100b's §5 flake, which was an EOF exit before disposal. **For the architect:** if CI meets it, a rerun is the remedy. The cause, a disposal race at `quit`, is Renode's or the runner's (`scripts/`), not this WO's.
+
 ### 5.4 Backlog (the scope test: not built here)
 
 - **CSleep is not modeled (A6).** A peripheral's clock runs across `WFI` whatever its `LPEN` says.
@@ -147,4 +153,13 @@ Two passes. Mine runs through the build, as WO §5's list. An **independent** on
 
 ## 7. Close
 
-@@CLOSE@@
+**Reduction pass (diff): −51 net · 2 duplicates removed · 4 dead paths removed · 0 protected kept · 3 findings below.** A fresh subagent proposed the cuts; I applied them and proved them by the suites and the RCC mutants. The two duplicates: `allowlist.py`'s second copy of its emitters, and the firmware's three endings. The dead paths: five unused class-string constants, the unread `machine` field, `KernelClock.Source` and the unread `fields-cases.txt` output.
+
+Findings, for the architect:
+1. **`tests/1300/replay-1300.sh`'s `trace`, `cost` and `cost-spi` modes, and the prototype files** (`RccProto1300.cs`, `Records1300.cs`, `onefile.sh`, `smoke.resc`; about 410 lines) only reproduce the §1.1 measurement, and they need scratch files that are not in the repository (the assembled `/ovl`). Keep them as evidence, or delete them and let `05b4b09` hold them. Your call.
+2. **The allow-list generator's inputs are not in the repository.** `tests/1300/allowlist.py` reads RM0433's field list and the stock model's kinds from the builder's scratch (`~/.cache/tvi-1300/rm/`, `stock/`). The rows it produced are committed, in the model, and are the authority, but they cannot be regenerated from a clean checkout. Committing the two tables (about 1,400 lines of data) would fix that.
+3. `Running()` and `Condition()` each compute a PLL output's `DIVxyEN` bit; a shared helper would save three lines.
+
+**Tokens:** one mint for the §1.1 push (`tviburi` only, revoked HTTP 204). One for the PR's push and opening, revoked after (recorded on the bus).
+
+**Head at READY:** see the PR. `main` `0f00a7b` is merged in; `main` had not moved when last fetched.
