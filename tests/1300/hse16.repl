@@ -1,0 +1,6 @@
+// TVI-WO-1300 (ruled 14:35Z): a planted platform that sets the HSE frequency on the RCC guard's entry, as a consumer
+// must (RUL-09 (b)). The owned stock RCC must be built with 16 MHz.
+using "/repo/model/tviburi-nucleo-h753zi.repl"
+
+tviburiRcc:
+    hseFrequency: 16000000

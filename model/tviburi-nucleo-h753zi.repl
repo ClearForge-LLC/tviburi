@@ -1,11 +1,20 @@
 // Tviburi overlay of Renode 1.17.0's NUCLEO-H753ZI board.
 // Stock Renode only Tags SPI1 (0x40013000, "SPI1_/_I2S1"); this registers the guarded
-// STM32H7_SPI there, in the mode this file names (RUL-19). Requires the release's one C# file
-// (tools/tviburi-release) to be included first; without it this file fails to load.
+// STM32H7_SPI there, in the mode this file names (RUL-19). The stock RCC is sealed, so the RCC guard is a wrapper:
+// stm32h7-rcc-restate.repl cancels the stock `rcc`, declares the guard as "rcc" and restates its 58 registrations
+// (RUL-07; RUL-09 (b)). Requires the release's one C# file (tools/tviburi-release) to be included first; without it
+// this file fails to load.
 using "platforms/boards/nucleo_h753zi.repl"
+using "./stm32h7-rcc-restate.repl"
+
+// The guard's mode (RUL-19), and the stock board's `rcc: hseFrequency: 8_000_000` restated on the guard: that update
+// lands on the cancelled stock entry (TVI-WO-1300.rm0433.md §6.4).
+tviburiRcc:
+    hseFrequency: 8000000
+    mode: "enforcing"
 
 spi1: Tviburi.GuardedSTM32H7_SPI @ {
         sysbus 0x40013000;
-        rcc RegistrationPeripheralAlias.SPI1
+        tviburiRcc RegistrationPeripheralAlias.SPI1
     }
     mode: "enforcing"
