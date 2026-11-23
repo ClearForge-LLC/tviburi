@@ -302,3 +302,40 @@ Silicon, by page: `IOLOCK` "can be set when SPI is disabled only else it is writ
 ## 7. Quote check
 
 Every quotation from RM0433 in this file was matched, after whitespace was normalised, against the text Ghostscript extracted from the PDF for the page its line cites. That is 17 quotations on pages named in the same line, plus "must be kept at reset value" (on every SPI register page, p2215–p2232) and "can be set when SPI is disabled only" (p2215), whose lines name no page. The other quoted strings are code text (the stock model's log messages, the guard's bit texts), a ruling's words (`RUL-17`), or a table title in DS12117. In DS12117, which pins carry an `SPIx_NSS` cell was read from Table 9 (pp89–100); the cell's AF column was not relied on (§1.2). The two pins either firmware uses that can carry NSS, PA11 and PE11, were read by eye: at AF1 each is `TIM1` (p89, p94).
+
+## 8. As ruled (architect, bus, 2026-11-23T11:00Z and 11:45Z) and where each is built
+
+**§2's last column is the proposal at the stop.** The allow-list as built is `Fields` in `model/GuardedSTM32H7_SPI.cs`, keyed by these names (`RUL-16`). It differs from §2 only by the rulings below.
+
+| Item | Ruling | Built as |
+|---|---|---|
+| A1 `CFG1.MBR` | acknowledged | any value; behaves as "no clock" |
+| A2 `CFG2.SSOE` = 1 | acknowledged: p2166 with NSS unrouted (§1.2, DS12117 Rev 10 Table 9) | any value; `SSM` = 0 with `SSOE` = 1 passes `TVI-SPI-MODF` and starts no history |
+| A3 `CFG2.AFCNTR` | acknowledged | any value |
+| A4 `CR1.MASRX` | acknowledged, served from the copy | any value; `CR1` reads it from the copy |
+| A5 `CFG1.CRCSIZE` = 00000 | acknowledged with `CRCEN` = 0 | {00111, 00000}; `CRCEN` is 0-only by its own row |
+| A6 `CFG1.DSIZE` = 00000 | acknowledged at stop only | {00111, 00000} written; at a `CR1` write with `SPE` = 1, `DSIZE` must be 00111 (`TVI-SPI-FIELD`) |
+| A7 `IER.OVRIE` | acknowledged | any value; `IER` is served from a copy (accepted 11:45Z) |
+| A8 `IFCR` write-1-to-clear tags | acknowledged | any value |
+| A9 `IFCR` reserved bits | acknowledged for `IFCR` only, `unmodeled` in the row, a bench row in FEEDBACK | any value; FEEDBACK B5 |
+| B inherited fields | listed as inherited and unaudited; not refused | any value, class "inherited, unaudited"; `IER`'s `RXPIE`, `TXPIE`, `EOTIE` likewise (FEEDBACK) |
+| C1 | per write | `TVI-SPI-FIELD` on each write |
+| C2 | whole copies of `CR1`, `CFG1` (reset `0x00070007`) and `CFG2`, served on read | as ruled; `CR1`'s `SPE`, `CSTART` and `CSUSP` read from the stock model, which drives them |
+| C3 | as leaned | `TVI-SPI-CFG1-SPE` |
+| C4 | as leaned | `CRCPOLY` 0x107 only; read as 0x107 |
+| C5 | as leaned | `TVI-SPI-WIDTH` at `TXDR` and `RXDR`: the access must be as wide as the frame |
+| C6 | `MODFC` with no history has no effect | as ruled |
+| C7 | `TVI-SPI-IOLOCK` on `CFG2` is `predicted-fault` only while the latch is certain | certain = taken with `SPE` 0 before and after, no history and `MASTER` known at the time; no `SPE` 1→0 since; and no history and `MASTER` known at the refusal |
+| 11:45Z | `scripts/tviburi-spike` passes the expected version and runs `ardupilot`, `generated`, `field`; a recorded or mode-less witness, or a `would-refuse` record, is never a pass; CI re-pinned to `1e0ab105…` | as ruled; `TVI-SPI-ORDER` and the `IER` copy accepted |
+
+**The kinds as built** (`RUL-18`; every refusal record carries one):
+
+| Rule | `predicted-fault` when | otherwise `unmodeled` |
+|---|---|---|
+| `TVI-SPI-MODF` | `CR1.SSI` = 0 with `SSM` = 1, `SSIOP` = 0 (p2184) | slave, TI mode, `SSM` = 0 with `SSOE` = 0, `SSIOP` = 1, the D1 history (enable and `CFG2` read), `MASTER` unknown after `MODFC` |
+| `TVI-SPI-CFG2-SPE` | always (p2217, p2221) | — |
+| `TVI-SPI-IOLOCK` | a `CFG2` write while the latch is certain (C7; p2215, p2221) | an uncertain latch; a `CR1` read while latched |
+| `TVI-SPI-CFG1-SPE` | a protected field changes (p2217, p2218) | only `TXDMAEN` or `RXDMAEN` change (the stock model drops them) |
+| `TVI-SPI-I2SMOD`, `TVI-SPI-WIDTH`, `TVI-SPI-FIELD`, `TVI-SPI-ORDER`, `TVI-LOAD` | — | always |
+
+**Gate clause 6** is shown two ways: `tests/fields.resc` writes every field outside the allow-list from the monitor, one per reset (58 cases, each refused by name), and the planted `field` firmware writes one (`CFG2.CPOL`) from the CPU.
