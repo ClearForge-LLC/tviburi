@@ -58,7 +58,23 @@ The model version is unchanged from the blind build:
 
 ## 4. Records, regenerated from the final code
 
-PLACEHOLDER-RECORDS
+Taken from the final code (`f2bec3d`), run `modf` of the last suite run. The model version is `sha256:1257143b…73330`. Each record is one line in Renode's log file; they are shown unwrapped.
+
+**The MODF scar** (`firmware/spi1.rs` `modf`): the witness, the refusal, and the end record.
+
+```
+[09:28:27.3810]  [INFO] spi1: {"tviburi":"witness","seq":0,"guard":"GuardedSTM32H7_SPI","model_version":"sha256:1257143b90b1eb8829d02f6786a38040c6690a048176fb91a5e409ea2ac73330"}
+[09:28:27.8130]  [ERROR] spi1: {"tviburi":"refusal","seq":1,"rule":"TVI-SPI-MODF","peripheral":"sysbus.spi1","register":"SPI_CR1 / SPI_CFG2","bit":"CR1.SSI (bit 12) = 0","condition":"master mode with software SS management and the internal SS input at its active level (SSM=1, SSI=0, SSIOP=0): silicon sets SR.MODF (bit 9), forces CR1.SPE to 0 and clears CFG2.MASTER; the stock model implements none of these","model_version":"sha256:1257143b90b1eb8829d02f6786a38040c6690a048176fb91a5e409ea2ac73330","citation":"RM0433 Rev 9 §50.5.2 p2184; §50.4.7 p2165, Figure 618 p2167; §50.11.4 p2221 (SSM, SSIOP); §50.11.6 p2225 (SR.MODF)","state":"CR1 last passed=0x00000000, CFG2 last passed=0x04400000, IOLOCK latched=no, master history=CR1=0x00000000, CFG2=0x04400000","access":{"offset":"0x0","value":"0x1","width":32,"pc":"0x0800002A","virtual_time":"00:00:00.000000000"}}
+[09:28:27.8574]  [INFO] spi1: {"tviburi":"end","seq":2,"guard":"GuardedSTM32H7_SPI","model_version":"sha256:1257143b90b1eb8829d02f6786a38040c6690a048176fb91a5e409ea2ac73330"}
+```
+
+**The refused access is still in the trace** (`sysbus LogPeripheralAccess spi1`), at the refusal's PC:
+
+```
+[09:28:27.8126]  [INFO] spi1: [cpu: 0x800002A] WriteUInt32 to 0x0 (Control1), value 0x1
+```
+
+**The check's output and the runner's verdict for that run:** `REFUSAL {…}`, then `CHECK REFUSED`, then `VERDICT REFUSED (renode exit 0)`, and the runner exits 3. The modeled path gives `CHECK PASS` and `VERDICT PASS`, and exits 0. Its log holds only `witness` at seq 0 and `end` at seq 1.
 
 ## 5. Findings for the architect
 
@@ -121,7 +137,72 @@ Each item comes with a recommendation.
 
 ## 6. Gates
 
-PLACEHOLDER-GATES
+All runs below are on the final code: the reduction commit `f2bec3d`; the commits after it change only documents. They ran on Furnace, one container at a time, under `capped-run`, with `--network none`.
+
+**Acceptance (WO §2).** `tests/spike.sh`: 22 checks, all pass.
+- **IOLOCK:** the planted `iolock` firmware sets IOLOCK, then writes CFG2. It refuses with the `TVI-SPI-IOLOCK` record (`iolock`).
+- **The reference check exits non-zero on each failure route:**
+  - a removed guard, which leaves no witness: `stock-modf`, `stock-forge`, and four ways in `adv-removed`;
+  - a refusal: `modf`, `cfg2first`, `iolock`, `rmw`, `conditions`;
+  - a crashed simulator: `crash`, which SIGKILLs Renode after its witness. Exit 137 leaves no end record, so `CHECK FAIL`.
+- **It exits 0 on the modeled path** (`modeled`).
+- **It ignores a firmware UART line that imitates a record:**
+  - `forge`: a forged refusal is ignored, and the run passes;
+  - `stock-forge`: a forged witness and end are ignored, and the run fails with no witness;
+  - `adv-spray`: record bytes written to every unguarded SPI1 register are not taken as records.
+- **The other acceptance tests:**
+  - **every rule branch, in order** (`conditions`), including the read cases and the RCC reset;
+  - **no model version:** a `TVI-LOAD` record at seq 0, no witness, every access refused (`load`);
+  - **the record is byte-identical across two runs** (`stable`);
+  - **the firmware's end marker is required** (`nomark`);
+  - **the check's unit tests** (`unit`).
+- **CI is green on the PR** (§1, item 8).
+
+**Adversarial pass (WO §5), full.**
+- **The committed cases:** `tests/adversarial.sh`, 14 checks, all pass:
+  - guard removal, four ways;
+  - an extra argument, and a variant that names no path;
+  - the caller's `TVIBURI_MODEL_DIR`;
+  - a value-changing monitor write hook, which is installed and does not displace the guard;
+  - `logLevel 3` after and before load;
+  - record bytes sprayed into SPI1;
+  - a script that stops before its end.
+- **A fresh reviewer** (read-only, given the code and not my conclusions) then attacked §5's four routes. Its findings:
+  - **One real false pass: read-modify-write (F2).** Fixed and tested.
+  - **One claim that contradicted my measurement: RCC reset.** I re-measured, and the reviewer was right (F3); it is now tested.
+  - **Five test weaknesses, all fixed:**
+    - `adv-env` could not fail; it now asserts the rule.
+    - `adv-hook` was a no-op; the hook now changes the value, and the record shows it.
+    - Mutant M20 died for the wrong reason; it now deletes the witness.
+    - The forge tests never reached the source filter (F8); a unit test now kills that mutant.
+    - The harness counted any exit 1 as a kill; it now needs a `FAIL` line from a named test.
+  - **One false refusal: `SET_BIT` on CR1,** fixed by F2.
+  - **Two citations, corrected:** I2SMOD is defined on p2232, and TI mode's "not required".
+  - **One plausible route, closed:** an unaligned 32-bit access. It refuses, and is tested.
+- **Every result in this FEEDBACK is reproduced by the committed harnesses.** None is labelled unverified.
+
+**Mutation (diff-sized): 45 mutants, one per guard this WO adds or changes. All 45 are killed,** each by a `FAIL` line of the test its row names (`tests/mutants.tsv`).
+- **The first run was invalid.** Bash's `read` collapses empty tab-separated fields, so rows with empty replacement text took the test name as the replacement. M11 was "killed" by a compile break.
+- **The fix:** an explicit `(empty)` token, and a check that every row has five fields.
+- **The second run:** one survivor, R02, the check's source filter. The new unit test kills it.
+- **Not mutated:**
+  - `belt-and-suspenders` code: there is none;
+  - the `named ||` guard against a second `NameChanged`: Renode sends it once (measured), so a mutant is equivalent;
+  - the runner's empty-`/out` check and `rc -eq 0`: no test can make Renode exit non-zero after a passing check without a crash, which `crash` covers at the check.
+
+**Reduction pass (diff): −50 net · 5 duplicates removed · 0 dead paths removed · 0 protected kept · 2 proposals rejected.**
+- **How it was run:** a fresh subagent proposed nine cuts and I took seven. One full suite run (36 checks) and one mutant run (45/45) proved the batch.
+- **The duplicates removed:**
+  - the six width and load preambles, now one helper;
+  - the guarded-register list;
+  - the runner's variant list;
+  - the `TVI-LOAD` citation;
+  - the monitor-output filter.
+- **Also removed:** `State()`'s restatement of the written value, and the check's three verdict arms, now one.
+- **One reduction was a regression, caught before commit.** The variant list's substring match accepted `"modf cfg2first"`, which built firmware with no guarded write that would then pass. An exact match replaced it, with a test (`adv-bad-variant`) and a mutant (S06).
+- **Rejected proposals:**
+  - deriving the test lists from function names, because it would change the run order and so the order failures show in CI's log;
+  - two one-line helpers in `spike.sh`, each of which adds a definition to save a line.
 
 ## 7. Scope notes
 

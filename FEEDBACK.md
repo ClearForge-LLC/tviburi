@@ -21,20 +21,16 @@ The cost of the chosen option is one subclass per stock model class that gets a 
 **Q3. What is the smallest concrete path, and what does the refusal contain?** The scarred one: **SPI1 `MODF`**. The firmware sets `CFG2 = MASTER|SSM` and `CR1 = SSI=0`, then sets `CR1.SPE`. On silicon that raises MODF and clears SPE and MASTER. Measured on the stock model (SPI4, the same class): CR1 reads `0x1` and SR reads `0x1002` (TXP, TXC), with no MODF and MASTER still set. The twin now emits:
 
 ```
-{"tviburi":"refusal","rule":"TVI-SPI-MODF","peripheral":"sysbus.spi1","register":"SPI_CR1 / SPI_CFG2",
- "bit":"CR1.SSI (bit 12) = 0 with CR1.SPE (bit 0) = 1",
- "condition":"CR1.SPE set in master mode with software SS management and the internal SS input at its active level (SSM=1, SSI=0, SSIOP=0): silicon sets SR.MODF (bit 9) and clears CR1.SPE and CFG2.MASTER; the stock model implements none of these",
- "model_version":"sha256:87206a22291cb892958392e98a9c91e1472c59d738525119e01a2099df8610e6",
- "citation":"RM0433 … SPI chapter: mode fault (MODF) … Section number and revision not verified …",
- "state":"CR1 written=0x00000001, CFG2 last written=0x04400000",
- "access":{"offset":"0x0","value":"0x1","width":32,"pc":"0x0800003E","virtual_time":"00:00:00.000000000"}}
+{"tviburi":"refusal","seq":1,"rule":"TVI-SPI-MODF","peripheral":"sysbus.spi1","register":"SPI_CR1 / SPI_CFG2","bit":"CR1.SSI (bit 12) = 0","condition":"master mode with software SS management and the internal SS input at its active level (SSM=1, SSI=0, SSIOP=0): silicon sets SR.MODF (bit 9), forces CR1.SPE to 0 and clears CFG2.MASTER; the stock model implements none of these","model_version":"sha256:1257143b90b1eb8829d02f6786a38040c6690a048176fb91a5e409ea2ac73330","citation":"RM0433 Rev 9 §50.5.2 p2184; §50.4.7 p2165, Figure 618 p2167; §50.11.4 p2221 (SSM, SSIOP); §50.11.6 p2225 (SR.MODF)","state":"CR1 last passed=0x00000000, CFG2 last passed=0x04400000, IOLOCK latched=no, master history=CR1=0x00000000, CFG2=0x04400000","access":{"offset":"0x0","value":"0x1","width":32,"pc":"0x0800002A","virtual_time":"00:00:00.000000000"}}
 ```
+
+*Regenerated from the final code of TVI-WO-0100a (`f2bec3d`). That build emits records on Renode's log, with a `seq`, a per-branch RM0433 Rev 9 citation and a new `state` format; see `docs/work-orders/TVI-WO-0100a.FEEDBACK.md` §4. The record above replaces the blind build's, whose citation said the section was unverified.*
 
 The runner exits **3 (REFUSED)**. The rule is three-way with refuse as the default. On every 32-bit CR1 write with SPE=1, it **passes only** when its own copy of CFG2 shows MASTER=1, SSM=1, SSIOP=0 and SSI=1. It refuses in four cases: slave mode (the stock model is master-only), hardware SS (the pin level is not modeled), SSIOP=1 (polarity not handled), and SSI=0 (a mode fault). A sub-word write that overlaps CR1 or CFG2 also refuses. A refused write is not passed to the model. "Provably impossible" holds only to the extent that the guard's CFG2 copy matches silicon. **One known route breaks that** (R8 below).
 
 Renode itself exits **0** on a refused run. Only the runner turns the refusal record into exit 3 (R9 below).
 
-**Q4. Does the trace still record the refused access?** Yes. `sysbus LogPeripheralAccess spi1` logs `spi1: [cpu: 0x800003E] WriteUInt32 to 0x0 (Control1), value 0x1`, which is the refused write at the same PC as the refusal record. Two caveats follow, both measured:
+**Q4. Does the trace still record the refused access?** Yes. `sysbus LogPeripheralAccess spi1` logs `spi1: [cpu: 0x800002A] WriteUInt32 to 0x0 (Control1), value 0x1` (regenerated from TVI-WO-0100a's final code; the PC moved because the firmware changed), which is the refused write at the same PC as the refusal record. Two caveats follow, both measured:
 
 - **The halt is not instruction-precise.** `RequestReturn()` and `PauseAndRequestEmulationPause(true)` stop the CPU at the end of the translation block, so the firmware's marker store *after* the refused write still ran (`0xAF7E0002`). This held with `IsHalted = true` as well. The design therefore makes the **refusal record the verdict, and it latches**; it does not rely on the halt. Nothing after a refusal is claimed.
 - **`machine.ElapsedVirtualTime` is quantum-granular** inside an access. It reads 0 here, and `ExecutedInstructions` also reads 0 mid-block. The PC is the exact locator today. Invariant 6 ("timestamp relative to virtual time") needs a better clock source in a later WO.
