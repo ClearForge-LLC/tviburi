@@ -20,6 +20,9 @@ RCC_CASES=$(sed -n 's/^CASES="\(.*\)"$/\1/p' "$(dirname "$0")/1300/rcc.sh")
 ACCEPTANCE="$ACCEPTANCE $(for c in $RCC_CASES; do printf 'rcc-%s ' "$c"; done)"
 # TVI-WO-1301: DS12117 Rev 10's AF table against ST's open pin data, every disagreement ruled (tools/tviburi-afcheck).
 ACCEPTANCE="$ACCEPTANCE afcheck"
+# TVI-WO-1301: the GPIO guard's cases live in tests/1301/gpio.sh; each is a test here, gpio-<case>, in the acceptance group.
+GPIO_CASES=$(sed -n 's/^CASES="\(.*\)"$/\1/p' "$(dirname "$0")/1301/gpio.sh")
+ACCEPTANCE="$ACCEPTANCE $(for c in $GPIO_CASES; do printf 'gpio-%s ' "$c"; done)"
 ALL="$ACCEPTANCE $ADVERSARIAL"
 here=$(cd "$(dirname "$0")/.." && pwd)
 scratch=${TVIBURI_SCRATCH:-$HOME/.cache/tviburi}
@@ -633,6 +636,17 @@ t_rcc() { # t_rcc <case>: one case of tests/1300/rcc.sh on this source, its ok/F
   fails=$((fails + f))
 }
 for c in $RCC_CASES; do eval "t_rcc-$c() { t_rcc $c; }"; done
+t_gpio() { # t_gpio <case>: one case of tests/1301/gpio.sh on this source, its ok/FAIL lines counted here (TVI-WO-1301)
+  local out grc=0
+  out=$(TVIBURI_TESTS="$1" TVIBURI_SCRATCH="$work" "$src/tests/1301/gpio.sh" "$src" 2>&1) || grc=$?
+  grep -E '^(ok|FAIL) ' <<<"$out" || true
+  local f; f=$(grep -c '^FAIL ' <<<"$out" || true)
+  if [ "$grc" -ne 0 ] && [ "$f" -eq 0 ]; then
+    echo "FAIL gpio-$1: tests/1301/gpio.sh exited $grc with no verdict"; f=1
+  fi
+  fails=$((fails + f))
+}
+for c in $GPIO_CASES; do eval "t_gpio-$c() { t_gpio $c; }"; done
 
 for t in ${TVIBURI_TESTS:-acceptance}; do
   case "$t" in

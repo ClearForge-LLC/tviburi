@@ -1,0 +1,52 @@
+# TVI-WO-1301: gate clause 6 for the GPIO guard. Each `# FIELD <bit prefix>` line names the refusal the write after it must give,
+# in order (tests/1301/gpio.sh `fields`). Port A, from the monitor (pc none).
+# FIELD GPIOA_PUPDR.PUPDR0 
+sysbus WriteDoubleWord 0x5802000C 0x00000003
+# FIELD GPIOA_PUPDR.PUPDR1 
+sysbus WriteDoubleWord 0x5802000C 0x0000000C
+# FIELD GPIOA_PUPDR.PUPDR2 
+sysbus WriteDoubleWord 0x5802000C 0x00000030
+# FIELD GPIOA_PUPDR.PUPDR3 
+sysbus WriteDoubleWord 0x5802000C 0x000000C0
+# FIELD GPIOA_PUPDR.PUPDR4 
+sysbus WriteDoubleWord 0x5802000C 0x00000300
+# FIELD GPIOA_PUPDR.PUPDR5 
+sysbus WriteDoubleWord 0x5802000C 0x00000C00
+# FIELD GPIOA_PUPDR.PUPDR6 
+sysbus WriteDoubleWord 0x5802000C 0x00003000
+# FIELD GPIOA_PUPDR.PUPDR7 
+sysbus WriteDoubleWord 0x5802000C 0x0000C000
+# FIELD GPIOA_PUPDR.PUPDR8 
+sysbus WriteDoubleWord 0x5802000C 0x00030000
+# FIELD GPIOA_PUPDR.PUPDR9 
+sysbus WriteDoubleWord 0x5802000C 0x000C0000
+# FIELD GPIOA_PUPDR.PUPDR10 
+sysbus WriteDoubleWord 0x5802000C 0x00300000
+# FIELD GPIOA_PUPDR.PUPDR11 
+sysbus WriteDoubleWord 0x5802000C 0x00C00000
+# FIELD GPIOA_PUPDR.PUPDR12 
+sysbus WriteDoubleWord 0x5802000C 0x03000000
+# FIELD GPIOA_PUPDR.PUPDR13 
+sysbus WriteDoubleWord 0x5802000C 0x0C000000
+# FIELD GPIOA_PUPDR.PUPDR14 
+sysbus WriteDoubleWord 0x5802000C 0x30000000
+# FIELD GPIOA_PUPDR.PUPDR15 
+sysbus WriteDoubleWord 0x5802000C 0xC0000000
+# FIELD GPIOA_OTYPER.Res31_16 
+sysbus WriteDoubleWord 0x58020004 0x10000
+# FIELD GPIOA_IDR.Res31_16 
+sysbus WriteDoubleWord 0x58020010 0x10000
+# FIELD GPIOA_ODR.Res31_16 
+sysbus WriteDoubleWord 0x58020014 0x10000
+# FIELD GPIOA_LCKR.Res31_17 
+sysbus WriteDoubleWord 0x5802001C 0x20000
+# FIELD GPIOA_LCKR.LCKK 
+sysbus WriteDoubleWord 0x5802001C 0x10000
+# FIELD GPIOA_LCKR.LCK[15:0] 
+sysbus WriteDoubleWord 0x5802001C 0x1
+# FIELD no register at offset 0x28
+sysbus WriteDoubleWord 0x58020028 0x1
+# FIELD no register at offset 0x2C
+sysbus WriteDoubleWord 0x5802002C 0x1
+# FIELD no register at offset 0x3FC
+sysbus WriteDoubleWord 0x580203FC 0x1
