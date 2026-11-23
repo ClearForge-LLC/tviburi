@@ -73,10 +73,10 @@ So the values written after a read carry whatever the stock port returned. This 
 - **The values change:**
   - the generated firmware now writes `MODER` = `11` on most untouched pins, carried from the analog reset (stock reset: only PF3, once);
   - it writes `OSPEEDR` = `11` on PA13 and PB3, the reset's "very high";
-  - ArduPilot's later read-modify-writes carry the reset pulls of PA13–PA15 and PB4 (`PUPDR` `01`/`10`).
+  - ~~ArduPilot's later read-modify-writes carry the reset pulls of PA13–PA15 and PB4 (`PUPDR` `01`/`10`).~~ **Corrected (build, §9):** this was F2, a defect of the measurement (Renode dropped a write of `00` after the reset), not silicon's reset carried through. With the guard's refresh, ArduPilot's boot block differs from stock only by 1300's `AHB2ENR`. The generated firmware reads before it writes, so its `MODER` `11` and `OSPEEDR` `11` stand.
   So the allow-list must take `MODER` `11` and `OSPEEDR` `11` on a valid path (A2, A4 below).
 - **The consumer's boot block changes on every board** (`sysbus ReadDoubleWord` of `MODER`, `AFRx` and `PUPDR` of A, B and others):
-  - ArduPilot: `PUPDR` A `0x00140000` → `0x64140000`;
+  - ArduPilot: `PUPDR` A `0x00140000` → `0x64140000` (**corrected in §9:** F2's artefact; with the fix, unchanged);
   - each generated board: `MODER` A and B, for example `sentinel-03` `0x002AA8A1` → `0xABEAABAD` and `0xA9A0A000` → `0xA9AFAEBF`.
   Every value that changes is silicon's reset carried through, so A5 is a consumer-visible change, as 1300's `AHB2ENR` was.
 
@@ -291,7 +291,7 @@ Each consumer platform refers to the ports in up to three ways, and each must na
   - 0 `would-refuse` under any port;
   - 11 recorded witnesses and 11 end records;
   - the boot reached its end;
-  - its boot block differs from stock only by 1300's `AHB2ENR` and silicon's `PUPDR` A reset (A5, ruled expected).
+  - its boot block differs from stock only by 1300's `AHB2ENR` (re-measured after F2's fix; before it, `PUPDR` A also differed, an artefact of F2).
 - **The 14 generated boots, the ports enforcing:**
   - 0 refusals under any port, 11 enforcing witnesses and ends each;
   - every boot-block difference is silicon's reset (A5);
@@ -300,4 +300,6 @@ Each consumer platform refers to the ports in up to three ways, and each must na
   - every rule refuses by name with its kind and page;
   - its passing twin passes;
   - ArduPilot's first 886 GPIO writes and sentinel-03's 88 pass, enforcing.
-- **Mutants:** G01–G19, one per guard, each killed by its named case.
+- **Mutants:** G01–G24, one per guard, each killed by its named case (`tests/mutants.tsv`).
+
+**The adversarial pass** (WO §5): mine through the build, and an independent one by a fresh reviewer given the code, the stock source and the manuals. Every finding was verified before acting; FEEDBACK §4 lists each.
