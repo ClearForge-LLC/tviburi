@@ -46,7 +46,8 @@
    - The join puts the RCC kernel-clock selectors and sleep enables first among ArduPilot's dropped writes. GPIO routing is written but held. TIM1 and TIM2 are not reached in 5 s.
    - 122 ArduPilot-only rows.
 6. **(vi) Cost and reset.**
-   - Cost is per compilation: +45, +170 and +290 MiB for 1, 2 and 3 files. Three files are over 1 GiB in every run.
+   - Cost is per compilation. Over a full ArduPilot boot (recorded mode) it is about +100–140, +195–255 and +325 MiB for 1, 2 and 3 files. **Only one file stays under 1 GiB** (954,716–964,704 KiB; two files are 1,069,240–1,071,880).
+   - Enforcing runs stop at A6's refusal (71.4 M of 88.1 M instructions), so they are partial boots. A first version compared shapes on them (§4).
    - Across a reset: one witness, `seq` continues, the record stays, the guard's `IOLOCK` latch clears as silicon's does, one `end`.
    - A monitor-caused refusal has `pc: none`; a DMA-caused one has the enabling store's PC.
 7. **(vii) RCC.**
@@ -68,7 +69,7 @@
 1. **`RUL-11` (b)** describes the `logFile` framing as a host stamp. Under the consumer's configuration it is virtual, with two spaces ((ii) 2).
 2. **`RUL-07`** cannot hold for the RCC, because it is sealed ((i), (vii)). The architect amends it from (vii).
 3. **`RUL-09`:** a class map serves the instances the consumer declares or restates, not a stock file's ((i)). One file per release ((vi)), as ruled.
-4. **`RUL-10`:** a constant in a separate file is two compilations. Under one file, the consumer checks the shipped file against the concatenation of the manifest's files and the filled template ((vi) note; not prototyped). The compiler cache off is a consumer requirement, as ruled.
+4. **`RUL-10`:** a constant in a separate file is two compilations, which is over the bound on a full boot ((vi)). Under one file, the consumer checks the shipped file against the concatenation of the manifest's files and the filled template ((vi) note; not prototyped). The compiler cache off is a consumer requirement, as ruled.
 5. **Response §4.7 ("`pc: none` is a harness access")** needs "and a real PC is not proof of a CPU write" ((vi)).
 6. **Northstar §6 ("so slow or heavy"):** the overlay's memory cost is the binding constraint on ArduPilot, not its wall time.
 
@@ -78,6 +79,11 @@
   - The two stops were posted to `architect.md`, and the rulings came back at 11:00Z and 11:45Z.
   - One question to the operator through the question dialog was interrupted; the ruling came on the bus instead.
 - **The mint for the fixture push failed** at 11:02Z (Cloudflare 502 on the S25 proxy). As the kickoff says, I did not loop, and `0100b` was told to fetch the fixture commit locally. One retry at the PR (§7).
+- **A mistake that reached a reported result, then corrected (found by the advisor's final check):**
+  - (vi)'s first table compared overlay shapes on enforcing runs. Those stop at ArduPilot's first refusal, A6, after 71,384,611 of 88,058,789 instructions.
+  - On them, two files read "under the bound by 25–34 MiB", and one file 885,668–899,160 KiB. That went to the bus at 11:30Z and into the architect's 11:45Z ruling, as "885–899 MiB"; those are KiB figures.
+  - Remeasured on full boots (recorded mode, the boot block identical to stock): **two files are over (1,069,240 and 1,071,880 KiB), and one file is under (954,716 and 964,704 KiB).** The ruling, one file, stands, with a smaller margin than it was given. The correction is on the bus.
+  - PR #10's description still carries the partial-boot figures, and `gh-write` cannot edit a PR. The corrected title and body are in `~/.cache/tvi-1150/pr-title-body.md`, for the architect to replace.
 - **Mistakes caught before they reached a result, all disclosed:**
   - The case runner fed Renode the case list on stdin, so only the first case ran. Fixed with `< /dev/null`.
   - `consumer-check.sh` split the manifest's file list on newlines inside a `case` pattern, so every file read as "not in the manifest". Fixed before any result used it.
@@ -86,6 +92,11 @@
   - The first held-core probes in (vi) never reached the guard (the bus lock). They were rerun with the clock enabled, and both runs are kept.
 - **Order:** (vi)'s cost runs were made before (v)'s access log, because they share its replay. That is said in `results.md`.
 - **`RUL-14`:** the scratch readers are Rust (`reader/records.rs`, built with `rustc` alone, reusing the check's `json.rs` by `#[path]`), `awk`/`gawk`, POSIX shell, and an IronPython monitor script (`retype/checks.py`). No build file is committed.
+- **Token.**
+  - Minted at the PR, scoped to `tviburi`; the 11:02Z 502 did not recur. Used for the push and the PR (#10), then revoked (HTTP 204). A later re-push used a fresh mint, also revoked.
+  - **Disclosure:** the transcript-pattern fill (the memory's recipe) put the pattern `ghs_3790181_…` in a Bash argv three times. Those are the token's first 12 characters, the installation id, not the secret part.
+  - The first PR fill took `tail -1`, which matched my own command's pattern text, and `gh-write` refused the 12-character stub as "implausibly short". The longest match was used after that, and the memory is updated.
+- **Containers:** each ran under `~/bin/capped-run` at 8G, except the Aethelgard CLI build, which ran at 16G with a network.
 - **Disk:** about 1.2 GB under `~/.cache/tvi-1150`, plus the CLI build in the worktree's untracked `target-aet/` (§7).
 
 ## 5. The adversarial pass (WO §5), targeted

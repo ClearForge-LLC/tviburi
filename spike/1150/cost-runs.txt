@@ -32,3 +32,15 @@ mode=load-overlay wall_s=3.69  peak_tree_vmrss_kib=816544  vmhwm_kib=816544  loa
 mode=pure         wall_s=9.43  peak_tree_vmrss_kib=847348  vmhwm_kib=847352  load=12.16 11.39 10.07
 mode=enforcing    wall_s=9.44  peak_tree_vmrss_kib=1022976 vmhwm_kib=1023036 load=12.37 11.46 10.11
 mode=load-overlay wall_s=3.17  peak_tree_vmrss_kib=796788  vmhwm_kib=796800  load=11.62 11.31 10.07
+# Added after the advisor's check: every enforcing run above stopped at the first refusal (A6), at 71,384,611 instructions
+# (0x4413E23), while stock and recorded boots run 88,058,789 (0x53EABA5). So full-boot cost is read from recorded mode.
+# container 5 (overlay: 1 file), full boots
+mode=pure         wall_s=10.53 peak_tree_vmrss_kib=853776  vmhwm_kib=853780  load=12.78 10.61 11.74
+mode=recorded     wall_s=12.07 peak_tree_vmrss_kib=954716  vmhwm_kib=954716  load=13.04 10.73 11.77
+mode=pure         wall_s=10.96 peak_tree_vmrss_kib=823944  vmhwm_kib=824016  load=12.65 10.73 11.75
+mode=recorded     wall_s=12.89 peak_tree_vmrss_kib=964704  vmhwm_kib=964708  load=13.41 10.99 11.82
+# container 6 (overlay: 2 files), full boots
+mode=pure         wall_s=10.09 peak_tree_vmrss_kib=814740  vmhwm_kib=814744  load=13.26 11.04 11.83
+mode=recorded     wall_s=11.51 peak_tree_vmrss_kib=1069240 vmhwm_kib=1071020 load=13.62 11.18 11.87
+mode=pure         wall_s=13.10 peak_tree_vmrss_kib=874492  vmhwm_kib=874572  load=13.93 11.37 11.92
+mode=recorded     wall_s=11.46 peak_tree_vmrss_kib=1071880 vmhwm_kib=1071880 load=13.86 11.44 11.94

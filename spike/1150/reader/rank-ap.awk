@@ -11,7 +11,10 @@
 #   within a tier: (a) ArduPilot writes it and the stock model drops what it wrote; (b) ArduPilot writes it;
 #   (c) ArduPilot does not write it; then 1100's rank; ArduPilot-only rows after 1100's rows of the same (a)/(b).
 # Output: new_rank tier ap_class ap_takes ap_writes_at_register ap_field_value ap_drop old_rank id old_class
-#         model_cover ap_first_pc origin
+#         model_cover ap_first_pc origin cite_view1_entry_line cite_view1_source cite_view2_renode_line
+#   The last three are 1100's queue.tsv columns 16-18 (both views' citations) for 1100's rows; "-" for ArduPilot-only
+#   rows, which cite the executed tag or bits in model_cover instead.
+#   "ap_takes" is register-level: ArduPilot wrote the field's register (any value), as 1100's fw_writes counts.
 BEGIN { OFS = "\t" }
 function tier(id,   inst, reg) {
   inst = id; sub(/\..*/, "", inst); reg = id; sub(/^[^.]*\./, "", reg); sub(/\..*/, "", reg)
@@ -36,16 +39,16 @@ FILENAME == ARGV[3] {
   id = $6; seen[id] = 1
   n = (id in jn) ? jn[id] : 0; d = (id in jd) ? jd[id] : "-"; ap = apclass(d, n)
   key = sprintf("%s|%s|0|%06d", tier(id), ap, $1)
-  line[key] = tier(id) OFS ap OFS ((n + 0 > 0) ? "yes" : "no") OFS n OFS ((id in jv) ? jv[id] : "-") OFS d OFS $1 OFS id OFS $3 OFS $12 OFS "-" OFS "1100 queue"
+  line[key] = tier(id) OFS ap OFS ((n + 0 > 0) ? "yes" : "no") OFS n OFS ((id in jv) ? jv[id] : "-") OFS d OFS $1 OFS id OFS $3 OFS $12 OFS "-" OFS "1100 queue" OFS $16 OFS $17 OFS $18
 }
 END {
   for (id in jd) if (!(id in seen) && jd[id] == "yes") {
     key = sprintf("%s|a|1|%s", tier(id), id)
-    line[key] = tier(id) OFS "a" OFS "yes" OFS jn[id] OFS jv[id] OFS "yes" OFS "-" OFS id OFS "-" OFS jc[id] OFS "-" OFS "ArduPilot only: a ledger field on some board, not in 1100's queue"
+    line[key] = tier(id) OFS "a" OFS "yes" OFS jn[id] OFS jv[id] OFS "yes" OFS "-" OFS id OFS "-" OFS jc[id] OFS "-" OFS "ArduPilot only: a ledger field on some board, not in 1100's queue" OFS "-" OFS "-" OFS "-"
   }
   for (id in only) {
     key = sprintf("%s|a|1|%s", tier(id), id)
-    line[key] = tier(id) OFS "a" OFS "yes" OFS on[id] OFS ov[id] OFS "yes" OFS "-" OFS id OFS "-" OFS oc[id] OFS op[id] OFS "ArduPilot only: no board's ledger has the field (named from Renode's map)"
+    line[key] = tier(id) OFS "a" OFS "yes" OFS on[id] OFS ov[id] OFS "yes" OFS "-" OFS id OFS "-" OFS oc[id] OFS op[id] OFS "ArduPilot only: no board's ledger has the field (named from Renode's map)" OFS "-" OFS "-" OFS "-"
   }
   nk = asorti(line, ks); for (i = 1; i <= nk; i++) print i, line[ks[i]]
 }

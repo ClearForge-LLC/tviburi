@@ -202,19 +202,22 @@ The guard is a spike copy (`overlay/Records1150.cs`, `overlay/GuardedSpi1150.cs`
   - **Calibration:** the CLI's own verdict for the captured boot says `peak_rss_kib` 818,220 (780 ‰ of the bound). The replay's stock runs, without the sandbox, read 827,084–854,908.
 - **Load-only:** Aethelgard's plain-load commands (`renode.rs` `commands()`): its two models, `mach create`, the platform, `peripherals`, `quit`. These were run without and with the overlay, three pairs, for the compile cost to the listing.
 
-| Shape | ArduPilot boot, 5 s, peak KiB (runs) | Against 1 GiB (1,048,576 KiB) | Load to `peripherals`: wall s / peak KiB |
-|---|---|---|---|
-| stock | 827,084; 844,624; 847,348; 854,908 (and **1,379,148**, at 26.4 s wall under load 16) | 79–82 % | 2.90–3.05 / 618,116–644,020 |
-| **overlay, 3 files** (`TviburiRelease.cs`, `Records1150.cs`, `GuardedSpi1150.cs`) | enforcing 1,118,536; 1,126,168; 1,135,488; 1,144,632. Recorded 1,176,720 | **107–112 %: over in every run** | 3.36–3.43 / 801,460–823,444 |
-| overlay, 2 files (the constant, plus both models in one file) | 1,014,372; 1,022,976 | 97–98 %: under, by 25–34 MiB | 3.17–3.69 / 796,788–816,544 |
-| overlay, 1 file (all three in one compilation) | 885,668; 899,160 | 84–86 % | 3.11–3.51 / 725,964–728,424 |
+**An enforcing run is not a full ArduPilot boot.** The enforcing guard pauses the machine at the first refusal (`RUL-08`), and ArduPilot meets one at its first SPI start (A6). Every enforcing replay ended at 71,384,611 instructions (`0x4413E23`). The stock boot runs 88,058,789 (`0x53EABA5`), and so does the recorded run, whose boot block is identical to stock. **The full-boot cost is therefore read from recorded mode.** That is an upper proxy: it also logs 7,117 records (5.9 MB). An enforcing guard that ArduPilot passes would log none. The enforcing rows are kept below, labelled as partial boots. (The first version of this table compared shapes on enforcing runs. The advisor caught it before the PR was ruled. One conclusion flipped: two files are over the bound, not under it.)
+
+| Shape | Full ArduPilot boot, 5 s (recorded), peak KiB | Against 1 GiB (1,048,576 KiB) | Partial boot (enforcing, stopped at A6), peak KiB | Load to `peripherals`: wall s / peak KiB |
+|---|---|---|---|---|
+| stock | 814,740; 823,944; 827,084; 844,624; 847,348; 853,776; 854,908; 874,492 (and **1,379,148**, at 26.4 s wall under load 16) | 78–83 % | — | 2.90–3.05 / 618,116–644,020 |
+| **3 files** (`TviburiRelease.cs`, `Records1150.cs`, `GuardedSpi1150.cs`) | 1,176,720 | **112 %: over** | 1,118,536; 1,126,168; 1,135,488; 1,144,632 (also over) | 3.36–3.43 / 801,460–823,444 |
+| **2 files** (the constant, plus both models in one file) | 1,069,240; 1,071,880 | **102 %: over** | 1,014,372; 1,022,976 | 3.17–3.69 / 796,788–816,544 |
+| **1 file** (all three in one compilation) | 954,716; 964,704 | **91–92 %: under, by 82–92 MiB** | 885,668; 899,160 | 3.11–3.51 / 725,964–728,424 |
 
 **Readings:**
-- **The memory cost is per compilation, not per line of code.** The same code costs about +290 MiB as three `include @` files, about +170 MiB as two, and about +45 MiB as one. On the load-only boot it is about +170, +165 and +90 MiB, against a stock 618–644 MiB. Aethelgard's own two models are already compiled in the stock boot. Why each extra compilation costs this much was not determined.
-- **Wall time is not the constraint here:** 9.1–10.4 s per ArduPilot boot with or without the overlay, and +0.3–0.6 s to the listing. **The stock outlier is:** at host load 16, one stock boot took 26.4 s and peaked at 1,379,148 KiB, over the bound with no overlay at all. That matches `AET-WO-4400f` F1 ("RSS grows with wall time under load"). 26.4 s is under the 30 s bound, by 3.6 s.
-- **(iii)'s scheme puts the constant in its own file,** so a release is at least two compilations. That shape stays under the bound with a 25–34 MiB margin, at this host load.
+- **The memory cost is per compilation, not per line of code.** Over a full boot, against the stock runs in the same container: about +100–140 MiB as one file, +195–255 MiB as two, and +325 MiB as three (one run). On the load-only boot it is about +90, +165 and +170 MiB, against a stock 618–644 MiB. Aethelgard's own two models are already compiled in the stock boot. Why each extra compilation costs this much was not determined.
+- **Wall time is not the constraint here:** 9.1–13.1 s per ArduPilot boot with or without the overlay, and +0.3–0.6 s to the listing. **The stock outlier is:** at host load 16, one stock boot took 26.4 s and peaked at 1,379,148 KiB, over the bound with no overlay at all. That matches `AET-WO-4400f` F1 ("RSS grows with wall time under load"). 26.4 s is under the 30 s bound, by 3.6 s.
+- **(iii)'s scheme as prototyped puts the constant in its own file,** which is two compilations, and that is over the bound on a full boot. Only one file stays under.
+- **Units:** the bound is 1,048,576 KiB = 1,024 MiB. 954,716 KiB is 932 MiB. My bus note of about 11:15Z called KiB figures "MiB-ish"; the KiB figures here are the measured ones.
 
-**Stop (WO §7):** the overlay, shipped as `0100a` ships it (one `include @` per file) plus (iii)'s constant file, **takes ArduPilot's foreign boot past the 1 GiB bound in all five runs.** That is northstar §6's "so slow or heavy" failure.
+**Stop (WO §7):** the overlay, shipped as `0100a` ships it (one `include @` per file) plus (iii)'s constant file, **takes ArduPilot's foreign boot past the 1 GiB bound in every run, full or partial.** That is northstar §6's "so slow or heavy" failure.
 
 **The architect's ruling (bus, 11:45Z):**
 - The overlay ships as one C# file: the models and the release constant, concatenated at release. `RUL-09` will say so. Raising Aethelgard's bound is Aethelgard's decision and is not assumed.
@@ -222,7 +225,7 @@ The guard is a spike copy (`overlay/Records1150.cs`, `overlay/GuardedSpi1150.cs`
 - (iv)'s check defect goes to `0100b`.
 - Continue (v) and (vi).
 
-**What one file means for (iii):** the shipped file holds the constant, so it cannot be listed in the manifest by its own hash. The consumer instead checks it byte for byte against the concatenation of the manifest-listed model files and the template filled with the pinned hash, in the release's order. That is the same check as `consumer-check.sh`'s, applied to one file. It was not prototyped; the one-file overlay used in (vi) was concatenated by hand (`cases/A1`).
+**What one file means for (iii):** the shipped file holds the constant, so it cannot be listed in the manifest by its own hash. The consumer instead checks it byte for byte against the concatenation of the manifest-listed model files and the template filled with the pinned hash, in the release's order. That is the same check as `consumer-check.sh`'s, applied to one file. It was not prototyped; the one-file overlay used in (vi) was concatenated by hand (`cases/A1`). **The cache result in (iii) was measured on the three-file shape.** With one file, the constant shares its compilation with `Records`, so a changed constant changes the file, and a cache keyed by the file's content could not reuse the stale assembly. That is reasoned, not measured; the consumer requirement (cache off) stands either way.
 
 ## (vi), the records across a reset, and DMA
 
@@ -281,7 +284,8 @@ The guard is a spike copy (`overlay/Records1150.cs`, `overlay/GuardedSpi1150.cs`
 - **View (1) for ArduPilot does not exist:** there is no ledger. So each of the 1,026 field ids in `1100`'s 13 boards' ledgers (`spike/1100/data/joined.tsv`) was given to `1100`'s own `view2-join.awk`, unchanged, as board `ardupilot`. Positions and addresses came from those rows. It judged ArduPilot's writes with the same drop rule (R2–R4).
 - **The join's `out2`** collected the writes the stock model drops that no board's ledger has a field for: 166 entries, of which 121 became rows (named from Renode's map and CMSIS). One further row is a ledger field on some board that `1100` did not queue. **122 rows are ArduPilot's alone.**
 - **The ranking rule** was written into `rank-ap.awk` before it ran, from `RUL-13`'s amended order. Tier 1 is the RCC enables (`*ENR`, `*LPENR`) and kernel-clock selectors (`*CCIP*R`). Tier 2 is GPIO alternate-function routing (`AFRL`, `AFRH`, `MODER`). Tier 3 is timers and DMA. Tier 4 is the rest: 4a other clock-tree registers (other RCC, `FLASH.ACR`), 4b everything else. Within a tier: (a) ArduPilot writes it and the stock model drops what it wrote; (b) ArduPilot writes it; (c) ArduPilot does not; then `1100`'s rank.
-- **Both views are cited as `1100`'s are:** `1100`'s columns (its rank, its ledger class, the executed model's cover) next to ArduPilot's (writes at the register, the field's last value, the drop, the first PC for ArduPilot-only rows). The Renode lines are `1100`'s `queue.tsv` columns 16–18 for its rows; the ArduPilot-only rows name the executed tag or bits.
+- **"ArduPilot takes it" is register-level,** as `1100`'s firmware-write count is: ArduPilot wrote the field's register, with any value. So a field written at its reset value counts as taken (`GPIOA.AFRH.AFSEL8` = 0, `RCC.APB1LENR.TIM2EN` = 0), which is why class (c) is empty in tiers 1, 2 and 4a. Of the 429 class-(b) rows, 202 are stored fields, 217 are tags written at their reset value, 8 are read-only fields and 2 are by source. The field value written is column 6.
+- **Both views are cited as `1100`'s are:** `1100`'s columns (its rank, its ledger class, the executed model's cover) next to ArduPilot's (writes at the register, the field's last value, the drop, the first PC for ArduPilot-only rows). **`1100`'s citations are carried as columns 14–16:** the `ledger.rs` entry line, its source, and the executed Renode line (its `queue.tsv` columns 16–18). The ArduPilot-only rows have `-` there, and name the executed tag or bits in column 11.
 
 | Tier | (a) ArduPilot writes, stock drops | (b) ArduPilot writes, stock holds | (c) ArduPilot does not write |
 |---|---|---|---|
