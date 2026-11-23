@@ -28,6 +28,8 @@
 //
 // The halt after a refusal is best-effort: the rest of the translation block may run (RUL-08).
 
+using System.Collections.Generic;
+using System.Linq;
 using System.Text;
 using Antmicro.Renode.Core;
 using Antmicro.Renode.Logging;
@@ -38,12 +40,15 @@ namespace Antmicro.Renode.Peripherals.Tviburi
 {
     public sealed class Records
     {
-        public Records(IMachine machine, IPeripheral owner, string guard, string mode)
+        // `witness`: extra fields the guard's witness carries after its mode, each a JSON string (TVI-WO-1301, granted
+        // 2026-11-23T19:08Z: `package`, so a consumer sees which package's rule ran, or "none").
+        public Records(IMachine machine, IPeripheral owner, string guard, string mode, IEnumerable<KeyValuePair<string, string>> witness = null)
         {
             this.machine = machine;
             this.owner = owner;
             this.guard = guard;
             this.mode = mode;
+            this.witness = witness == null ? "" : string.Concat(witness.Select(f => "," + Json(f.Key) + ":" + Json(f.Value)));
             if(mode != Enforcing && mode != RecordedMode)
             {
                 loadFailure = "mode must be \"" + Enforcing + "\" or \"" + RecordedMode + "\", not " + (mode == null ? "null" : Json(mode));
@@ -111,7 +116,7 @@ namespace Antmicro.Renode.Peripherals.Tviburi
             named = true;
             if(loadFailure == null)
             {
-                Emit(LogLevel.Info, "witness", ",\"guard\":" + Json(guard) + ",\"model_version\":" + Json(version) + ",\"mode\":" + Json(mode));
+                Emit(LogLevel.Info, "witness", ",\"guard\":" + Json(guard) + ",\"model_version\":" + Json(version) + ",\"mode\":" + Json(mode) + witness);
             }
             else
             {
@@ -147,6 +152,7 @@ namespace Antmicro.Renode.Peripherals.Tviburi
         private readonly string guard;
         private readonly string version = TviburiRelease.ManifestSha256;
         private readonly string mode;
+        private readonly string witness;
         private readonly string loadFailure;
         private readonly object sync = new object();
         private bool named;

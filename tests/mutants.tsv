@@ -154,3 +154,8 @@ G16-boardPackage	model/tviburi-nucleo-h753zi.repl	tviburiGpioH:\n    mode: "enfo
 G17-namesLine	scripts/tviburi-spike	gpioPortJ gpioPortK >	gpioPortJ >	modeled
 G18-unlistedPinAf	model/GuardedSTM32_GPIOPort.cs	if(cell == null || cell.Text == "-")	if(cell != null && cell.Text == "-")	gpio-pk8af
 G19-unlistedPinPackage	model/GuardedSTM32_GPIOPort.cs	(!bonding.TryGetValue("P" + port + pin, out var b) || b.Pin == null)	(bonding.TryGetValue("P" + port + pin, out var b) && b.Pin == null)	gpio-pk8out
+G20-staleRefresh	model/GuardedSTM32_GPIOPort.cs	base.ReadDoubleWord(b);\n            }\n            base.WriteDoubleWord(b, value);	}\n            base.WriteDoubleWord(b, value);	gpio-resetwrite
+G21-recordEveryRule	model/GuardedSTM32_GPIOPort.cs	RefusedAf(offset, b, word, width);\n                RefusedPackage(offset, b, word, width);	RefusedAf(offset, b, word, width);	gpio-recordedtwo
+G22-witnessPackage	model/GuardedSTM32_GPIOPort.cs	("package", package ?? "none")	("package", "LQFP144")	gpio-nopackage
+G23-registrationCount	model/GuardedSTM32_GPIOPort.cs	if(points.Length != 1)	if(false)	gpio-twoaddr
+G24-latchRecorded	model/GuardedSTM32_GPIOPort.cs	afFaulted |= entering;	;	gpio-recorded

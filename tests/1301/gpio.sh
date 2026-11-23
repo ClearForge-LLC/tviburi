@@ -9,7 +9,7 @@ set -euo pipefail
 
 here=$(cd "$(dirname "$0")/../.." && pwd)
 IMAGE=$(sed -n 's/^IMAGE=//p' "$here/tests/spike.sh")
-CASES="valid blank blankfirst afterwards afrh package packageinput pk8af pk8out pc2 nopackage pupdr lckr brr read bsrr bsrrhalf otyper ardupilot gen-s03 recorded config query registrations reset misaligned fields ledger adv-monitor"
+CASES="valid blank blankfirst afterwards afrh package packageinput pk8af pk8out pc2 nopackage pupdr lckr brr read bsrr bsrrhalf otyper ardupilot gen-s03 recorded config query registrations reset misaligned fields ledger adv-monitor resetwrite recordedtwo twoaddr"
 GUARDS="spi1 rcc gpioPortA gpioPortB gpioPortC gpioPortD gpioPortE gpioPortF gpioPortG gpioPortH gpioPortI gpioPortJ gpioPortK"
 PATHS='"valid","blank","blankfirst","afterwards","twice","afrh","package","packageinput","pk8af","pk8out","pc2","pupdr","lckr","brr","read","bsrr","bsrrhalf","otyper","ardupilot","gen-s03"'
 scratch=${TVIBURI_SCRATCH:-$HOME/.cache/tviburi}
@@ -92,7 +92,8 @@ for t in ${TVIBURI_TESTS:-$CASES}; do
   case $t in
   valid)
     run_case valid valid "$run" "${marks[@]}"
-    check "valid: PA5 on AF5 (SPI1_SCK, DS12117 Table 9 p89), then AF mode: a pass, enforcing" "passes valid" ;;
+    check "valid: PA5 on AF5 (SPI1_SCK, DS12117 Table 9 p89), then AF mode: a pass, enforcing; each port's witness names LQFP144" \
+      "passes valid && [ \$(grep -c 'gpioPort[A-K]: {\"tviburi\":\"witness\".*\"package\":\"LQFP144\"}' '$work/valid/renode-log.txt') = 11 ]" ;;
   blank)
     run_case blank blank "$run" "${marks[@]}"
     check "blank: PA5 on AF6 (blank, p89) put in AF mode refuses TVI-GPIO-AF, predicted-fault, naming the pin, the AF and the page, at the firmware's MODER store" \
@@ -131,7 +132,8 @@ for t in ${TVIBURI_TESTS:-$CASES}; do
       "[ \$rc = 3 ] && first pc2 'r[\"rule\"] == \"TVI-GPIO-PACKAGE\" and r[\"kind\"] == \"unmodeled\" and \"footnote 4 p88\" in r[\"citation\"]'" ;;
   nopackage)
     PLATFORM_SED='/package: "LQFP144"/d' run_case nopackage package "$run" "${marks[@]}"
-    check "nopackage: with no package declared the package rule does not run: PH2 to output passes" "passes nopackage" ;;
+    check "nopackage: with no package declared the package rule does not run (PH2 to output passes), and each port's witness says \"package\":\"none\" (granted 19:08Z)" \
+      "passes nopackage && [ \$(grep -c 'gpioPort[A-K]: {\"tviburi\":\"witness\".*\"package\":\"none\"}' '$work/nopackage/renode-log.txt') = 11 ]" ;;
   pupdr)
     run_case pupdr pupdr "$run" "${marks[@]}"
     check "pupdr: PUPDR0 = 11 (reserved, p542) refuses TVI-GPIO-FIELD, unmodeled" \
@@ -213,6 +215,25 @@ sys.exit(0 if len(f) == 31 and len({r[\"register\"] for r in f}) == 10 and pairs
     run_case adv-monitor - 'sysbus.gpioPortA WriteDoubleWord 0x20 0x00600000' 'sysbus.gpioPortA WriteDoubleWord 0x0 0xABFFFBFF'
     check "adv-monitor: the monitor's own WriteDoubleWord on the port (not through sysbus) reaches the guard: PA5 AF6 in AF mode refuses TVI-GPIO-AF (WO §5)" \
       "[ \$rc = 3 ] && first adv-monitor 'r[\"rule\"] == \"TVI-GPIO-AF\" and r[\"bit\"] == \"PA5 AF6\"'" ;;
+  resetwrite)
+    run_case resetwrite - 'machine Reset' 'sysbus WriteDoubleWord 0x5802000C 0x0' 'sysbus WriteDoubleWord 0x58020400 0x0' \
+      'echo "R-PUPDR"' 'sysbus ReadDoubleWord 0x5802000C' 'echo "R-MODER"' 'sysbus ReadDoubleWord 0x58020400' \
+      "python \"print('Q3 ' + str(self.Machine['sysbus.gpioPortB'].WhichSignal(3)))\""
+    check "resetwrite: after a reset, writes of 0 to PUPDR A and MODER B take (the stock register's cache is refreshed first): they read 0, and PB3 is an input" \
+      "[ \$rc = 0 ] && console resetwrite | grep -A1 -x 'R-PUPDR' | tail -n1 | grep -qx 0x00000000 && console resetwrite | grep -A1 -x 'R-MODER' | tail -n1 | grep -qx 0x00000000 && tr -d '\\r' < '$work/resetwrite/renode.out' | grep -qx 'Q3 input'" ;;
+  recordedtwo)
+    PLATFORM_SED='s/^    mode: "enforcing"$/    mode: "recorded"/' run_case recordedtwo - 'sysbus WriteDoubleWord 0x58020020 0x06600000' 'sysbus WriteDoubleWord 0x58020000 0xABFFEBFF' 'sysbus WriteDoubleWord 0x58021C00 0xFFFFFFEF'
+    check "recordedtwo: in recorded mode every pin and every rule is recorded: PA5 and PA6 on AF6 give two TVI-GPIO-AF; PH2 in AF mode on AF0 gives TVI-GPIO-AF and TVI-GPIO-PACKAGE" \
+      "l='$work/recordedtwo/renode-log.txt'; [ \$(grep -c 'would-refuse.*TVI-GPIO-AF.*\"bit\":\"PA[56] AF6\"' \$l) = 2 ] && grep -q 'would-refuse.*TVI-GPIO-AF.*\"bit\":\"PH2 AF0\"' \$l && grep -q 'would-refuse.*TVI-GPIO-PACKAGE.*\"bit\":\"PH2 MODER = 10\"' \$l" ;;
+  twoaddr)
+    PLATFORM_SED='$a\
+tviburiGpioA: @ {\
+        sysbus <0x58020000, +0x400>;\
+        sysbus <0x58030000, +0x400>;\
+        tviburiRcc RegistrationPeripheralAlias.GPIOA\
+    }' run_case twoaddr - 'sysbus ReadDoubleWord 0x58030000'
+    check "twoaddr: a port registered at a second address refuses every access, TVI-GPIO-CONFIG, unmodeled" \
+      "[ \$rc = 3 ] && first twoaddr 'r[\"rule\"] == \"TVI-GPIO-CONFIG\" and \"2 bus registrations\" in r[\"condition\"]'" ;;
   *) echo "unknown case $t" >&2; exit 2 ;;
   esac
 done

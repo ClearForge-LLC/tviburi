@@ -38,10 +38,12 @@
 //                     on LQFP144 are unmodeled: their alternate functions reach PC2_C and PC3_C when the SYSCFG analog
 //                     switch is closed (DS12117 Table 8 footnote 4, p88), which the twin does not model. Input and
 //                     analog writes pass, so a firmware's whole-port initialisation does (ruled 2026-11-23T17:52Z).
-//                     With no package declared the rule does not run.
-// TVI-GPIO-AF and TVI-GPIO-PACKAGE fire once as a pin enters the faulting state, not on every later write.
-// Recorded mode (RUL-19): after a rule fires and is recorded, the access goes on to the stock port as if no rule had
-// fired, and no further rule is evaluated for it (model/Refusal.cs).
+//                     With no package declared the rule does not run, and the witness says "package": "none", so a
+//                     consumer sees a check that did not run (ruled 17:52Z; the witness field granted 19:08Z).
+// TVI-GPIO-AF and TVI-GPIO-PACKAGE record each pin that enters the faulting state, once, not on every later write.
+// Enforcing: the first rule that fires refuses the access, which is not passed. Recorded mode (RUL-19): every rule is
+// evaluated, each records what it finds as a would-refuse, and the access goes on to the stock port as if none had
+// fired (model/Refusal.cs).
 // A port whose RCC clock is off is locked by the RCC guard's sync (TVI-WO-1300a), before this guard sees the access;
 // it adds no rule of its own for it (ruled 2026-11-23T17:52Z).
 
@@ -67,7 +69,8 @@ namespace Antmicro.Renode.Peripherals.Tviburi
             resets = new[] { modeResetValue, outputSpeedResetValue, pullUpPullDownResetValue };
             afs = numberOfAFs;
             Package = package;
-            records = new Records(machine, this, nameof(GuardedSTM32_GPIOPort), mode);
+            records = new Records(machine, this, nameof(GuardedSTM32_GPIOPort), mode,
+                new[] { new KeyValuePair<string, string>("package", package ?? "none") });
         }
 
         public string Package { get; }
@@ -179,9 +182,21 @@ namespace Antmicro.Renode.Peripherals.Tviburi
             var mask = width == 32 ? 0xFFFFFFFFu : width == 16 ? 0xFFFFu : 0xFFu;
             var shift = (int)(8 * (offset & 3));
             var word = width == 32 ? value : (Served(b) & ~(mask << shift)) | ((value & mask) << shift);
-            if((Unloaded(offset, value, width) || Misaligned(offset, value, width, "write")
-                || RefusedField(offset, b, word, width) || RefusedAf(offset, b, word, width) || RefusedPackage(offset, b, word, width))
-                && !records.Recorded)
+            if(Unloaded(offset, value, width) || Misaligned(offset, value, width, "write"))
+            {
+                if(!records.Recorded)
+                {
+                    return;
+                }
+            }
+            else if(records.Recorded)
+            {
+                // Recorded mode (RUL-19) measures every path: each rule is evaluated and records what it finds.
+                RefusedField(offset, b, word, width);
+                RefusedAf(offset, b, word, width);
+                RefusedPackage(offset, b, word, width);
+            }
+            else if(RefusedField(offset, b, word, width) || RefusedAf(offset, b, word, width) || RefusedPackage(offset, b, word, width))
             {
                 return;
             }
@@ -236,10 +251,19 @@ namespace Antmicro.Renode.Peripherals.Tviburi
             {
                 otyper = value & 0xFFFFu;
             }
+            if(b == ModerOffset || b == OspeedrOffset || b == PupdrOffset)
+            {
+                // The stock port's register caches the last value written and calls a field's change handler only
+                // where a write differs from it. Reset leaves the cache at 0 while the port's modes, speeds and pulls
+                // take the reset values (silicon's, non-zero), so a write of 00 after a reset would be dropped. A read
+                // refreshes the cache from the port's state (Renode's PeripheralRegister.WriteInner, ReadInner).
+                base.ReadDoubleWord(b);
+            }
             base.WriteDoubleWord(b, value);
+            // A pin leaves a fault's latch when it leaves the faulting state; only a recorded pin enters it.
             var moder = base.ReadDoubleWord(ModerOffset);
-            afFaulted = AfFaults(moder, base.ReadDoubleWord(AfrlOffset), base.ReadDoubleWord(AfrhOffset));
-            packageFaulted = PackageFaults(moder);
+            afFaulted &= AfFaults(moder, base.ReadDoubleWord(AfrlOffset), base.ReadDoubleWord(AfrhOffset));
+            packageFaulted &= PackageFaults(moder);
         }
 
         // ---- rules ---------------------------------------------------------------------------------------------
@@ -285,7 +309,19 @@ namespace Antmicro.Renode.Peripherals.Tviburi
             {
                 return false;
             }
-            var pin = Lowest(entering);
+            for(var pin = 0; pin < 16; pin++)
+            {
+                if((entering & (1 << pin)) != 0)
+                {
+                    RefuseAf(offset, b, word, width, moder, afrl, afrh, pin);
+                }
+            }
+            afFaulted |= entering;
+            return true;
+        }
+
+        private void RefuseAf(long offset, long b, uint word, int width, uint moder, uint afrl, uint afrh, int pin)
+        {
             var af = Af(afrl, afrh, pin);
             var cell = CellAt(pin, af);
             records.Refuse("TVI-GPIO-AF", PredictedFault, Register(b), "P" + port + pin + " AF" + af,
@@ -295,7 +331,6 @@ namespace Antmicro.Renode.Peripherals.Tviburi
                 (cell == null ? "DS12117 Rev 10 Table 9 p100 (port K: PK0-PK7 only)" : "DS12117 Rev 10 Table 9 p" + cell.Page + " (P" + port + pin + " AF" + af + ": -)")
                     + "; RM0433 Rev 9 §11.4.1 p541 (MODER), §11.4.9-11.4.10 p545-546 (AFSEL)",
                 State(moder, afrl, afrh), offset, word, width);
-            return true;
         }
 
         private bool RefusedPackage(long offset, long b, uint word, int width)
@@ -309,7 +344,19 @@ namespace Antmicro.Renode.Peripherals.Tviburi
             {
                 return false;
             }
-            var pin = Lowest(entering);
+            for(var pin = 0; pin < 16; pin++)
+            {
+                if((entering & (1 << pin)) != 0)
+                {
+                    RefusePackage(offset, b, word, width, pin);
+                }
+            }
+            packageFaulted |= entering;
+            return true;
+        }
+
+        private void RefusePackage(long offset, long b, uint word, int width, int pin)
+        {
             var name = "P" + port + pin;
             Bonding(Package).TryGetValue(name, out var b8);   // null: a pin DS12117 lists on no package (PK8-PK15)
             var mode = ((word >> (2 * pin)) & 3) == 1 ? "output" : "alternate-function";
@@ -318,13 +365,12 @@ namespace Antmicro.Renode.Peripherals.Tviburi
                 records.Refuse("TVI-GPIO-PACKAGE", Unmodeled, Register(b), name + " MODER = " + (mode == "output" ? "01" : "10"),
                     name + " set to " + mode + " mode on " + Package + ", which does not bond " + name + "; its alternate functions reach " + name + "_C when the SYSCFG analog switch is closed, which the twin does not model",
                     "DS12117 Rev 10 Table 8 p" + b8.Page + " (" + Package + ": -) and footnote 4 p88", State(), offset, word, width);
-                return true;
+                return;
             }
             records.Refuse("TVI-GPIO-PACKAGE", PredictedFault, Register(b), name + " MODER = " + (mode == "output" ? "01" : "10"),
                 name + " set to " + mode + " mode, but the declared package " + Package + (b8 == null ? " bonds no " + name + ", which DS12117 lists on no package (port K has PK0-PK7)" : " does not bond " + name) + ": on silicon the signal reaches no pin",
                 (b8 == null ? "DS12117 Rev 10 Table 8 p64-88 (no " + name + " row), Table 9 p100" : "DS12117 Rev 10 Table 8 p" + b8.Page + " (" + Package + " column: -)") + ", Figure 6 p57; RM0433 Rev 9 §11.4.1 p541",
                 State(word, base.ReadDoubleWord(AfrlOffset), base.ReadDoubleWord(AfrhOffset)), offset, word, width);
-            return true;
         }
 
         // The pins in AF mode on a blank cell.
@@ -366,16 +412,6 @@ namespace Antmicro.Renode.Peripherals.Tviburi
             return m;
         }
 
-        private static int Lowest(int mask)
-        {
-            var pin = 0;
-            while((mask & (1 << pin)) == 0)
-            {
-                pin++;
-            }
-            return pin;
-        }
-
         private static int Af(uint afrl, uint afrh, int pin)
         {
             return (int)(((pin < 8 ? afrl : afrh) >> (4 * (pin & 7))) & 0xF);
@@ -399,7 +435,12 @@ namespace Antmicro.Renode.Peripherals.Tviburi
             ulong start;
             try
             {
-                start = machine.SystemBus.GetRegistrationPoints(this).First().Range.StartAddress;
+                var points = machine.SystemBus.GetRegistrationPoints(this).ToArray();
+                if(points.Length != 1)
+                {
+                    return points.Length + " bus registrations, not one: a second address would reach the stock port's registers";
+                }
+                start = points[0].Range.StartAddress;
             }
             catch(Exception e)
             {
@@ -512,6 +553,8 @@ namespace Antmicro.Renode.Peripherals.Tviburi
 
         private const long ModerOffset = 0x00;
         private const long OtyperOffset = 0x04;
+        private const long OspeedrOffset = 0x08;
+        private const long PupdrOffset = 0x0C;
         private const long BsrrOffset = 0x18;
         private const long AfrlOffset = 0x20;
         private const long AfrhOffset = 0x24;
@@ -613,10 +656,10 @@ namespace Antmicro.Renode.Peripherals.Tviburi
             R("GPIOx_PUPDR", 0x0C, "§11.4.4", "PUPDR0", 1, 0, NotReserved, "inherited, unaudited (acknowledged by name)", "the stock port: stored, with no effect on IDR; 11 is reserved (TVI-WO-1301 A3)", 542),
             R("GPIOx_IDR", 0x10, "§11.4.5", "IDR[15:0]", 15, 0, Any, "read-only", "ignored (read-only); reads the port's output state, not its inputs (TVI-WO-1301 A6)", 543),
             R("GPIOx_IDR", 0x10, "§11.4.5", "Res31_16", 31, 16, Zero, "reserved", "reserved: dropped, reads 0", 543),
-            R("GPIOx_ODR", 0x14, "§11.4.6", "ODR[15:0]", 15, 0, Any, "inherited, unaudited (acknowledged by name)", "the stock port: the output state, driving the pins' connections", 543),
+            R("GPIOx_ODR", 0x14, "§11.4.6", "ODR[15:0]", 15, 0, Any, "stock, wrong (the stock port drives each pin's connections, its LEDs, EXTI and timer inputs, from ODR in every mode; silicon drives a pin from ODR only in output mode: p537-539)", "the stock port: the output state, stored", 543),
             R("GPIOx_ODR", 0x14, "§11.4.6", "Res31_16", 31, 16, Zero, "reserved", "reserved: dropped, reads 0", 543),
-            R("GPIOx_BSRR", 0x18, "§11.4.7", "BR[15:0]", 31, 16, Any, "modeled by the guard", "resets ODR bits, except where the BS bit is set too: BS has priority (p544), which the stock port gets wrong (TVI-WO-1301 A7)", 544),
-            R("GPIOx_BSRR", 0x18, "§11.4.7", "BS[15:0]", 15, 0, Any, "inherited, unaudited (acknowledged by name)", "the stock port: sets ODR bits", 544),
+            R("GPIOx_BSRR", 0x18, "§11.4.7", "BR[15:0]", 31, 16, Any, "modeled by the guard", "resets ODR bits, except where the BS bit is set too: BS has priority (p544), which the stock port gets wrong (TVI-WO-1301 A7); the stock port drives ODR onto the pin's connections in every mode (p537-539)", 544),
+            R("GPIOx_BSRR", 0x18, "§11.4.7", "BS[15:0]", 15, 0, Any, "stock, wrong (it sets ODR bits, which the stock port drives onto the pin's connections in every mode; silicon only in output mode: p537-539)", "the stock port: sets ODR bits", 544),
             R("GPIOx_LCKR", 0x1C, "§11.4.8", "Res31_17", 31, 17, Zero, "reserved", "reserved: dropped, reads 0", 545),
             R("GPIOx_LCKR", 0x1C, "§11.4.8", "LCKK", 16, 16, Zero, "stock, wrong (the lock key sequence and the lock are not modeled; the stock port reads back the locked pins, not the LCK bits; TVI-WO-1301 A8)", "no lock: LCKK written 0, which starts no sequence", 545),
             R("GPIOx_LCKR", 0x1C, "§11.4.8", "LCK[15:0]", 15, 0, Zero, "stock, wrong (the lock key sequence and the lock are not modeled; the stock port reads back the locked pins, not the LCK bits; TVI-WO-1301 A8)", "no lock: LCK written 0", 545),

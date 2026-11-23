@@ -271,3 +271,33 @@ Each consumer platform refers to the ports in up to three ways, and each must na
 - where a CI-like peak is measured.
 
 **My lean:** build with `V2`'s shape, and measure the peak in CI or on an unshared 4-CPU host before READY.
+
+## 9. The build, as ruled (17:52Z, 18:30Z)
+
+- **The guard:** `model/GuardedSTM32_GPIOPort.cs` (`RUL-07`'s subclass; V2's shape: the table and the bonding as one string each, about 30 allow-list rows). Its header states the rules in order.
+- **The data,** generated, never typed:
+  - **`model/ds12117-rev10-table9.tsv`** (§1 of the ds12117 document).
+  - **`model/ds12117-rev10-lqfp144.tsv`:** 112 of the 168 GPIOs bonded on LQFP144, with each pin's number.
+    - Figure 6 (p57), read mechanically, and Table 8's LQFP144 column (pp64–88), read by eye by a separate agent, agree pin for pin.
+    - PC2 and PC3 reach the package only through PC2_C/PC3_C and SYSCFG's analog switch (Table 8 footnote 4, p88), so they are `unmodeled`.
+    - PK8–PK15 are on no package: port K has PK0–PK7.
+  - `tools/tviburi-afcheck csharp` emits the two constants. Its unit tests check them, and the bonding file, against their sources.
+- **The restatement:** `model/stm32h7-gpio-restate.{awk,repl}`, identical to §4's measured prototype, with silicon's resets.
+- **The board:** each port `enforcing` with `package: "LQFP144"`, cited (DS12117 §9 p346: "Z = 144 pins", "T = LQFP"; that the Nucleo carries an `…ZIT6` is from memory). The Nucleo's LEDs and button are restated onto the guards.
+- **Every check call names the 11 ports.** `tools/tviburi-check` fails a run on a record from an unnamed source, so a guarded port nobody named cannot pass silently.
+
+**Acceptance (WO §2), measured on the consumer's captured boots** (`replay-1301.sh accept`, the release built from this branch):
+- **ArduPilot's full 5 s boot, recorded:**
+  - 0 `would-refuse` under any port;
+  - 11 recorded witnesses and 11 end records;
+  - the boot reached its end;
+  - its boot block differs from stock only by 1300's `AHB2ENR` and silicon's `PUPDR` A reset (A5, ruled expected).
+- **The 14 generated boots, the ports enforcing:**
+  - 0 refusals under any port, 11 enforcing witnesses and ends each;
+  - every boot-block difference is silicon's reset (A5);
+  - the motor observers' lines are identical to stock on all five motor boards (timer, then pin, then LED).
+- **The planted firmware** (`firmware/gpio.rs`, 20 paths; `tests/1301/gpio.sh`, 29 cases, each `gpio-<case>` in the suite):
+  - every rule refuses by name with its kind and page;
+  - its passing twin passes;
+  - ArduPilot's first 886 GPIO writes and sentinel-03's 88 pass, enforcing.
+- **Mutants:** G01–G19, one per guard, each killed by its named case.
