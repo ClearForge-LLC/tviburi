@@ -164,20 +164,13 @@ fn main() -> ExitCode {
     for p in &report.problems {
         println!("PROBLEM {p}");
     }
-    match report.verdict {
-        Verdict::Pass => {
-            println!("CHECK PASS");
-            ExitCode::from(0)
-        }
-        Verdict::Refused => {
-            println!("CHECK REFUSED");
-            ExitCode::from(3)
-        }
-        Verdict::Fail => {
-            println!("CHECK FAIL");
-            ExitCode::from(1)
-        }
-    }
+    let (line, code) = match report.verdict {
+        Verdict::Pass => ("CHECK PASS", 0),
+        Verdict::Refused => ("CHECK REFUSED", 3),
+        Verdict::Fail => ("CHECK FAIL", 1),
+    };
+    println!("{line}");
+    ExitCode::from(code)
 }
 
 #[cfg(test)]

@@ -51,7 +51,9 @@ namespace Antmicro.Renode.Peripherals.Tviburi
             machine.PeripheralsChanged += OnPeripheralsChanged;
         }
 
-        // True when the model version could not be computed: the guard must refuse every write.
+        public const string LoadCitation = "Tviburi records contract (RUL-12); northstar invariant 5";
+
+        // True when the model version could not be computed: the guard must refuse every access.
         public bool LoadFailed => loadFailure != null;
 
         public void Refuse(string rule, string register, string bit, string condition, string citation,
@@ -101,7 +103,7 @@ namespace Antmicro.Renode.Peripherals.Tviburi
             else
             {
                 Refuse("TVI-LOAD", "none", "none", "the guard's model version could not be computed at load: " + loadFailure
-                    + "; the guard refuses every write to this peripheral", "Tviburi records contract (RUL-12); northstar invariant 5",
+                    + "; the guard refuses every access to this peripheral", LoadCitation,
                     "no witness emitted", 0, 0, 0);
             }
         }

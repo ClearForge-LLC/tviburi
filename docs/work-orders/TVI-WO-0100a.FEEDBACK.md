@@ -62,7 +62,62 @@ PLACEHOLDER-RECORDS
 
 ## 5. Findings for the architect
 
-PLACEHOLDER-FINDINGS
+Each item comes with a recommendation.
+
+**F1. Bench check on the Nucleo (ruling D1).**
+- **The question:** is MODF evaluated while SPE=0? Only silicon settles it.
+- **The procedure:** on NUCLEO-H753ZI SPI1, write `CFG2 = MASTER|SSM` with `CR1.SSI = 0` and SPE=0. Then read SR.MODF and CFG2.MASTER.
+- **What each result means:**
+  - **MODF=1, or MASTER=0:** the history branch is right, and its condition text can cite the bench.
+  - **MODF=0 and MASTER=1, repeated across resets:** the history branch is a false refusal, and the passing order could be relaxed.
+- **What it costs today:** firmware that writes CFG2 before SSI, which p2171's own procedure does, refuses.
+
+**F2. Reads are now partly modeled (adversarial pass, posted on the bus).**
+- **The false pass it closes:** the guard copied writes but not reads. The stock model reads `CFG2.MASTER` as 1 and the dropped tag bits as 0. So read-modify-write firmware sent the twin a different word from the one it would send silicon, and the guard judged the twin's word. Repro: the `rmw` firmware, `SSIOP=1` then `CFG2 |= MASTER|SSM`. Before the fix it passed; silicon is in row T3.
+- **The fix:**
+  - A CFG2 read returns the guard's copy, which is silicon's value. Every field is rw with reset 0 (p2221–2222), and every write silicon would drop refuses.
+  - A CR1 read takes SSI from the copy (p2215).
+  - A CR1 read while IOLOCK is latched refuses.
+- **A side effect:** HAL's `SET_BIT(CR1, SPE)` was a false refusal, and is now a pass. The modeled firmware enables that way.
+- **What is still unmodeled:** reads of other CR1 bits come from the stock model as they always did. Those are CSTART, CSUSP, the CRC bits and HDDIR, which the guard does not track.
+
+**F3. RCC `SPI1RST`: not a false-pass route. This corrects my earlier bus note.**
+- **What was posted:** at 08:52Z I posted that RCC_APB2RSTR.SPI1RST (p442) does not reset `spi1`. The architect's 09:23Z note took it as a real route, and my correction went up at 09:23Z as well.
+- **Why it was wrong:** my probe's grep cut the line off with `head`.
+- **What was measured:** with RCC access logging, the `APB2Reset` write calls `spi1.Reset()`, and the guard's `Reset()` clears its copies with it.
+- **Now pinned:** `conditions` case 15 enables, resets SPI1 through RCC, then expects SPE to refuse as slave.
+- **For TVI-WO-1100's coverage queue:** **no row is needed.**
+
+**F4. The model version against RUL-10.** See §3. For TVI-WO-1200.
+
+**F5. CI's image pin must follow Aethelgard `main`'s `container/IMAGE` (RUL-09).**
+- **Today:** `tests/spike.sh` pins `e5fc7ddb…`, the build architecture §2.0 cites, and the CI workflow reads it from there.
+- **Coming:** Aethelgard's PR #355 re-pins `main` to `1e0ab105…`, which has the same Renode build string, `aet1605`. When that lands, the `IMAGE=` line in `tests/spike.sh` changes, alone, by PR.
+- **Never by tag.** The workflow pulls by digest only.
+
+**F6. A SIGTERM'd Renode looks clean to the check (measured).**
+- **What the check sees:** SIGTERM runs `Dispose`, so a run killed by `timeout` has a witness and an end. If it saw no refusal before the kill, the check passes it.
+- **Who is covered:** the runner's end-of-script marker catches this (`adv-noend`).
+- **For the architect, under RUL-12:** a consumer needs its own completion evidence. Is that enough, or should the end record carry something that a SIGTERM path cannot produce? For example, a monitor command that only the consumer's script runs at its end.
+
+**F7. The console interleaves log entries mid-line (measured).**
+- **What happens:** Renode prints log entries from a separate thread, so a refusal line split the echo `TVIBURI-END` into `TVIB[…log…]\nURI-END`.
+- **The fix:** `scripts/monitor-output` removes log entries before the marker is searched for.
+- **Who is exposed:** Aethelgard parses console sentinel lines the same way (architecture §2.0), so it is exposed to the same split. That is not changed here.
+
+**F8. RUL-11 testing gap (adversarial pass).**
+- **The limit:** the UART analyzer prefixes every line with `[host: …]`, so a firmware UART line never starts with `{`. The forge tests therefore never reached the check's source filter.
+- **What covers it now:** a unit test, in which a well-formed record under another peripheral's name does not count. It kills the source-filter mutant.
+- **What has no end-to-end case:** a second guarded peripheral. None exists yet.
+
+**F9. Recorded, not acted on (ruling):**
+- the manual's two inconsistencies: p2171 puts IOLOCK in "SPI_CFG1"; p2184 says "pulled low" where p2165 says "equal to SSIOP";
+- the `SSM=0, SSOE=1` pass (R7).
+
+**F10. Not built: the rest of RUL-12's "different hash" clause.**
+- The check enforces "a witness, an end, no refusal".
+- It does not compare the witness's `model_version` with a pinned value, because the version's definition is TVI-WO-1200's.
+- That is one flag to add once RUL-10's manifest hash exists.
 
 ## 6. Gates
 
@@ -70,4 +125,14 @@ PLACEHOLDER-GATES
 
 ## 7. Scope notes
 
-PLACEHOLDER-SCOPE
+- **Fences:** only `model/`, `scripts/`, `tests/`, `firmware/`, `tools/`, `.github/workflows/`, README's status line, `FEEDBACK.md` (regenerated quotes) and `docs/work-orders/TVI-WO-0100a.*` changed. Nothing in the steering documents, `docs/reviews/` or Aethelgard changed.
+- **Beyond the literal list, each tied to the WO's adversarial §5 or acceptance:**
+  - **The `end` record:** the crashed-simulator acceptance needs it.
+  - **The read handling (F2):** it closes a guard-copy-versus-silicon route, which §5 names.
+  - **`TVI-SPI-CFG2-SPE` and `TVI-SPI-I2SMOD`:** rulings D3 and D6.
+  - **The `spray` and `forge` firmware:** the RUL-11 tests.
+  - **The `rmw` firmware:** F2's test.
+- **How to run:**
+  - On Furnace: `tests/spike.sh`, `tests/adversarial.sh` and `tests/mutants.sh`. Each takes an optional source directory and defaults to `git archive HEAD`, and needs `~/bin/capped-run` and the image already pulled.
+  - In CI, `TVIBURI_CI=1` uses plain `podman run`. Only a disposable runner may set it.
+- **Concurrency:** one container of mine at a time throughout. Another builder's container (`/harness/capture`) was seen running once and was left alone.

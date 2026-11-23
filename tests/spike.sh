@@ -13,7 +13,7 @@ set -euo pipefail
 
 IMAGE=ghcr.io/clearforge-llc/aethelgard-tools@sha256:e5fc7ddbe36c050e78763ad1d203ec8d176408a3e534bed5563c424d8d9a1b58
 ACCEPTANCE="unit modf modeled stable cfg2first iolock rmw forge stock-forge stock-modf nomark conditions load crash"
-ADVERSARIAL="adv-removed adv-extra-arg adv-env adv-hook adv-loglevel adv-spray adv-noend"
+ADVERSARIAL="adv-removed adv-extra-arg adv-bad-variant adv-env adv-hook adv-loglevel adv-spray adv-noend"
 ALL="$ACCEPTANCE $ADVERSARIAL"
 here=$(cd "$(dirname "$0")/.." && pwd)
 scratch=${TVIBURI_SCRATCH:-$HOME/.cache/tviburi}
@@ -81,10 +81,6 @@ fields='(len(recs) == 1 and all(isinstance(recs[0].get(k), str) and recs[0][k].s
   ("rule", "peripheral", "register", "bit", "condition", "model_version", "citation", "state"))
   and recs[0]["peripheral"] == "sysbus.spi1" and recs[0]["model_version"].startswith("sha256:")
   and len(recs[0]["model_version"]) == 71 and "RM0433 Rev 9" in recs[0]["citation"])'
-monitor_output() { # as the runner reads it: no \r, and no log entries (they can land mid-line)
-  tr -d '\r' <"$1" | sed -zE 's/\[[0-9]{2}:[0-9]{2}:[0-9]{2}\.[0-9]{4}\] \[[A-Z]+\] [^\n]*\n//g'
-}
-
 forged_in() { grep -q 'usart3: .*{"tviburi":"witness"' "$work/$1/renode-log.txt"; }
 
 t_unit() {
@@ -191,7 +187,7 @@ t_conditions() {
  (\"TVI-SPI-MODF\", \"CFG2.MASTER (bit 22) = 0\", \"0x0\", 32),
  (\"TVI-SPI-MODF\", \"CFG2.MASTER (bit 22) = 0\", \"0x0\", 32)]' \
       && grep -qx 'CHECK REFUSED' '$work/conditions.stdout'"
-  local console; console=$(monitor_output "$work/conditions/renode.out")
+  local console; console=$("$src/scripts/monitor-output" "$work/conditions/renode.out")
   check "the conditions script reached its end" 'grep -qx TVIBURI-END <<<"$console"'
   check "reads return silicon's value: CR1.SSI from the copy, CFG2 from the copy" \
     "[ \"\$(grep -A1 -x READ-CR1 <<<\"\$console\" | tail -n1)\" = 0x00001000 ] && [ \"\$(grep -A1 -x READ-CFG2 <<<\"\$console\" | tail -n1)\" = 0x10000000 ]"
@@ -240,6 +236,11 @@ t_adv-removed() {
 t_adv-extra-arg() {
   pod adv-extra-arg "$src" -- /repo/scripts/tviburi-spike modf --no-refuse
   check "an extra runner argument fails (1)" '[ $rc -eq 1 ]'
+}
+
+t_adv-bad-variant() {
+  pod adv-bad-variant "$src" -- /repo/scripts/tviburi-spike "modf cfg2first"
+  check "a variant that names no firmware path fails (1)" '[ $rc -eq 1 ]'
 }
 
 t_adv-env() {
