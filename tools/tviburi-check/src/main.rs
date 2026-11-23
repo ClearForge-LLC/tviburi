@@ -347,8 +347,7 @@ mod tests {
         assert_eq!(run(&log), Verdict::Fail);
         assert!(problems(&log).iter().any(|p| p.contains("would-refuse")));
         let recorded = witness(0).replace(r#""mode":"enforcing""#, r#""mode":"recorded""#);
-        assert_eq!(run(&(recorded.clone() + &would + &end(2))), Verdict::Fail);
-        assert_eq!(run(&(recorded + &end(1))), Verdict::Fail);
+        assert_eq!(run(&(recorded + &would + &end(2))), Verdict::Fail);
     }
 
     #[test]

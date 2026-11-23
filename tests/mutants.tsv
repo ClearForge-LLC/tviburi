@@ -51,7 +51,7 @@ M32-loadRefusalAtNaming	model/Refusal.cs	                Refuse("TVI-LOAD", "unm
 S07-modelDirOverride	scripts/tviburi-spike	export TVIBURI_MODEL_DIR=$root/model\n	(empty)	adv-env
 N01-noteMasterStateAfterCr1	model/GuardedSTM32H7_SPI.cs	                cr1 = value;\n                NoteMasterState();	                cr1 = value;	conditions
 N02-fieldAllowList	model/GuardedSTM32H7_SPI.cs	if(f.Allowed != null && !f.Allowed.Contains(v))	if(false)	fields
-N03-noRegister	model/GuardedSTM32H7_SPI.cs	if(rows.Length == 0)	if(false)	conditions
+N03-noRegister	model/GuardedSTM32H7_SPI.cs	if(rows.Length == 0)	if(false)	fields
 N04-dsizeAtEnable	model/GuardedSTM32H7_SPI.cs	if(dsize != DsizeModeled)	if(false)	conditions
 N05-masterUnknownAtEnable	model/GuardedSTM32H7_SPI.cs	var failure = masterUnknown ? new Branch(	var failure = false ? new Branch(	conditions
 N06-modfcClears	model/GuardedSTM32H7_SPI.cs	if((value & IfcrModfc) != 0 && history != null)	if(false)	conditions
@@ -61,7 +61,7 @@ N09-cfg2ReadMasterUnknown	model/GuardedSTM32H7_SPI.cs	: masterUnknown ? "IFCR.MO
 N10-iolockOnlyFromSpe0	model/GuardedSTM32H7_SPI.cs	&& !wasEnabled && !ioLock)	&& !ioLock)	conditions
 N11-iolockKind	model/GuardedSTM32H7_SPI.cs	certain ? PredictedFault : Unmodeled, "SPI_CFG2"	PredictedFault, "SPI_CFG2"	conditions
 N12-iolockUncertainAfterDisable	model/GuardedSTM32H7_SPI.cs	                    ioLockCertain = false; // silicon clears IOLOCK on SPE 1->0 (p2215); not modeled\n	(empty)	conditions
-N13-iolockCertainty	model/GuardedSTM32H7_SPI.cs	ioLockCertain = (value & Cr1Spe) == 0 && history == null && !masterUnknown;	ioLockCertain = true;	conditions
+N13-iolockCertainty	model/GuardedSTM32H7_SPI.cs	ioLockCertain = (value & Cr1Spe) == 0;	ioLockCertain = true;	conditions
 N14-readIolockFromLatch	model/GuardedSTM32H7_SPI.cs	(cr1 & ~Cr1Stock & ~Cr1IoLock)	(cr1 & ~Cr1Stock)	conditions
 N15-readCfg1Copy	model/GuardedSTM32H7_SPI.cs	                return cfg1;	                return value;	conditions
 N16-cfg1Reset	model/GuardedSTM32H7_SPI.cs	            cfg1 = Cfg1Reset;	            cfg1 = 0;	conditions

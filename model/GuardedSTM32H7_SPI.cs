@@ -95,11 +95,11 @@ namespace Antmicro.Renode.Peripherals.Tviburi
                 var wasEnabled = (cr1 & Cr1Spe) != 0;
                 if((value & Cr1IoLock) != 0 && !wasEnabled && !ioLock)
                 {
-                    // Set only from SPE=0 (p2215, p2217). Certain only if this write leaves SPE=0 (whether
-                    // the write that enables counts is not settled) and no mode fault is possible (an
-                    // active MODF blocks the setting, p2215, p2225).
+                    // Set only from SPE=0 (p2215, p2217). Certain only if this write leaves SPE=0: whether the
+                    // write that enables counts is not settled. A doubt about MODF at this point lasts until
+                    // reset while latched (CFG2, which would clear it, is refused), so the refusal checks it.
                     ioLock = true;
-                    ioLockCertain = (value & Cr1Spe) == 0 && history == null && !masterUnknown;
+                    ioLockCertain = (value & Cr1Spe) == 0;
                 }
                 if(wasEnabled && (value & Cr1Spe) == 0)
                 {
@@ -700,7 +700,7 @@ namespace Antmicro.Renode.Peripherals.Tviburi
         private const long CrcPolyOffset = 0x40;
         private const long I2sCfgrOffset = 0x50;
         private const uint Cr1Spe = 1u << 0;
-        private const uint Cr1Stock = (1u << 0) | (1u << 9) | (1u << 10); // SPE, CSTART, CSUSP: driven by the stock model
+        private const uint Cr1Stock = Cr1Spe | Cr1Cstart | Cr1Csusp; // driven by the stock model
         private const uint Cr1Cstart = 1u << 9;
         private const uint Cr1Csusp = 1u << 10;
         private const uint Cr1Ssi = 1u << 12;

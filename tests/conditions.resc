@@ -190,7 +190,7 @@ sysbus ReadWord 0x40013030
 sysbus WriteWord 0x40013004 0x1
 machine Reset
 # 26 (C2, C4). reads served from the copies at reset: CFG1 (p2218) and CRCPOLY (p2228); MASRX from CR1's
-# copy; then a CRCPOLY write other than 0x107 refuses, and a write where no register is refuses
+# copy; a CRCPOLY write of 0x107 passes (the other values, and offsets with no register: tests/fields.resc)
 echo "READ-CFG1"
 sysbus ReadDoubleWord 0x40013008
 echo "READ-CRCPOLY"
@@ -202,8 +202,6 @@ sysbus WriteDoubleWord 0x40013010 0x41
 echo "READ-IER"
 sysbus ReadDoubleWord 0x40013010
 sysbus WriteDoubleWord 0x40013040 0x107
-sysbus WriteDoubleWord 0x40013040 0x7
-sysbus WriteDoubleWord 0x4001301C 0x0
 machine Reset
 # 28. reset clears MASTER unknown and the IER copy: after a reset, the CFG2 read is served (no refusal),
 # and IER reads its reset value

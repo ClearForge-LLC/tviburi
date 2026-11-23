@@ -55,3 +55,17 @@ Run twice: by me, and by an independent reviewer on Opus who had the code and no
   - a record from an unnamed source, a recorded-mode or mode-less witness, a `would-refuse` record, a wrong or missing version argument;
   - a record line the check cannot frame (a prompt prefix, a broken stamp). That used to be skipped, so a refusal behind a prompt would have been lost; it now fails the run.
 - **A log line under `spi1` whose text the firmware controls:** none. The stock model's log calls (L137, L192, L288, L302, L333, L404), Renode's "Unhandled" and tag lines, and `LogPeripheralAccess` lines all start with fixed text, and the firmware controls only hex values in them. A child device logs under its own name, which the check fails. The guard escapes every string it records.
+
+## 4. The reduction pass (diff), by a fresh subagent; I applied what is below
+
+- **Taken:**
+  - two `conditions` writes that `fields.resc` already covers;
+  - a duplicate unit assertion;
+  - two `REFUSAL` greps that the runner's exit 0 already implies;
+  - `ioLockCertain`'s write-time doubt, which the refusal-time test covers, since a doubt at latch time lasts while latched;
+  - `Cr1Stock` from the named bits.
+- **Kept:**
+  - the console fixtures byte-for-byte (provenance);
+  - the explicit `would-refuse` arm and its test (the architect asked for them by name);
+  - two cuts that were taste, not reduction.
+- **Not built, and reported:** the `CRCPOLY` copy, which could only ever hold `0x107`, was removed in favour of the constant, before this pass.
