@@ -129,7 +129,9 @@ t_generated() {
 t_field() {
   run field field
   check "a planted field outside the allow-list (CFG2.CPOL=1) is REFUSED (3), TVI-SPI-FIELD, unmodeled" \
-    "[ \$rc -eq 3 ] && records '$work/field.stdout' 'len(recs) == 1 and recs[0][\"rule\"] == \"TVI-SPI-FIELD\" and recs[0][\"kind\"] == \"unmodeled\" and recs[0][\"bit\"] == \"SPI_CFG2.CPOL (bit 25) = 1\"'"
+    "[ \$rc -eq 3 ] && records '$work/field.stdout' 'recs[0][\"seq\"] == 1 and recs[0][\"rule\"] == \"TVI-SPI-FIELD\" and recs[0][\"kind\"] == \"unmodeled\" and recs[0][\"bit\"] == \"SPI_CFG2.CPOL (bit 25) = 1\"'"
+  # The halt lands at the end of the translation block (RUL-08), so the firmware's later SPI writes
+  # also refuse; the first refusal is the verdict.
 }
 
 t_cfg2first() {
@@ -304,8 +306,10 @@ t_adv-hook() {
   fixture hook scripts/prelude.resc "$prelude_line" "$prelude_line
 sysbus SetHookBeforePeripheralWrite spi1 \"value = value | 0x100\""
   run adv-hook modf "$work/hook.tree"
+  # The hook ORs 0x100 into every spi1 write; in CFG2 that is a reserved bit, so the first refusal is the
+  # allow-list's, at the CFG2 write, carrying the hooked value.
   check "a monitor write hook on spi1 is installed (it changed the value) and does not displace the guard: REFUSED (3)" \
-    "[ \$rc -eq 3 ] && records '$work/adv-hook.stdout' 'len(recs) == 1 and recs[0][\"access\"][\"value\"] == \"0x101\"'"
+    "[ \$rc -eq 3 ] && records '$work/adv-hook.stdout' 'recs[0][\"rule\"] == \"TVI-SPI-FIELD\" and recs[0][\"access\"][\"value\"] == \"0x4400100\"'"
 }
 
 t_adv-loglevel() {
