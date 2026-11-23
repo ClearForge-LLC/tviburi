@@ -76,3 +76,22 @@ Run twice: by me, and by an independent reviewer on Opus who had the code and no
 - The strong claim now uses a script that quits cleanly without its end marker, which is deterministic and still kills `S04`.
 - The monitor-error route stays as its own case, asserting only that the run does not PASS.
 - Nothing was weakened: both claims are kept, each on a route that shows it every time.
+
+## 6. Gates (WO §2), on `08a559f`, run on Furnace
+
+Every container ran under `capped-run` at `nice -n 10`, one at a time, with `--network none`, in the image re-pinned to `1e0ab105…`.
+
+- **ArduPilot's SPI start** (`spi_lld_start` through `spi_lld_stop`, twice, with each read-modify-write as decoded from the ELF): **PASS, enforcing.** Its enable carries `MASRX` as silicon would (`CR1` = `0x101`). **The generated firmware's SPI1 sequence,** with its `SR` and `RXDR` reads: **PASS.**
+- **Every field outside the allow-list refuses** `TVI-SPI-FIELD`, `unmodeled`, by name: 58 cases from the monitor (`fields`), and one planted firmware (`field`, `CFG2.CPOL`) (gate clause 6).
+- **The `MODF` scar still refuses,** `predicted-fault`, citing RM0433 Rev 9 §50.5.2 p2184 (gate clause 4). Every other branch refuses with its kind, in order (`conditions`, 44 refusals).
+- **The check exits non-zero** on:
+  - a wrong expected version, or none (`adv-version`);
+  - a record from an unnamed source (`adv-version`, unit);
+  - a recorded-mode witness (`adv-recorded`, unit), a mode-less witness (unit), a `would-refuse` record (unit);
+  - a record it cannot frame (unit).
+  
+  It reads `1150` (ii)'s console fixture in both framings (unit; gate clause 7).
+- **Suites:** acceptance and adversarial, 48 checks, all pass. Reference check: 20 unit tests.
+- **Mutation, diff-sized:** 92 mutants, one per guard this work order adds or changes, plus `0100a`'s rows re-anchored. **All 92 killed.** Two mutants survived dry runs and drove fixes: `N13` (`IOLOCK` certainty, no case isolated it) and one wrong-kind route.
+- **Reduction pass (diff):** −5 lines net · 2 duplicates removed · 0 dead paths removed · 1 protected kept (the console fixture's verbatim copy) · 2 findings (§4).
+- **CI:** on the PR.
