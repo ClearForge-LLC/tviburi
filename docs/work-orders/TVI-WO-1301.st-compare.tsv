@@ -1,0 +1,377 @@
+# DS pins: 168; ST GPIO_Pin entries: 173; ST pins with an AF and no DS row: ['PA0_C', 'PA1_C', 'PC2_C', 'PC3_C']
+class	pin	af	ds_cell	ds_page	st_signals	note
+alias	PA0	11	ETH_MII_CRS	89	ETH_CRS	ETH MII and RMII names merged
+presence	PA0	15	EVENTOUT	89	-	
+alias	PA1	11	ETH_MII_RX_CLK/ETH_RMII_REF_CLK	89	ETH_REF_CLK/ETH_RX_CLK	ETH MII and RMII names merged
+alias	PA1	14	LCD_R2	89	LTDC_R2	LCD is ST open pin data's LTDC
+presence	PA1	15	EVENTOUT	89	-	
+alias	PA2	14	LCD_R1	89	LTDC_R1	LCD is ST open pin data's LTDC
+presence	PA2	15	EVENTOUT	89	-	
+alias	PA3	9	LCD_B2	89	LTDC_B2	LCD is ST open pin data's LTDC
+alias	PA3	10	OTG_HS_ULPI_D0	89	USB_OTG_HS_ULPI_D0	OTG_ is USB_OTG_
+alias	PA3	11	ETH_MII_COL	89	ETH_COL	ETH MII and RMII names merged
+alias	PA3	14	LCD_B5	89	LTDC_B5	LCD is ST open pin data's LTDC
+presence	PA3	15	EVENTOUT	89	-	
+presence	PA4	0	D1PWREN	89	-	
+alias	PA4	12	OTG_HS_SOF	89	USB_OTG_HS_SOF	OTG_ is USB_OTG_
+alias	PA4	14	LCD_VSYNC	89	LTDC_VSYNC	LCD is ST open pin data's LTDC
+presence	PA4	15	EVENTOUT	89	-	
+presence	PA5	0	D2PWREN	89	-	
+alias	PA5	10	OTG_HS_ULPI_CK	89	USB_OTG_HS_ULPI_CK	OTG_ is USB_OTG_
+alias	PA5	14	LCD_R4	89	LTDC_R4	LCD is ST open pin data's LTDC
+presence	PA5	15	EVENTOUT	89	-	
+alias	PA6	10	TIM8_BKIN_COMP12	89	TIM8_BKIN_COMP1/TIM8_BKIN_COMP2	COMP12 is two signals, COMP1 and COMP2
+alias	PA6	12	TIM1_BKIN_COMP12	89	TIM1_BKIN_COMP1/TIM1_BKIN_COMP2	COMP12 is two signals, COMP1 and COMP2
+alias	PA6	14	LCD_G2	89	LTDC_G2	LCD is ST open pin data's LTDC
+presence	PA6	15	EVENTOUT	89	-	
+alias	PA7	11	ETH_MII_RX_DV/ETH_RMII_CRS_DV	89	ETH_CRS_DV/ETH_RX_DV	ETH MII and RMII names merged
+presence	PA7	15	EVENTOUT	89	-	
+alias	PA8	0	MCO1	89	RCC_MCO_1	MCOn is RCC_MCO_n
+alias	PA8	10	OTG_FS_SOF	89	USB_OTG_FS_SOF	OTG_ is USB_OTG_
+alias	PA8	12	TIM8_BKIN2_COMP12	89	TIM8_BKIN2_COMP1/TIM8_BKIN2_COMP2	COMP12 is two signals, COMP1 and COMP2
+alias	PA8	13	LCD_B3	89	LTDC_B3	LCD is ST open pin data's LTDC
+alias	PA8	14	LCD_R6	89	LTDC_R6	LCD is ST open pin data's LTDC
+presence	PA8	15	EVENTOUT	89	-	
+alias	PA9	14	LCD_R5	89	LTDC_R5	LCD is ST open pin data's LTDC
+presence	PA9	15	EVENTOUT	89	-	
+alias	PA10	10	OTG_FS_ID	89	USB_OTG_FS_ID	OTG_ is USB_OTG_
+alias	PA10	12	LCD_B4	89	LTDC_B4	LCD is ST open pin data's LTDC
+alias	PA10	14	LCD_B1	89	LTDC_B1	LCD is ST open pin data's LTDC
+presence	PA10	15	EVENTOUT	89	-	
+alias	PA11	10	OTG_FS_DM	89	USB_OTG_FS_DM	OTG_ is USB_OTG_
+alias	PA11	14	LCD_R4	89	LTDC_R4	LCD is ST open pin data's LTDC
+presence	PA11	15	EVENTOUT	89	-	
+alias	PA12	10	OTG_FS_DP	90	USB_OTG_FS_DP	OTG_ is USB_OTG_
+alias	PA12	14	LCD_R5	90	LTDC_R5	LCD is ST open pin data's LTDC
+presence	PA12	15	EVENTOUT	90	-	
+alias	PA13	0	JTMS-SWDIO	90	DEBUG_JTMS-SWDIO	debug signals carry DEBUG_
+presence	PA13	15	EVENTOUT	90	-	
+alias	PA14	0	JTCK-SWCLK	90	DEBUG_JTCK-SWCLK	debug signals carry DEBUG_
+presence	PA14	15	EVENTOUT	90	-	
+alias	PA15	0	JTDI	90	DEBUG_JTDI	debug signals carry DEBUG_
+presence	PA15	13	-	90	DSIHOST_TE	
+presence	PA15	15	EVENTOUT	90	-	
+alias	PB0	9	LCD_R3	90	LTDC_R3	LCD is ST open pin data's LTDC
+alias	PB0	10	OTG_HS_ULPI_D1	90	USB_OTG_HS_ULPI_D1	OTG_ is USB_OTG_
+alias	PB0	11	ETH_MII_RXD2	90	ETH_RXD2	ETH MII and RMII names merged
+alias	PB0	14	LCD_G1	90	LTDC_G1	LCD is ST open pin data's LTDC
+presence	PB0	15	EVENTOUT	90	-	
+alias	PB1	9	LCD_R6	90	LTDC_R6	LCD is ST open pin data's LTDC
+alias	PB1	10	OTG_HS_ULPI_D2	90	USB_OTG_HS_ULPI_D2	OTG_ is USB_OTG_
+alias	PB1	11	ETH_MII_RXD3	90	ETH_RXD3	ETH MII and RMII names merged
+alias	PB1	14	LCD_G0	90	LTDC_G0	LCD is ST open pin data's LTDC
+presence	PB1	15	EVENTOUT	90	-	
+alias	PB2	0	RTC_OUT	90	RTC_OUT_ALARM/RTC_OUT_CALIB	RTC_OUT is two ST signals
+presence	PB2	15	EVENTOUT	90	-	
+alias	PB3	0	JTDO/TRACESWO	90	DEBUG_JTDO-SWO	JTDO/TRACESWO is one ST signal, DEBUG_JTDO-SWO
+presence	PB3	15	EVENTOUT	90	-	
+alias	PB4	0	NJTRST	90	SYS_JTRST	NJTRST is SYS_JTRST
+presence	PB4	15	EVENTOUT	90	-	
+alias	PB5	10	OTG_HS_ULPI_D7	90	USB_OTG_HS_ULPI_D7	OTG_ is USB_OTG_
+presence	PB5	15	EVENTOUT	90	-	
+presence	PB6	15	EVENTOUT	90	-	
+presence	PB7	15	EVENTOUT	90	-	
+alias	PB8	11	ETH_MII_TXD3	90	ETH_TXD3	ETH MII and RMII names merged
+alias	PB8	14	LCD_B6	90	LTDC_B6	LCD is ST open pin data's LTDC
+presence	PB8	15	EVENTOUT	90	-	
+alias	PB9	14	LCD_B7	90	LTDC_B7	LCD is ST open pin data's LTDC
+presence	PB9	15	EVENTOUT	90	-	
+alias	PB10	10	OTG_HS_ULPI_D3	91	USB_OTG_HS_ULPI_D3	OTG_ is USB_OTG_
+alias	PB10	11	ETH_MII_RX_ER	91	ETH_RX_ER	ETH MII and RMII names merged
+alias	PB10	14	LCD_G4	91	LTDC_G4	LCD is ST open pin data's LTDC
+presence	PB10	15	EVENTOUT	91	-	
+alias	PB11	10	OTG_HS_ULPI_D4	91	USB_OTG_HS_ULPI_D4	OTG_ is USB_OTG_
+alias	PB11	11	ETH_MII_TX_EN/ETH_RMII_TX_EN	91	ETH_TX_EN	ETH MII and RMII names merged
+presence	PB11	13	-	91	DSIHOST_TE	
+alias	PB11	14	LCD_G5	91	LTDC_G5	LCD is ST open pin data's LTDC
+presence	PB11	15	EVENTOUT	91	-	
+alias	PB12	10	OTG_HS_ULPI_D5	91	USB_OTG_HS_ULPI_D5	OTG_ is USB_OTG_
+alias	PB12	11	ETH_MII_TXD0/ETH_RMII_TXD0	91	ETH_TXD0	ETH MII and RMII names merged
+alias	PB12	12	OTG_HS_ID	91	USB_OTG_HS_ID	OTG_ is USB_OTG_
+alias	PB12	13	TIM1_BKIN_COMP12	91	TIM1_BKIN_COMP1/TIM1_BKIN_COMP2	COMP12 is two signals, COMP1 and COMP2
+presence	PB12	15	EVENTOUT	91	-	
+alias	PB13	10	OTG_HS_ULPI_D6	91	USB_OTG_HS_ULPI_D6	OTG_ is USB_OTG_
+alias	PB13	11	ETH_MII_TXD1/ETH_RMII_TXD1	91	ETH_TXD1	ETH MII and RMII names merged
+presence	PB13	15	EVENTOUT	91	-	
+alias	PB14	12	OTG_HS_DM	91	USB_OTG_HS_DM	OTG_ is USB_OTG_
+presence	PB14	15	EVENTOUT	91	-	
+alias	PB15	12	OTG_HS_DP	91	USB_OTG_HS_DP	OTG_ is USB_OTG_
+presence	PB15	15	EVENTOUT	91	-	
+alias	PC0	10	OTG_HS_ULPI_STP	91	USB_OTG_HS_ULPI_STP	OTG_ is USB_OTG_
+alias	PC0	14	LCD_R5	91	LTDC_R5	LCD is ST open pin data's LTDC
+presence	PC0	15	EVENTOUT	91	-	
+alias	PC1	0	TRACED0	91	DEBUG_TRACED0	debug signals carry DEBUG_
+presence	PC1	15	EVENTOUT	91	-	
+presence	PC2	0	C1DSLEEP	91	-	
+alias	PC2	10	OTG_HS_ULPI_DIR	91	USB_OTG_HS_ULPI_DIR	OTG_ is USB_OTG_
+alias	PC2	11	ETH_MII_TXD2	91	ETH_TXD2	ETH MII and RMII names merged
+presence	PC2	15	EVENTOUT	91	-	
+presence	PC3	0	C1SLEEP	91	-	
+alias	PC3	10	OTG_HS_ULPI_NXT	91	USB_OTG_HS_ULPI_NXT	OTG_ is USB_OTG_
+alias	PC3	11	ETH_MII_TX_CLK	91	ETH_TX_CLK	ETH MII and RMII names merged
+presence	PC3	15	EVENTOUT	91	-	
+presence	PC4	0	C2DSLEEP	91	-	
+name	PC4	9	SPDIFRX1_IN3	91	SPDIFRX1_IN2	
+alias	PC4	11	ETH_MII_RXD0/ETH_RMII_RXD0	91	ETH_RXD0	ETH MII and RMII names merged
+presence	PC4	15	EVENTOUT	91	-	
+presence	PC5	0	C2SLEEP	91	-	
+name	PC5	9	SPDIFRX1_IN4	91	SPDIFRX1_IN3	
+alias	PC5	11	ETH_MII_RXD1/ETH_RMII_RXD1	91	ETH_RXD1	ETH MII and RMII names merged
+presence	PC5	15	EVENTOUT	91	-	
+alias	PC6	14	LCD_HSYNC	92	LTDC_HSYNC	LCD is ST open pin data's LTDC
+presence	PC6	15	EVENTOUT	92	-	
+alias	PC7	0	TRGIO	92	DEBUG_TRGIO	debug signals carry DEBUG_
+alias	PC7	11	SWPMI_TX	92	SWPMI1_TX	SWPMI is SWPMI1
+alias	PC7	14	LCD_G6	92	LTDC_G6	LCD is ST open pin data's LTDC
+presence	PC7	15	EVENTOUT	92	-	
+alias	PC8	0	TRACED1	92	DEBUG_TRACED1	debug signals carry DEBUG_
+alias	PC8	11	SWPMI_RX	92	SWPMI1_RX	SWPMI is SWPMI1
+presence	PC8	15	EVENTOUT	92	-	
+alias	PC9	0	MCO2	92	RCC_MCO_2	MCOn is RCC_MCO_n
+alias	PC9	10	LCD_G3	92	LTDC_G3	LCD is ST open pin data's LTDC
+alias	PC9	11	SWPMI_SUSPEND	92	SWPMI1_SUSPEND	SWPMI is SWPMI1
+alias	PC9	14	LCD_B2	92	LTDC_B2	LCD is ST open pin data's LTDC
+presence	PC9	15	EVENTOUT	92	-	
+alias	PC10	14	LCD_R2	92	LTDC_R2	LCD is ST open pin data's LTDC
+presence	PC10	15	EVENTOUT	92	-	
+presence	PC11	15	EVENTOUT	92	-	
+alias	PC12	0	TRACED3	92	DEBUG_TRACED3	debug signals carry DEBUG_
+presence	PC12	15	EVENTOUT	92	-	
+presence	PC13	15	EVENTOUT	92	-	
+presence	PC14	15	EVENTOUT	92	-	
+presence	PC15	15	EVENTOUT	92	-	
+presence	PD0	15	EVENTOUT	92	-	
+presence	PD1	15	EVENTOUT	92	-	
+alias	PD2	0	TRACED2	92	DEBUG_TRACED2	debug signals carry DEBUG_
+presence	PD2	15	EVENTOUT	92	-	
+alias	PD3	14	LCD_G7	92	LTDC_G7	LCD is ST open pin data's LTDC
+presence	PD3	15	EVENTOUT	92	-	
+presence	PD4	15	EVENTOUT	92	-	
+presence	PD5	15	EVENTOUT	93	-	
+alias	PD6	14	LCD_B2	93	LTDC_B2	LCD is ST open pin data's LTDC
+presence	PD6	15	EVENTOUT	93	-	
+name	PD7	9	SPDIFRX1_IN1	93	SPDIFRX1_IN0	
+presence	PD7	15	EVENTOUT	93	-	
+name	PD8	9	SPDIFRX1_IN2	93	SPDIFRX1_IN1	
+presence	PD8	15	EVENTOUT	93	-	
+presence	PD9	15	EVENTOUT	93	-	
+alias	PD10	14	LCD_B3	93	LTDC_B3	LCD is ST open pin data's LTDC
+presence	PD10	15	EVENTOUT	93	-	
+presence	PD11	15	EVENTOUT	93	-	
+presence	PD12	15	EVENTOUT	93	-	
+presence	PD13	15	EVENTOUT	93	-	
+presence	PD14	15	EVENTOUT	93	-	
+presence	PD15	15	EVENTOUT	93	-	
+presence	PE0	15	EVENTOUT	94	-	
+presence	PE1	15	EVENTOUT	94	-	
+alias	PE2	0	TRACECLK	94	DEBUG_TRACECLK	debug signals carry DEBUG_
+alias	PE2	11	ETH_MII_TXD3	94	ETH_TXD3	ETH MII and RMII names merged
+presence	PE2	15	EVENTOUT	94	-	
+alias	PE3	0	TRACED0	94	DEBUG_TRACED0	debug signals carry DEBUG_
+presence	PE3	15	EVENTOUT	94	-	
+alias	PE4	0	TRACED1	94	DEBUG_TRACED1	debug signals carry DEBUG_
+alias	PE4	14	LCD_B0	94	LTDC_B0	LCD is ST open pin data's LTDC
+presence	PE4	15	EVENTOUT	94	-	
+alias	PE5	0	TRACED2	94	DEBUG_TRACED2	debug signals carry DEBUG_
+alias	PE5	14	LCD_G0	94	LTDC_G0	LCD is ST open pin data's LTDC
+presence	PE5	15	EVENTOUT	94	-	
+alias	PE6	0	TRACED3	94	DEBUG_TRACED3	debug signals carry DEBUG_
+alias	PE6	11	TIM1_BKIN2_COMP12	94	TIM1_BKIN2_COMP1/TIM1_BKIN2_COMP2	COMP12 is two signals, COMP1 and COMP2
+alias	PE6	14	LCD_G1	94	LTDC_G1	LCD is ST open pin data's LTDC
+presence	PE6	15	EVENTOUT	94	-	
+presence	PE7	15	EVENTOUT	94	-	
+presence	PE8	15	EVENTOUT	94	-	
+presence	PE9	15	EVENTOUT	94	-	
+presence	PE10	15	EVENTOUT	94	-	
+alias	PE11	14	LCD_G3	94	LTDC_G3	LCD is ST open pin data's LTDC
+presence	PE11	15	EVENTOUT	94	-	
+alias	PE12	14	LCD_B4	94	LTDC_B4	LCD is ST open pin data's LTDC
+presence	PE12	15	EVENTOUT	94	-	
+alias	PE13	14	LCD_DE	94	LTDC_DE	LCD is ST open pin data's LTDC
+presence	PE13	15	EVENTOUT	94	-	
+alias	PE14	14	LCD_CLK	94	LTDC_CLK	LCD is ST open pin data's LTDC
+presence	PE14	15	EVENTOUT	94	-	
+alias	PE15	13	TIM1_BKIN_COMP12/COMP_TIM1_BKIN	94	COMP_TIM1_BKIN/TIM1_BKIN_COMP1/TIM1_BKIN_COMP2	COMP12 is two signals, COMP1 and COMP2
+alias	PE15	14	LCD_R7	94	LTDC_R7	LCD is ST open pin data's LTDC
+presence	PE15	15	EVENTOUT	94	-	
+presence	PF0	15	EVENTOUT	95	-	
+presence	PF1	15	EVENTOUT	95	-	
+presence	PF2	15	EVENTOUT	95	-	
+presence	PF3	15	EVENTOUT	95	-	
+presence	PF4	15	EVENTOUT	95	-	
+presence	PF5	15	EVENTOUT	95	-	
+presence	PF6	15	EVENTOUT	95	-	
+presence	PF7	15	EVENTOUT	95	-	
+presence	PF8	15	EVENTOUT	95	-	
+presence	PF9	15	EVENTOUT	95	-	
+alias	PF10	14	LCD_DE	95	LTDC_DE	LCD is ST open pin data's LTDC
+presence	PF10	15	EVENTOUT	95	-	
+presence	PF11	15	EVENTOUT	95	-	
+presence	PF12	15	EVENTOUT	95	-	
+presence	PF13	15	EVENTOUT	95	-	
+presence	PF14	15	EVENTOUT	95	-	
+presence	PF15	15	EVENTOUT	95	-	
+presence	PG0	15	EVENTOUT	96	-	
+presence	PG1	15	EVENTOUT	96	-	
+alias	PG2	11	TIM8_BKIN_COMP12	96	TIM8_BKIN_COMP1/TIM8_BKIN_COMP2	COMP12 is two signals, COMP1 and COMP2
+presence	PG2	15	EVENTOUT	96	-	
+alias	PG3	11	TIM8_BKIN2_COMP12	96	TIM8_BKIN2_COMP1/TIM8_BKIN2_COMP2	COMP12 is two signals, COMP1 and COMP2
+presence	PG3	15	EVENTOUT	96	-	
+alias	PG4	11	TIM1_BKIN2_COMP12	96	TIM1_BKIN2_COMP1/TIM1_BKIN2_COMP2	COMP12 is two signals, COMP1 and COMP2
+presence	PG4	15	EVENTOUT	96	-	
+presence	PG5	15	EVENTOUT	96	-	
+alias	PG6	14	LCD_R7	96	LTDC_R7	LCD is ST open pin data's LTDC
+presence	PG6	15	EVENTOUT	96	-	
+alias	PG7	14	LCD_CLK	96	LTDC_CLK	LCD is ST open pin data's LTDC
+presence	PG7	15	EVENTOUT	96	-	
+name	PG8	8	SPDIFRX1_IN3	96	SPDIFRX1_IN2	
+alias	PG8	14	LCD_G7	96	LTDC_G7	LCD is ST open pin data's LTDC
+presence	PG8	15	EVENTOUT	96	-	
+name	PG9	8	SPDIFRX1_IN4	96	SPDIFRX1_IN3	
+presence	PG9	15	EVENTOUT	96	-	
+alias	PG10	9	LCD_G3	96	LTDC_G3	LCD is ST open pin data's LTDC
+alias	PG10	14	LCD_B2	96	LTDC_B2	LCD is ST open pin data's LTDC
+presence	PG10	15	EVENTOUT	96	-	
+name	PG11	8	SPDIFRX1_IN1	96	SPDIFRX1_IN0	
+alias	PG11	11	ETH_MII_TX_EN/ETH_RMII_TX_EN	96	ETH_TX_EN	ETH MII and RMII names merged
+alias	PG11	14	LCD_B3	96	LTDC_B3	LCD is ST open pin data's LTDC
+presence	PG11	15	EVENTOUT	96	-	
+name	PG12	8	SPDIFRX1_IN2	97	SPDIFRX1_IN1	
+alias	PG12	9	LCD_B4	97	LTDC_B4	LCD is ST open pin data's LTDC
+alias	PG12	11	ETH_MII_TXD1/ETH_RMII_TXD1	97	ETH_TXD1	ETH MII and RMII names merged
+alias	PG12	14	LCD_B1	97	LTDC_B1	LCD is ST open pin data's LTDC
+presence	PG12	15	EVENTOUT	97	-	
+alias	PG13	0	TRACED0	97	DEBUG_TRACED0	debug signals carry DEBUG_
+alias	PG13	11	ETH_MII_TXD0/ETH_RMII_TXD0	97	ETH_TXD0	ETH MII and RMII names merged
+alias	PG13	14	LCD_R0	97	LTDC_R0	LCD is ST open pin data's LTDC
+presence	PG13	15	EVENTOUT	97	-	
+alias	PG14	0	TRACED1	97	DEBUG_TRACED1	debug signals carry DEBUG_
+alias	PG14	11	ETH_MII_TXD1/ETH_RMII_TXD1	97	ETH_TXD1	ETH MII and RMII names merged
+alias	PG14	14	LCD_B0	97	LTDC_B0	LCD is ST open pin data's LTDC
+presence	PG14	15	EVENTOUT	97	-	
+presence	PG15	15	EVENTOUT	97	-	
+presence	PH0	15	EVENTOUT	97	-	
+presence	PH1	15	EVENTOUT	97	-	
+alias	PH2	11	ETH_MII_CRS	97	ETH_CRS	ETH MII and RMII names merged
+alias	PH2	14	LCD_R0	97	LTDC_R0	LCD is ST open pin data's LTDC
+presence	PH2	15	EVENTOUT	97	-	
+alias	PH3	11	ETH_MII_COL	97	ETH_COL	ETH MII and RMII names merged
+alias	PH3	14	LCD_R1	97	LTDC_R1	LCD is ST open pin data's LTDC
+presence	PH3	15	EVENTOUT	97	-	
+alias	PH4	9	LCD_G5	97	LTDC_G5	LCD is ST open pin data's LTDC
+alias	PH4	10	OTG_HS_ULPI_NXT	97	USB_OTG_HS_ULPI_NXT	OTG_ is USB_OTG_
+alias	PH4	14	LCD_G4	97	LTDC_G4	LCD is ST open pin data's LTDC
+presence	PH4	15	EVENTOUT	97	-	
+presence	PH5	15	EVENTOUT	97	-	
+alias	PH6	11	ETH_MII_RXD2	97	ETH_RXD2	ETH MII and RMII names merged
+presence	PH6	15	EVENTOUT	97	-	
+alias	PH7	11	ETH_MII_RXD3	97	ETH_RXD3	ETH MII and RMII names merged
+presence	PH7	15	EVENTOUT	97	-	
+alias	PH8	14	LCD_R2	97	LTDC_R2	LCD is ST open pin data's LTDC
+presence	PH8	15	EVENTOUT	97	-	
+alias	PH9	14	LCD_R3	97	LTDC_R3	LCD is ST open pin data's LTDC
+presence	PH9	15	EVENTOUT	97	-	
+alias	PH10	14	LCD_R4	98	LTDC_R4	LCD is ST open pin data's LTDC
+presence	PH10	15	EVENTOUT	98	-	
+alias	PH11	14	LCD_R5	98	LTDC_R5	LCD is ST open pin data's LTDC
+presence	PH11	15	EVENTOUT	98	-	
+alias	PH12	14	LCD_R6	98	LTDC_R6	LCD is ST open pin data's LTDC
+presence	PH12	15	EVENTOUT	98	-	
+alias	PH13	14	LCD_G2	98	LTDC_G2	LCD is ST open pin data's LTDC
+presence	PH13	15	EVENTOUT	98	-	
+alias	PH14	14	LCD_G3	98	LTDC_G3	LCD is ST open pin data's LTDC
+presence	PH14	15	EVENTOUT	98	-	
+alias	PH15	14	LCD_G4	98	LTDC_G4	LCD is ST open pin data's LTDC
+presence	PH15	15	EVENTOUT	98	-	
+alias	PI0	14	LCD_G5	98	LTDC_G5	LCD is ST open pin data's LTDC
+presence	PI0	15	EVENTOUT	98	-	
+alias	PI1	11	TIM8_BKIN2_COMP12	98	TIM8_BKIN2_COMP1/TIM8_BKIN2_COMP2	COMP12 is two signals, COMP1 and COMP2
+alias	PI1	14	LCD_G6	98	LTDC_G6	LCD is ST open pin data's LTDC
+presence	PI1	15	EVENTOUT	98	-	
+alias	PI2	14	LCD_G7	98	LTDC_G7	LCD is ST open pin data's LTDC
+presence	PI2	15	EVENTOUT	98	-	
+presence	PI3	15	EVENTOUT	98	-	
+alias	PI4	11	TIM8_BKIN_COMP12	98	TIM8_BKIN_COMP1/TIM8_BKIN_COMP2	COMP12 is two signals, COMP1 and COMP2
+alias	PI4	14	LCD_B4	98	LTDC_B4	LCD is ST open pin data's LTDC
+presence	PI4	15	EVENTOUT	98	-	
+alias	PI5	14	LCD_B5	98	LTDC_B5	LCD is ST open pin data's LTDC
+presence	PI5	15	EVENTOUT	98	-	
+alias	PI6	14	LCD_B6	98	LTDC_B6	LCD is ST open pin data's LTDC
+presence	PI6	15	EVENTOUT	98	-	
+alias	PI7	14	LCD_B7	98	LTDC_B7	LCD is ST open pin data's LTDC
+presence	PI7	15	EVENTOUT	98	-	
+presence	PI8	15	EVENTOUT	98	-	
+alias	PI9	14	LCD_VSYNC	99	LTDC_VSYNC	LCD is ST open pin data's LTDC
+presence	PI9	15	EVENTOUT	99	-	
+alias	PI10	11	ETH_MII_RX_ER	99	ETH_RX_ER	ETH MII and RMII names merged
+alias	PI10	14	LCD_HSYNC	99	LTDC_HSYNC	LCD is ST open pin data's LTDC
+presence	PI10	15	EVENTOUT	99	-	
+alias	PI11	9	LCD_G6	99	LTDC_G6	LCD is ST open pin data's LTDC
+alias	PI11	10	OTG_HS_ULPI_DIR	99	USB_OTG_HS_ULPI_DIR	OTG_ is USB_OTG_
+presence	PI11	15	EVENTOUT	99	-	
+alias	PI12	14	LCD_HSYNC	99	LTDC_HSYNC	LCD is ST open pin data's LTDC
+presence	PI12	15	EVENTOUT	99	-	
+alias	PI13	14	LCD_VSYNC	99	LTDC_VSYNC	LCD is ST open pin data's LTDC
+presence	PI13	15	EVENTOUT	99	-	
+alias	PI14	14	LCD_CLK	99	LTDC_CLK	LCD is ST open pin data's LTDC
+presence	PI14	15	EVENTOUT	99	-	
+alias	PI15	9	LCD_G2	99	LTDC_G2	LCD is ST open pin data's LTDC
+alias	PI15	14	LCD_R0	99	LTDC_R0	LCD is ST open pin data's LTDC
+presence	PI15	15	EVENTOUT	99	-	
+alias	PJ0	9	LCD_R7	99	LTDC_R7	LCD is ST open pin data's LTDC
+alias	PJ0	14	LCD_R1	99	LTDC_R1	LCD is ST open pin data's LTDC
+presence	PJ0	15	EVENTOUT	99	-	
+alias	PJ1	14	LCD_R2	99	LTDC_R2	LCD is ST open pin data's LTDC
+presence	PJ1	15	EVENTOUT	99	-	
+presence	PJ2	13	-	99	DSIHOST_TE	
+alias	PJ2	14	LCD_R3	99	LTDC_R3	LCD is ST open pin data's LTDC
+presence	PJ2	15	EVENTOUT	99	-	
+alias	PJ3	14	LCD_R4	99	LTDC_R4	LCD is ST open pin data's LTDC
+presence	PJ3	15	EVENTOUT	99	-	
+alias	PJ4	14	LCD_R5	99	LTDC_R5	LCD is ST open pin data's LTDC
+presence	PJ4	15	EVENTOUT	99	-	
+alias	PJ5	14	LCD_R6	99	LTDC_R6	LCD is ST open pin data's LTDC
+presence	PJ5	15	EVENTOUT	99	-	
+alias	PJ6	14	LCD_R7	99	LTDC_R7	LCD is ST open pin data's LTDC
+presence	PJ6	15	EVENTOUT	99	-	
+alias	PJ7	0	TRGIN	99	DEBUG_TRGIN	debug signals carry DEBUG_
+alias	PJ7	14	LCD_G0	99	LTDC_G0	LCD is ST open pin data's LTDC
+presence	PJ7	15	EVENTOUT	99	-	
+alias	PJ8	14	LCD_G1	99	LTDC_G1	LCD is ST open pin data's LTDC
+presence	PJ8	15	EVENTOUT	99	-	
+alias	PJ9	14	LCD_G2	100	LTDC_G2	LCD is ST open pin data's LTDC
+presence	PJ9	15	EVENTOUT	100	-	
+alias	PJ10	14	LCD_G3	100	LTDC_G3	LCD is ST open pin data's LTDC
+presence	PJ10	15	EVENTOUT	100	-	
+alias	PJ11	14	LCD_G4	100	LTDC_G4	LCD is ST open pin data's LTDC
+presence	PJ11	15	EVENTOUT	100	-	
+alias	PJ12	0	TRGOUT	100	DEBUG_TRGOUT	debug signals carry DEBUG_
+alias	PJ12	9	LCD_G3	100	LTDC_G3	LCD is ST open pin data's LTDC
+alias	PJ12	14	LCD_B0	100	LTDC_B0	LCD is ST open pin data's LTDC
+presence	PJ12	15	EVENTOUT	100	-	
+alias	PJ13	9	LCD_B4	100	LTDC_B4	LCD is ST open pin data's LTDC
+alias	PJ13	14	LCD_B1	100	LTDC_B1	LCD is ST open pin data's LTDC
+presence	PJ13	15	EVENTOUT	100	-	
+alias	PJ14	14	LCD_B2	100	LTDC_B2	LCD is ST open pin data's LTDC
+presence	PJ14	15	EVENTOUT	100	-	
+alias	PJ15	14	LCD_B3	100	LTDC_B3	LCD is ST open pin data's LTDC
+presence	PJ15	15	EVENTOUT	100	-	
+alias	PK0	14	LCD_G5	100	LTDC_G5	LCD is ST open pin data's LTDC
+presence	PK0	15	EVENTOUT	100	-	
+alias	PK1	14	LCD_G6	100	LTDC_G6	LCD is ST open pin data's LTDC
+presence	PK1	15	EVENTOUT	100	-	
+alias	PK2	10	TIM8_BKIN_COMP12	100	TIM8_BKIN_COMP1/TIM8_BKIN_COMP2	COMP12 is two signals, COMP1 and COMP2
+alias	PK2	11	TIM1_BKIN_COMP12	100	TIM1_BKIN_COMP1/TIM1_BKIN_COMP2	COMP12 is two signals, COMP1 and COMP2
+alias	PK2	14	LCD_G7	100	LTDC_G7	LCD is ST open pin data's LTDC
+presence	PK2	15	EVENTOUT	100	-	
+alias	PK3	14	LCD_B4	100	LTDC_B4	LCD is ST open pin data's LTDC
+presence	PK3	15	EVENTOUT	100	-	
+alias	PK4	14	LCD_B5	100	LTDC_B5	LCD is ST open pin data's LTDC
+presence	PK4	15	EVENTOUT	100	-	
+alias	PK5	14	LCD_B6	100	LTDC_B6	LCD is ST open pin data's LTDC
+presence	PK5	15	EVENTOUT	100	-	
+alias	PK6	14	LCD_B7	100	LTDC_B7	LCD is ST open pin data's LTDC
+presence	PK6	15	EVENTOUT	100	-	
+alias	PK7	14	LCD_DE	100	LTDC_DE	LCD is ST open pin data's LTDC
+presence	PK7	15	EVENTOUT	100	-	
+# agree 2314, af-number 0, presence 177, alias 189, name 8
