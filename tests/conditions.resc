@@ -182,6 +182,7 @@ machine Reset
 sysbus WriteDoubleWord 0x40013000 0x1000
 sysbus WriteDoubleWord 0x4001300C 0x04400000
 sysbus WriteDoubleWord 0x40013000 0x1001
+sysbus WriteDoubleWord 0x40013000 0x1201
 sysbus WriteByte 0x40013020 0x55
 sysbus ReadByte 0x40013030
 sysbus WriteDoubleWord 0x40013020 0x55
@@ -223,5 +224,41 @@ sysbus WriteDoubleWord 0x40013000 0x1200
 sysbus WriteDoubleWord 0x40013000 0x1201
 sysbus WriteDoubleWord 0x40013000 0x1001
 sysbus WriteDoubleWord 0x40013004 0x4
+machine Reset
+# 29. MASTER unknown comes before the truth table: history, MODFC, then SPE with SSI=0 refuses unmodeled
+sysbus WriteDoubleWord 0x4001300C 0x04400000
+sysbus WriteDoubleWord 0x40013018 0x200
+sysbus WriteDoubleWord 0x40013000 0x1
+machine Reset
+# 30 (TVI-SPI-READ). no register; write-only IFCR and TXDR; RXDR with the RxFIFO empty
+sysbus ReadDoubleWord 0x4001301C
+sysbus ReadDoubleWord 0x40013018
+sysbus ReadByte 0x40013020
+sysbus WriteDoubleWord 0x40013000 0x1000
+sysbus WriteDoubleWord 0x4001300C 0x04400000
+sysbus WriteDoubleWord 0x40013000 0x1001
+sysbus ReadByte 0x40013030
+machine Reset
+# 31. CSUSP: an SR read after the suspend refuses until EOTC; CSUSP with SPE=0 refuses; a reset clears it
+sysbus WriteDoubleWord 0x40013000 0x1000
+sysbus WriteDoubleWord 0x4001300C 0x04400000
+sysbus WriteDoubleWord 0x40013000 0x1001
+sysbus WriteDoubleWord 0x40013000 0x1201
+sysbus WriteByte 0x40013020 0xAA
+sysbus ReadByte 0x40013030
+sysbus WriteDoubleWord 0x40013000 0x1601
+sysbus ReadDoubleWord 0x40013014
+sysbus WriteDoubleWord 0x40013018 0x8
+sysbus ReadDoubleWord 0x40013014
+machine Reset
+sysbus WriteDoubleWord 0x40013000 0x1400
+machine Reset
+sysbus WriteDoubleWord 0x40013000 0x1000
+sysbus WriteDoubleWord 0x4001300C 0x04400000
+sysbus WriteDoubleWord 0x40013000 0x1001
+sysbus WriteDoubleWord 0x40013000 0x1201
+sysbus WriteDoubleWord 0x40013000 0x1601
+machine Reset
+sysbus ReadDoubleWord 0x40013014
 echo "TVIBURI-END"
 quit

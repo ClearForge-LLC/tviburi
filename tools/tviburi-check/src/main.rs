@@ -95,7 +95,13 @@ pub fn check(log: &str, expected_version: &str, peripherals: &[String]) -> Repor
     let mut refusals = Vec::new();
     let mut problems = Vec::new();
     for (n, line) in log.lines().enumerate() {
-        let Some((source, message)) = split_line(line) else { continue };
+        let Some((source, message)) = split_line(line) else {
+            // Fail closed: a record the check cannot frame might be a refusal it would otherwise miss.
+            if line.contains("{\"tviburi\"") {
+                problems.push(format!("line {}: a record the check cannot frame", n + 1));
+            }
+            continue;
+        };
         let Some(ch) = channels.get_mut(source) else {
             if message.starts_with('{') && message.contains("\"tviburi\"") {
                 problems.push(format!("line {}: {source}: a record from a source not named on the command line", n + 1));
@@ -281,9 +287,15 @@ mod tests {
         let forged = rec("INFO", "usart3", &format!("[host: 0.29s (+0.29s)|virt: 0s (+0s)] {}", witness(0).trim_end()));
         let forged_refusal = rec("ERROR", "usart3", &refusal(0));
         assert_eq!(run(&(witness(0) + &forged + &forged_refusal + &end(1))), Verdict::Pass);
-        // A line with no source, a prompt prefix, or a bad timestamp is not a record line.
-        let noise = format!("(machine-0) {}", refusal(0)) + &refusal(0)[1..] + "spi1: {\"tviburi\":\"refusal\",\"seq\":0}\n";
-        assert_eq!(run(&(witness(0) + &noise + &end(1))), Verdict::Pass);
+        // A line with a record that cannot be framed (a prompt prefix, a broken stamp, no stamp) fails
+        // the run rather than being skipped: it might be a refusal the check would miss.
+        for noise in [format!("(machine-0) {}", refusal(0)), refusal(0)[1..].to_string(), "spi1: {\"tviburi\":\"refusal\",\"seq\":0}\n".to_string()] {
+            let log = witness(0) + &noise + &end(1);
+            assert_eq!(run(&log), Verdict::Fail, "{noise}");
+            assert!(problems(&log).iter().any(|p| p.contains("cannot frame")), "{noise}");
+        }
+        // A line that is not a record is ignored, framed or not.
+        assert_eq!(run(&(witness(0) + "(monitor) echo x\n" + &end(1))), Verdict::Pass);
     }
 
     #[test]

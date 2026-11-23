@@ -25,7 +25,13 @@
 //                     access must be as wide as the frame (whole bytes of DSIZE+1 bits).
 //   TVI-SPI-ORDER     a write the manual orders against SPE, where it does not say what silicon does:
 //                     TXDR with SPE=0 (the FIFOs are flushed at SPE=0, p2217; the stock model queues the
-//                     data and sends it at the enable), CR2 with SPE=1 (p2218), CSTART with SPE=0 (p2216).
+//                     data and sends it at the enable), CR2 with SPE=1 (p2218), CSTART or CSUSP with
+//                     SPE=0 (p2216).
+//   TVI-SPI-READ      a read whose value the twin cannot give: an offset with no register (Table 429,
+//                     p2233); a write-only register (TXDR p2227, IFCR p2226); RXDR with the RxFIFO empty
+//                     (SR.RXP=0; p2228 does not say what it reads); SR while EOT is the stock model's,
+//                     set by CSUSP (silicon sets only SUSP at a suspend, p2225, and EOT only when TSIZE
+//                     frames are done, p2226). A refused read is not passed to the model.
 //   TVI-SPI-IOLOCK    a CFG2 write while the IOLOCK latch is set. The latch is taken only from a CR1
 //                     write made with SPE=0, as silicon accepts it (p2217). predicted-fault while the
 //                     latch is certain, otherwise unmodeled (ruling C7).
@@ -69,6 +75,7 @@ namespace Antmicro.Renode.Peripherals.Tviburi
             ioLockCertain = false;
             history = null;
             masterUnknown = false;
+            eotBySuspend = false;
         }
 
         public void Dispose()
@@ -98,6 +105,18 @@ namespace Antmicro.Renode.Peripherals.Tviburi
                 {
                     ioLockCertain = false; // silicon clears IOLOCK on SPE 1->0 (p2215); not modeled
                 }
+                // The stock model clears EOT when SPE falls or CSTART rises, and sets it at CSUSP when it was
+                // clear (STM32H7_SPI.cs L100-123): remember when EOT is only the suspend's.
+                var stockSr = base.ReadDoubleWord(SrOffset);
+                var cstartRises = (value & Cr1Cstart) != 0 && (base.ReadDoubleWord(Cr1Offset) & Cr1Cstart) == 0;
+                if((value & Cr1Spe) == 0 || cstartRises)
+                {
+                    eotBySuspend = false;
+                }
+                if((value & Cr1Csusp) != 0 && ((stockSr & SrEot) == 0 || cstartRises))
+                {
+                    eotBySuspend = true;
+                }
                 cr1 = value;
                 NoteMasterState();
                 break;
@@ -113,6 +132,10 @@ namespace Antmicro.Renode.Peripherals.Tviburi
                 ier = value;
                 break;
             case IfcrOffset:
+                if((value & IfcrEotc) != 0)
+                {
+                    eotBySuspend = false;
+                }
                 if((value & IfcrModfc) != 0 && history != null)
                 {
                     history = null;
@@ -141,11 +164,11 @@ namespace Antmicro.Renode.Peripherals.Tviburi
 
         public new uint ReadDoubleWord(long offset)
         {
-            var value = base.ReadDoubleWord(offset);
-            if(RefusedAccess(offset, value, 32, "read"))
+            if(RefusedAccess(offset, 0, 32, "read") || RefusedRead(offset, 32))
             {
-                return value;
+                return 0;
             }
+            var value = base.ReadDoubleWord(offset);
             switch(offset)
             {
             case Cr1Offset:
@@ -180,16 +203,48 @@ namespace Antmicro.Renode.Peripherals.Tviburi
 
         public new ushort ReadWord(long offset)
         {
-            var value = base.ReadWord(offset);
-            RefusedAccess(offset, value, 16, "read");
-            return value;
+            return RefusedAccess(offset, 0, 16, "read") || RefusedRead(offset, 16) ? (ushort)0 : base.ReadWord(offset);
         }
 
         public new byte ReadByte(long offset)
         {
-            var value = base.ReadByte(offset);
-            RefusedAccess(offset, value, 8, "read");
-            return value;
+            return RefusedAccess(offset, 0, 8, "read") || RefusedRead(offset, 8) ? (byte)0 : base.ReadByte(offset);
+        }
+
+        // TVI-SPI-READ, after TVI-SPI-WIDTH and before the model is read: true if the read was refused.
+        private bool RefusedRead(long offset, int width)
+        {
+            string bit = null, condition = null, citation = null;
+            if(!Fields.Any(f => f.Offset == offset))
+            {
+                bit = "no register at offset 0x" + offset.ToString("X");
+                condition = "read of an SPI offset where RM0433 defines no register: the twin cannot say what silicon returns";
+                citation = "RM0433 Rev 9 §50.12 Table 429 p2233";
+            }
+            else if(offset == TxdrOffset || offset == IfcrOffset)
+            {
+                bit = "write-only register";
+                condition = "read of a write-only register: RM0433 gives its fields as write-only and does not say what a read returns; the stock model returns what it stored";
+                citation = offset == TxdrOffset ? "RM0433 Rev 9 §50.11.8 p2227 (TXDR)" : "RM0433 Rev 9 §50.11.7 p2226 (IFCR)";
+            }
+            else if(offset == RxdrOffset && (base.ReadDoubleWord(SrOffset) & SrRxp) == 0)
+            {
+                bit = "SR.RXP (bit 0) = 0, RXDR read";
+                condition = "RXDR read with the RxFIFO empty: the manual does not say what it returns while the SPI is enabled, and the stock model returns 0";
+                citation = "RM0433 Rev 9 §50.11.9 p2228 (RXDR); §50.11.6 p2226 (RXP)";
+            }
+            else if(offset == SrOffset && eotBySuspend)
+            {
+                bit = "SR.EOT (bit 3) set by the stock model at CSUSP";
+                condition = "SR read after CR1.CSUSP: silicon sets SUSP at a suspend and EOT only when TSIZE frames are done, while the stock model sets EOT too, so the value cannot be given";
+                citation = "RM0433 Rev 9 §50.11.1 p2216 (CSUSP); §50.11.6 p2225 (SUSP), p2226 (EOT)";
+            }
+            if(bit == null)
+            {
+                return false;
+            }
+            records.Refuse("TVI-SPI-READ", Unmodeled, RegisterAt(offset), bit, condition, citation, State(), offset, 0, width);
+            return true;
         }
 
         // TVI-LOAD, then TVI-SPI-WIDTH: true if the access was refused.
@@ -240,6 +295,12 @@ namespace Antmicro.Renode.Peripherals.Tviburi
                 bit = "CR1.SPE (bit 0) = 1, CR2 written";
                 condition = "CR2 written while the SPI is enabled: \"When these bits are changed by software, the SPI must be disabled\", and the manual does not say what silicon does otherwise; the stock model takes the write";
                 citation = "RM0433 Rev 9 §50.11.2 p2218 (TSIZE)";
+            }
+            else if(offset == Cr1Offset && !enabled && (value & Cr1Csusp) != 0)
+            {
+                bit = "CR1.CSUSP (bit 10) = 1 with SPE = 0";
+                condition = "CSUSP set while the SPI was disabled: the manual describes the suspend only for an active master, and the stock model sets SUSP and ends the transfer";
+                citation = "RM0433 Rev 9 §50.11.1 p2216 (CSUSP), p2217 (SPE)";
             }
             else if(offset == Cr1Offset && !enabled && (value & Cr1Cstart) != 0)
             {
@@ -353,13 +414,11 @@ namespace Antmicro.Renode.Peripherals.Tviburi
                     State(), Cr1Offset, newCr1, 32);
                 return false;
             }
-            var failure = FirstFailingBranch(cfg2, newCr1);
-            if(failure == null && masterUnknown)
-            {
-                failure = new Branch(Unmodeled, "CFG2.MASTER unknown: IFCR.MODFC written after a master state other than the passing one, and CFG2 not written since",
+            // MASTER unknown first: if a mode fault cleared MASTER, no branch of the truth table applies.
+            var failure = masterUnknown ? new Branch(Unmodeled, "CFG2.MASTER unknown: IFCR.MODFC written after a master state other than the passing one, and CFG2 not written since",
                     "CR1.SPE set after IFCR.MODFC cleared a possible mode fault: if silicon raised MODF it also cleared CFG2.MASTER, and MODFC clears only MODF, so whether this SPI is still a master cannot be given until CFG2 is written again",
-                    "RM0433 Rev 9 §50.11.7 p2227 (MODFC); §50.5.2 p2184");
-            }
+                    "RM0433 Rev 9 §50.11.7 p2227 (MODFC); §50.5.2 p2184")
+                : FirstFailingBranch(cfg2, newCr1);
             if(failure == null && history != null)
             {
                 failure = new Branch(Unmodeled, "a master state other than the passing one, since reset: " + history,
@@ -622,6 +681,7 @@ namespace Antmicro.Renode.Peripherals.Tviburi
         private bool ioLockCertain;
         private string history;
         private bool masterUnknown;
+        private bool eotBySuspend;
         private readonly Records records;
 
         private const string Modf = "TVI-SPI-MODF";
@@ -633,6 +693,7 @@ namespace Antmicro.Renode.Peripherals.Tviburi
         private const long Cfg1Offset = 0x08;
         private const long Cfg2Offset = 0x0C;
         private const long IerOffset = 0x10;
+        private const long SrOffset = 0x14;
         private const long IfcrOffset = 0x18;
         private const long TxdrOffset = 0x20;
         private const long RxdrOffset = 0x30;
@@ -641,6 +702,7 @@ namespace Antmicro.Renode.Peripherals.Tviburi
         private const uint Cr1Spe = 1u << 0;
         private const uint Cr1Stock = (1u << 0) | (1u << 9) | (1u << 10); // SPE, CSTART, CSUSP: driven by the stock model
         private const uint Cr1Cstart = 1u << 9;
+        private const uint Cr1Csusp = 1u << 10;
         private const uint Cr1Ssi = 1u << 12;
         private const uint Cr1IoLock = 1u << 16;
         private const uint Cfg1Reset = 0x00070007; // p2218
@@ -653,6 +715,9 @@ namespace Antmicro.Renode.Peripherals.Tviburi
         private const uint Cfg2Ssiop = 1u << 28;
         private const uint Cfg2Ssoe = 1u << 29;
         private const uint IfcrModfc = 1u << 9;
+        private const uint IfcrEotc = 1u << 3;
+        private const uint SrRxp = 1u << 0;
+        private const uint SrEot = 1u << 3;
         private const uint CrcPolyReset = 0x107; // p2228
         private const uint I2sMod = 1u << 0;
     }

@@ -227,7 +227,14 @@ t_conditions() {
  (\"TVI-SPI-ORDER\", \"unmodeled\", \"CR1.SPE (bit 0) = 0, TXDR written\", \"0x20\", 8),
  (\"TVI-SPI-ORDER\", \"unmodeled\", \"CR1.CSTART (bit 9) = 1 with SPE = 0\", \"0x0\", 32),
  (\"TVI-SPI-ORDER\", \"unmodeled\", \"CR1.CSTART (bit 9) = 1 with SPE = 0\", \"0x0\", 32),
- (\"TVI-SPI-ORDER\", \"unmodeled\", \"CR1.SPE (bit 0) = 1, CR2 written\", \"0x4\", 32)]' \
+ (\"TVI-SPI-ORDER\", \"unmodeled\", \"CR1.SPE (bit 0) = 1, CR2 written\", \"0x4\", 32),
+ (\"TVI-SPI-MODF\", \"unmodeled\", \"CFG2.MASTER unknown: IFCR.MODFC written after a master state other than the passing one, and CFG2 not written since\", \"0x0\", 32),
+ (\"TVI-SPI-READ\", \"unmodeled\", \"no register at offset 0x1C\", \"0x1C\", 32),
+ (\"TVI-SPI-READ\", \"unmodeled\", \"write-only register\", \"0x18\", 32),
+ (\"TVI-SPI-READ\", \"unmodeled\", \"write-only register\", \"0x20\", 8),
+ (\"TVI-SPI-READ\", \"unmodeled\", \"SR.RXP (bit 0) = 0, RXDR read\", \"0x30\", 8),
+ (\"TVI-SPI-READ\", \"unmodeled\", \"SR.EOT (bit 3) set by the stock model at CSUSP\", \"0x14\", 32),
+ (\"TVI-SPI-ORDER\", \"unmodeled\", \"CR1.CSUSP (bit 10) = 1 with SPE = 0\", \"0x0\", 32)]' \
       && grep -qx 'CHECK REFUSED' '$work/conditions.stdout'"
   local console; console=$("$src/scripts/monitor-output" "$work/conditions/renode.out")
   check "the conditions script reached its end" 'grep -qx TVIBURI-END <<<"$console"'
