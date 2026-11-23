@@ -46,6 +46,10 @@
 - **The RCC, from `1300` §5.4:** CSleep (`*LPEN` across `WFI`) is not modeled; `D1CKRDY`/`D2CKRDY` read 0, so a firmware that polls them (p372 step c) stalls with no record; `RCC_CSICFGR` is undefined in the stock model (silicon reads `0x2000 00xx`, p390); `PLL2DIVR`/`PLL3DIVR` drop each field's top bit, and no PLL2/3 frequency is modeled; `HSEBYP` written with the HSE on is not checked (p384). Neither firmware reaches any of them today.
 - **SPI1's start asks which signal its pins carry** (`1301`'s query wired in, as `1300a` wires the clock's).
 - **I2C, USART and RNG starts ask for their kernel clock** when their own guards exist (`1300` (4)).
+- **The records' log level:** the witness and end records log at INFO, against `RUL-12`'s "Error level". It fails closed today, but the contract and the code disagree; the records' owner (`model/Refusal.cs`) decides which moves (`1300a` §1.1 Q4).
+- **`rtc` and `RCC_BDCR.RTCEN`:** the stock model reads `RTCEN` as 1 at reset, so `rtc` is never locked (`1300a` §1.1 M1, Q4).
+- **Seven bit-backed peripherals are unregistered and cannot be locked** (`crypto`, `fdcan1/2`, `fmc`, `sdmmc`, `usb1/2`; `1300a` §1.1 M1).
+- **CI runs the full suite (about 19 minutes) on a docs-only pull request.** A docs-only route, as Aethelgard's `ci/route.sh` does, fail-closed on any file it cannot classify.
 - **Consumer side, from `1300` §5.3** (Aethelgard Phase 2): every RCC property goes on the guard's entry (the `hse16-trap`); the consumer's own `spi1`/`spi2` registrations name the guard; `sysbus.rcc`'s access log loses register names; the stock RCC's warnings become sourceless; ArduPilot's `AHB2ENR` boot value changes to silicon's.
 
 **Exit gate.** Each clause is checkable in CI on a pull request, in the pinned image:
