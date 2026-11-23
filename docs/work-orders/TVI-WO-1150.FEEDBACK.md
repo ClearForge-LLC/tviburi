@@ -81,7 +81,7 @@
 - **The mint for the fixture push failed** at 11:02Z (Cloudflare 502 on the S25 proxy). As the kickoff says, I did not loop, and `0100b` was told to fetch the fixture commit locally. One retry at the PR (§7).
 - **A mistake that reached a reported result, then corrected (found by the advisor's final check):**
   - (vi)'s first table compared overlay shapes on enforcing runs. Those stop at ArduPilot's first refusal, A6, after 71,384,611 of 88,058,789 instructions.
-  - On them, two files read "under the bound by 25–34 MiB", and one file 885,668–899,160 KiB. That went to the bus at 11:30Z and into the architect's 11:45Z ruling, as "885–899 MiB"; those are KiB figures.
+  - On them, two files read "under the bound by 25–34 MiB", and one file 885,668–899,160 KiB. That went to the bus at 11:18Z and into the architect's 11:45Z ruling, as "885–899 MiB"; those are KiB figures.
   - Remeasured on full boots (recorded mode, the boot block identical to stock): **two files are over (1,069,240 and 1,071,880 KiB), and one file is under (954,716 and 964,704 KiB).** The ruling, one file, stands, with a smaller margin than it was given. The correction is on the bus.
   - PR #10's description still carries the partial-boot figures, and `gh-write` cannot edit a PR. The corrected title and body are in `~/.cache/tvi-1150/pr-title-body.md`, for the architect to replace.
 - **Mistakes caught before they reached a result, all disclosed:**
