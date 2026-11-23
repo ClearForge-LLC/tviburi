@@ -50,6 +50,12 @@
 - **`rtc` and `RCC_BDCR.RTCEN`:** the stock model reads `RTCEN` as 1 at reset, so `rtc` is never locked (`1300a` §1.1 M1, Q4).
 - **Seven bit-backed peripherals are unregistered and cannot be locked** (`crypto`, `fdcan1/2`, `fmc`, `sdmmc`, `usb1/2`; `1300a` §1.1 M1).
 - **CI runs the full suite (about 19 minutes) on a docs-only pull request.** A docs-only route, as Aethelgard's `ci/route.sh` does, fail-closed on any file it cannot classify.
+- **ADC's kernel clock depends on `ADCx_CCR.CKMODE`** (p920): with `CKMODE` ≠ 00 the ADC runs on `adc_sclk` and `ADCSEL` is unused. The RCC guard cannot see `CKMODE`, so it answers ADC `unmodeled` until an ADC guard reads it (Aethelgard `4240e`; `1300` F8 corrected).
+- **For the I2C and DMA guards (`1300a` §1.1):** ArduPilot reads and writes I2C1 `CR1` before `I2C1EN` in program order (a read-modify-write clearing `PE`), and touches DMA1/DMA2 at 0.92 ms while locked. Silicon ignores both; each guard decides its enable rule from this.
+- **`SYSCFG_PMCR`:** no firmware writes `PC2SO`/`PC3SO` (Aethelgard `4410` S1); a guard row when SYSCFG is guarded.
+- **The GPIO package property for the consumer's platforms** (Phase 2): without it the unbonded-pin rule does not run, and the witness says `package: none` (`1301` stop 1).
+- **Renode's peak memory rises with wall time** (r = 0.978, `1301` §8): on a contended host one boot reached 1,910,576 KiB. Northstar §6's bound is judged in CI, or on unslowed runs as a proxy; a CI job that measures the one-file peak over several ArduPilot boots belongs in CI.
+- **ST's pin data, for Aethelgard** (`1301` D3, D5): `DSIHOST_TE` comes from ST's shared H747 file, and `SPDIFRX1_INn` is off by one in 8 rows. Neither function is used by a committed board.
 - **Consumer side, from `1300` §5.3** (Aethelgard Phase 2): every RCC property goes on the guard's entry (the `hse16-trap`); the consumer's own `spi1`/`spi2` registrations name the guard; `sysbus.rcc`'s access log loses register names; the stock RCC's warnings become sourceless; ArduPilot's `AHB2ENR` boot value changes to silicon's.
 
 **Exit gate.** Each clause is checkable in CI on a pull request, in the pinned image:
