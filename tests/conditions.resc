@@ -1,0 +1,89 @@
+# Drives every branch of the SPI1 guards from the monitor (bus writes reach the same guard as CPU
+# writes), with a machine reset between cases so that each starts from reset (the master-state
+# history of TVI-SPI-MODF persists until reset). Run by tests/spike.sh, which lists the expected
+# refusals in order. Values: CR1 SPE=bit 0, SSI=12, IOLOCK=16; CFG2 SP=21:19, MASTER=22, SSM=26,
+# SSIOP=28, SSOE=29; I2SCFGR I2SMOD=bit 0 (RM0433 Rev 9 §50.11).
+include @/repo/scripts/prelude.resc
+# 1. slave (CFG2 at reset): SPE refuses
+sysbus WriteDoubleWord 0x40013000 0x1001
+machine Reset
+# 2. master, TI mode (SP=001): SPE refuses
+sysbus WriteDoubleWord 0x40013000 0x1000
+sysbus WriteDoubleWord 0x4001300C 0x04480000
+sysbus WriteDoubleWord 0x40013000 0x1001
+machine Reset
+# 3. master, hardware SS input (SSM=0, SSOE=0): SPE refuses
+sysbus WriteDoubleWord 0x4001300C 0x00400000
+sysbus WriteDoubleWord 0x40013000 0x1001
+machine Reset
+# 4. master, hardware NSS output (SSM=0, SSOE=1): SPE refuses
+sysbus WriteDoubleWord 0x4001300C 0x20400000
+sysbus WriteDoubleWord 0x40013000 0x1001
+machine Reset
+# 5. master, SSM=1, SSIOP=1: SPE refuses
+sysbus WriteDoubleWord 0x40013000 0x1000
+sysbus WriteDoubleWord 0x4001300C 0x14400000
+sysbus WriteDoubleWord 0x40013000 0x1001
+machine Reset
+# 6. master, SSM=1, SSIOP=0, SSI=0: mode fault, SPE refuses
+sysbus WriteDoubleWord 0x4001300C 0x04400000
+sysbus WriteDoubleWord 0x40013000 0x00000001
+machine Reset
+# 7. CFG2 master before SSI=1 (an earlier master state with SSI=0): a CFG2 read refuses (7a), and
+# SPE refuses on history
+sysbus WriteDoubleWord 0x4001300C 0x04400000
+sysbus WriteDoubleWord 0x40013000 0x1000
+sysbus ReadDoubleWord 0x4001300C
+sysbus WriteDoubleWord 0x40013000 0x1001
+machine Reset
+# pass: SSI=1 before CFG2, then SPE
+sysbus WriteDoubleWord 0x40013000 0x1000
+sysbus WriteDoubleWord 0x4001300C 0x04400000
+sysbus WriteDoubleWord 0x40013000 0x1001
+# 8. CFG2 while SPE=1: refuses
+sysbus WriteDoubleWord 0x4001300C 0x04400000
+# pass: disable, then IOLOCK with SPE=0
+sysbus WriteDoubleWord 0x40013000 0x1000
+sysbus WriteDoubleWord 0x40013000 0x11000
+# 9. CFG2 after IOLOCK: refuses; 9a. a CR1 read while IOLOCK is latched: refuses
+sysbus WriteDoubleWord 0x4001300C 0x04400000
+sysbus ReadDoubleWord 0x40013000
+machine Reset
+# pass: reset cleared the IOLOCK latch and the history: the passing sequence passes again
+sysbus WriteDoubleWord 0x40013000 0x1000
+sysbus WriteDoubleWord 0x4001300C 0x04400000
+sysbus WriteDoubleWord 0x40013000 0x1001
+# 10. I2SCFGR with I2SMOD=1: refuses; pass: I2SCFGR with I2SMOD=0
+sysbus WriteDoubleWord 0x40013050 0x1
+sysbus WriteDoubleWord 0x40013050 0x0
+# 11-13. sub-word writes overlapping CR1, CFG2 and I2SCFGR refuse; 13a. an unaligned 32-bit write;
+# 13b. a sub-word read; 13c. an unaligned 32-bit read
+sysbus WriteWord 0x40013002 0x0
+sysbus WriteByte 0x4001300E 0x0
+sysbus WriteByte 0x40013051 0x0
+sysbus WriteDoubleWord 0x4001300D 0x0
+sysbus ReadWord 0x40013000
+sysbus ReadDoubleWord 0x4001300D
+# pass: a byte write to TXDR is not guarded
+sysbus WriteByte 0x40013020 0x55
+machine Reset
+# 14. reset cleared the CFG2 copy: SPE refuses as slave; then reset cleared the CR1 copy (SPE=0): CFG2 passes
+sysbus WriteDoubleWord 0x40013000 0x1001
+sysbus WriteDoubleWord 0x4001300C 0x04400000
+machine Reset
+# reads give silicon's value: the CFG2 fields the stock model drops, and CR1.SSI (no refusal)
+sysbus WriteDoubleWord 0x40013000 0x1000
+sysbus WriteDoubleWord 0x4001300C 0x10000000
+echo "READ-CR1"
+sysbus ReadDoubleWord 0x40013000
+echo "READ-CFG2"
+sysbus ReadDoubleWord 0x4001300C
+# 15. an RCC reset of SPI1 (RCC_APB2RSTR at 0x098, SPI1RST bit 12: RM0433 Rev 9 §8.7.35 p442-443) resets the guard's
+# copies with the model: after enabling, SPI1RST, then SPE refuses as slave
+sysbus WriteDoubleWord 0x4001300C 0x04400000
+sysbus WriteDoubleWord 0x40013000 0x1001
+sysbus WriteDoubleWord 0x58024498 0x1000
+sysbus WriteDoubleWord 0x58024498 0x0
+sysbus WriteDoubleWord 0x40013000 0x1001
+echo "TVIBURI-END"
+quit

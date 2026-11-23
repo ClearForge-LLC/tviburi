@@ -1,0 +1,65 @@
+#!/usr/bin/env bash
+# tviburi-spike <variant> — Tviburi's own runner (RUL-12). Runs INSIDE
+# the pinned tools image (see tests/spike.sh), with the repository mounted read-only at /repo and a
+# writable, empty output directory at /out. It takes no flags.
+#
+# The verdict on the records is the consumer-side reference check's (tools/tviburi-check), run on
+# Renode's log file; this runner adds only its own end-of-script evidence. Exit status:
+#   3  REFUSED - the check found a refusal record (its exit 3). A refusal latches.
+#   0  PASS    - the check passed (a witness, an end record, no refusal), Renode exited 0, the
+#                script reached its end, and the firmware's after-the-last-write marker is present.
+#   1  FAIL    - anything else: a build failure, a check failure (no witness: the guard did not
+#                load; no end record: Renode crashed), a Renode error or timeout, missing evidence.
+# Renode's own exit status is not trusted: a failed monitor command still exits 0 (measured).
+set -uo pipefail
+
+variants="modeled modf cfg2first iolock forge spray rmw"  # the firmware's --cfg path values
+variant=
+for v in $variants; do [ "${1:-}" = "$v" ] && variant=$v; done
+[ -n "$variant" ] || { echo "usage: tviburi-spike <${variants// /|}>" >&2; exit 1; }
+[ $# -eq 1 ] || { echo "tviburi-spike takes exactly one argument" >&2; exit 1; }
+
+root=/repo
+out=/out
+export TVIBURI_MODEL_DIR=$root/model
+[ -d "$out" ] && [ -z "$(ls -A "$out")" ] || { echo "FAIL: $out must be an empty directory" >&2; exit 1; }
+
+export PATH=/opt/cargo/bin:$PATH RUSTUP_HOME=/opt/rustup CARGO_HOME=$out/cargo-home
+rustc --edition 2021 --target thumbv7em-none-eabihf -C opt-level=s -C panic=abort -C debuginfo=0 \
+  --cfg "path=\"$variant\"" --check-cfg "cfg(path, values(\"${variants// /\",\"}\"))" \
+  -C link-arg=-T"$root/firmware/link.x" -o "$out/fw.elf" "$root/firmware/spi1.rs" \
+  || { echo "VERDICT FAIL (firmware build)"; exit 1; }
+cargo build --quiet --offline --locked --manifest-path "$root/tools/tviburi-check/Cargo.toml" --target-dir "$out/target" \
+  || { echo "VERDICT FAIL (check build)"; exit 1; }
+
+cat > "$out/run.resc" <<EOF2
+include @$root/scripts/prelude.resc
+showAnalyzer usart3
+sysbus LogPeripheralAccess spi1 true
+sysbus LoadELF @$out/fw.elf
+cpu VectorTableOffset 0x08000000
+emulation RunFor "0.001"
+echo "TVIBURI-MARK-AFTER"
+sysbus ReadDoubleWord 0x20000104
+echo "TVIBURI-END"
+quit
+EOF2
+
+timeout 120 renode --disable-gui --console --plain "$out/run.resc" </dev/null >"$out/renode.out" 2>&1
+rc=$?
+
+"$out/target/debug/tviburi-check" "$out/renode-log.txt" spi1 >"$out/check.txt"
+crc=$?
+cat "$out/check.txt"
+if [ $crc -eq 3 ]; then
+  echo "VERDICT REFUSED (renode exit $rc)"
+  exit 3
+fi
+console=$("$root/scripts/monitor-output" "$out/renode.out")
+after=$(grep -A1 -x 'TVIBURI-MARK-AFTER' <<<"$console" | tail -n1)
+if [ $crc -eq 0 ] && [ $rc -eq 0 ] && grep -qx 'TVIBURI-END' <<<"$console" && [ "$after" = "0xAF7E0002" ]; then
+  echo "VERDICT PASS"
+  exit 0
+fi
+echo "VERDICT FAIL (check exit $crc, renode exit $rc, after-marker=${after:-none})"
+exit 1

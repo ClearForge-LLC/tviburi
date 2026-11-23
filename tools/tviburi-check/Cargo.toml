@@ -1,0 +1,9 @@
+[package]
+name = "tviburi-check"
+version = "0.1.0"
+edition = "2021"
+license = "MIT OR Apache-2.0"
+description = "Consumer-side reference check of Tviburi's records contract (RUL-11, RUL-12)"
+publish = false
+
+[dependencies]
