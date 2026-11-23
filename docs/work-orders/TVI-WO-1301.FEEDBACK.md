@@ -1,6 +1,6 @@
 # TVI-WO-1301 — FEEDBACK
 
-**Builder:** Claude (Opus 5.5), Furnace, 2026-11-23. **Branch:** `wo/tvi-1301-gpio-af-guard`, from `main` `604c3d6`, with `main` `2e4c56d` (docs only) merged.
+**Builder:** Claude (Opus 5.5), Furnace, 2026-11-23. **Branch:** `wo/tvi-1301-gpio-af-guard`, from `main` `604c3d6`, with `main` `2e4c56d` and `c95f161` (docs only) merged; the suites were not rerun for them.
 
 **State:**
 - §1.1 measured and stopped (16:59Z). The architect ruled at 17:52Z (both stops, the form, A1–A10, D1–D5, records, AFRH), 18:30Z (the memory: judged in CI) and 19:08Z (Q1–Q3). The build followed.
