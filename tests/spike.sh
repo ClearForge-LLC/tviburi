@@ -125,8 +125,8 @@ t_unit() {
 t_afcheck() { # TVI-WO-1301 (1): its unit tests (each a planted change it must catch), then the committed data
   pod afcheck "$src" -- sh -c 'export PATH=/opt/cargo/bin:$PATH RUSTUP_HOME=/opt/rustup CARGO_HOME=/out/cargo-home;
     cargo test --offline --locked --manifest-path /repo/tools/tviburi-afcheck/Cargo.toml --target-dir /out/target &&
-    cargo run --quiet --offline --locked --manifest-path /repo/tools/tviburi-afcheck/Cargo.toml --target-dir /out/target --
-      /repo/model/ds12117-rev10-table9.tsv /repo/tests/1301/fixtures/st-open-pin-data/GPIO-STM32H747_gpio_v1_0_Modes.xml
+    cargo run --quiet --offline --locked --manifest-path /repo/tools/tviburi-afcheck/Cargo.toml --target-dir /out/target -- \
+      /repo/model/ds12117-rev10-table9.tsv /repo/tests/1301/fixtures/st-open-pin-data/GPIO-STM32H747_gpio_v1_0_Modes.xml \
       /repo/tests/1301/st-aliases.tsv /repo/tests/1301/st-ruled.tsv'
   check "afcheck: the AF table agrees with ST's open pin data but for the ruled disagreements" '[ $rc -eq 0 ]'
 }
