@@ -64,7 +64,6 @@ namespace Antmicro.Renode.Peripherals.Tviburi
         public GuardedSTM32H7_RCC(IMachine machine, IHasDivisibleFrequency systick = null, ulong hseFrequency = 8000000,
             ulong csiFrequency = 4000000, string mode = Records.Enforcing)
         {
-            this.machine = machine;
             HseFrequency = hseFrequency;
             CsiFrequency = csiFrequency;
             inner = new STM32H7_RCC(machine, systick, hseFrequency, csiFrequency);
@@ -108,7 +107,7 @@ namespace Antmicro.Renode.Peripherals.Tviburi
         {
             if(!Clocked.TryGetValue(peripheral, out var p))
             {
-                return new KernelClock(peripheral, false, false, "no kernel clock rule for " + peripheral, "none", "none",
+                return new KernelClock(peripheral, false, false, "no kernel clock rule for " + peripheral, "none",
                     "TVI-WO-1300 (4): the query covers spi1, spi2, i2c1, i2c2, usart1, usart2, usart3 and rng");
             }
             var mux = muxes.Single(m => m.Def == p.Mux);
@@ -119,18 +118,17 @@ namespace Antmicro.Renode.Peripherals.Tviburi
             if(!enabled)
             {
                 return new KernelClock(peripheral, true, false, p.EnableName + " = 0: no clock is provided to the peripheral",
-                    selector, "none", citation);
+                    selector, citation);
             }
             if(mux.Current != mux.Selector)
             {
                 return new KernelClock(peripheral, true, false, "the mux has not switched from " + p.Mux.Sources[mux.Current]
                     + " (" + Condition(p.Mux.Sources[mux.Current]) + ") to " + p.Mux.Sources[mux.Selector] + " ("
-                    + Condition(p.Mux.Sources[mux.Selector]) + "): no clock is provided to the peripheral", selector,
-                    p.Mux.Sources[mux.Selector], citation);
+                    + Condition(p.Mux.Sources[mux.Selector]) + "): no clock is provided to the peripheral", selector, citation);
             }
             var source = p.Mux.Sources[mux.Current];
             var running = Running(source);
-            return new KernelClock(peripheral, true, running, source + ": " + Condition(source), selector, source,
+            return new KernelClock(peripheral, true, running, source + ": " + Condition(source), selector,
                 citation + "; " + SourceCitation(source));
         }
 
@@ -163,14 +161,13 @@ namespace Antmicro.Renode.Peripherals.Tviburi
 
         public sealed class KernelClock
         {
-            public KernelClock(string peripheral, bool modeled, bool running, string condition, string selector, string source, string citation)
+            public KernelClock(string peripheral, bool modeled, bool running, string condition, string selector, string citation)
             {
                 Peripheral = peripheral;
                 Modeled = modeled;
                 Running = running;
                 Condition = condition;
                 Selector = selector;
-                Source = source;
                 Citation = citation;
             }
 
@@ -185,7 +182,6 @@ namespace Antmicro.Renode.Peripherals.Tviburi
             public bool Running { get; }
             public string Condition { get; }
             public string Selector { get; }
-            public string Source { get; }
             public string Citation { get; }
         }
 
@@ -775,7 +771,6 @@ namespace Antmicro.Renode.Peripherals.Tviburi
         private const string Unmodeled = "unmodeled";
         private const string PredictedFault = "predicted-fault";
 
-        private readonly IMachine machine;
         private readonly STM32H7_RCC inner;
         private readonly Records records;
         private readonly MuxState[] muxes;
@@ -831,11 +826,6 @@ namespace Antmicro.Renode.Peripherals.Tviburi
 
         private static readonly uint[] Any = null;
         private static readonly uint[] Zero = { 0 };
-        private const string Guard = "modeled by the guard";
-        private const string Inherited = "inherited, unaudited (acknowledged by name)";
-        private const string Acked = "acknowledged by name";
-        private const string Tag = "tag";
-        private const string Reserved = "reserved";
 
         private static Row R(string reg, long off, string sec, string name, int msb, int lsb, uint[] allowed, string cls, string behaves, int page)
         {

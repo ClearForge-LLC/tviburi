@@ -269,7 +269,7 @@ t_conditions() {
     "python3 -I - '$work/conditions.stdout' '$work/conditions/release/LEDGER.jsonl' <<'EOF'
 import json, sys
 faults = {(r['rule'], r['bit']) for r in (json.loads(l[8:]) for l in open(sys.argv[1]) if l.startswith('REFUSAL ')) if r['kind'] == 'predicted-fault'}
-bench = {(r['rule'], r['bit']) for r in (json.loads(l) for l in list(open(sys.argv[2]))[1:]) if r['row'] == 'bench'}
+bench = {(r['rule'], r['bit']) for r in (json.loads(l) for l in list(open(sys.argv[2]))[1:]) if r['row'] == 'bench' and r['peripheral'] == 'Tviburi.GuardedSTM32H7_SPI'}
 print('predicted-fault', sorted(faults), 'bench', sorted(bench))
 sys.exit(0 if faults and faults == bench else 1)
 EOF
@@ -571,7 +571,7 @@ t_adv-release() {
   fixture rel-form model/GuardedSTM32H7_SPI.cs '"MSSI", 3, 0, Zero, Tag, "0000 (no delay)", 2222),' '"MSSI", 3, 0, Zero, Tag, "0000 (no delay)", 2222), // a comment'
   fixture rel-pin tools/tviburi-release/pins.tsv 'b85cb4af7a7e' 'b85cb4af7a7f'
   fixture rel-template tools/tviburi-release/TviburiRelease.cs.template 'public static readonly string' 'public const string'
-  fixture rel-bench model/bench-checks.tsv 'Tviburi.GuardedSTM32H7_SPI	B4' 'Tviburi.GuardedSTM32H7_RCC	B4'
+  fixture rel-bench model/bench-checks.tsv 'Tviburi.GuardedSTM32H7_SPI	B4' 'Tviburi.GuardedSTM32H7_TIM	B4'
   local f why
   for f in rel-symlink:'not a regular file' rel-subdir:'not a regular file' rel-case:'another case' rel-alias:'alias' \
       rel-late:'after a declaration' rel-row:'in no row' rel-class:'a stop' rel-form:'not one' rel-pin:'not the pinned' \

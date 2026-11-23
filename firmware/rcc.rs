@@ -127,8 +127,6 @@ pub unsafe extern "C" fn reset() -> ! {
                 while (read_volatile(RCC_CR) >> 1) & v & 0x1500_0000 != v & 0x1500_0000 {}
             }
         }
-        write_volatile(MARK_AFTER, 0xAF7E_0002);
-        loop {}
     }
     #[cfg(path = "pllref")]
     {
@@ -153,11 +151,6 @@ pub unsafe extern "C" fn reset() -> ! {
         let _ = read_volatile(RCC_APB1LENR);
         write_volatile(USART2_CR1, 1); // UE: the start
     }
-    #[cfg(any(path = "pllref", path = "divm0", path = "sw", path = "width", path = "read", path = "usart2"))]
-    {
-        write_volatile(MARK_AFTER, 0xAF7E_0002);
-        loop {}
-    }
     #[cfg(path = "divq")]
     write_volatile(RCC_PLLCFGR, read_volatile(RCC_PLLCFGR) & !(1 << 17));
     #[cfg(any(path = "clocked", path = "field", path = "pll", path = "switched", path = "alias", path = "divq"))]
@@ -170,12 +163,16 @@ pub unsafe extern "C" fn reset() -> ! {
     spi123sel(0b011);
     #[cfg(path = "pll")]
     write_volatile(RCC_PLLCFGR, read_volatile(RCC_PLLCFGR) & !(1 << 17));
-    #[cfg(not(any(path = "alias", path = "pllref", path = "divm0", path = "sw", path = "width", path = "read", path = "usart2")))]
-    write_volatile(RCC_APB2ENR, read_volatile(RCC_APB2ENR) | SPI1EN);
     #[cfg(path = "alias")]
     write_volatile(RCC_C1_APB2ENR, read_volatile(RCC_C1_APB2ENR) | SPI1EN);
-    let _ = read_volatile(RCC_APB2ENR); // RM0433 p372 b): read back the enable before using the peripheral
-    spi1_start();
+    // Every path but the nine that end at their own access enables SPI1 and starts it.
+    #[cfg(not(any(path = "ardupilot", path = "gen-s03", path = "gen-hc16", path = "pllref", path = "divm0", path = "sw", path = "width", path = "read", path = "usart2")))]
+    {
+        #[cfg(not(path = "alias"))]
+        write_volatile(RCC_APB2ENR, read_volatile(RCC_APB2ENR) | SPI1EN);
+        let _ = read_volatile(RCC_APB2ENR); // RM0433 p372 b): read back the enable before using the peripheral
+        spi1_start();
+    }
     write_volatile(MARK_AFTER, 0xAF7E_0002);
     loop {}
 }

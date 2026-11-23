@@ -92,7 +92,7 @@ for t in ${TVIBURI_TESTS:-$CASES}; do
   scar)
     run_case scar scar "$hook" "$run"
     check "scar: SPI1 started with SPI123SEL on pll1_q_ck and PLL1 off refuses, predicted-fault, naming the selector, the source and the pages" \
-      "[ \$rc = 3 ] && first_kernel scar 'r[\"rule\"] == \"TVI-RCC-KERNEL\" and r[\"kind\"] == \"predicted-fault\" and \"SPI123SEL = 000\" in r[\"bit\"] and \"pll1_q_ck\" in r[\"condition\"] and \"PLL1ON = 0\" in r[\"condition\"] and \"p414\" in r[\"citation\"] and \"p371-372\" in r[\"citation\"] and r[\"access\"][\"pc\"] != \"none\"'" ;;
+      "[ \$rc = 3 ] && first_kernel scar 'r[\"rule\"] == \"TVI-RCC-KERNEL\" and r[\"kind\"] == \"predicted-fault\" and r[\"bit\"] == \"RCC_D2CCIP1R.SPI123SEL = 000\" and \"pll1_q_ck\" in r[\"condition\"] and \"PLL1ON = 0\" in r[\"condition\"] and \"p414\" in r[\"citation\"] and \"p371-372\" in r[\"citation\"] and r[\"access\"][\"pc\"] != \"none\"'" ;;
   switch)
     run_case switch switch "$hook" "$run"
     check "switch: SPI123SEL to pll2_p_ck with PLL2 off: the mux cannot switch, predicted-fault (p371)" \
@@ -100,7 +100,7 @@ for t in ${TVIBURI_TESTS:-$CASES}; do
   stuck)
     run_case stuck stuck "$hook" "$run"
     check "stuck: SPI123SEL to per_ck (running) while the input pll1_q_ck never ran: no clock, predicted-fault (p371-372)" \
-      "[ \$rc = 3 ] && first_kernel stuck 'r[\"kind\"] == \"predicted-fault\" and \"has not switched from pll1_q_ck\" in r[\"condition\"] and \"per_ck\" in r[\"condition\"]'" ;;
+      "[ \$rc = 3 ] && first_kernel stuck 'r[\"kind\"] == \"predicted-fault\" and r[\"bit\"] == \"RCC_D2CCIP1R.SPI123SEL = 100\" and \"has not switched from pll1_q_ck\" in r[\"condition\"] and \"per_ck\" in r[\"condition\"]'" ;;
   clocked)
     run_case clocked clocked "$hook" "$run" 'echo "TVIBURI-MARK-AFTER"' "$after"
     check "clocked: PLL1 started, SPI1 starts on pll1_q_ck: a pass, the firmware past its last write" \
@@ -120,7 +120,7 @@ for t in ${TVIBURI_TESTS:-$CASES}; do
   pll)
     run_case pll pll "$hook" "$run"
     check "pll: DIVQ1EN cleared while PLL1 is on refuses, TVI-RCC-PLL, predicted-fault (p401)" \
-      "[ \$rc = 3 ] && first_kernel pll 'r[\"rule\"] == \"TVI-RCC-PLL\" and r[\"kind\"] == \"predicted-fault\" and \"p400-401\" in r[\"citation\"]'" ;;
+      "[ \$rc = 3 ] && first_kernel pll 'r[\"rule\"] == \"TVI-RCC-PLL\" and r[\"bit\"] == \"DIVP1EN/DIVQ1EN/DIVR1EN\" and r[\"kind\"] == \"predicted-fault\" and \"p400-401\" in r[\"citation\"]'" ;;
   fields)
     mapfile -t lines < <(grep -v '^#' "$src/tests/1300/fields.resc")
     run_case fields - "${lines[@]}"
@@ -224,7 +224,7 @@ for t in ${TVIBURI_TESTS:-$CASES}; do
   ledger)
     mkdir -p "$work/ledger"
     rc=0; container -v "$src:/repo:ro,Z" -v "$work/ledger:/out:Z" "$IMAGE" sh -c '/repo/scripts/build-release /repo /out/release >/dev/null' </dev/null >"$work/ledger.stdout" 2>&1 || rc=$?
-    check "ledger: the release carries the RCC guard's 677 field rows; each acknowledged row cites TVI-WO-1300.rm0433.md §8, never 0100b's; the RCC bench rows R1-R3 are in it" \
+    check "ledger: the release carries the RCC guard's 677 field rows; each acknowledged row cites TVI-WO-1300.rm0433.md §8, never 0100b's; the RCC bench rows R1-R3 are in it, with the (rule, bit) the scar, stuck and pll cases emit (RUL-18)" \
       "[ \$rc = 0 ] && python3 -I -c '
 import json, sys
 rows = [json.loads(l) for l in open(sys.argv[1]).read().splitlines()[1:]]
@@ -232,7 +232,9 @@ rcc = [r for r in rows if r.get(\"peripheral\") == \"Tviburi.GuardedSTM32H7_RCC\
 f = [r for r in rcc if r[\"row\"] == \"field\"]
 a = [r for r in f if r[\"state\"] == \"acknowledged\"]
 b = sorted(r[\"field\"] for r in rcc if r[\"row\"] == \"bench\")
-sys.exit(0 if len(f) == 677 and a and all(r[\"reason\"].startswith(\"TVI-WO-1300.rm0433.md §8 A\") for r in a) and b == [\"R1\", \"R2\", \"R3\"] else 1)
+pairs = sorted((r[\"rule\"], r[\"bit\"]) for r in rcc if r[\"row\"] == \"bench\")
+want = [(\"TVI-RCC-KERNEL\", \"RCC_D2CCIP1R.SPI123SEL = 000\"), (\"TVI-RCC-KERNEL\", \"RCC_D2CCIP1R.SPI123SEL = 100\"), (\"TVI-RCC-PLL\", \"DIVP1EN/DIVQ1EN/DIVR1EN\")]
+sys.exit(0 if len(f) == 677 and a and all(r[\"reason\"].startswith(\"TVI-WO-1300.rm0433.md §8 A\") for r in a) and b == [\"R1\", \"R2\", \"R3\"] and pairs == want else 1)
 ' '$work/ledger/release/LEDGER.jsonl'" ;;
   alias17c)
     run_case alias17c - 'echo "R-17C"' 'sysbus ReadDoubleWord 0x5802457C'
