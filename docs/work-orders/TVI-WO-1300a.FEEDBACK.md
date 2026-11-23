@@ -73,10 +73,11 @@
 | The one-file peak under 1,048,576 KiB (ruled 18:30Z: unslowed runs only, at least 5) | ArduPilot's full 5 s boot, `replay-1300.sh 2 accept`, 7 runs in sequence on `8cd6e45`'s code, Furnace, host load 4.7–5.9 | **all 7 unslowed** (wall 10.1–10.7 s), **0 `would-refuse`**, 3 ends each. **Peaks 948,304–1,002,452 KiB, median 982,060; the highest is under by 46,124 KiB (45 MiB).** No run was slowed, so none was set aside. `1300` measured 955,512–980,696; 1301's GPIO is expected to add 10–25 MiB |
 | CI green | the PR | see the PR |
 
-**Suites on the branch** (`02faa91`, before the merge of `main`'s docs-only `2e4c56d`):
+**Suites on the branch** (`02faa91`, before the merges of `main`'s docs-only `2e4c56d` and `c95f161`):
 - `tests/spike.sh`, `all`: **137 ok, 0 FAIL** (402 s).
 - **Mutants,** diff-sized: the work order's 20 (C24–C35, A01, S01–S06, F03), **20/20 killed**, each by the test its row names.
 - **Three earlier rows** targeted lines this work order changed (M09, M12, C03). They were re-targeted to the same mutation and re-run: **3/3 killed**.
+- **CI's full mutation run found one more:** `C07-kernelKind` (1300's) named `rcc-scar`, which now refuses at SPI1. It now names `rcc-kernelq`, which kills it. CI is green on the PR with every row.
 - **`boots.sh check`:** 15/15 boards as `boots.tsv` expects.
 
 ## 3. Findings and rows for the architect
