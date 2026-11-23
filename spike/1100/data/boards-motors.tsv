@@ -1,0 +1,13 @@
+sentinel-01-minimal	-	0
+sentinel-01	-	0
+motors-dshot600	MOTOR1,MOTOR2,MOTOR3,MOTOR4	1
+sentinel-03	MOTOR1,MOTOR2,MOTOR3,MOTOR4	1
+sentinel-02-shaped	MOTOR1,MOTOR2,MOTOR3,MOTOR4	1
+motors-pwm	MOTOR1,MOTOR2,MOTOR3,MOTOR4	0
+serial-dshot-9600	MOTOR1,MOTOR2,MOTOR3,MOTOR4	1
+hse-external-8	MOTOR1,MOTOR2,MOTOR3,MOTOR4	1
+hse-crystal-16	MOTOR1,MOTOR2,MOTOR3,MOTOR4	1
+driver-judges-nothing	HB_IN1,HB_IN2,SERVO1,SERVO2	0
+d1-drv8876	DRV_EN,DRV_PH,SERVO1	0
+sentinel-02-bench	-	0
+sentinel-01-ext-bmp581	-	0
