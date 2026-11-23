@@ -11,6 +11,8 @@
 //!                         TVI-GPIO-AF at the MODER store (a sub-word AFRH write merged, then judged).
 //!   path="package"      - PH2 (not bonded on LQFP144, Table 8 p68) set to output: TVI-GPIO-PACKAGE, predicted-fault.
 //!   path="packageinput" - every port's MODER written as input (a whole-port init, PH2-PH15 included): passes.
+//!   path="pk8af"        - PK8 (no such pin: Table 9 lists PK0-PK7, p100) in AF mode: TVI-GPIO-AF, predicted-fault.
+//!   path="pk8out"       - PK8 set to output, on LQFP144: TVI-GPIO-PACKAGE, predicted-fault.
 //!   path="pc2"          - PC2 set to output on LQFP144 (bonded only through PC2_C, footnote 4 p88): unmodeled.
 //!   path="pupdr"        - PUPDR0 = 11 (reserved, p542): TVI-GPIO-FIELD, unmodeled.
 //!   path="lckr"         - LCKR = LCKK | LCK0, the lock key sequence's first write: TVI-GPIO-FIELD, unmodeled (p545).
@@ -32,6 +34,7 @@ const RCC_AHB4ENR: *mut u32 = 0x5802_44E0 as *mut u32;
 const GPIOA: usize = 0x5802_0000;
 const GPIOC: usize = 0x5802_0800;
 const GPIOH: usize = 0x5802_1C00;
+const GPIOK: usize = 0x5802_2800;
 const MODER: usize = 0x00;
 const OTYPER: usize = 0x04;
 const PUPDR: usize = 0x0C;
@@ -1101,6 +1104,14 @@ pub unsafe extern "C" fn reset() -> ! {
             w(port, MODER, 0);
             port += 0x400;
         }
+    }
+    #[cfg(path = "pk8af")]
+    {
+        mode(GPIOK, 8, 2);
+    }
+    #[cfg(path = "pk8out")]
+    {
+        mode(GPIOK, 8, 1);
     }
     #[cfg(path = "pc2")]
     {

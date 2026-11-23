@@ -9,9 +9,9 @@ set -euo pipefail
 
 here=$(cd "$(dirname "$0")/../.." && pwd)
 IMAGE=$(sed -n 's/^IMAGE=//p' "$here/tests/spike.sh")
-CASES="valid blank blankfirst afterwards afrh package packageinput pc2 nopackage pupdr lckr brr read bsrr bsrrhalf otyper ardupilot gen-s03 recorded config query registrations reset misaligned fields ledger adv-monitor"
+CASES="valid blank blankfirst afterwards afrh package packageinput pk8af pk8out pc2 nopackage pupdr lckr brr read bsrr bsrrhalf otyper ardupilot gen-s03 recorded config query registrations reset misaligned fields ledger adv-monitor"
 GUARDS="spi1 rcc gpioPortA gpioPortB gpioPortC gpioPortD gpioPortE gpioPortF gpioPortG gpioPortH gpioPortI gpioPortJ gpioPortK"
-PATHS='"valid","blank","blankfirst","afterwards","twice","afrh","package","packageinput","pc2","pupdr","lckr","brr","read","bsrr","bsrrhalf","otyper","ardupilot","gen-s03"'
+PATHS='"valid","blank","blankfirst","afterwards","twice","afrh","package","packageinput","pk8af","pk8out","pc2","pupdr","lckr","brr","read","bsrr","bsrrhalf","otyper","ardupilot","gen-s03"'
 scratch=${TVIBURI_SCRATCH:-$HOME/.cache/tviburi}
 mkdir -p "$scratch"
 work=$(mktemp -d "$scratch/gpio.XXXXXX")
@@ -116,6 +116,15 @@ for t in ${TVIBURI_TESTS:-$CASES}; do
   packageinput)
     run_case packageinput packageinput "$run" "${marks[@]}"
     check "packageinput: every port written as input, unbonded pins included (a whole-port init): a pass" "passes packageinput" ;;
+  pk8af|pk8out)
+    run_case "$t" "$t" "$run" "${marks[@]}"
+    if [ $t = pk8af ]; then
+      check "pk8af: PK8 (no such pin; Table 9 lists PK0-PK7, p100) in AF mode refuses TVI-GPIO-AF, predicted-fault" \
+        "[ \$rc = 3 ] && first pk8af 'r[\"rule\"] == \"TVI-GPIO-AF\" and r[\"bit\"] == \"PK8 AF0\" and \"PK0-PK7\" in r[\"citation\"]'"
+    else
+      check "pk8out: PK8 (on no package) set to output refuses TVI-GPIO-PACKAGE, predicted-fault" \
+        "[ \$rc = 3 ] && first pk8out 'r[\"rule\"] == \"TVI-GPIO-PACKAGE\" and r[\"kind\"] == \"predicted-fault\" and r[\"bit\"] == \"PK8 MODER = 01\"'"
+    fi ;;
   pc2)
     run_case pc2 pc2 "$run" "${marks[@]}"
     check "pc2: PC2 set to output on LQFP144 (bonded only through PC2_C, footnote 4 p88) refuses TVI-GPIO-PACKAGE, unmodeled" \

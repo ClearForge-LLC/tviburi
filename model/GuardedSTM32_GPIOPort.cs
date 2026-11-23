@@ -31,10 +31,10 @@
 //                     a write to an offset with no register (the stock port's 0x28 BRR is RM0090's, not the H7's).
 //                     unmodeled.
 //   TVI-GPIO-AF       a write after which a pin is in alternate-function mode (MODER = 10) selecting an AF with no
-//                     function on that pin in DS12117 Rev 10 Table 9 (a blank cell). predicted-fault, naming the pin,
-//                     the AF and the page.
-//   TVI-GPIO-PACKAGE  with a package declared: a write after which a pin the package does not bond is in output or
-//                     AF mode (MODER 01 or 10). predicted-fault, naming the pin, the package and the page. PC2 and PC3
+//                     function on that pin in DS12117 Rev 10 Table 9 (a blank cell), or a pin the table does not list
+//                     (PK8-PK15: port K has PK0-PK7, p100). predicted-fault, naming the pin, the AF and the page.
+//   TVI-GPIO-PACKAGE  with a package declared: a write after which a pin the package does not bond (or that DS12117
+//                     lists on no package, PK8-PK15) is in output or AF mode (MODER 01 or 10). predicted-fault, naming the pin, the package and the page. PC2 and PC3
 //                     on LQFP144 are unmodeled: their alternate functions reach PC2_C and PC3_C when the SYSCFG analog
 //                     switch is closed (DS12117 Table 8 footnote 4, p88), which the twin does not model. Input and
 //                     analog writes pass, so a firmware's whole-port initialisation does (ruled 2026-11-23T17:52Z).
@@ -101,7 +101,7 @@ namespace Antmicro.Renode.Peripherals.Tviburi
             {
                 return mode == 0 ? "input" : mode == 1 ? "output" : "analog";
             }
-            return CellAt(pin, Af(base.ReadDoubleWord(AfrlOffset), base.ReadDoubleWord(AfrhOffset), pin))?.Text;
+            return CellAt(pin, Af(base.ReadDoubleWord(AfrlOffset), base.ReadDoubleWord(AfrhOffset), pin))?.Text ?? "-";
         }
 
         // The citation for WhichSignal's answer on `pin`: the table and page, or RM0433's MODER.
@@ -113,8 +113,9 @@ namespace Antmicro.Renode.Peripherals.Tviburi
                 return null;
             }
             var mode = (base.ReadDoubleWord(ModerOffset) >> (2 * pin)) & 3;
+            var cell = mode == 2 ? CellAt(pin, Af(base.ReadDoubleWord(AfrlOffset), base.ReadDoubleWord(AfrhOffset), pin)) : null;
             return mode != 2 ? "RM0433 Rev 9 §11.4.1 p541"
-                : "DS12117 Rev 10 Table 9 p" + CellAt(pin, Af(base.ReadDoubleWord(AfrlOffset), base.ReadDoubleWord(AfrhOffset), pin)).Page
+                : (cell == null ? "DS12117 Rev 10 Table 9 p100 (port K: PK0-PK7 only)" : "DS12117 Rev 10 Table 9 p" + cell.Page)
                     + "; RM0433 Rev 9 §11.4.9-11.4.10 p545-546";
         }
 
@@ -288,8 +289,11 @@ namespace Antmicro.Renode.Peripherals.Tviburi
             var af = Af(afrl, afrh, pin);
             var cell = CellAt(pin, af);
             records.Refuse("TVI-GPIO-AF", PredictedFault, Register(b), "P" + port + pin + " AF" + af,
-                "pin P" + port + pin + " in alternate-function mode (MODER = 10) selects AF" + af + ", which has no function on that pin in DS12117's alternate-function table: on silicon the pin carries no peripheral's signal",
-                "DS12117 Rev 10 Table 9 p" + cell.Page + " (P" + port + pin + " AF" + af + ": -); RM0433 Rev 9 §11.4.1 p541 (MODER), §11.4.9-11.4.10 p545-546 (AFSEL)",
+                "pin P" + port + pin + " in alternate-function mode (MODER = 10) selects AF" + af + (cell == null
+                    ? ", but DS12117's alternate-function table lists no pin P" + port + pin + " (port K has PK0-PK7): on silicon no pin carries the signal"
+                    : ", which has no function on that pin in DS12117's alternate-function table: on silicon the pin carries no peripheral's signal"),
+                (cell == null ? "DS12117 Rev 10 Table 9 p100 (port K: PK0-PK7 only)" : "DS12117 Rev 10 Table 9 p" + cell.Page + " (P" + port + pin + " AF" + af + ": -)")
+                    + "; RM0433 Rev 9 §11.4.1 p541 (MODER), §11.4.9-11.4.10 p545-546 (AFSEL)",
                 State(moder, afrl, afrh), offset, word, width);
             return true;
         }
@@ -307,7 +311,7 @@ namespace Antmicro.Renode.Peripherals.Tviburi
             }
             var pin = Lowest(entering);
             var name = "P" + port + pin;
-            var b8 = Bonding(Package)[name];
+            Bonding(Package).TryGetValue(name, out var b8);   // null: a pin DS12117 lists on no package (PK8-PK15)
             var mode = ((word >> (2 * pin)) & 3) == 1 ? "output" : "alternate-function";
             if(name == "PC2" || name == "PC3")
             {
@@ -317,8 +321,8 @@ namespace Antmicro.Renode.Peripherals.Tviburi
                 return true;
             }
             records.Refuse("TVI-GPIO-PACKAGE", PredictedFault, Register(b), name + " MODER = " + (mode == "output" ? "01" : "10"),
-                name + " set to " + mode + " mode, but the declared package " + Package + " does not bond " + name + ": on silicon the signal reaches no pin",
-                "DS12117 Rev 10 Table 8 p" + b8.Page + " (" + Package + " column: -), Figure 6 p57; RM0433 Rev 9 §11.4.1 p541",
+                name + " set to " + mode + " mode, but the declared package " + Package + (b8 == null ? " bonds no " + name + ", which DS12117 lists on no package (port K has PK0-PK7)" : " does not bond " + name) + ": on silicon the signal reaches no pin",
+                (b8 == null ? "DS12117 Rev 10 Table 8 p64-88 (no " + name + " row), Table 9 p100" : "DS12117 Rev 10 Table 8 p" + b8.Page + " (" + Package + " column: -)") + ", Figure 6 p57; RM0433 Rev 9 §11.4.1 p541",
                 State(word, base.ReadDoubleWord(AfrlOffset), base.ReadDoubleWord(AfrhOffset)), offset, word, width);
             return true;
         }
@@ -329,8 +333,12 @@ namespace Antmicro.Renode.Peripherals.Tviburi
             var m = 0;
             for(var pin = 0; pin < 16; pin++)
             {
-                var cell = ((moder >> (2 * pin)) & 3) == 2 ? CellAt(pin, Af(afrl, afrh, pin)) : null;
-                if(cell != null && cell.Text == "-")
+                if(((moder >> (2 * pin)) & 3) != 2)
+                {
+                    continue;
+                }
+                var cell = CellAt(pin, Af(afrl, afrh, pin));
+                if(cell == null || cell.Text == "-")
                 {
                     m |= 1 << pin;
                 }
@@ -350,7 +358,7 @@ namespace Antmicro.Renode.Peripherals.Tviburi
             for(var pin = 0; pin < 16; pin++)
             {
                 var mode = (moder >> (2 * pin)) & 3;
-                if((mode == 1 || mode == 2) && bonding.TryGetValue("P" + port + pin, out var b) && b.Pin == null)
+                if((mode == 1 || mode == 2) && (!bonding.TryGetValue("P" + port + pin, out var b) || b.Pin == null))
                 {
                     m |= 1 << pin;
                 }
