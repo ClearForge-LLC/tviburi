@@ -60,7 +60,7 @@
 
 **Mutants:** G01–G24, each killed by its named case (`tests/mutants.sh` on exports of `3ec764c` and `025b6e4`).
 
-**Suites on `bfc1594`:** see §7.
+**Suites:** see §7.
 
 ## 4. The adversarial pass (WO §5)
 
@@ -138,7 +138,9 @@ Each finding was verified in the code or the manual before acting.
 
 ## 7. Close
 
-**Suites on `bfc1594`, run from its export:** (filled in at READY).
+**Suites, each run from an export of HEAD:**
+- **`bfc1594`:** `tests/spike.sh` gave **144 of 145 checks**, with all 32 GPIO cases among them. The one failure was `rcc-resetfwd`: the teardown flake (§5 item 5). Its answers were all correct, and 11 of 13 end records were written before Renode exited. It passed on rerun. `tests/adversarial.sh`: **ALL PASS**.
+- **`ec04588`,** after the reduction pass: `rcc-resetfwd`, `afcheck`, `unit`, `gpio-valid`, `-ledger`, `-fields` and `-registrations` give **ALL PASS**. `tests/1301/ci-memory.sh` (one run, the trimmed fixture) gives the ELF `a799dfb6` and a peak of 991,676 KiB: **ALL PASS**.
 
 **Reduction pass (diff): −187 net · 2 duplicates removed · 1 dead path removed · 0 protected kept · 3 findings below.** A fresh subagent proposed the cuts; I applied three and kept the rest as findings.
 - Removed: the Python comparison, which the ruled Rust tool supersedes; the fixture's byte-identical `platform.repl`; and the guard's unread `Row.Class`.
