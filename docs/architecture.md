@@ -32,7 +32,7 @@ Read at Aethelgard `main` `f42a0c88` on 2026-11-23. Paths are in that repository
 **How Renode is run:**
 - **Only the CLI runs Renode** (`crates/aethelgard-cli/src/main.rs` `simulate`, `src/renode.rs`, `src/renode/foreign.rs`). `campaign` and `verify` reuse that path. `aethelgard-twin` never runs Renode; it emits the `.repl` and holds the judge's expectations.
 - **The build is pinned.** It is Renode 1.17.0's portable release, checked by sha256, with `Infrastructure.dll` and `Renode.dll` rebuilt with three upstream NVIC patches. The build string is `1.17.0+20260907gitf1dd1b4af.aet1605` (`twin/src/platform.rs` L25, L33). The CLI refuses any other version or build by name (`main.rs` L1871-1890). The stock `.repl` include chain is pinned by sha256 (`platform.rs` L36-49).
-- **The sandbox:** Landlock, seccomp (no sockets), dropped capabilities, uid 65534, and an empty environment (`run.rs` L1-19, `main.rs` L1840-1862). A boot is bounded at 30 s wall and 1 GiB.
+- **The sandbox:** Landlock, seccomp (no sockets), dropped capabilities, uid 65534, and an empty environment (`run.rs` L1-19, `main.rs` L1840-1862). A boot is bounded at 30 s wall and 1.5 GiB (1 GiB until Aethelgard's `RUL-13` was amended on 2026-11-23, Scotty, on `TVI-WO-1301`'s CI measurements).
 
 **What it loads and reads:**
 - **The platform is Aethelgard's,** emitted from its solved topology, and it includes stock `platforms/cpus/stm32h753.repl`.
