@@ -1,0 +1,17 @@
+logFile @/out/renode-log.txt
+include @/out/onefile.cs
+emulation SetSeed 1
+mach create
+machine LoadPlatformDescription @/repo/model/tviburi-nucleo-h753zi.repl
+sysbus WriteDoubleWord 0x58020418 0x00010001
+echo "BSRR-BOTH-PB0 ODR:"
+sysbus ReadDoubleWord 0x58020414
+sysbus.gpioPortB.GreenLED State
+sysbus WriteDoubleWord 0x58020428 0x1
+echo "AFTER-BS-THEN-0x28:"
+sysbus WriteDoubleWord 0x58020418 0x1
+sysbus ReadDoubleWord 0x58020414
+sysbus WriteDoubleWord 0x58020428 0x1
+sysbus ReadDoubleWord 0x58020414
+echo "TVIBURI-END"
+quit

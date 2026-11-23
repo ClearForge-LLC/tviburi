@@ -1,0 +1,18 @@
+// TVI-WO-1301 §1.1 smoke: Tviburi's board, then the GPIO restatement, then the stock Nucleo board's GPIO references
+// restated onto the guards' variables.
+using "/repo/model/tviburi-nucleo-h753zi.repl"
+using "/proto/gpio-restate.repl"
+
+GreenLED: @ tviburiGpioB 0
+YellowLED: @ tviburiGpioE 1
+RedLED: @ tviburiGpioB 14
+
+UserButton1: @ tviburiGpioC 13
+    -> tviburiGpioC@13
+
+tviburiGpioB:
+    0 -> GreenLED@0
+    14 -> RedLED@0
+
+tviburiGpioE:
+    1 -> YellowLED@0
