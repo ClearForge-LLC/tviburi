@@ -19,8 +19,10 @@
 // from the guard's latch. A CR1 read while the latch is set refuses: the clear on SPE 1->0 (p2215) is
 // not modeled. A CFG2 read refuses while MASTER may have been cleared by a mode fault.
 //
-// Rules, in the order they are evaluated. A refused access is not passed to the model.
-//   TVI-LOAD          (Records) the model version could not be computed: every access refuses.
+// Rules, in the order they are evaluated. A refused access is not passed to the model. In recorded mode
+// (RUL-19) the first rule that fires is logged as `would-refuse`, no later rule is evaluated for that access,
+// and the access goes on to the model and the copies as if no rule had fired. TVI-LOAD always refuses.
+//   TVI-LOAD          (Records) the guard failed to load (a mode other than the two): every access refuses.
 //   TVI-SPI-WIDTH     any access other than an aligned 32-bit one, except at TXDR and RXDR, where the
 //                     access must be as wide as the frame (whole bytes of DSIZE+1 bits).
 //   TVI-SPI-ORDER     a write the manual orders against SPE, where it does not say what silicon does:
@@ -58,9 +60,10 @@ namespace Antmicro.Renode.Peripherals.Tviburi
 {
     public class GuardedSTM32H7_SPI : STM32H7_SPI, IDoubleWordPeripheral, IWordPeripheral, IBytePeripheral, IDisposable
     {
-        public GuardedSTM32H7_SPI(IMachine machine) : base(machine)
+        // `mode` comes from the platform description (RUL-19): "enforcing" or "recorded".
+        public GuardedSTM32H7_SPI(IMachine machine, string mode = Records.Enforcing) : base(machine)
         {
-            records = new Records(machine, this, nameof(GuardedSTM32H7_SPI));
+            records = new Records(machine, this, nameof(GuardedSTM32H7_SPI), mode);
         }
 
         // The base constructor calls this before `records` exists (measured): touch only the copies.
@@ -85,7 +88,7 @@ namespace Antmicro.Renode.Peripherals.Tviburi
 
         public new void WriteDoubleWord(long offset, uint value)
         {
-            if(RefusedAccess(offset, value, 32, "write") || RefusedOrder(offset, value, 32) || RefusedWrite(offset, value))
+            if((RefusedAccess(offset, value, 32, "write") || RefusedOrder(offset, value, 32) || RefusedWrite(offset, value)) && !records.Recorded)
             {
                 return;
             }
@@ -148,7 +151,7 @@ namespace Antmicro.Renode.Peripherals.Tviburi
 
         public new void WriteWord(long offset, ushort value)
         {
-            if(!RefusedAccess(offset, value, 16, "write") && !RefusedOrder(offset, value, 16))
+            if(!(RefusedAccess(offset, value, 16, "write") || RefusedOrder(offset, value, 16)) || records.Recorded)
             {
                 base.WriteWord(offset, value);
             }
@@ -156,7 +159,7 @@ namespace Antmicro.Renode.Peripherals.Tviburi
 
         public new void WriteByte(long offset, byte value)
         {
-            if(!RefusedAccess(offset, value, 8, "write") && !RefusedOrder(offset, value, 8))
+            if(!(RefusedAccess(offset, value, 8, "write") || RefusedOrder(offset, value, 8)) || records.Recorded)
             {
                 base.WriteByte(offset, value);
             }
@@ -164,7 +167,8 @@ namespace Antmicro.Renode.Peripherals.Tviburi
 
         public new uint ReadDoubleWord(long offset)
         {
-            if(RefusedAccess(offset, 0, 32, "read") || RefusedRead(offset, 32))
+            var fired = RefusedAccess(offset, 0, 32, "read") || RefusedRead(offset, 32);
+            if(fired && !records.Recorded)
             {
                 return 0;
             }
@@ -172,12 +176,15 @@ namespace Antmicro.Renode.Peripherals.Tviburi
             switch(offset)
             {
             case Cr1Offset:
-                if(ioLock)
+                if(ioLock && !fired)
                 {
                     records.Refuse("TVI-SPI-IOLOCK", Unmodeled, "SPI_CR1", "CR1.IOLOCK (bit 16), read",
                         "CR1 read while the guard's IOLOCK latch is set: silicon reads IOLOCK=1 until SPE goes from 1 to 0, and the guard does not model the clear, so the value cannot be given",
                         "RM0433 Rev 9 §50.11.1 p2215 (CR1.IOLOCK)", State(), offset, value, 32);
-                    return value;
+                    if(!records.Recorded)
+                    {
+                        return value;
+                    }
                 }
                 return (value & Cr1Stock) | (cr1 & ~Cr1Stock & ~Cr1IoLock);
             case Cfg1Offset:
@@ -185,12 +192,15 @@ namespace Antmicro.Renode.Peripherals.Tviburi
             case Cfg2Offset:
                 var doubt = history != null ? "a master state other than the passing one, since reset: " + history
                     : masterUnknown ? "IFCR.MODFC written after such a state, and CFG2 not written since" : null;
-                if(doubt != null)
+                if(doubt != null && !fired)
                 {
                     records.Refuse(Modf, Unmodeled, "SPI_CFG2", "CFG2 read after " + doubt,
                         "CFG2 read after the SPI was configured as a master in a state where a mode fault was possible: if silicon raised MODF there it cleared CFG2.MASTER, which the guard's copy still holds, and IFCR.MODFC clears MODF but does not set MASTER again. RM0433 does not settle whether MODF is evaluated while SPE=0, so the value cannot be given",
                         "RM0433 Rev 9 §50.5.2 p2184; §50.11.1 p2217; §50.4.9 p2171; §50.11.7 p2227 (MODFC)", State(), offset, value, 32);
-                    return value;
+                    if(!records.Recorded)
+                    {
+                        return value;
+                    }
                 }
                 return cfg2;
             case IerOffset:
@@ -203,12 +213,12 @@ namespace Antmicro.Renode.Peripherals.Tviburi
 
         public new ushort ReadWord(long offset)
         {
-            return RefusedAccess(offset, 0, 16, "read") || RefusedRead(offset, 16) ? (ushort)0 : base.ReadWord(offset);
+            return (RefusedAccess(offset, 0, 16, "read") || RefusedRead(offset, 16)) && !records.Recorded ? (ushort)0 : base.ReadWord(offset);
         }
 
         public new byte ReadByte(long offset)
         {
-            return RefusedAccess(offset, 0, 8, "read") || RefusedRead(offset, 8) ? (byte)0 : base.ReadByte(offset);
+            return (RefusedAccess(offset, 0, 8, "read") || RefusedRead(offset, 8)) && !records.Recorded ? (byte)0 : base.ReadByte(offset);
         }
 
         // TVI-SPI-READ, after TVI-SPI-WIDTH and before the model is read: true if the read was refused.
@@ -253,7 +263,7 @@ namespace Antmicro.Renode.Peripherals.Tviburi
             if(records.LoadFailed)
             {
                 records.Refuse("TVI-LOAD", Unmodeled, RegisterAt(offset), "none",
-                    "access to a guarded peripheral whose model version could not be computed at load", Records.LoadCitation,
+                    "access to a guarded peripheral that failed to load", Records.LoadCitation,
                     State(), offset, value, width);
                 return true;
             }

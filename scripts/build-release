@@ -1,0 +1,12 @@
+#!/bin/sh
+# build-release [TREE [OUT]]: inside the pinned tools image, build tools/tviburi-release and run it on the tree at
+# TREE (default /repo), writing the release to OUT (default /out/release) (the one-file overlay Tviburi.cs, MANIFEST, LEDGER.jsonl, the template, the tarball).
+# Prints the release hash, `sha256:<hex>`: the version every witness must report (RUL-10). Every run from scripts/
+# and tests/ loads this release's one file, never model/ (TVI-WO-1200).
+set -eu
+export PATH=/opt/cargo/bin:$PATH RUSTUP_HOME=/opt/rustup CARGO_HOME=/out/cargo-home
+tree=${1:-/repo} out=${2:-/out/release}
+# The program is built from the tree it releases, whose MANIFEST names its sources: never from another tree.
+cargo build --quiet --offline --locked --manifest-path "$tree/tools/tviburi-release/Cargo.toml" --target-dir "$out.target"
+"$out.target/debug/tviburi-release" build "$tree" /opt/renode "$out" >"$out.txt"
+sed -n 's/^release //p' "$out.txt"
