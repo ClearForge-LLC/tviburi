@@ -86,7 +86,7 @@ Three firmwares, `modeled`, `modf` and `forge`, each run under two environments:
 3. **`0100a`'s unchanged check sees no record in either framing under Aethelgard's configuration.** Its parser takes only the 13-character host stamp (`tools/tviburi-check/src/main.rs` L47–66). For `modeled` with the model directory set, and for the console capture, it prints "no load witness … no end record" and exits 1. For `modf` the refusal is invisible to it as well: it says FAIL, not REFUSED (exit 3). It fails closed, but it does not name the refusal.
 4. **Aethelgard's empty environment makes `0100a`'s guard refuse everything** (review A2, now run). The witness is a `TVI-LOAD` refusal, `seq` 0. Every guarded access then refuses, and the `end` carries `model_version: "unavailable"`. `modeled` gives 6 records and `modf` 4, every one but the `end` a refusal.
 5. **`use-synchronous-logging = true`: no mid-line interleave.** In all 15 consoles, every line that carries a record starts with the stamp, once a `\r` at either end is removed. `0100a` F7's split was not seen, although the monitor's echo and listing ran right beside records.
-6. **A `\r` does precede a record line on the console.** The `end` record printed after the `peripherals` listing begins with `\r` (`^M[00:00:00.001000000] [INFO] spi1: {"tviburi":"end",…}`). Every console has 418 `\r` characters. Aethelgard's `clean_lines` trims them, and so does the reader. **A reader that does not trim them loses the `end` record.**
+6. **A `\r` does precede a record line on the console.** The `end` record printed after the `peripherals` listing begins with `\r` (`^M[00:00:00.001000000] [INFO] spi1: {"tviburi":"end",…}`). Every console has 831 `\r` characters, on 418 lines. Aethelgard's `clean_lines` trims them, and so does the reader. **A reader that does not trim them loses the `end` record.**
 7. **`collapse-repeated-log-entries = True` folded nothing.** Three identical messages, logged in a row under `spi1`'s name by the monitor, appear three times on both framings, with no `(2)`. Why was not determined: it may be synchronous logging, or the source. `0100a`'s folding was measured under its own configuration. `seq` still makes every record distinct, so it stays.
 8. **`always-log-machine-name = False`:** the source is `spi1` on both framings, never `machine-0:spi1`. The record's own `peripheral` field says `sysbus.spi1`.
 9. **A multi-line message:** each continuation line is unstamped and indented by four spaces (`    {"tviburi":"refusal","seq":99,…}`). The reader rejects it as "no stamp at column 0", and so would `log_stamped`. A message cannot carry a second record past the grammar.
@@ -115,7 +115,7 @@ The same harness was used. The forms are `n3` and `n5` in `retype/forms/`, and t
 
 **Every change a consumer sees, for an instance a stock file declares:**
 1. **Its platform must cancel the stock entry,** `timer1: @none`, and restate the instance in full: the registration with its RCC alias, the constructor arguments, and every interrupt line. The values come from the stock file the consumer pins (`stm32h7.repl` L316–325 for `timer1`).
-2. **With `as "<stock name>"` (n3), the listing and name are unchanged.** But **every untyped update the consumer emits for that name must move to the new variable.** Otherwise it silently reaches the cancelled stock entry. Aethelgard emits exactly such updates for 14 timers and 8 USARTs (`sentinel-02-own.repl`, `AET-WO-4400g`).
+2. **With `as "<stock name>"` (n3), the listing and name are unchanged.** But **every untyped update the consumer emits for that name must move to the new variable.** Otherwise it silently reaches the cancelled stock entry. Aethelgard emits exactly such updates for 14 timers and 8 USARTs (counted in the captured `platform-booted.repl`, `AET-WO-4400g`).
 3. **With a second description (n5), the name and the updates stay where they are.** But the consumer's monitor commands gain a second `machine LoadPlatformDescription` per run, and its sealed-platform hashing covers two files.
 4. **Not determined:** whether the cancelled stock object is still constructed and connected. It is off the bus and receives no writes.
 5. **The interrupt endpoints read back unnamed** (`?@1`…) in `n1` and `n3`, where `n5` and the stock entry show `sysbus.nvic@24` and so on. Only IRQ 25 was checked functionally (pending in all three). Why the read-back differs was not determined.
@@ -211,7 +211,7 @@ The guard is a spike copy (`overlay/Records1150.cs`, `overlay/GuardedSpi1150.cs`
 
 **Readings:**
 - **The memory cost is per compilation, not per line of code.** The same code costs about +290 MiB as three `include @` files, about +170 MiB as two, and about +45 MiB as one. On the load-only boot it is about +170, +165 and +90 MiB, against a stock 618–644 MiB. Aethelgard's own two models are already compiled in the stock boot. Why each extra compilation costs this much was not determined.
-- **Wall time is not the constraint here:** 9.1–10.4 s per ArduPilot boot with or without the overlay, and +0.3–0.6 s to the listing. **The stock outlier is:** at host load 16, one stock boot took 26.4 s and peaked at 1,379,148 KiB, over the bound with no overlay at all. That matches `AET-WO-4400f` F1 ("RSS grows with wall time under load").
+- **Wall time is not the constraint here:** 9.1–10.4 s per ArduPilot boot with or without the overlay, and +0.3–0.6 s to the listing. **The stock outlier is:** at host load 16, one stock boot took 26.4 s and peaked at 1,379,148 KiB, over the bound with no overlay at all. That matches `AET-WO-4400f` F1 ("RSS grows with wall time under load"). 26.4 s is under the 30 s bound, by 3.6 s.
 - **(iii)'s scheme puts the constant in its own file,** so a release is at least two compilations. That shape stays under the bound with a 25–34 MiB margin, at this host load.
 
 **Stop (WO §7):** the overlay, shipped as `0100a` ships it (one `include @` per file) plus (iii)'s constant file, **takes ArduPilot's foreign boot past the 1 GiB bound in all five runs.** That is northstar §6's "so slow or heavy" failure.
@@ -270,7 +270,7 @@ The guard is a spike copy (`overlay/Records1150.cs`, `overlay/GuardedSpi1150.cs`
 **Writes the log misses or misattributes (WO §5).** **DMA writes are logged, but under a CPU's PC.** All 25,073 writes to `spi2`'s `TXDR` carry `pc 0x810107E` or `0x81010CC`. Those are the PCs of the CPU's writes to `dma1` offset `0x58` (stream 3's `CR`, the enable). The transfer runs inside that CPU write, as (vi) shows. Nothing after the window is logged, because nothing runs after it.
 
 **The recorded guard on `spi1` and `spi2`** (`mode: "recorded"`, the same replay):
-- **7,115 `would-refuse` records, all one path:** `TVI-SPI-MODF`, `kind: unmodeled`, `CFG2.SSM (bit 26) = 0, CFG2.SSOE (bit 29) = 1` (review A6, `0100b`'s), at every `CR1` write that sets `SPE`.
+- **7,117 `would-refuse` records, all one path:** `TVI-SPI-MODF`, `kind: unmodeled`, `CFG2.SSM (bit 26) = 0, CFG2.SSOE (bit 29) = 1` (review A6, `0100b`'s), at every `CR1` write that sets `SPE`.
 - **`spi1`:** 17–19 each for `CR1` values `0x1`, `0x201` and `0x601`.
 - **`spi2`:** 2,354 for each of the same three values, once per IMU transaction.
 - **First PCs:** `0x08100EBC`, `0x08101088`, `0x08100CC0`.
@@ -311,7 +311,7 @@ The guard is a spike copy (`overlay/Records1150.cs`, `overlay/GuardedSpi1150.cs`
   - `USART1.CR1`/`CR2` tags;
   - `FLASH.CR2.PSIZE2`;
   - `PWR.CR1`–`CR3` (classed by source: no register collection).
-- **Read with care:** 58 of the 167 (a) rows are write-to-clear or status registers (`SR`, `LIFCR`, `HIFCR`, `ICR`, `FLASH.SR2`/`CCR1`/`CCR2`). There "dropped" means the twin has no such flag at all. Whether that is a gap depends on whether silicon could have set the flag, which the access log cannot say.
+- **Read with care:** 79 of the 167 (a) rows are write-to-clear or status registers: DMA `LIFCR`/`HIFCR` 24, SPI `IFCR` 16, USART and I2C `ICR` 13, TIM5 `SR` 5, `FLASH.SR2`/`CCR1`/`CCR2` 21. (A first count of 58 left out `FLASH`; the independent review's 63 left out SPI's `IFCR`. Both were corrected here.) There "dropped" means the twin has no such flag at all. Whether that is a gap depends on whether silicon could have set the flag, which the access log cannot say.
 - **Against `1100`'s proposed cut (ranks 1–172):** ArduPilot writes 52 of its rows (6 dropped, 46 held), and does not write 120 (TIM1 and TIM2).
 
 **Sentinel-03:** `crates/aethelgard-cli/tests/fixtures/sentinel-03.json` is unchanged between `f42a0c88` and `7dec1d7b` (`git diff --stat` is empty), so `1100`'s rows stand and were not re-measured.
@@ -340,7 +340,7 @@ The harness was `harness/run-retype.sh`, with each form's `.monitor` commands ap
 **What each costs, measured:**
 - **(a)** needs the consumer to restate the RCC registration of 58 stock entries in its own platform. That is a large consumer change, mechanical and generated from the pinned stock file. **The owned stock RCC is unregistered, so its own log lines lose their source name** (`[WARNING] Unhandled write to offset 0x50 …` with no `rcc:`). A consumer that cites or filters RCC lines by name loses them.
 - **(b1) leaves a bypass.** The stock RCC stays on the bus at its new address, and a write there reaches it with no guard line: the monitor write to `0x58027050` landed on `rcc` directly. On silicon that address is unused, so firmware has no reason to write it, but the twin would answer it.
-- **(b2)** has no second address, but **the stock RCC answers `0x00`–`0x4F` unguarded**: `CR`, `CFGR`, the domain prescalers, `PLLCKSELR`, `PLLCFGR` and the PLL dividers. Those are clock-tree registers too (RM0433 Rev 9 §8.7, offsets from the register map). The narrowed registration was accepted for a peripheral whose size is 0x400.
+- **(b2)** has no second address, but **the stock RCC answers `0x00`–`0x4F` unguarded** (inferred from the narrowed registration; only `0x50` and above were probed): `CR`, `CFGR`, the domain prescalers, `PLLCKSELR`, `PLLCFGR` and the PLL dividers. Those are clock-tree registers too (RM0433 Rev 9 §8.7, offsets from the register map). The narrowed registration was accepted for a peripheral whose size is 0x400.
 - **(c)** is displaceable by one monitor command, as architecture §2.0a recorded for SPI, and cannot be set from a `.repl`.
 
 **The ruling this leaves open (the architect's):** (a) and (b) each work. (a) is closest to `RUL-07`'s "guard owns the access", at the price of 58 restated registrations. (b1) is the smallest consumer change, with a bypass address. (b2) splits the RCC at a register boundary.
