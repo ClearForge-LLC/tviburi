@@ -69,10 +69,15 @@
 | A source turned off under a running SPI1 refuses at the RCC write, or is blocked | `rcc-lost-*` (5), `rcc-lost-alias`; `rcc-blocked`, `rcc-stopped`, `rcc-ckper-live` | as stated |
 | A same-value `CFG2` write with `SPE` = 1 passes; a different value refuses | `conditions` 8/8a, `rcc-cfg2same` | as stated |
 | The allow-list regenerates from a clean checkout, byte for byte | `allowlist` | as stated |
-| ArduPilot's boot and the generated firmware pass as `1300` measured, except where these rules predict a fault (a stop) | `tests/1300/boots.sh` on `1300`'s captures (Aethelgard `75da8053`) | ArduPilot and five boards: 0 records. The nine `per_ck` boards: `TVI-SPI-KERNEL` at SPI1 (SPI2 on two), as ruled 17:16Z. `d1-drv8876`: its `ADC3EN` refusal, `unmodeled`, as ruled. Peaks: ArduPilot 921,408–977,304 KiB; boards 504,788–967,372 KiB; bound 1,048,576 |
+| ArduPilot's boot and the generated firmware pass as `1300` measured, except where these rules predict a fault (a stop) | `tests/1300/boots.sh` on `1300`'s captures (Aethelgard `75da8053`) | ArduPilot and five boards: 0 records. The nine `per_ck` boards: `TVI-SPI-KERNEL` at SPI1 (SPI2 on two), as ruled 17:16Z. `d1-drv8876`: its `ADC3EN` refusal, `unmodeled`, as ruled. Boards' peaks 504,788–967,372 KiB |
+| The one-file peak under 1,048,576 KiB (ruled 18:30Z: unslowed runs only, at least 5) | ArduPilot's full 5 s boot, `replay-1300.sh 2 accept`, 7 runs in sequence on `8cd6e45`'s code, Furnace, host load 4.7–5.9 | **all 7 unslowed** (wall 10.1–10.7 s), **0 `would-refuse`**, 3 ends each. **Peaks 948,304–1,002,452 KiB, median 982,060; the highest is under by 46,124 KiB (45 MiB).** No run was slowed, so none was set aside. `1300` measured 955,512–980,696; 1301's GPIO is expected to add 10–25 MiB |
 | CI green | the PR | see the PR |
 
-**Suites on HEAD:** `TVI-WO-1300a`'s run of `tests/spike.sh` (`all`): 130 ok, 0 FAIL. **Mutants** (diff-sized: C24–C32, A01, S01–S05, F03): 16/16 killed, each by the test its row names.
+**Suites on the branch** (`02faa91`, before the merge of `main`'s docs-only `2e4c56d`):
+- `tests/spike.sh`, `all`: **137 ok, 0 FAIL** (402 s).
+- **Mutants,** diff-sized: the work order's 20 (C24–C35, A01, S01–S06, F03), **20/20 killed**, each by the test its row names.
+- **Three earlier rows** targeted lines this work order changed (M09, M12, C03). They were re-targeted to the same mutation and re-run: **3/3 killed**.
+- **`boots.sh check`:** 15/15 boards as `boots.tsv` expects.
 
 ## 3. Findings and rows for the architect
 
@@ -133,4 +138,19 @@
 
 ## 6. Close
 
-(reduction pass, filled at close)
+**Reduction pass (diff): +5 net · 3 duplicates removed · 0 dead paths removed · 1 protected kept · 5 findings below.**
+- A fresh subagent proposed the cuts; I applied four and proved them by the suite, the 20 mutants and `boots.sh check` (§2).
+- **The duplicates:**
+  - the nine `*ENR` offsets, written twice: `CopiedOffsets` now derives from `EnableOffsets`;
+  - the enable-bit test, twice: now `Enabled`;
+  - the SPI guard's "no RCC guard" sentence, twice: now `NoRcc`.
+- **Protected:** `RequireKernelClock` (`TVI-RCC-KERNEL`). Bench rows R1–R2 and the USART2 case name it.
+- **Not cut, with the reason:**
+  - `Unregister`'s new loop completes F1's fix, though no platform here unregisters;
+  - `replay-1300.sh`'s `pure` mode is the control for `accept`;
+  - the peak sampler carries the bound's evidence;
+  - generating the ledger case's `want` from `bench-checks.tsv` was judged riskier than the copy it removes;
+  - folding `divr` into the copies would change their read-back.
+- **(6)'s own deletions are separate:** six prototype files, and `allowlist.py`'s measurement half.
+
+**Tokens:** one mint for the §1.1 push (revoked HTTP 204), and one for the PR, recorded on the bus.
