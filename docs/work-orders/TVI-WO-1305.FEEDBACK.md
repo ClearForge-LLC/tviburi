@@ -180,4 +180,11 @@ Reduction pass (diff): −17 net · 5 duplicates removed · 3 dead paths removed
 - **The acceptance replays on `8e1d2d1`** (the 14 generated boots and the fixture; the armed run): as measure §6 and §3.1.
 - **Memory:** a prototype measured −6.5 MiB (measure §4). **The built guard's budget is judged in CI** (ruled; Furnace is shared).
 
-**CI:** FINAL-CI
+**CI:**
+- **Run 45475257047** (`18f4405`, the first push) gave the budget only: `MEDIANS main 902872 KiB, branch 908924 KiB, difference 6052 KiB (+5.9 MiB)`, PASS. The ledger commits superseded it.
+- **Run 45477599657** (`6c86750`):
+  - route, budget, budget-tests and **all five shards passed** (14.5–16.6 min);
+  - the aggregate failed: `647 expected (291 cases, 356 mutants), 646 ran … FAIL mutant  did not run in any shard`. The missing item was a mutant with an empty id: an orphaned line in `tests/mutants.tsv`, left by a `printf` whose `\n` split my first US37 row in two. `tests/mutants.sh` skips a row with no id; `tools/tviburi-route` counts it. Removed in `844f533`.
+- **The run on the final commit is reported in the READY note on the bus** (a FEEDBACK-only commit would rerun every shard).
+
+**A row (the route):** `tools/tviburi-route`'s item list and `tests/mutants.sh` disagree on what a mutant row is. The runner skips an empty id, and the route expects it. The aggregate caught it (it failed closed), but the route could refuse a malformed row by name at the start.
