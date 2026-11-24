@@ -1,6 +1,6 @@
 # TVI-WO-1304 — FEEDBACK
 
-**Builder:** Claude (Opus 5.5), Furnace, 2026-11-24. **Branch:** `wo/tvi-1304-flash-guard`, from `main` `d22dad8`, `main` `b06ba63` merged.
+**Builder:** Claude (Opus 5.5), Furnace, 2026-11-24. **Branch:** `wo/tvi-1304-flash-guard`, from `main` `d22dad8`; `main` `0a86577` (with `TVI-WO-1303`, the DMA guard) merged.
 
 **State:**
 - §1.1 was measured and stopped (`TVI-WO-1304.measure.md`), then ruled at 2026-11-24T15:50Z (Q1–Q7).
@@ -127,6 +127,18 @@ Reduction pass (diff): −21 net · 2 duplicates removed · 1 mechanism removed 
 - **The replay's translation** of the consumer's block fails closed on any other shape (A15).
 - **The records runtime:** `Refusal.cs`'s comment says recorded mode "evaluates no further rule". The flash, timer and GPIO guards evaluate every rule (A8).
 - **The teardown race** lost every end record once in this WO's full-suite run (`flash-lockedsame`, which passed on its rerun): the known row.
+
+## 7a. The merge with `TVI-WO-1303`
+
+- **The conflicts were all appends.**
+  - Every guard-name list now reads `… timer1 timer8 dma1 dma2 flashController`, `tests/1303/dma.sh`'s and `tests/1304/flash.sh`'s included.
+  - The class row takes main's new fourth column and names its instance, `flashController` (the fence's "the class row naming its instances").
+  - The board, the bench rows, the citations, the mutants and the replay hold both guards' blocks. G17 was retargeted.
+- **Two faults the merge exposed, each fixed and re-proved:**
+  - **The replay lost a closing `fi`.** It sat after the DMA block as common context, and the conflict's resolution dropped it, so every budget boot failed on both sides (CI run 45443616081). Restored; one ArduPilot replay on the merged tree then booted with 19 witnesses, both DMA guards and the flash guard among them, and 0 would-refuse.
+  - **`t_crash` killed Renode as soon as `spi1`'s witness began.** The log is flushed in blocks. With the DMA and flash witnesses ahead of it, `spi1`'s witness line straddled a block on every run, and the kill left it malformed. Each branch alone passed, and the merge failed 3 of 3. The case now waits for the whole line, closing brace included, and passed 3 of 3.
+- **CI on the merge's fixes** (`0d37417`, run 45446871058): route, budget (+1.1 MiB against the merged main), budget-tests and four shards green. Shard 2 failed one case, `timer-moe0`, which CI prints only as a verdict. It passed 3 of 3 runs on Furnace at the same head, and this WO touches nothing it reads but the guard-name list. That is the known teardown race (§7), unconfirmed; the next run re-ran it (§8).
+- **Peer information, `AET-WO-4400h`** (Aethelgard, 17:02Z): unmodified ArduPilot on Sentinel-03 also programs bank 2 at run time, at each `PARAM_SET`. It runs the same `KEYR`/`CR2` sequence as the boot (`0x734`, `0x736`, `0x735`) that `flash-ap` replays. Under the guard, `PSIZE2` reads back as written there too.
 
 ## 8. Suites, mutants, memory and CI
 
