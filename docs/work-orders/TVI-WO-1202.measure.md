@@ -139,9 +139,8 @@ verdict is §7's stop, so the plan does not use it.
 
 ### 1.6 The route's path classes
 
-- **Nothing reads `docs/` or the root's licence files** (the `Cargo.toml`s carry `license = "MIT OR Apache-2.0"`, no
-  `license-file`).
-- **Nothing else reads `docs/` either.** The release program reads `model/` (every file), `tools/tviburi-release/` and
+- **No test, script, model or tool reads `docs/` or the root's licence files** (the `Cargo.toml`s carry
+  `license = "MIT OR Apache-2.0"`, no `license-file`). The release program reads `model/` (every file), `tools/tviburi-release/` and
   `tools/tviburi-check/src/json.rs`; its `rm0433.md` names are strings in acknowledgements, not reads. The models cite
   `docs/work-orders/*.rm0433.md` in comments. `docs/work-orders/TVI-WO-1301.st-compare.tsv` is read by nothing
   (`TVI-WO-1301.ds12117.md` cites it).
