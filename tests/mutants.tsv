@@ -160,8 +160,8 @@ G01-afRule	model/GuardedSTM32_GPIOPort.cs	var entering = AfFaults(moder, afrl, a
 G02-afOnce	model/GuardedSTM32_GPIOPort.cs	afFaulted &= AfFaults(moder, base.ReadDoubleWord(AfrlOffset), base.ReadDoubleWord(AfrhOffset));	afFaulted = 0;	gpio-recorded
 G03-package	model/GuardedSTM32_GPIOPort.cs	var entering = PackageFaults(word) & ~packageFaulted;	var entering = 0;	gpio-package
 G04-pc2Switch	model/GuardedSTM32_GPIOPort.cs	if(name == "PC2" || name == "PC3")	if(false)	gpio-pc2
-G05-bsrrPriority	model/GuardedSTM32_GPIOPort.cs	value &= ~((value & 0xFFFFu) << 16);	;	gpio-bsrr
-G06-otyperCopy	model/GuardedSTM32_GPIOPort.cs	return b == OtyperOffset ? otyper : base.ReadDoubleWord(b);	return base.ReadDoubleWord(b);	gpio-otyper
+G05-bsrrPriority	model/GuardedSTM32_GPIOPort.cs	: (odr & ~(value >> 16) | value) & 0xFFFFu;	: (odr | value) & ~(value >> 16) & 0xFFFFu;	gpio-bsrr
+G06-otyperCopy	model/GuardedSTM32_GPIOPort.cs	return b == OtyperOffset ? otyper : b == OdrOffset	return b == OtyperOffset ? base.ReadDoubleWord(b) : b == OdrOffset	gpio-otyper
 G07-fieldRow	model/GuardedSTM32_GPIOPort.cs	if(f.Allowed != null && !f.Allowed.Contains(v))	if(false)	gpio-pupdr gpio-fields
 G08-noRegister	model/GuardedSTM32_GPIOPort.cs	if(rows.Length == 0)	if(false)	gpio-brr
 G09-readNoRegister	model/GuardedSTM32_GPIOPort.cs	if(b > AfrhOffset)	if(false)	gpio-read
@@ -175,8 +175,30 @@ G16-boardPackage	model/tviburi-nucleo-h753zi.repl	tviburiGpioH:\n    mode: "enfo
 G17-namesLine	scripts/tviburi-spike	gpioPortJ gpioPortK >	gpioPortJ >	modeled
 G18-unlistedPinAf	model/GuardedSTM32_GPIOPort.cs	if(cell == null || cell.Text == "-")	if(cell != null && cell.Text == "-")	gpio-pk8af
 G19-unlistedPinPackage	model/GuardedSTM32_GPIOPort.cs	(!bonding.TryGetValue("P" + port + pin, out var b) || b.Pin == null)	(bonding.TryGetValue("P" + port + pin, out var b) && b.Pin == null)	gpio-pk8out
-G20-staleRefresh	model/GuardedSTM32_GPIOPort.cs	base.ReadDoubleWord(b);\n            }\n            base.WriteDoubleWord(b, value);	}\n            base.WriteDoubleWord(b, value);	gpio-resetwrite
+G20-staleRefresh	model/GuardedSTM32_GPIOPort.cs	base.ReadDoubleWord(b);\n            }\n            var before = Selection();	}\n            var before = Selection();	gpio-resetwrite
 G21-recordEveryRule	model/GuardedSTM32_GPIOPort.cs	RefusedAf(offset, b, word, width);\n                RefusedPackage(offset, b, word, width);	RefusedAf(offset, b, word, width);	gpio-recordedtwo
 G22-witnessPackage	model/GuardedSTM32_GPIOPort.cs	("package", package ?? "none")	("package", "LQFP144")	gpio-nopackage
 G23-registrationCount	model/GuardedSTM32_GPIOPort.cs	if(points.Length != 1)	if(false)	gpio-twoaddr
 G24-latchRecorded	model/GuardedSTM32_GPIOPort.cs	afFaulted |= entering;	;	gpio-recorded
+# TVI-WO-1301a: one mutant per guard it adds (diff-sized), each with the case that must kill it.
+H01-driveByMode	model/GuardedSTM32_GPIOPort.cs	var level = m == 1 ? ((odr >> pin) & 1) == 1                       //	var level = true ? ((odr >> pin) & 1) == 1                       //	gpio-analogled
+H02-switchDrives	model/GuardedSTM32_GPIOPort.cs	            Drive(changed);	            ;	gpio-analogout
+H03-afEntry	model/GuardedSTM32_GPIOPort.cs	return sources.Any(g => g.IsSet) ^ inverted.Contains(pin * 16 + af);	return null;	gpio-afenter
+H04-afInverted	model/GuardedSTM32_GPIOPort.cs	return sources.Any(g => g.IsSet) ^ inverted.Contains(pin * 16 + af);	return sources.Any(g => g.IsSet);	gpio-afentern
+H05-odrLatched	model/GuardedSTM32_GPIOPort.cs	: b == OdrOffset ? odr :	: b == OdrOffset ? Idr() :	gpio-afodr
+H06-idrAnalog	model/GuardedSTM32_GPIOPort.cs	m == 0 && (Outside(pin, m) ?? false)	m == 0 ? (Outside(pin, m) ?? false) : Connections[pin].IsSet	gpio-analoghold
+H07-floatingZero	model/GuardedSTM32_GPIOPort.cs	m == 0 && (Outside(pin, m) ?? false)	m == 0 && (Outside(pin, m) ?? Connections[pin].IsSet)	gpio-inputidr
+H08-pull	model/GuardedSTM32_GPIOPort.cs	return pull == 1 ? true : pull == 2 ? (bool?)false : null;	return null;	gpio-inputidr
+H09-declared	model/GuardedSTM32_GPIOPort.cs	if((declaredMask >> pin & 1) == 1)	if(false)	gpio-inputidr
+H10-externalCheck	model/GuardedSTM32_GPIOPort.cs	                if(!ok)	                if(false)	gpio-externalbad
+H11-senderOutput	model/GuardedSTM32_GPIOPort.cs	                Drive(1u << number);	                SetPin(number, value);	gpio-button
+H12-resetOdr	model/GuardedSTM32_GPIOPort.cs	            odr = 0;   // a sender's level is outside the port, so a reset keeps it\n	(empty)	gpio-resetodr
+H13-pullDown	model/GuardedSTM32_GPIOPort.cs	return pull == 1 ? true : pull == 2 ? (bool?)false : null;	return pull == 1 ? true : (bool?)null;	gpio-inputidr
+H14-selectionAf	model/GuardedSTM32_GPIOPort.cs	 | (uint)Af(afrl, afrh, pin) << 2	(empty)	gpio-afswitch
+H15-selectionPull	model/GuardedSTM32_GPIOPort.cs	 | (pupdr >> (2 * pin) & 3) << 6;	;	gpio-inputidr
+H16-analogNoPull	model/GuardedSTM32_GPIOPort.cs	var pull = mode == 3 ? 0 :	var pull = mode == 9 ? 0 :	gpio-inputidr
+H17-firstAccessDrive	model/GuardedSTM32_GPIOPort.cs	Drive(0xFFFF);   // the declared levels and the pulls, on the pins nobody drives	;	gpio-afodr
+H18-resetDrive	model/GuardedSTM32_GPIOPort.cs	Drive(0xFFFF);   // the declared levels and the reset pulls	;  //	gpio-resetodr
+H19-senderBeforeConfig	model/GuardedSTM32_GPIOPort.cs	SetPin(number, value);   // before the first access	;   //	gpio-button
+H20-senderKeptOnReset	model/GuardedSTM32_GPIOPort.cs	            odr = 0;   // a sender	            senderKnown = 0;\n            odr = 0;   // a sender	gpio-button
+H21-afNoSourceHold	model/GuardedSTM32_GPIOPort.cs	m == 2 ? Peripheral(pin) ?? Outside(pin, m)	m == 2 ? Peripheral(pin) ?? false	gpio-afnosrc

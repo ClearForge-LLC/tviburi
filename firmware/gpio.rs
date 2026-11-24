@@ -23,6 +23,32 @@
 //!   path="otyper"       - OTYPER = 0x00C0 (open-drain on pins 6, 7): kept and read back: passes.
 //!   path="ardupilot", "gen-s03" - ArduPilot's first 886 GPIO writes (every pin state it ever enters; widths kept)
 //!                         and sentinel-03's 88, as measured (TVI-WO-1301 §1.1): each passes, enforcing (WO §2).
+//! TVI-WO-1301a, what drives a pin (RM0433 Rev 9 §11.3.9-11.3.13 p537-539). MARK_READ and MARK_READ2 keep what is read:
+//!   path="analogled"   - BSRR = 1 on PB0, analog from reset: GreenLED stays dark (p539); MARK_READ = ODR_B << 16 | IDR_B
+//!                        (ODR0 reads 1, as written, p537; IDR0 reads 0, analog, p539).
+//!   path="analogout"   - the same, then MODER PB0 = output: GreenLED lights with the latched ODR; MARK_READ = IDR_B.
+//!   path="odrfirst"    - ODR = 1 on port B, then PB0 output ("set ODR, then output"): GreenLED lit.
+//!   path="moderfirst"  - PB0 output, then ODR = 1: GreenLED lit.
+//!   path="analoghold"  - PB0 output with ODR0 = 1, then analog: the pin holds (nothing drives it); IDR0 reads 0.
+//!   path="afodr"       - PA8 AF1 (TIM1_CH1, DS12117 Table 9 p89), TIM1 PWM held low (CCR1 = 0), then ODR = 0x100: the
+//!                        pin follows TIM1, not ODR (p538); MARK_READ = ODR_A << 16 | IDR_A.
+//!   path="afenter"     - PA8 output high, then AF1 with TIM1 low: the pin takes TIM1's level at the switch; MARK_READ = IDR_A.
+//!   path="afenterhigh" - PA8 output low, TIM1 driving high (CCR1 > ARR), then AF1: the pin goes high at the switch.
+//!   path="afout"       - PA8 AF1 with TIM1 low and ODR8 = 1, then output (high), then AF again (low):
+//!                        MARK_READ = IDR8 after output << 1 | IDR8 after AF.
+//!   path="afentern"    - PA7 output low, TIM1 CH1 low, then AF1 (TIM1_CH1N, p89): the pin takes the level Renode's
+//!                        routing gives CH1N, CH1 inverted (stm32h7.repl invertedAFPins [7, 1, 3]; CCxNE is not gated there).
+//!   path="odrhalf"     - a 16-bit store of 1 to port B's ODR, PB0 analog: latched (ODR0 reads 1), GreenLED dark.
+//!   path="idle"        - nothing but the marker: a monitor-driven case runs it so that emulation can advance.
+//!   path="inputidr"    - port D: PD0 output high, then input (floating: reads 0); PD1 input, then pulled up; PD2 output
+//!                        high, input (held), then pulled down (PUPDR, p542: the pin follows each pull); PD3 output high;
+//!                        PD4 analog with ODR4 = 1 and a pull-up written (no pull in analog, p539: IDR 0, the pin low);
+//!                        PD5 input, declared up by the test's platform; PD6 input with ODR6 = 1 (floating: 0).
+//!                        MARK_READ = IDR_D, MARK_READ2 = ODR_D.
+//!   path="afswitch"    - PA0 on AF1 (TIM2_CH1, p89) with TIM2 low, then AFSEL = 2 (TIM5_CH1) with TIM5 high, in AF mode:
+//!                        the pin follows the newly selected AF. MARK_READ = IDR0 before << 1 | IDR0 after.
+//!   path="afnosrc"     - PA5 output high, then AF5 (SPI1_SCK, p89; no Renode model drives a pin), then BSRR resets ODR5:
+//!                        the pin holds high (ruled 2026-11-23T23:52Z) and IDR5 reads it. MARK_READ = IDR_A.
 //! Bits: RM0433 Rev 9 §11.4 p541-546.
 #![no_std]
 #![no_main]
@@ -32,6 +58,11 @@ use core::ptr::{read_volatile, write_volatile};
 
 const RCC_AHB4ENR: *mut u32 = 0x5802_44E0 as *mut u32;
 const GPIOA: usize = 0x5802_0000;
+const GPIOB: usize = 0x5802_0400;
+const GPIOD: usize = 0x5802_0C00;
+const RCC_APB2ENR: *mut u32 = 0x5802_44F0 as *mut u32;
+const TIM1: usize = 0x4001_0000;
+const IDR: usize = 0x10;
 const GPIOC: usize = 0x5802_0800;
 const GPIOH: usize = 0x5802_1C00;
 const GPIOK: usize = 0x5802_2800;
@@ -47,6 +78,7 @@ const AFRH: usize = 0x24;
 const MARK_AFTER: *mut u32 = 0x2000_0104 as *mut u32;
 /// Where a read's value is kept, so the test can see it.
 const MARK_READ: *mut u32 = 0x2000_0108 as *mut u32;
+const MARK_READ2: *mut u32 = 0x2000_010C as *mut u32;
 
 unsafe fn w(port: usize, off: usize, v: u32) {
     write_volatile((port + off) as *mut u32, v);
@@ -64,6 +96,47 @@ unsafe fn afsel(port: usize, pin: u32, af: u32) {
     let off = if pin < 8 { AFRL } else { AFRH };
     let sh = 4 * (pin & 7);
     w(port, off, (r(port, off) & !(0xF << sh)) | (af << sh));
+}
+
+/// TIM1 CH1 in PWM mode 1 (OC1M = 0110, RM0433 Rev 9 §38.4.7 p1599; p1557), its output enabled (CC1E, §38.4.11
+/// p1605) and the counter running, CCR1 = `ccr` with ARR = 99: 0 holds the output low, more than ARR high. A busy loop
+/// then lets virtual time pass, so the stock timer has set its output before the caller goes on.
+#[cfg(any(path = "afodr", path = "afenter", path = "afenterhigh", path = "afout", path = "afentern"))]
+unsafe fn tim1(ccr: u32) {
+    write_volatile(RCC_APB2ENR, read_volatile(RCC_APB2ENR) | 1);
+    w(TIM1, 0x28, 0);
+    w(TIM1, 0x2C, 99);
+    w(TIM1, 0x34, ccr);
+    w(TIM1, 0x18, 0x68);
+    w(TIM1, 0x20, 1);
+    w(TIM1, 0x44, 0x8000);
+    w(TIM1, 0x14, 1);
+    w(TIM1, 0x00, 0x81);
+    let mut i = 0u32;
+    while i < 20000 {
+        write_volatile(MARK_READ2, i);
+        i += 1;
+    }
+}
+
+/// A general-purpose timer's CH1 (TIM2, TIM5) as tim1 sets TIM1's, without the break register: PWM mode 1
+/// (§39.4.7 p1688), CC1E, ARR = 99, CCR1 = `ccr`; its clock enabled in RCC_APB1LENR bit `en` (TIM5EN is bit 3, p464).
+#[cfg(path = "afswitch")]
+unsafe fn gtim(base: usize, en: u32, ccr: u32) {
+    let apb1lenr = 0x5802_44E8 as *mut u32;
+    write_volatile(apb1lenr, read_volatile(apb1lenr) | 1 << en);
+    w(base, 0x28, 0);
+    w(base, 0x2C, 99);
+    w(base, 0x34, ccr);
+    w(base, 0x18, 0x68);
+    w(base, 0x20, 1);
+    w(base, 0x14, 1);
+    w(base, 0x00, 0x81);
+    let mut i = 0u32;
+    while i < 5000 {
+        write_volatile(MARK_READ2, i);
+        i += 1;
+    }
 }
 
 #[cfg(any(path = "ardupilot", path = "gen-s03"))]
@@ -1150,6 +1223,119 @@ pub unsafe extern "C" fn reset() -> ! {
     {
         w(GPIOA, OTYPER, 0x00C0);
         write_volatile(MARK_READ, r(GPIOA, OTYPER));
+    }
+    #[cfg(path = "analogled")]
+    {
+        w(GPIOB, BSRR, 1);
+        write_volatile(MARK_READ, (r(GPIOB, ODR) & 0xFFFF) << 16 | (r(GPIOB, IDR) & 0xFFFF));
+    }
+    #[cfg(path = "analogout")]
+    {
+        w(GPIOB, BSRR, 1);
+        mode(GPIOB, 0, 1);
+        write_volatile(MARK_READ, r(GPIOB, IDR));
+    }
+    #[cfg(path = "odrfirst")]
+    {
+        w(GPIOB, ODR, 1);
+        mode(GPIOB, 0, 1);
+    }
+    #[cfg(path = "moderfirst")]
+    {
+        mode(GPIOB, 0, 1);
+        w(GPIOB, ODR, 1);
+    }
+    #[cfg(path = "analoghold")]
+    {
+        mode(GPIOB, 0, 1);
+        w(GPIOB, BSRR, 1);
+        mode(GPIOB, 0, 3);
+        write_volatile(MARK_READ, r(GPIOB, IDR));
+    }
+    #[cfg(path = "afodr")]
+    {
+        afsel(GPIOA, 8, 1);
+        mode(GPIOA, 8, 2);
+        tim1(0);
+        w(GPIOA, ODR, 0x100);
+        write_volatile(MARK_READ, (r(GPIOA, ODR) & 0xFFFF) << 16 | (r(GPIOA, IDR) & 0xFFFF));
+    }
+    #[cfg(path = "afenter")]
+    {
+        w(GPIOA, BSRR, 1 << 8);
+        mode(GPIOA, 8, 1);
+        tim1(0);
+        afsel(GPIOA, 8, 1);
+        mode(GPIOA, 8, 2);
+        write_volatile(MARK_READ, r(GPIOA, IDR));
+    }
+    #[cfg(path = "afenterhigh")]
+    {
+        mode(GPIOA, 8, 1);
+        tim1(200);
+        afsel(GPIOA, 8, 1);
+        mode(GPIOA, 8, 2);
+        write_volatile(MARK_READ, r(GPIOA, IDR));
+    }
+    #[cfg(path = "afout")]
+    {
+        afsel(GPIOA, 8, 1);
+        mode(GPIOA, 8, 2);
+        tim1(0);
+        w(GPIOA, BSRR, 1 << 8);
+        mode(GPIOA, 8, 1);
+        let out = r(GPIOA, IDR) >> 8 & 1;
+        mode(GPIOA, 8, 2);
+        write_volatile(MARK_READ, out << 1 | (r(GPIOA, IDR) >> 8 & 1));
+    }
+    #[cfg(path = "afentern")]
+    {
+        mode(GPIOA, 7, 1);
+        tim1(0);
+        afsel(GPIOA, 7, 1);
+        mode(GPIOA, 7, 2);
+        write_volatile(MARK_READ, r(GPIOA, IDR));
+    }
+    #[cfg(path = "afswitch")]
+    {
+        gtim(0x4000_0000, 0, 0);
+        gtim(0x4000_0C00, 3, 200);
+        afsel(GPIOA, 0, 1);
+        mode(GPIOA, 0, 2);
+        let before = r(GPIOA, IDR) & 1;
+        afsel(GPIOA, 0, 2);
+        write_volatile(MARK_READ, before << 1 | (r(GPIOA, IDR) & 1));
+    }
+    #[cfg(path = "afnosrc")]
+    {
+        mode(GPIOA, 5, 1);
+        w(GPIOA, BSRR, 1 << 5);
+        afsel(GPIOA, 5, 5);
+        mode(GPIOA, 5, 2);
+        w(GPIOA, BSRR, 1 << 21);
+        write_volatile(MARK_READ, r(GPIOA, IDR));
+    }
+    #[cfg(path = "odrhalf")]
+    {
+        write_volatile((GPIOB + ODR) as *mut u16, 1);
+        write_volatile(MARK_READ, r(GPIOB, ODR));
+    }
+    #[cfg(path = "inputidr")]
+    {
+        mode(GPIOD, 0, 1);
+        w(GPIOD, BSRR, 1);
+        mode(GPIOD, 0, 0);
+        mode(GPIOD, 1, 0);
+        mode(GPIOD, 2, 1);
+        w(GPIOD, BSRR, 1 << 2);
+        mode(GPIOD, 2, 0);
+        w(GPIOD, PUPDR, (1 << 2) | (2 << 4) | (1 << 8));
+        mode(GPIOD, 3, 1);
+        w(GPIOD, BSRR, (1 << 3) | (1 << 4) | (1 << 6));
+        mode(GPIOD, 5, 0);
+        mode(GPIOD, 6, 0);
+        write_volatile(MARK_READ, r(GPIOD, IDR) & 0x7F);
+        write_volatile(MARK_READ2, r(GPIOD, ODR));
     }
     #[cfg(path = "ardupilot")]
     replay(&SEQ_AP);

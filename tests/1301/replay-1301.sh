@@ -11,6 +11,8 @@
 #           spi1, spi2 and the RCC stay recorded); the consumer's own references to a port moved onto the guard's
 #           variable (its untyped `gpioPortX:` blocks re-appended after the restatement; `@ gpioPortX` and
 #           `-> gpioPortX` repointed). Writes /out/N-accept.{argv.txt,platform-booted.repl,console.txt,cost.txt}.
+#           ACCEPT_EXTERNAL ("PB6:up PB7:up"): the board's declared levels, each on its port's guard as `external`
+#           (TVI-WO-1301a, ruled 2026-11-23T23:52Z). It stands in for the consumer, whose platforms declare none yet.
 set -u
 n=$1
 [ "${2:-}" = accept ] || { echo "replay-1301: usage: replay-1301.sh N accept" >&2; exit 2; }
@@ -36,7 +38,12 @@ for i in "${!args[@]}"; do
   grep -n '@ gpioPort[A-K]\|-> gpioPort[A-K]' "$plat" > /out/$n-$mode.repointed-gpio.txt
   sed -i 's/@ gpioPort\([A-K]\)/@ tviburiGpio\1/; s/-> gpioPort\([A-K]\)/-> tviburiGpio\1/g' "$plat"
   { echo; cat /repo/model/stm32h7-gpio-restate.repl; echo
-    for x in A B C D E F G H I J K; do printf 'tviburiGpio%s:\n    mode: "%s"\n    package: "LQFP144"\n\n' $x "${ACCEPT_MODE:-recorded}"; done
+    for x in A B C D E F G H I J K; do
+      printf 'tviburiGpio%s:\n    mode: "%s"\n    package: "LQFP144"\n' $x "${ACCEPT_MODE:-recorded}"
+      e=$(printf '%s\n' ${ACCEPT_EXTERNAL:-} | grep "^P$x" | tr '\n' ' ' | sed 's/ $//')
+      [ -z "$e" ] || printf '    external: "%s"\n' "$e"
+      echo
+    done
     cat /out/$n-$mode.moved-gpio.txt; } >> "$plat"
   args[$((i + 1))]=${c/'mach create; '/'include @/tmp/release/Tviburi.cs; mach create; '}
 done

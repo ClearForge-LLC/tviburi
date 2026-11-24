@@ -50,7 +50,9 @@ for r in $(seq 1 "$RUNS"); do
   tool=$(echo "$cap"/varlib/*/tool)
   mkdir -p "$tool/.config"
   cp "$work/elf/sentinel-02/arducopter.elf" "$tool/firmware.elf"
-  container -e ACCEPT_MODE=recorded -v "$work/cap$r:/cap:ro" -v "$src:/repo:ro" -v "$out:/out" "$IMAGE" \
+  # Sentinel-02's I2C1 lines are "open-drain, pulled up off-chip" (fixtures/…/boards/sentinel-02.hwdef.dat L24-25), which
+  # the consumer's platform does not yet declare: declared here, as TVI-WO-1301a was ruled (2026-11-23T23:52Z).
+  container -e ACCEPT_MODE=recorded -e ACCEPT_EXTERNAL="PB6:up PB7:up" -v "$work/cap$r:/cap:ro" -v "$src:/repo:ro" -v "$out:/out" "$IMAGE" \
     bash /repo/tests/1301/replay-1301.sh 2 accept >"$out/replay.txt" 2>&1 || true
   peak=$(sed -n 's/.*peak_tree_vmrss_kib=\([0-9]*\).*/\1/p' "$out/2-accept.cost.txt")
   end=$(grep -a -c '^AETHELGARD-BOOT-END' "$out/2-accept.console.txt" || true)

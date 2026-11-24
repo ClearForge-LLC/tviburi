@@ -9,9 +9,9 @@ set -euo pipefail
 
 here=$(cd "$(dirname "$0")/../.." && pwd)
 IMAGE=$(sed -n 's/^IMAGE=//p' "$here/tests/spike.sh")
-CASES="valid blank blankfirst afterwards afrh package packageinput pk8af pk8out pc2 nopackage pupdr lckr brr read bsrr bsrrhalf otyper ardupilot gen-s03 recorded config query registrations reset misaligned fields ledger adv-monitor resetwrite recordedtwo twoaddr"
+CASES="valid blank blankfirst afterwards afrh package packageinput pk8af pk8out pc2 nopackage pupdr lckr brr read bsrr bsrrhalf otyper ardupilot gen-s03 recorded config query registrations reset misaligned fields ledger adv-monitor resetwrite recordedtwo twoaddr analogled analogout odrfirst moderfirst analoghold afodr afenter afenterhigh afout afentern inputidr button externalbad resetodr odrhalf exti afswitch afnosrc"
 GUARDS="spi1 rcc gpioPortA gpioPortB gpioPortC gpioPortD gpioPortE gpioPortF gpioPortG gpioPortH gpioPortI gpioPortJ gpioPortK"
-PATHS='"valid","blank","blankfirst","afterwards","twice","afrh","package","packageinput","pk8af","pk8out","pc2","pupdr","lckr","brr","read","bsrr","bsrrhalf","otyper","ardupilot","gen-s03"'
+PATHS='"valid","blank","blankfirst","afterwards","twice","afrh","package","packageinput","pk8af","pk8out","pc2","pupdr","lckr","brr","read","bsrr","bsrrhalf","otyper","ardupilot","gen-s03","analogled","analogout","odrfirst","moderfirst","analoghold","afodr","afenter","afenterhigh","afout","afentern","inputidr","odrhalf","afswitch","afnosrc","idle"'
 scratch=${TVIBURI_SCRATCH:-$HOME/.cache/tviburi}
 mkdir -p "$scratch"
 work=$(mktemp -d "$scratch/gpio.XXXXXX")
@@ -89,6 +89,18 @@ run='emulation RunFor "0.001"'
 clk='sysbus WriteDoubleWord 0x580244E0 0x7FF'
 marks=('echo "TVIBURI-MARK-AFTER"' 'sysbus ReadDoubleWord 0x20000104' 'echo "TVIBURI-MARK-READ"' 'sysbus ReadDoubleWord 0x20000108')
 readmark() { console "$1" | grep -A1 -x 'TVIBURI-MARK-READ' | tail -n1; }
+# TVI-WO-1301a: readouts after the firmware's marks. `R-<tag>` then a value; `pin P n` prints what port P's pin n carries.
+marks2=('echo "TVIBURI-MARK-READ2"' 'sysbus ReadDoubleWord 0x2000010C')
+readout() { console "$1" | grep -A1 -x "R-$2" | tail -n1; }
+readmark2() { console "$1" | grep -A1 -x 'TVIBURI-MARK-READ2' | tail -n1; }
+pin() { echo "python \"print('R-PIN$1$2${3:-}'); print(self.Machine['sysbus.gpioPort$1'].Connections[$2].IsSet)\""; }
+bit() { [[ ${1:-} =~ ^0x[0-9A-Fa-f]{8}$ ]] || { echo none; return; }; (( ($1 >> $2) & 1 )) && echo 1 || echo 0; }  # a missing readout is neither 0 nor 1
+# PA8 observed as the consumer's generated boards observe a motor pin (TVI-WO-1301 F1): an LED beside TIM1's input.
+pa8obs='$a\
+pa8obs: Miscellaneous.LED @ tviburiGpioA 8\
+tviburiGpioA:\
+    8 -> timer1@00 | pa8obs@0'
+
 passes() { [ "$rc" = 0 ] && grep -qx 'CHECK PASS' "$work/$1.stdout" && after "$1"; }
 fw_pc='r["access"]["pc"] != "none"'
 
@@ -185,8 +197,8 @@ tviburiGpioA:\
     check "query: PA5 carries SPI1_SCK/I2S1_CK (p89); PA0 is analog (silicon's reset, p541); PA13 is AF0 JTMS-SWDIO" \
       "q=\$(tr -d '\\r' < '$work/query/renode.out') && grep -qx 'Q5 SPI1_SCK/I2S1_CK' <<<\"\$q\" && grep -q '^Q5 DS12117 Rev 10 Table 9 p89' <<<\"\$q\" && grep -qx 'Q0 analog' <<<\"\$q\" && grep -qx 'Q13 JTMS-SWDIO' <<<\"\$q\"" ;;
   registrations)
-    run_case registrations - "$clk" 'peripherals' 'include @/repo/tests/1301/checks.py' 'sysbus WriteDoubleWord 0x58020418 0x1' 'echo "R-GREEN"' 'sysbus.gpioPortB.GreenLED State'
-    check "registrations: the 11 ports are the guard, no stock port remains, the timers' AF routes reach the guards, and GreenLED follows BSRR" \
+    run_case registrations - "$clk" 'peripherals' 'include @/repo/tests/1301/checks.py' 'sysbus WriteDoubleWord 0x58020400 0xFFFFFEBD' 'sysbus WriteDoubleWord 0x58020418 0x1' 'echo "R-GREEN"' 'sysbus.gpioPortB.GreenLED State'
+    check "registrations: the 11 ports are the guard, no stock port remains, the timers' AF routes reach the guards, and GreenLED follows BSRR with PB0 an output (TVI-WO-1301a)" \
       "[ \$(grep -c 'gpioPort[A-K] (GuardedSTM32_GPIOPort)' '$work/registrations/renode.out') = 11 ] && grep -q 'TVICHK stock STM32_GPIOPort instances in the machine: 0' '$work/registrations/renode.out' && grep -q 'TVICHK timer1 out: .*sysbus.gpioPortA#8@1' '$work/registrations/renode.out' && console registrations | grep -A1 -x 'R-GREEN' | tail -n1 | grep -qx True" ;;
   reset)
     run_case reset - "$clk" 'sysbus WriteDoubleWord 0x58020004 0xC0' 'sysbus WriteDoubleWord 0x58020000 0x0' 'machine Reset' "$clk" \
@@ -220,11 +232,11 @@ sys.exit(0 if len(f) == 31 and len({r[\"register\"] for r in f}) == 10 and pairs
     check "adv-monitor: the monitor's own WriteDoubleWord on the port (not through sysbus) reaches the guard: PA5 AF6 in AF mode refuses TVI-GPIO-AF (WO §5)" \
       "[ \$rc = 3 ] && first adv-monitor 'r[\"rule\"] == \"TVI-GPIO-AF\" and r[\"bit\"] == \"PA5 AF6\"'" ;;
   resetwrite)
-    run_case resetwrite - 'machine Reset' "$clk" 'sysbus WriteDoubleWord 0x5802000C 0x0' 'sysbus WriteDoubleWord 0x58020400 0x0' \
-      'echo "R-PUPDR"' 'sysbus ReadDoubleWord 0x5802000C' 'echo "R-MODER"' 'sysbus ReadDoubleWord 0x58020400' \
+    run_case resetwrite - 'machine Reset' "$clk" 'sysbus WriteDoubleWord 0x5802000C 0x0' 'sysbus WriteDoubleWord 0x58020400 0x0' 'sysbus WriteDoubleWord 0x58020008 0x0' \
+      'echo "R-OSPEEDR"' 'sysbus ReadDoubleWord 0x58020008' 'echo "R-PUPDR"' 'sysbus ReadDoubleWord 0x5802000C' 'echo "R-MODER"' 'sysbus ReadDoubleWord 0x58020400' \
       "python \"print('Q3 ' + str(self.Machine['sysbus.gpioPortB'].WhichSignal(3)))\""
-    check "resetwrite: after a reset, writes of 0 to PUPDR A and MODER B take (the stock register's cache is refreshed first): they read 0, and PB3 is an input" \
-      "[ \$rc = 0 ] && console resetwrite | grep -A1 -x 'R-PUPDR' | tail -n1 | grep -qx 0x00000000 && console resetwrite | grep -A1 -x 'R-MODER' | tail -n1 | grep -qx 0x00000000 && tr -d '\\r' < '$work/resetwrite/renode.out' | grep -qx 'Q3 input'" ;;
+    check "resetwrite: after a reset, writes of 0 to PUPDR A, MODER B and OSPEEDR A take (the stock register's cache is refreshed first): they read 0, and PB3 is an input" \
+      "[ \$rc = 0 ] && [ \"\$(readout resetwrite OSPEEDR)\" = 0x00000000 ] && console resetwrite | grep -A1 -x 'R-PUPDR' | tail -n1 | grep -qx 0x00000000 && console resetwrite | grep -A1 -x 'R-MODER' | tail -n1 | grep -qx 0x00000000 && tr -d '\\r' < '$work/resetwrite/renode.out' | grep -qx 'Q3 input'" ;;
   recordedtwo)
     PLATFORM_SED='s/^    mode: "enforcing"$/    mode: "recorded"/' run_case recordedtwo - "$clk" 'sysbus WriteDoubleWord 0x58020020 0x06600000' 'sysbus WriteDoubleWord 0x58020000 0xABFFEBFF' 'sysbus WriteDoubleWord 0x58021C00 0xFFFFFFEF'
     check "recordedtwo: in recorded mode every pin and every rule is recorded: PA5 and PA6 on AF6 give two TVI-GPIO-AF; PH2 in AF mode on AF0 gives TVI-GPIO-AF and TVI-GPIO-PACKAGE" \
@@ -238,6 +250,75 @@ tviburiGpioA: @ {\
     }' run_case twoaddr - "$clk" 'sysbus ReadDoubleWord 0x58030000'
     check "twoaddr: a port registered at a second address refuses every access, TVI-GPIO-CONFIG, unmodeled; the run fails (Renode names the port by its variable, which the check was not given)" \
       "[ \$rc = 1 ] && grep -q '\"tviburi\":\"refusal\".*\"rule\":\"TVI-GPIO-CONFIG\".*2 bus registrations' '$work/twoaddr/renode-log.txt'" ;;
+  # ---- TVI-WO-1301a: what drives a pin (RM0433 Rev 9 §11.3.9-11.3.13 p537-539) ----
+  analogled)
+    run_case analogled analogled "$run" "${marks[@]}" 'echo "R-GreenLED"' 'sysbus.gpioPortB.GreenLED State'
+    m=$(readmark analogled)
+    check "analogled: BSRR = 1 on PB0, analog from reset: GreenLED stays dark (p539); ODR0 reads 1, as written (p537); IDR0 reads 0 (p539)" \
+      "passes analogled && [ \"\$(readout analogled GreenLED)\" = False ] && [ \$(bit $m 16) = 1 ] && [ \$(bit $m 0) = 0 ]" ;;
+  analogout|odrfirst|moderfirst)
+    run_case "$t" "$t" "$run" "${marks[@]}" 'echo "R-GreenLED"' 'sysbus.gpioPortB.GreenLED State'
+    check "$t: ODR set on PB0 and PB0 made an output, in the firmware's order: GreenLED lit (p537); the switch drives the latched ODR" \
+      "passes $t && [ \"\$(readout $t GreenLED)\" = True ]"
+    [ $t != analogout ] || check "analogout: IDR0 reads the driven pin, 1 (p537)" "[ \$(bit \$(readmark analogout) 0) = 1 ]" ;;
+  analoghold)
+    run_case analoghold analoghold "$run" "${marks[@]}" 'echo "R-GreenLED"' 'sysbus.gpioPortB.GreenLED State'
+    check "analoghold: PB0 driven high, then analog: nothing drives it, so it holds (GreenLED lit, ruled 23:52Z); IDR0 reads 0 (p539)" \
+      "passes analoghold && [ \"\$(readout analoghold GreenLED)\" = True ] && [ \$(bit \$(readmark analoghold) 0) = 0 ]" ;;
+  afodr|afenter|afenterhigh|afout|afentern|afswitch|afnosrc)
+    PLATFORM_SED=$pa8obs run_case "$t" "$t" "$run" "${marks[@]}" 'echo "R-pa8obs"' 'sysbus.gpioPortA.pa8obs State' "$(pin A 7)" "$(pin A 0)" "$(pin A 5)" "$(pin A 15)"
+    m=$(readmark "$t"); obs=$(readout "$t" pa8obs)
+    case $t in
+    afodr) check "afodr: PA8 on AF1 (TIM1_CH1, p89), TIM1 low, then ODR = 0x100: the observer follows TIM1, not ODR (p538); ODR8 reads 1, IDR8 0; PA15, AF0 at reset with no source, carries its reset pull-up (p542) from the port's first access" \
+      "passes afodr && [ $obs = False ] && [ \$(bit $m 24) = 1 ] && [ \$(bit $m 8) = 0 ] && [ \"\$(readout afodr PINA15)\" = True ]" ;;
+    afswitch) check "afswitch: PA0 in AF mode moved from AF1 (TIM2_CH1, low) to AF2 (TIM5_CH1, high): the pin follows the newly selected AF (p538)" \
+      "passes afswitch && [ $m = 0x00000001 ] && [ \"\$(readout afswitch PINA0)\" = True ]" ;;
+    afnosrc) check "afnosrc: PA5 high, then AF5 (SPI1_SCK, which no Renode model drives): the pin holds high through an ODR reset (ruled 23:52Z), and IDR5 reads the held level" \
+      "passes afnosrc && [ \$(bit $m 5) = 1 ] && [ \"\$(readout afnosrc PINA5)\" = True ]" ;;
+    afenter) check "afenter: PA8 an output, high, then AF1 with TIM1 low: the pin takes TIM1's level at the switch (p538)" \
+      "passes afenter && [ $obs = False ] && [ \$(bit $m 8) = 0 ]" ;;
+    afenterhigh) check "afenterhigh: PA8 an output, low, then AF1 with TIM1 high (CCR1 > ARR): the pin goes high at the switch (p538)" \
+      "passes afenterhigh && [ $obs = True ] && [ \$(bit $m 8) = 1 ]" ;;
+    afout) check "afout: PA8 on AF1 with TIM1 low and ODR8 = 1; output reads 1, AF again reads 0, and the observer ends low" \
+      "passes afout && [ $obs = False ] && [ $m = 0x00000002 ]" ;;
+    afentern) check "afentern: PA7 an output, low, then AF1 (TIM1_CH1N, p89) with CH1 low: the pin takes CH1N, CH1 inverted as Renode routes it" \
+      "passes afentern && [ \"\$(readout afentern PINA7)\" = True ] && [ \$(bit $m 7) = 1 ]" ;;
+    esac ;;
+  inputidr)
+    PLATFORM_SED='$a\
+tviburiGpioD:\
+    external: "PD5:up"' run_case inputidr inputidr "$run" "${marks[@]}" "${marks2[@]}" "$(pin D 1)" "$(pin D 2)" "$(pin D 4)"
+    check "inputidr: IDR by mode on port D: a floating input reads 0 (ruled 23:52Z), PUPDR's pulls read as pulled (p537), an output reads ODR, analog 0 (p539), a declared level as declared; ODR reads as written (0x2A, ODR 0x5D); a pull written on an input pin moves the pin (PD1 up, PD2 down from a held 1), and none in analog (PD4 low)" \
+      "passes inputidr && [ \"\$(readmark inputidr)\" = 0x0000002A ] && [ \$(( \$(readmark2 inputidr) & 0x7F )) = \$((0x5D)) ] && [ \"\$(readout inputidr PIND1)\" = True ] && [ \"\$(readout inputidr PIND2)\" = False ] && [ \"\$(readout inputidr PIND4)\" = False ]" ;;
+  button)
+    run_case button idle "$run" 'sysbus.gpioPortC.UserButton1 Press' 'emulation RunFor "0.00001"' "$(pin C 13 PRE)" 'sysbus.gpioPortC.UserButton1 Release' 'emulation RunFor "0.00001"' \
+      'sysbus WriteDoubleWord 0x58020800 0xF3FFFFFF' 'sysbus.gpioPortC.UserButton1 Press' 'emulation RunFor "0.00001"' 'echo "R-IN"' 'sysbus ReadDoubleWord 0x58020810' "$(pin C 13)" \
+      'sysbus.gpioPortC.UserButton1 Release' 'emulation RunFor "0.00001"' 'sysbus WriteDoubleWord 0x58020800 0xF7FFFFFF' 'sysbus.gpioPortC.UserButton1 Press' 'emulation RunFor "0.00001"' \
+      'echo "R-ODR"' 'sysbus ReadDoubleWord 0x58020814' 'echo "R-IDR"' 'sysbus ReadDoubleWord 0x58020810' "$(pin C 13 OUT)" \
+      'sysbus WriteDoubleWord 0x58024488 0x4' 'sysbus WriteDoubleWord 0x58024488 0x0' "$(pin C 13 RST)"
+    check "button: the Nucleo's button (an external sender) sets PC13 before the port's first access, and in input mode (IDR13 = 1, the pin high), not in output mode, where ODR and IDR read the 0 written and the pin stays low (p537); held through GPIOCRST (p435), the pin is high again: its level is outside the port" \
+      "[ \$rc = 0 ] && [ \"\$(readout button PINC13PRE)\" = True ] && [ \"\$(readout button IN)\" = 0x00002000 ] && [ \"\$(readout button PINC13)\" = True ] && [ \"\$(readout button ODR)\" = 0x00000000 ] && [ \"\$(readout button IDR)\" = 0x00000000 ] && [ \"\$(readout button PINC13OUT)\" = False ] && [ \"\$(readout button PINC13RST)\" = True ]" ;;
+  odrhalf)
+    run_case odrhalf odrhalf "$run" "${marks[@]}" 'echo "R-GreenLED"' 'sysbus.gpioPortB.GreenLED State'
+    check "odrhalf: a 16-bit ODR store (merged into its word, p541) on analog PB0 is latched, not driven: ODR0 reads 1, GreenLED dark (WO §5)" \
+      "passes odrhalf && [ \"\$(readout odrhalf GreenLED)\" = False ] && [ \$(bit \$(readmark odrhalf) 0) = 1 ]" ;;
+  exti)
+    run_case exti idle "$run" 'sysbus WriteDoubleWord 0x580244F4 0x10002' 'sysbus WriteDoubleWord 0x58000414 0x20' 'sysbus WriteDoubleWord 0x58000000 0x2000' \
+      'sysbus WriteDoubleWord 0x58000080 0x2000' 'sysbus WriteDoubleWord 0x58020800 0xF3FFFFFF' 'sysbus WriteDoubleWord 0x58020818 0x2000' 'echo "R-PR"' 'sysbus ReadDoubleWord 0x58000088' \
+      'echo "R-EXTICR"' 'sysbus ReadDoubleWord 0x58000414' 'sysbus WriteDoubleWord 0x58020800 0xF7FFFFFF' 'echo "R-PROUT"' 'sysbus ReadDoubleWord 0x58000088'
+    check "exti: PC13 an input on EXTI13 (rising, unmasked): BSRR = 0x2000 fires nothing (p537; the stock port fires it); made an output, the latched 1 rises and EXTI13 is pending" \
+      "[ \$rc = 0 ] && [ \"\$(readout exti EXTICR)\" = 0x00000020 ] && [ \"\$(readout exti PR)\" = 0x00000000 ] && [ \"\$(readout exti PROUT)\" = 0x00002000 ]" ;;
+  externalbad)
+    PLATFORM_SED='$a\
+tviburiGpioD:\
+    external: "PA5:up"' run_case externalbad - "$clk" 'sysbus ReadDoubleWord 0x58020C00'
+    check "externalbad: port D declared with a pin of port A refuses every access, TVI-GPIO-CONFIG, unmodeled, naming the declaration" \
+      "[ \$rc = 3 ] && first externalbad 'r[\"rule\"] == \"TVI-GPIO-CONFIG\" and r[\"kind\"] == \"unmodeled\" and \"external\" in r[\"condition\"] and r[\"peripheral\"] == \"sysbus.gpioPortD\"'" ;;
+  resetodr)
+    run_case resetodr - "$clk" 'sysbus WriteDoubleWord 0x58020400 0xFFFFFEBD' 'sysbus WriteDoubleWord 0x58020418 0x1' 'echo "R-LIT"' 'sysbus.gpioPortB.GreenLED State' \
+      'machine Reset' "$(pin B 0 RESET)" "$(pin B 4 RESET)" "$clk" 'sysbus WriteDoubleWord 0x58020400 0xFFFFFEBD' 'echo "R-OUT"' 'sysbus.gpioPortB.GreenLED State'
+    check "resetodr: GreenLED lit, then machine Reset: PB0 low, PB4 carries its reset pull-up again (p542), and PB0 made an output drives ODR's reset value, 0 (p543)" \
+      "[ \$rc = 0 ] && [ \"\$(readout resetodr LIT)\" = True ] && [ \"\$(readout resetodr PINB0RESET)\" = False ] && [ \"\$(readout resetodr PINB4RESET)\" = True ] && [ \"\$(readout resetodr OUT)\" = False ]" ;;
   *) echo "unknown case $t" >&2; exit 2 ;;
   esac
 done
