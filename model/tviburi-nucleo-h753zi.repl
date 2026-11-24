@@ -10,6 +10,7 @@ using "./stm32h7-gpio-restate.repl"
 using "./stm32h7-timer-restate.repl"
 using "./stm32h7-dma-restate.repl"
 using "./stm32h7-flash-restate.repl"
+using "./stm32h7-usart-restate.repl"
 
 // The guard's mode (RUL-19), and the stock board's `rcc: hseFrequency: 8_000_000` restated on the guard: that update
 // lands on the cancelled stock entry (TVI-WO-1300.rm0433.md §6.4).
@@ -106,3 +107,22 @@ tviburiGpioB:
 
 tviburiGpioE:
     1 -> YellowLED@0
+
+// TVI-WO-1305: the eight USART/UARTs are guarded (stm32h7-usart-restate.repl cancels each stock port and declares the guard
+// as "usartN"/"uartN"; lpuart1 stays stock). Each port's mode (RUL-19).
+tviburiUsart1:
+    mode: "enforcing"
+tviburiUsart2:
+    mode: "enforcing"
+tviburiUsart3:
+    mode: "enforcing"
+tviburiUart4:
+    mode: "enforcing"
+tviburiUart5:
+    mode: "enforcing"
+tviburiUsart6:
+    mode: "enforcing"
+tviburiUart7:
+    mode: "enforcing"
+tviburiUart8:
+    mode: "enforcing"
