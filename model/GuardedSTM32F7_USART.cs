@@ -41,7 +41,7 @@
 //
 // Modeled, cited:
 //   IDLE (p2090, p2021): one idle frame (a start bit, the data bits by M, the stop bits by STOP, at the stock model's baud)
-//     after a received byte with no newer one, UE and RE set, the guard sets ISR.IDLE; with IDLEIE it raises the port's
+//     after a received byte with no newer one, and with UE and RE never cleared in between, the guard sets ISR.IDLE; with IDLEIE it raises the port's
 //     interrupt. ICR.IDLECF clears it. It is set only after a received byte, never at a start with nothing received (ruled
 //     Q5: p2040's sentence is in the mute-mode section).
 //   The receive DMA request (p2048, "after each RXNE (RXFNE in case FIFO mode is enabled) event"): asserted while DMAR = 1,
@@ -49,7 +49,10 @@
 //     waits (the stock model raises it only when its buffer leaves empty, so a byte that arrived before the stream was armed
 //     never moved, measure.md U11-U12). Reset at UE = 0 (p2070).
 //   UE cleared (p2070): "all the USART_ISR status flags are reset", and the DMA requests: the guard flushes the receive
-//     queue, clears TC and IDLE, and drops the request.
+//     queue and clears IDLE, so the request drops; TC is left to the stock model, which sets it as TE clears (its reset
+//     value, p2085, p2091).
+//   No clock (p470, p2019, p371): a byte arriving while the RCC guard's query says the port's clock does not run is not
+//     received (no RXFNE, IDLE or request).
 //
 // Reads: CR1, CR2, CR3, GTPR and PRESC from the guard's copies (RUL-17), so a read-modify-write keeps FIFOEN, IDLEIE, M0,
 // RXINV, LBDIE and EIE as silicon does (measure.md §2.1: ChibiOS reads CR1 back as 0x12D where silicon holds 0x2000013D); ISR
@@ -117,6 +120,10 @@ namespace Antmicro.Renode.Peripherals.Tviburi
         {
             lock(sync)
             {
+                if(!Clocked())
+                {
+                    return;   // no clock reaches the port (p470 USARTxEN, p2019 usart_ker_ck, p371): nothing is received
+                }
                 var taken = (cr1 & UeBit) != 0 && (cr1 & ReBit) != 0;
                 inner.WriteChar(value);
                 if(taken)
@@ -279,11 +286,14 @@ namespace Antmicro.Renode.Peripherals.Tviburi
                 inner.WriteDoubleWord(offset, word);
                 if((before & UeBit) != 0 && (word & UeBit) == 0)
                 {
-                    // p2070: UE = 0 resets every ISR flag and the DMA requests.
+                    // p2070: UE = 0 resets every ISR flag and the DMA requests. RXFNE and IDLE to 0; TC and TXFNF are left to the
+                    // stock model, whose TE clear sets TC: their reset value is 1 (ISR 0x0X8000C0, p2085, p2091).
                     inner.WriteDoubleWord(RqrOffset, RxfrqBit);
-                    inner.WriteDoubleWord(IcrOffset, TccfBit);
                     idle = false;
-                    idleGen++;
+                }
+                if((before & (UeBit | ReBit)) == (UeBit | ReBit) && (word & (UeBit | ReBit)) != (UeBit | ReBit))
+                {
+                    idleGen++;   // the receiver stops: a pending idle frame is never detected (p2070 RE, UE)
                 }
                 UpdateIrq();
                 Request();
@@ -336,7 +346,8 @@ namespace Antmicro.Renode.Peripherals.Tviburi
                 return false;
             }
             var changed = (Copy(offset) ^ word) & mask;
-            if(changed == 0 || (changed & ~Acknowledged(offset)) == 0)
+            changed &= ~Acknowledged(offset);   // the re-init pattern's own fields are never the offence (ruled Q2 (c))
+            if(changed == 0)
             {
                 return false;
             }
@@ -399,6 +410,15 @@ namespace Antmicro.Renode.Peripherals.Tviburi
             return true;
         }
 
+        // Whether the port's bus and kernel clocks run now, by the RCC guard's query; true where the query has no rule (a port
+        // whose enable the RCC guard already refuses) or no RCC guard is found, as the stock model would.
+        private bool Clocked()
+        {
+            GuardedSTM32H7_RCC rcc = null;
+            var k = host.TryGetLocalName(this, out var name) && host.TryGetByName<GuardedSTM32H7_RCC>(RccName, out rcc) ? rcc.QueryKernelClock(name) : null;
+            return k == null || !k.Modeled || k.Running;
+        }
+
         private static bool Running(uint cr)
         {
             return (cr & UeBit) != 0 && (cr & (TeBit | ReBit)) != 0;
@@ -446,7 +466,7 @@ namespace Antmicro.Renode.Peripherals.Tviburi
             {
                 lock(sync)
                 {
-                    if(g == idleGen && (cr1 & UeBit) != 0 && (cr1 & ReBit) != 0)
+                    if(g == idleGen)
                     {
                         idle = true;
                         UpdateIrq();
@@ -604,7 +624,6 @@ namespace Antmicro.Renode.Peripherals.Tviburi
         private const uint DmarBit = 1u << 6;
         private const uint IdleBit = 1u << 4;     // ISR.IDLE and ICR.IDLECF
         private const uint RxfneBit = 1u << 5;
-        private const uint TccfBit = 1u << 6;
         private const uint RxfrqBit = 1u << 3;
 
         // The stock model's register names, so the access log names them as it did (measure.md §2.3).

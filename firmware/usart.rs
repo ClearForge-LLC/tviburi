@@ -20,7 +20,7 @@
 //!                       ones, then CR1's read-modify-write clearing RXNEIE: passes. MARK_READ = CR1 (0x2000011D: FIFOEN and
 //!                       IDLEIE kept, as silicon), MARK_READ2 = CR2 (0x40).
 //!   path="width"      - a byte write to CR1: TVI-USART-WIDTH, unmodeled (p2067).
-//!   path="tdrbyte"    - config, then a byte write to TDR: passes (ruled Q7). MARK_READ = ISR (TC set).
+//!   path="tdrbyte"    - config, TC cleared, then a byte write to TDR: passes (ruled Q7). MARK_READ = ISR (TC set again).
 //!   path="read"       - a read at 0x30 (no register): TVI-USART-READ, unmodeled.
 //!   path="field"      - CR3.HDSEL = 1 with UE = 0: TVI-USART-FIELD, unmodeled (the allow-list).
 //!   path="nine"       - CR1 with M0 = 1 and PCE = 0 (9 data bits), UE = 0: TVI-USART-FIELD, unmodeled.
@@ -146,6 +146,7 @@ pub unsafe extern "C" fn reset() -> ! {
     #[cfg(path = "tdrbyte")]
     {
         config();
+        w(ICR, 1 << 6);
         write_volatile((USART1 + TDR) as *mut u8, 0x41);
         write_volatile(MARK_READ, r(ISR));
     }

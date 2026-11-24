@@ -76,8 +76,10 @@
 // silicon does: TCIF is set "to indicate the end of transfer due to the stream interruption", and the stream's next transfer
 // starts at the addresses software programs (§15.3.16 p654; PAR, M0AR p666), where the stock model sets no flag and resumes
 // from the offset its earlier transfer reached (STM32DMA.cs L160, L256, L262). The guard reaches the stock model's private
-// `transferCompleteIrqStatus` and per-stream `dataOffset` by reflection; a build without them is TVI-DMA-CONFIG. This
-// replaces TVI-DMA-OFFSET, which refused the re-enable the twin now models. ArduPilot's USART receive path ends a frame so
+// `transferCompleteIrqStatus` and per-stream `dataOffset` by reflection; a build without them is TVI-DMA-CONFIG.
+//   TVI-DMA-OFFSET (narrowed by TVI-WO-1305, which models the offset) a stream enabled again after such a suspension with no
+//                     NDTR write since: the manual has software rewrite NDTR (p654), and says NDT reloads after a completed
+//                     transfer (p665), so whether the remaining or the programmed count runs is not stated. unmodeled. ArduPilot's USART receive path ends a frame so
 // (UARTDriver.cpp rx_irq_cb, rxbuff_full_irq; TVI-WO-1305.measure.md §2.6).
 //
 // Reads: CR from the guard's copy (every field but EN, which is the stock model's), so a read-modify-write keeps the
@@ -290,6 +292,7 @@ namespace Antmicro.Renode.Peripherals.Tviburi
             else if(r == NdtrOffset && !Enabled(s))
             {
                 programmed[s] = word & 0xFFFF;   // written only while disabled (p665); a refused write keeps nothing
+                suspended[s] = false;
             }
             inner.WriteDoubleWord(offset, word);
         }
@@ -302,6 +305,7 @@ namespace Antmicro.Renode.Peripherals.Tviburi
             ((IFlagRegisterField[])IrqStatusField.GetValue(inner))[s].Value = true;
             OffsetField.SetValue(((Array)StreamsField.GetValue(inner)).GetValue(s), 0ul);
             UpdateInterruptsMethod.Invoke(inner, null);
+            suspended[s] = true;
         }
 
         private void ResetCopies()
@@ -311,6 +315,7 @@ namespace Antmicro.Renode.Peripherals.Tviburi
                 cr[i] = 0;
                 fcr[i] = FcrReset;
                 programmed[i] = 0;
+                suspended[i] = false;
             }
         }
 
@@ -425,6 +430,17 @@ namespace Antmicro.Renode.Peripherals.Tviburi
                 refused = Refuse(offset, s, word, "TVI-DMA-SIZE", Unmodeled, "DMA_SxCR.PSIZE = " + ((word >> 11) & 3) + ", MSIZE = " + ((word >> 13) & 3),
                     "stream " + s + " enabled with PSIZE and MSIZE different: silicon forces MSIZE to PSIZE in direct mode and runs memory-to-memory in FIFO mode only, while the stock model counts the transfer in MSIZE items, so the twin cannot say what moves",
                     "RM0433 Rev 9 §15.5.5 p663 (MSIZE); §15.3.8 p645 (memory-to-memory: direct mode not allowed); p648 (NDT in PSIZE items)");
+                if(!records.Recorded)
+                {
+                    return true;
+                }
+            }
+            if(suspended[s])
+            {
+                suspended[s] = false;
+                refused |= Refuse(offset, s, word, "TVI-DMA-OFFSET", Unmodeled, "stream " + s + " re-enabled after a suspension, NDTR not rewritten",
+                    "stream " + s + " enabled again after software suspended it (EN cleared mid-transfer) with no NDTR write since: RM0433 has software rewrite NDTR before the restart (p654), and NDT reloads the programmed value at a re-enable after a completed transfer (p665), which TCIF declared this one, so the twin cannot say whether silicon moves the remaining items or the programmed count",
+                    "RM0433 Rev 9 §15.3.16 p654; §15.5.6 p665 (NDT); TVI-WO-1305 (adversarial pass G2)");
                 if(!records.Recorded)
                 {
                     return true;
@@ -687,6 +703,8 @@ namespace Antmicro.Renode.Peripherals.Tviburi
         private readonly uint[] fcr = new uint[Streams];
         // The NDT software last wrote to each stream, which silicon reloads at a re-enable (p665).
         private readonly uint[] programmed = new uint[Streams];
+        // Suspended by software (Suspend) with no NDTR write since: TVI-DMA-OFFSET at the next enable.
+        private readonly bool[] suspended = new bool[Streams];
         private string config;
 
         private const int Streams = 8;

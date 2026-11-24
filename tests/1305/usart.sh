@@ -10,9 +10,9 @@ set -euo pipefail
 
 here=$(cd "$(dirname "$0")/../.." && pwd)
 IMAGE=$(sed -n 's/^IMAGE=//p' "$here/tests/spike.sh")
-CASES="config m1ue over8ue psue psoff stopue reinit reinitstop disable same ap width tdrbyte read field nine kernel clock idle idlere dmarx fields ledger registrations recorded reset config2 regen"
+CASES="config m1ue over8ue psue psoff stopue reinit reinitstop disable same ap width tdrbyte read field nine kernel clock rxoff idle idleframe idlere dmarx fields ledger registrations recorded reset config2 regen"
 GUARDS="spi1 rcc gpioPortA gpioPortB gpioPortC gpioPortD gpioPortE gpioPortF gpioPortG gpioPortH gpioPortI gpioPortJ gpioPortK timer1 timer8 dma1 dma2 flashController usart1 usart2 usart3 uart4 uart5 usart6 uart7 uart8"
-MONITOR="clock idle idlere dmarx fields ledger registrations recorded reset config2 regen"
+MONITOR="clock rxoff idle idleframe idlere dmarx fields ledger registrations recorded reset config2 regen"
 PATHS=$(for c in $CASES; do case " $MONITOR " in *" $c "*) ;; *) printf '"%s",' "$c" ;; esac; done | sed 's/,$//')
 scratch=${TVIBURI_SCRATCH:-$HOME/.cache/tviburi}
 mkdir -p "$scratch"
@@ -98,7 +98,7 @@ for t in ${TVIBURI_TESTS:-$CASES}; do
   over8ue) check "over8ue: CR1.OVER8 changed with UE = 1 refuses TVI-USART-UE, unmodeled (p2068)" \
     "refuses over8ue TVI-USART-UE unmodeled 'r[\"bit\"] == \"OVER8 (bit 15) changed with UE = 1\" and \"0 -> 1\" in r[\"condition\"]'" ;;
   psue) check "psue: CR1.PCE and PS changed with UE = 1 refuses TVI-USART-UE naming PS only: PCE alone is the acknowledged re-init pattern (p2069; ruled Q2 (c))" \
-    "refuses psue TVI-USART-UE unmodeled 'r[\"bit\"] == \"PCE (bit 10), PS (bit 9) changed with UE = 1\" and \"p2069\" in r[\"citation\"]'" ;;
+    "refuses psue TVI-USART-UE unmodeled 'r[\"bit\"] == \"PS (bit 9) changed with UE = 1\" and \"p2069\" in r[\"citation\"]'" ;;
   psoff) check "psoff: the same PCE|PS change made with UE = 0, then UE, passes; CR1 reads 0x2000060D" \
     "passes psoff && [ \"\$(readout psoff READ)\" = 0x2000060D ]" ;;
   stopue) check "stopue: CR2.STOP changed with UE = 1 refuses TVI-USART-UE (p2076)" \
@@ -114,7 +114,7 @@ for t in ${TVIBURI_TESTS:-$CASES}; do
     "passes ap && [ \"\$(readout ap READ)\" = 0x2000011D ] && [ \"\$(readout ap READ2)\" = 0x00000040 ]" ;;
   width) check "width: a byte write to CR1 refuses TVI-USART-WIDTH, unmodeled (p2067)" \
     "refuses width TVI-USART-WIDTH unmodeled 'r[\"access\"][\"width\"] == 8 and r[\"bit\"] == \"8-bit write\" and \"p2067\" in r[\"citation\"]'" ;;
-  tdrbyte) check "tdrbyte: a byte write to TDR passes (ruled Q7: ArduPilot's DMA writes it by bytes) and is sent: ISR.TC reads 1" \
+  tdrbyte) check "tdrbyte: a byte write to TDR passes (ruled Q7: ArduPilot's DMA writes it by bytes) and is sent: ISR.TC, cleared before it, reads 1" \
     "passes tdrbyte && bit \"\$(readout tdrbyte READ)\" 6 1" ;;
   read) check "read: a read at 0x30 refuses TVI-USART-READ, unmodeled" \
     "refuses read TVI-USART-READ unmodeled 'r[\"bit\"] == \"read of offset 0x30\"'" ;;
@@ -144,13 +144,28 @@ for t in ${TVIBURI_TESTS:-$CASES}; do
       "passed idle && bit \"\$(readout idle START)\" 4 0 && bit \"\$(readout idle EARLY)\" 4 0 && bit \"\$(readout idle EARLY)\" 5 1 && bit \"\$(readout idle RESTART)\" 4 0 && bit \"\$(readout idle IDLE)\" 4 1 \
        && [ \"\$(readout idle IRQ)\" = 'GPIO: set' ] && bit \"\$(readout idle CLEARED)\" 4 0 && [ \"\$(readout idle IRQ2)\" = 'GPIO: unset' ] \
        && bit \"\$(readout idle AGAIN)\" 4 0 && bit \"\$(readout idle OFF)\" 4 0 && bit \"\$(readout idle OFF)\" 5 0 && [ \"\$(readout idle IRQ3)\" = 'GPIO: set' ]" ;;
+  rxoff)
+    # Adversarial B3: a byte arriving while the port's bus clock is off is not received (p470 USART1EN; p2019; p371): no
+    # RXFNE, no IDLE, no request. The guard asks the RCC guard's query; the stock model would take the byte.
+    run_case rxoff - 'cpu IsHalted true' "$clk" 'sysbus WriteDoubleWord 0x4001100C 0x271' 'sysbus WriteDoubleWord 0x40011000 0x2000001D' \
+      'sysbus WriteDoubleWord 0x580244F0 0x0' 'sysbus.usart1 WriteChar 0x41' 'emulation RunFor "0.0001"' "$clk" 'echo "R-ISR"' 'sysbus ReadDoubleWord 0x4001101C'
+    check "rxoff: a byte arriving with USART1EN cleared under a running port is not received: no RXFNE and no IDLE once the clock is back (adversarial B3)" \
+      "passed rxoff && bit \"\$(readout rxoff ISR)\" 5 0 && bit \"\$(readout rxoff ISR)\" 4 0" ;;
+  idleframe)
+    # Adversarial T2: the idle frame by M and STOP (p2068-2069, p2076): M0 = PCE = 1 (9 bits with parity) and STOP = 10 (2):
+    # 1 + 9 + 2 = 12 bits at 320,000 baud, 37.5 us, where 8N1 would be 31.25 and either term alone 34.375.
+    run_case idleframe - 'cpu IsHalted true' "$clk" 'sysbus WriteDoubleWord 0x4001100C 0x271' 'sysbus WriteDoubleWord 0x40011004 0x2000' \
+      'sysbus WriteDoubleWord 0x40011000 0x2000141D' 'sysbus.usart1 WriteChar 0x41' 'emulation RunFor "0.000036"' 'echo "R-36"' 'sysbus ReadDoubleWord 0x4001101C' \
+      'emulation RunFor "0.000003"' 'echo "R-39"' 'sysbus ReadDoubleWord 0x4001101C'
+    check "idleframe: with M0 = PCE = 1 and two stop bits the idle frame is 12 bits (37.5 us): no IDLE at 36 us, IDLE at 39 us" \
+      "passed idleframe && bit \"\$(readout idleframe 36)\" 4 0 && bit \"\$(readout idleframe 39)\" 4 1" ;;
   idlere)
     # WO §5: a frame that ends without IDLE. RE cleared before the idle frame elapses: the receiver is off, so no idle line is
     # detected (p2070 RE; p2090), and the guard's timer must not set IDLE.
     run_case idlere - 'cpu IsHalted true' "$clk" 'sysbus WriteDoubleWord 0x4001100C 0x271' 'sysbus WriteDoubleWord 0x40011000 0x2000001D' \
       'sysbus.usart1 WriteChar 0x41' 'emulation RunFor "0.00001"' 'sysbus WriteDoubleWord 0x40011000 0x20000019' \
-      'emulation RunFor "0.0001"' 'echo "R-ISR"' 'sysbus ReadDoubleWord 0x4001101C'
-    check "idlere: RE cleared 10 us after a byte, before its idle frame (31.25 us) elapses: no IDLE (WO §5)" \
+      'emulation RunFor "0.00001"' 'sysbus WriteDoubleWord 0x40011000 0x2000001D' 'emulation RunFor "0.0001"' 'echo "R-ISR"' 'sysbus ReadDoubleWord 0x4001101C'
+    check "idlere: RE cleared 10 us after a byte and set again 10 us later, inside its idle frame (31.25 us): the receiver stopped, so that frame's IDLE never comes (WO §5; adversarial G5)" \
       "passed idlere && bit \"\$(readout idlere ISR)\" 4 0" ;;
   dmarx)
     # The receive request (p2048, p2070; ruled Q6), with the platform's request line: DMA1 stream 0 peripheral-to-memory on
