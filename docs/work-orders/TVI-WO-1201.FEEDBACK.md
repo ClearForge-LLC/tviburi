@@ -3,7 +3,7 @@
 **Builder:** Claude (Opus 5.5), Furnace, 2026-11-23/24. **Branch:** `wo/tvi-1201-memory-budget`, from `main` `e891211`, with `main` merged before READY (§7). **PR:** #26.
 
 **State:**
-- §1's measurement ran first. **The §7 stop did not fire.** Main against main differed by −0.4, +3.1 and +1.1 MiB at the median, in three CI jobs on two clouds and three CPUs (§1).
+- §1's measurement ran first. **The §7 stop did not fire.** Main against main differed by −0.4, +3.1, +1.1 and −4.8 MiB at the median, in four CI jobs on two clouds and four CPUs (§1).
 - (1)–(4) are built, and the acceptance is met in CI (§3). The planted 64 MiB branch is refused by `budget` alone, at +62.0, +56.8 and +64.3 MiB, and main against main passes.
 - **Ruled at 23:12Z (architect):** `tests/1301/replay-1301.sh` is in the fence. Its GPIO condition is restored (§2), and it now snapshots the peak.
 - `model/`, `tools/`, the steering documents, `README.md` and `docs/reviews/` are untouched. One PR, left unmerged.
@@ -22,6 +22,8 @@ Every figure is a peak in KiB, as defined in §2: the sampled sum of Renode's Vm
 | CI 45286469273 | main against main + the plant | 998,488 | 1,056,648 | **+58,160 (+56.8 MiB)**, refused by `budget` | 981,848–1,022,820 / 1,055,448–1,076,592 |
 | CI 45294287114 (final head), Azure westus2, AMD EPYC 9V74 | main (`0d3b4af`) against main | 784,420 | 785,552 | **+1,132 (+1.1 MiB)** | 777,620–784,784 / 780,768–804,196 |
 | CI 45294287114 | main against main + the plant | 784,572 | 850,368 | **+65,796 (+64.3 MiB)**, refused by `budget` | 784,296–795,480 / 846,844–866,092 |
+| CI 45302732365 (the Rust judge, `9011bbf`), Azure centralus, Intel Xeon Platinum 8573C | main against main | 1,042,616 | 1,037,724 | **−4,892 (−4.8 MiB)** | 1,028,800–1,056,400 (both sides) |
+| CI 45302732365 | main against main + the plant | 1,048,436 | 1,103,780 | **+55,344 (+54.0 MiB)**, refused by `budget` | — |
 | CI 45286469273 | **1301 (`d598442`) against the commit before it (`b019105`)** | 989,392 | 995,116 | **+5,724 (+5.6 MiB)**, passes | 980,652–997,376 / 989,996–1,006,300 |
 | Furnace, unshared moment, 10–11 s a boot | main against main + the plant | 1,005,456 | 1,075,992 | +70,536 (+68.9 MiB), refused by `budget` | 994,168–1,171,940 / 1,040,728–1,088,520 |
 
@@ -129,6 +131,7 @@ PASS: every boot counts, every branch boot at or under 1572864 KiB, the median w
 | 45285950556 (this) | Azure westus3 | 20261116.376.1 | AMD EPYC 9V45, 4, 32 MiB | 801,000–809,568 (main against main) | 12.4–13.4 |
 | 45286469273 (this) | AWS us-west-2 | 20261116.133.1 | Intel Xeon 6975P-C, 4, 480 MiB | 989,348–1,007,148 (main against main) | 13.9–14.6 |
 | 45294287114 (this) | Azure westus2 | 20261116.376.1 | AMD EPYC 9V74, 4, 32 MiB | 777,620–804,196 (main against main) | 16.2–17.7 |
+| 45302732365 (this) | Azure centralus | 20261116.376.1 | Intel Xeon Platinum 8573C, 4, 260 MiB | 1,028,800–1,056,400 (main against main) | 19.0–20.9 |
 | Furnace | — | — | Intel Core Ultra 7 265K, 20, 30 MiB | 990,088–1,009,648 unslowed; 1,180,932–1,208,196 at 18–19 s | 10–19 |
 
 **What the data rule out:**
@@ -147,8 +150,10 @@ PASS: every boot counts, every branch boot at or under 1572864 KiB, the median w
 - This harness cannot say whether that anon is the managed heap or native memory (tlib's translation cache, Renode's own buffers). That needs `GC.GetGCMemoryInfo()` at the peak, or an `smaps` split by mapping.
 
 **The leading candidate is the CPU model,** not established:
-- Both AMD jobs are low (about 809 and 784 MiB). Both Intel machines measured are high (about 991 MiB on the Xeon; about 990–1,005 MiB on Furnace unslowed).
-- Every older job is consistent with this if the slow Azure runner (45249617507) was an Intel part, but that job recorded no CPU.
+- Both AMD jobs are low (about 809 and 784 MiB). The Intel machines measured are high (about 991 MiB on the Xeon; about 990–1,005 MiB on Furnace unslowed).
+- Every older job was consistent with this if the slow, high Azure runner (45249617507: centralus, 18.9–20.3 s, 1,018–1,050k) was an Intel part. That job recorded no CPU.
+- **The prediction was then met once.** 45302732365 landed on Azure centralus, was slow (19–21 s) and high (1,029–1,056k). Its CPU was an Intel Xeon Platinum 8573C, and its RssAnon was 936,836–964,352 KiB, with RssFile 92 MiB and 15 threads, the same shape as before.
+- **The tally:** 2 AMD runners low; 3 Intel machines high. This remains a candidate, now with a successful prediction, not a cause.
 - **The step now records the CPU, nproc, L3, memory, THP, kernel and image on every PR.** So the next few PRs accumulate the table that confirms or breaks this candidate, at no extra cost.
 
 **Proposed row (for the architect):** "the 200 MiB spread follows the runner's CPU?":
@@ -219,4 +224,10 @@ The budget no longer depends on the answer, because each job compares against it
   - The planted test refused by `budget` alone at +65,796 KiB, with the plant in 5 of 5 boots. `main-not-the-base` passed.
   - **The base binding, observed with main moved:** main is `0d3b4af` (`HEAD^1`), and the PR's `base.sha` is also `0d3b4af`.
   - The gate took 6 min 0 s and the plant test 5 min 55 s, on this slower runner. The job took 47 min.
-- **What follows `ca14cbd`:** one docs-only commit (this FEEDBACK, completed from that run). The measured code is `ca14cbd`'s.
+- **Then the Rust judge (ruled 01:05Z): `9011bbf`, CI run 45302732365, green.** The runner was Azure centralus, Intel Xeon Platinum 8573C.
+  - The judge: `test result: ok. 17 passed`, in both memory steps.
+  - The gate: `MEDIANS main 1042616 KiB, branch 1037724 KiB, difference -4892 KiB (-4.8 MiB)`, then `PASS`.
+  - The plant: `REFUSE budget` alone at +55,344 KiB, in 5 of 5 boots. `main-not-the-base` passed.
+  - The gate took 6 min 49 s and the plant test 6 min 50 s, on a slow runner (19–21 s a boot).
+  - The Rust judge's 13 mutants were run on Furnace, all killed (§5).
+- **What follows `9011bbf`:** one docs-only commit, this FEEDBACK completed from that run. The measured code is `9011bbf`'s.
