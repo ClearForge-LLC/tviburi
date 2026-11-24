@@ -50,6 +50,15 @@ tools/tviburi-route/src/main.rs	LICENSE-APACHE
 tools/tviburi-route/src/main.rs	LICENSE-MIT
 tools/tviburi-route/src/main.rs	README.md
 tools/tviburi-route/src/main.rs	TVI-WO-1202.md
+# TVI-WO-1303 (F12): the DMA guard's citations, each a comment or a record string, checked by hand 2026-11-24.
+firmware/dma.rs	TVI-WO-1303.measure.md
+model/GuardedSTM32DMA.cs	FEEDBACK.md
+model/GuardedSTM32DMA.cs	TVI-WO-1303.measure.md
+model/GuardedSTM32DMA.cs	docs/
+model/stm32h7-dma-restate.awk	TVI-WO-1303.measure.md
+tests/1303/dma.sh	TVI-WO-1303.measure.md
+tests/1303/fields.py	TVI-WO-1303.measure.md
+model/GuardedSTM32DMA.cs	TVI-WO-1303.FEEDBACK.md
 firmware/flash.rs	TVI-WO-1300.rm0433.md
 firmware/flash.rs	TVI-WO-1304.measure.md
 model/GuardedSTM32H7_Flash.cs	TVI-WO-1304.measure.md

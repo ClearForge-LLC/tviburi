@@ -53,18 +53,21 @@ struct Pins {
     stock: Vec<stock::Pin>,
     /// (stock type, guard type)
     classes: Vec<(String, String)>,
+    /// A class row's fourth column, when it has one: the stock instances its guard restates, by name (TVI-WO-1303 Q9 (c)).
+    instances: BTreeMap<String, Vec<String>>,
 }
 
-/// Tab-separated rows of `cols` non-empty fields; `#` lines are comments.
-fn tsv<'a>(path: &str, text: &'a str, cols: usize) -> Result<Vec<Vec<&'a str>>, String> {
+/// Tab-separated rows of `min` to `max` non-empty fields; `#` lines are comments.
+fn tsv<'a>(path: &str, text: &'a str, min: usize, max: usize) -> Result<Vec<Vec<&'a str>>, String> {
     let mut out = Vec::new();
     for (i, line) in text.lines().enumerate() {
         if line.starts_with('#') {
             continue;
         }
         let f: Vec<&str> = line.split('\t').collect();
-        if f.len() != cols || f.iter().any(|x| x.is_empty() || x.trim() != *x) {
-            return Err(format!("{path}:{}: not {cols} non-empty tab-separated fields", i + 1));
+        if f.len() < min || f.len() > max || f.iter().any(|x| x.is_empty() || x.trim() != *x) {
+            let n = if min == max { min.to_string() } else { format!("{min} to {max}") };
+            return Err(format!("{path}:{}: not {n} non-empty tab-separated fields", i + 1));
         }
         out.push(f);
     }
@@ -74,8 +77,11 @@ fn tsv<'a>(path: &str, text: &'a str, cols: usize) -> Result<Vec<Vec<&'a str>>, 
 fn pins(repo: &Path) -> Result<Pins, String> {
     let path = format!("{TOOL}/pins.tsv");
     let src = Source { path: path.clone(), bytes: fs::read(repo.join(&path)).map_err(|e| format!("{path}: {e}"))? };
-    let mut p = Pins { builds: vec![], stock: vec![], classes: vec![] };
-    for f in tsv(&path, overlay::text(&src)?, 3)? {
+    let mut p = Pins { builds: vec![], stock: vec![], classes: vec![], instances: BTreeMap::new() };
+    for f in tsv(&path, overlay::text(&src)?, 3, 4)? {
+        if f.len() == 4 && f[0] != "class" {
+            return Err(format!("{path}: only a class row takes a fourth column (its instances): {}", f.join(" ")));
+        }
         match f[0] {
             "build" => p.builds.push((f[1].into(), f[2].into())),
             "stock" if f[1].len() == 64 && f[1].bytes().all(|b| b.is_ascii_hexdigit() && !b.is_ascii_uppercase()) => {
@@ -86,6 +92,13 @@ fn pins(repo: &Path) -> Result<Pins, String> {
                     return Err(format!("{path}: the class map names {} or {} twice", f[1], f[2]));
                 }
                 p.classes.push((f[1].into(), f[2].into()));
+                if let Some(list) = f.get(3) {
+                    let names: Vec<String> = list.split(' ').map(String::from).collect();
+                    if names.iter().any(String::is_empty) {
+                        return Err(format!("{path}: {}'s instances are not names separated by one space: {list:?}", f[2]));
+                    }
+                    p.instances.insert(f[2].into(), names);
+                }
             }
             _ => return Err(format!("{path}: a row this release cannot read: {}", f.join(" "))),
         }
@@ -232,9 +245,22 @@ fn stock_rows(chain: &stock::Chain, pins: &Pins) -> Vec<Row> {
     rows
 }
 
+/// The stock instances a class row's guard restates: every one the pinned chain declares with its stock type, or, when the
+/// row names its instances, those, each of which the chain must declare with that type.
+fn restated<'a>(declared: &'a [(String, String, String)], stock_ty: &str, named: Option<&Vec<String>>) -> Result<Vec<(&'a str, &'a str)>, String> {
+    let all: Vec<(&str, &str)> = declared.iter().filter(|d| d.0 == stock_ty).map(|d| (d.1.as_str(), d.2.as_str())).collect();
+    let Some(names) = named else { return Ok(all) };
+    for n in names {
+        if !all.iter().any(|(i, _)| i == n) {
+            return Err(format!("the class row for {stock_ty} names {n}, which the pinned stock chain does not declare as {stock_ty}"));
+        }
+    }
+    Ok(all.into_iter().filter(|(i, _)| names.iter().any(|n| n == i)).collect())
+}
+
 fn bench_rows(src: &Source, pins: &Pins) -> Result<Vec<Row>, String> {
     let mut rows = Vec::new();
-    for f in tsv(&src.path, overlay::text(src)?, 9)? {
+    for f in tsv(&src.path, overlay::text(src)?, 9, 9)? {
         if !pins.classes.iter().any(|c| c.1 == f[0]) {
             return Err(format!("{}: {} is not a guard of the class map", src.path, f[0]));
         }
@@ -300,10 +326,8 @@ fn build(repo: &Path, renode: &Path, out: &Path) -> Result<(String, String), Str
     }
     for (stock_ty, guard) in &pins.classes {
         m += &format!("class {stock_ty} {guard}\n");
-        for (ty, inst, file) in &chain.declared {
-            if ty == stock_ty {
-                m += &format!("restate {stock_ty} {inst} {file}\n");
-            }
+        for (inst, file) in restated(&chain.declared, stock_ty, pins.instances.get(guard))? {
+            m += &format!("restate {stock_ty} {inst} {file}\n");
         }
     }
     for src in &sources {
@@ -615,6 +639,17 @@ mod tests {
         assert_eq!(e.matches("machine Reset\n").count(), heads.len());
         assert!(e.contains("machine Reset\nsysbus WriteDoubleWord 0x580244F0 0x00001000\n# CASE"));
         assert_eq!(e.replace(en, ""), c);
+    }
+
+    #[test]
+    fn a_class_row_naming_its_instances_restates_only_those() {
+        let d = |t: &str, i: &str| (t.to_string(), i.to_string(), "platforms/cpus/stm32h7.repl".to_string());
+        let declared = vec![d("DMA.STM32DMA", "dma2"), d("DMA.STM32DMA", "dma1"), d("Timers.STM32_Timer", "timer1")];
+        let all = restated(&declared, "DMA.STM32DMA", None).unwrap();
+        assert_eq!(all.iter().map(|x| x.0).collect::<Vec<_>>(), ["dma2", "dma1"]);
+        let one = restated(&declared, "DMA.STM32DMA", Some(&vec!["dma1".to_string()])).unwrap();
+        assert_eq!(one.iter().map(|x| x.0).collect::<Vec<_>>(), ["dma1"]);
+        assert!(restated(&declared, "DMA.STM32DMA", Some(&vec!["timer1".to_string()])).unwrap_err().contains("does not declare"));
     }
 
     #[test]
