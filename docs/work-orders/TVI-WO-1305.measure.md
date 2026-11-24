@@ -278,3 +278,26 @@ Nothing in the generated boots or ArduPilot's fixture boot would refuse under th
 - **The receive line has no timing:** injected bytes arrive at once (`WriteChar`), so a firmware that reads too slowly is never overrun.
 - **A kernel clock lost under a running USART** (Q3), for the RCC guard.
 - **For Aethelgard (findings, not changes):** its serial access parser will reject a guarded port's records (§2.4); ChibiOS's `usart_init` on an enabled port writes `BRR` and framing with `UE` = 1, so ArduPilot's RC-protocol probing on an H7 may not switch baud on silicon (the manual's statement; no bench result).
+
+## 6. After the ruling (2026-11-24T18:55Z): the acceptance runs on Furnace
+
+Ruled: Q2 (c) (iii), the ChibiOS re-init pattern acknowledged by name with bench row U1; Q2's other protected fields `unmodeled`; a write clearing `UE` judged as `UE` = 0; Q6 (b), a narrow DMA fence (`TCIF` on a software disable, the offset reset, requests 43/45/46); the rest as proposed. Two readings were posted to the bus before building (18:58Z): every protected field changed with `UE` = 1 is `unmodeled`, so WO §2's "M or OVER8 … refuses `predicted-fault`" becomes `unmodeled`; and `FIFOEN` is in the acknowledged mask, as §2.1 measured it once in the pattern.
+
+**G1, the 14 generated boots and ArduPilot's fixture, on the guarded tree** (recorded; `h/replay-u3.sh` = the committed `tests/1301/replay-1301.sh` plus the logging), against M1 (main):
+- **Every write, every `RDR` value and every `ISR` poll count is identical** on all 15 boots. Only `ISR` read values differ: `IDLE` is set one frame after each echo byte. Aethelgard discards `ISR`/`RDR` read lines (§2.4), and the generated driver polls bits 7 and 5 only.
+- **The boot block differs only in copy-served bits:** `CR1` `FIFOEN` on every configured port (`0xD` → `0x2000000D`); on ArduPilot `CR1` `0x10D` → `0x2000011D`, `CR2` 0 → `0x40`, `CR3` `0xC0` → `0xC1`. Each is outside the mask Aethelgard judges it under. Read in source at `fa12abf4`: `boot.rs`:960–990 (the image's masks are the stored bits), `foreign.rs`:1107–1136 (`CR1` under the frame bits, `CR2` under the image mask, `STOP`). Instruction counts are identical.
+- **ArduPilot's one changed write:** the read-modify-write at `0x80F9FB2` now writes `0x2000011D` (silicon's) for `0x10D`, four times. `judge_options` reads only `UE` from a `CR1` write (`serial.rs`:971ff). Its 547 transmitted bytes, their stamps and PCs are identical.
+- **Records:** no USART `would-refuse` on any boot. Eight witnesses and eight end records each.
+
+**ARM, the armed run on the guarded twin, unpadded** (`~/.cache/tvi-1305/armed/`):
+- **The inputs:**
+  - 4400h's Sentinel-03 capture (`aet-4400h/cap/s03c/1`, ELF `dbf598d8…`), re-rooted to the committed replay's layout;
+  - the full guarded twin, recorded, with `usart1`'s `ReceiveDmaRequest -> dmamux1@41` (`ACCEPT_USART_DMA`, standing in for Aethelgard `4400i`);
+  - 4400h's `s03-arm-s` plan (`injected.tsv`): 21 frames and 837 bytes, **each frame its own bytes, no padding**, at the same times;
+  - 14 s, with `usart1`–`usart3` and `dma1` access-logged. 51 s wall, 3,126,496 KiB.
+- **ArduPilot answered every command and armed.** Ten `COMMAND_ACK`s and 13 `PARAM_VALUE`s, decoded from `usart1`'s `TDR` lines (`h/mav.py`). The arm was `COMMAND_ACK` 400 result 0 at 9.003 s, with `base_mode` 209 from 9.75 s. The sequence matches 4400h's padded run: `Motors: Check frame class and type` before `FRAME_CLASS`, the accelerometer calibration accepted, GUIDED refused for position.
+- **The mechanism, in the log** (the first frame, 21 bytes at 6.000 s): at 6.0000868 s, one frame time later (86.8 µs at 115,200 baud), `ISR` reads `0x206000D0` (`IDLE` set). `rx_irq_cb` writes `S0CR` `0x100416` (`EN` cleared). `TCIF` follows, and `LIFCR` `0x20` is written. The handler re-arms on the other bounce buffer (`M0AR` `0x38001940`, `NDTR` 64, `EN`).
+- **No USART `would-refuse` in 14 s,** and no `TVI-DMA-REQUEST`. Other guards' records, rows for them:
+  - `rcc` `TVI-RCC-FIELD` `AHB1ENR.ADC12EN` = 1 (77,076, the ADC poll) and `AHB4ENR.ADC3EN`, with their `LPEN` clears;
+  - `APB1LLPENR.USART2LPEN` = 0 (27) and `APB2LPENR.TIM1LPEN` = 0;
+  - `dma1` `TVI-DMA-FIELD` `CIRC` = 1 (an ADC stream).
