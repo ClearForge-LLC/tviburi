@@ -50,3 +50,13 @@ tools/tviburi-route/src/main.rs	LICENSE-APACHE
 tools/tviburi-route/src/main.rs	LICENSE-MIT
 tools/tviburi-route/src/main.rs	README.md
 tools/tviburi-route/src/main.rs	TVI-WO-1202.md
+firmware/flash.rs	TVI-WO-1300.rm0433.md
+firmware/flash.rs	TVI-WO-1304.measure.md
+model/GuardedSTM32H7_Flash.cs	TVI-WO-1304.measure.md
+model/GuardedSTM32H7_Flash.cs	docs/
+model/stm32h7-flash-restate.awk	TVI-WO-1304.measure.md
+model/stm32h7-flash-restate.repl	TVI-WO-1304.measure.md
+tests/1301/replay-1301.sh	TVI-WO-1304.measure.md
+tests/1304/fields.py	TVI-WO-1304.measure.md
+tests/1304/flash.sh	TVI-WO-1304.measure.md
+tests/1304/flash.sh	docs/
