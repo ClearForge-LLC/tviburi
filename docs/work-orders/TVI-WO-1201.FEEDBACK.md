@@ -3,7 +3,7 @@
 **Builder:** Claude (Opus 5.5), Furnace, 2026-11-23/24. **Branch:** `wo/tvi-1201-memory-budget`, from `main` `e891211`, with `main` merged before READY (§7). **PR:** #26.
 
 **State:**
-- §1's measurement ran first. **The §7 stop did not fire.** Main against main differed by −0.4, +3.1, +1.1 and −4.8 MiB at the median, in four CI jobs on two clouds and four CPUs (§1).
+- §1's measurement ran first. **The §7 stop did not fire.** Main against main differed by −0.4, +3.1, +1.1, −4.8 and −8.0 MiB at the median, in five CI jobs on two clouds and four CPUs (§1, §7).
 - (1)–(4) are built, and the acceptance is met in CI (§3). The planted 64 MiB branch is refused by `budget` alone, at +62.0, +56.8 and +64.3 MiB, and main against main passes.
 - **Ruled at 23:12Z (architect):** `tests/1301/replay-1301.sh` is in the fence. Its GPIO condition is restored (§2), and it now snapshots the peak.
 - `model/`, `tools/`, the steering documents, `README.md` and `docs/reviews/` are untouched. One PR, left unmerged.
@@ -238,4 +238,9 @@ The budget no longer depends on the answer, because each job compares against it
   - The plant: `REFUSE budget` alone at +55,344 KiB, in 5 of 5 boots. `main-not-the-base` passed.
   - The gate took 6 min 49 s and the plant test 6 min 50 s, on a slow runner (19–21 s a boot).
   - The Rust judge's 13 mutants were run on Furnace, all killed (§5).
-- **What follows `9011bbf`:** one docs-only commit, this FEEDBACK completed from that run. The measured code is `9011bbf`'s.
+- **Then F4's window and F5's binding (ruled 02:22Z and 02:24Z): `3011266`, CI run 45312537654, green.** The runner was AWS us-east-1, Intel Xeon 6975P-C.
+  - **The binding:** `branch HEAD is this pull request's merge: its second parent is the pull request's head, 30112664…`, which is the PR's `head.sha`. `MEASURED main commit 9210a8d… (HEAD^1)` is main after #28.
+  - **The gate:** `MEDIANS main 995112 KiB, branch 986900 KiB, difference -8212 KiB (-8.0 MiB)`, then `PASS`. This is the widest main against main of the five, and still half the 16 MiB stop line.
+  - **The plant:** `REFUSE budget` alone at +69,108 KiB (+67.5 MiB), in 5 of 5 boots, inside the new window.
+  - **The tests:** both `not-this-prs-merge` cases passed.
+- **What follows `3011266`:** one docs-only commit, this FEEDBACK completed from that run. The measured code is `3011266`'s.
