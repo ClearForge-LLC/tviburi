@@ -1,6 +1,10 @@
-# CI per RUL-15: GitHub-hosted runner, the consumer's pinned tools image (named by digest in
-# tests/spike.sh, which must follow Aethelgard main's container/IMAGE, RUL-09), and no network for
-# any run: every container is started with --network none. Only the image pull uses the network.
+# CI per RUL-15: GitHub-hosted runners, the consumer's pinned tools image (named by digest in tests/spike.sh, which
+# must follow Aethelgard main's container/IMAGE, RUL-09), and no network for any run: every container is started with
+# --network none. Only the image pulls use the network.
+# TVI-WO-1202: parallel jobs, so the wall time is the longest job, not the sum. `route` classes the change; on code,
+# five shards run every case and every mutant between them, one case at a time each (two at once changed verdicts,
+# 1202 measure §1.5), and `budget` runs the memory budget in one job. `ci` fails unless every job that had to run
+# succeeded and the shards' records show every case and mutant of the tree run exactly once. Nothing reruns itself.
 name: ci
 on:
   pull_request:
@@ -8,25 +12,78 @@ on:
     branches: [main]
 permissions:
   contents: read
+env:
+  TVIBURI_CI: "1"
+# `shell: bash` is bash -eo pipefail: a failing stage of a pipe fails the step.
+defaults:
+  run:
+    shell: bash
 jobs:
-  suite:
+  route:
     runs-on: ubuntu-24.04
-    timeout-minutes: 150
-    env:
-      TVIBURI_CI: "1"
+    timeout-minutes: 15
+    outputs:
+      class: ${{ steps.route.outputs.class }}
+      budget: ${{ steps.route.outputs.budget }}
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
           persist-credentials: false
-          # TVI-WO-1201: the memory budget compares HEAD with HEAD^1 (main's tip, under a pull request's merge commit).
           fetch-depth: 2
       - name: Pull the pinned tools image, by digest
         run: podman pull "$(sed -n 's/^IMAGE=//p' tests/spike.sh)"
-      - name: Acceptance suite
-        run: TVIBURI_SCRATCH="$RUNNER_TEMP/tviburi" tests/spike.sh
-      # TVI-WO-1201 (Scotty, 2026-11-23 evening): the memory budget, main's one file against this change's in this
-      # one job. ArduPilot's ELF is built from Aethelgard's pinned image and held to its sha256; five full boots a
-      # side, interleaved. Every branch boot at or under 1,572,864 KiB; the branch's median at most 32 MiB over main's.
+      - name: Route (its own tests, the inventory, then the change's class; a push to main is always code)
+        id: route
+        env:
+          TVIBURI_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          ALL: ${{ github.event_name == 'push' && '--all' || '' }}
+        run: |
+          TVIBURI_SCRATCH="$RUNNER_TEMP/tviburi" tests/ci/route.sh $ALL | tee "$RUNNER_TEMP/route.txt"
+          grep -E '^(class=(docs|code)|budget=(yes|no))$' "$RUNNER_TEMP/route.txt" >>"$GITHUB_OUTPUT"
+
+  # Five explicit shards (ruled 2026-11-24T10:30Z, Q1 and Q4): each its own job, so each passes its own record.
+  shard-1:
+    needs: route
+    if: needs.route.outputs.class == 'code'
+    uses: ./.github/workflows/shard.yml
+    with: { shard: 1, of: 5 }
+  shard-2:
+    needs: route
+    if: needs.route.outputs.class == 'code'
+    uses: ./.github/workflows/shard.yml
+    with: { shard: 2, of: 5 }
+  shard-3:
+    needs: route
+    if: needs.route.outputs.class == 'code'
+    uses: ./.github/workflows/shard.yml
+    with: { shard: 3, of: 5 }
+  shard-4:
+    needs: route
+    if: needs.route.outputs.class == 'code'
+    uses: ./.github/workflows/shard.yml
+    with: { shard: 4, of: 5 }
+  shard-5:
+    needs: route
+    if: needs.route.outputs.class == 'code'
+    uses: ./.github/workflows/shard.yml
+    with: { shard: 5, of: 5 }
+
+  # TVI-WO-1201 (Scotty, 2026-11-23 evening): the memory budget, main's one file against this change's in this one
+  # job. ArduPilot's ELF is built from Aethelgard's pinned image and held to its sha256; five full boots a side,
+  # interleaved. Every branch boot at or under 1,572,864 KiB; the branch's median at most 32 MiB over main's.
+  budget:
+    needs: route
+    if: needs.route.outputs.class == 'code'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+          # The memory budget compares HEAD with HEAD^1 (main's tip, under a pull request's merge commit).
+          fetch-depth: 2
+      - name: Pull the pinned tools image, by digest
+        run: podman pull "$(sed -n 's/^IMAGE=//p' tests/spike.sh)"
       - name: Pull Aethelgard's pinned ArduPilot image, by digest
         run: podman pull "$(sed -n 's/^AP_IMAGE=//p' tests/1301/ci-memory.sh)"
       - name: Memory budget (this change against main, same job; median at most 32 MiB over, every boot under 1.5 GiB)
@@ -34,9 +91,69 @@ jobs:
           # The merge ref's second parent must be this head, so its first is the main GitHub merges into (02:24Z).
           TVIBURI_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
         run: TVIBURI_SCRATCH="$RUNNER_TEMP/tviburi" tests/1301/ci-memory.sh
+
+  # The budget's own tests: on a push to main always; on a pull request when the route finds the budget's code changed
+  # (tools/tviburi-route's BUDGET list, which its inventory checks against what these tests read).
+  budget-tests:
+    needs: route
+    if: needs.route.outputs.budget == 'yes'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+          fetch-depth: 2
+      - name: Pull the pinned tools image, by digest
+        run: podman pull "$(sed -n 's/^IMAGE=//p' tests/spike.sh)"
+      - name: Pull Aethelgard's pinned ArduPilot image, by digest
+        run: podman pull "$(sed -n 's/^AP_IMAGE=//p' tests/1301/ci-memory.sh)"
       - name: Memory budget's own tests (main bound to the PR's base; a planted 64 MiB branch refused by budget)
         run: TVIBURI_SCRATCH="$RUNNER_TEMP/tviburi" tests/1201/test-budget.sh
-      - name: Adversarial cases
-        run: TVIBURI_SCRATCH="$RUNNER_TEMP/tviburi" tests/adversarial.sh
-      - name: Mutation run (one mutant per guard this change adds; each must be killed)
-        run: TVIBURI_SCRATCH="$RUNNER_TEMP/tviburi" tests/mutants.sh
+
+  ci:
+    needs: [route, shard-1, shard-2, shard-3, shard-4, shard-5, budget, budget-tests]
+    if: always()
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - name: Every job that had to run succeeded (a skipped or cancelled one is a failure)
+        env:
+          CLASS: ${{ needs.route.outputs.class }}
+          BUDGET: ${{ needs.route.outputs.budget }}
+          ROUTE: ${{ needs.route.result }}
+          SHARDS: ${{ needs.shard-1.result }} ${{ needs.shard-2.result }} ${{ needs.shard-3.result }} ${{ needs.shard-4.result }} ${{ needs.shard-5.result }}
+          MEMORY: ${{ needs.budget.result }}
+          MEMORY_TESTS: ${{ needs.budget-tests.result }}
+        run: |
+          echo "route $ROUTE (class '$CLASS', budget '$BUDGET'); shards $SHARDS; budget $MEMORY; budget-tests $MEMORY_TESTS"
+          [ "$ROUTE" = success ] || { echo "FAIL the route did not succeed"; exit 1; }
+          case "$CLASS" in
+            code) for r in $SHARDS $MEMORY; do [ "$r" = success ] || { echo "FAIL a code change needs every shard and the budget: one was $r"; exit 1; }; done ;;
+            docs) for r in $SHARDS $MEMORY; do [ "$r" = skipped ] || { echo "FAIL a docs-only change ran the suite's jobs: $r"; exit 1; }; done ;;
+            *) echo "FAIL the route gave no class"; exit 1 ;;
+          esac
+          case "$BUDGET" in
+            yes) [ "$MEMORY_TESTS" = success ] || { echo "FAIL the budget's own tests were needed: $MEMORY_TESTS"; exit 1; } ;;
+            no) [ "$MEMORY_TESTS" = skipped ] || { echo "FAIL the budget's own tests: $MEMORY_TESTS"; exit 1; } ;;
+            *) echo "FAIL the route gave no budget answer"; exit 1 ;;
+          esac
+          echo "every job that had to run succeeded"
+      - if: needs.route.outputs.class == 'code'
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+      - if: needs.route.outputs.class == 'code'
+        name: Pull the pinned tools image, by digest
+        run: podman pull "$(sed -n 's/^IMAGE=//p' tests/spike.sh)"
+      - if: needs.route.outputs.class == 'code'
+        name: Every case and every mutant of this tree ran exactly once across the shards
+        env:
+          RAN1: ${{ needs.shard-1.outputs.ran }}
+          RAN2: ${{ needs.shard-2.outputs.ran }}
+          RAN3: ${{ needs.shard-3.outputs.ran }}
+          RAN4: ${{ needs.shard-4.outputs.ran }}
+          RAN5: ${{ needs.shard-5.outputs.ran }}
+        run: |
+          for i in 1 2 3 4 5; do v=RAN$i; printf '%s\n' "${!v}" >"$RUNNER_TEMP/ran-$i.txt"; done
+          TVIBURI_SCRATCH="$RUNNER_TEMP/tviburi" tests/ci/aggregate.sh "$RUNNER_TEMP"/ran-{1,2,3,4,5}.txt

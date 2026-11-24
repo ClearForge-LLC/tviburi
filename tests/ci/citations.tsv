@@ -1,0 +1,42 @@
+# TVI-WO-1202: each code file that names a documentation file (or docs/), and the name, as a citation, never a read:
+# a comment, or a string a record or the ledger carries. tools/tviburi-route's inventory fails on a name not listed here
+# (a new reader: make the path code, or list it after checking it only cites) and on a row that no longer holds.
+# Checked by hand 2026-11-24 (TVI-WO-1202), every row read in its file. FILE<tab>NAME.
+firmware/gpio.rs	TVI-WO-1301.rm0433.md
+firmware/rcc.rs	TVI-WO-1300.rm0433.md
+firmware/spi1.rs	TVI-WO-0100b.rm0433.md
+model/bench-checks.tsv	FEEDBACK.md
+model/bench-checks.tsv	TVI-WO-0100b.FEEDBACK.md
+model/GuardedSTM32_GPIOPort.cs	docs/
+model/GuardedSTM32_GPIOPort.cs	TVI-WO-1301.ds12117.md
+model/GuardedSTM32_GPIOPort.cs	TVI-WO-1301.rm0433.md
+model/GuardedSTM32H7_RCC.cs	docs/
+model/GuardedSTM32H7_RCC.cs	TVI-WO-0100b.rm0433.md
+model/GuardedSTM32H7_RCC.cs	TVI-WO-1300a.measure.md
+model/GuardedSTM32H7_RCC.cs	TVI-WO-1300.rm0433.md
+model/GuardedSTM32H7_SPI.cs	docs/
+model/GuardedSTM32H7_SPI.cs	TVI-WO-0100a.rm0433.md
+model/GuardedSTM32H7_SPI.cs	TVI-WO-0100b.rm0433.md
+model/stm32h7-gpio-restate.awk	TVI-WO-1301.rm0433.md
+model/tviburi-nucleo-h753zi.repl	TVI-WO-1300.rm0433.md
+model/tviburi-nucleo-h753zi.repl	TVI-WO-1301.rm0433.md
+spike/1150/overlay/GuardedSpi1150.cs	docs/
+spike/1150/overlay/GuardedSpi1150.cs	TVI-WO-0100a.rm0433.md
+tests/1300/allowlist.py	TVI-WO-1300.rm0433.md
+tests/1300/rcc.sh	TVI-WO-1300a.measure.md
+tests/1300/rcc.sh	TVI-WO-1300.rm0433.md
+tests/1300/replay-1300.sh	TVI-WO-1300.rm0433.md
+tests/1301/fixtures/aet-1c32c8ea-ardupilot/SOURCE.md	FEEDBACK.md
+tests/1301/fixtures/aet-1c32c8ea-ardupilot/SOURCE.md	TVI-WO-1301.rm0433.md
+tests/conditions.resc	TVI-WO-0100b.rm0433.md
+tests/mutants.tsv	TVI-WO-0100b.rm0433.md
+tests/mutants.tsv	TVI-WO-1300.rm0433.md
+tools/tviburi-release/src/main.rs	TVI-WO-0100b.rm0433.md
+tools/tviburi-release/src/main.rs	TVI-WO-1300.rm0433.md
+tools/tviburi-route/src/main.rs	CLAUDE.md
+tools/tviburi-route/src/main.rs	docs/
+tools/tviburi-route/src/main.rs	FEEDBACK.md
+tools/tviburi-route/src/main.rs	LICENSE-APACHE
+tools/tviburi-route/src/main.rs	LICENSE-MIT
+tools/tviburi-route/src/main.rs	README.md
+tools/tviburi-route/src/main.rs	TVI-WO-1202.md

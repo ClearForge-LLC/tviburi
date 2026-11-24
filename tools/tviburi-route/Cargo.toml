@@ -1,0 +1,9 @@
+[package]
+name = "tviburi-route"
+version = "0.1.0"
+edition = "2021"
+license = "MIT OR Apache-2.0"
+description = "Tviburi's CI route, shard plan and aggregate (TVI-WO-1202)"
+publish = false
+
+[dependencies]
