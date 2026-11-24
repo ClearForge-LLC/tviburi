@@ -10,8 +10,8 @@ set -euo pipefail
 
 here=$(cd "$(dirname "$0")/../.." && pwd)
 IMAGE=$(sed -n 's/^IMAGE=//p' "$here/tests/spike.sh")
-CASES="axi tcm itcm partcm below wrap unmapped ndt0 reload reassert sizes fth fthzero reloadtcm en enoff done same disable width read field msize16 route0 route54 mux shared sharedx request txother fields ledger registrations irq config recorded reset clock offset regen restate"
-GUARDS="spi1 rcc gpioPortA gpioPortB gpioPortC gpioPortD gpioPortE gpioPortF gpioPortG gpioPortH gpioPortI gpioPortJ gpioPortK timer1 timer8 dma1 dma2 flashController"
+CASES="axi tcm itcm partcm below wrap unmapped ndt0 reload reassert sizes fth fthzero reloadtcm en enoff done same disable width read field msize16 route0 route54 mux shared sharedx request txother usart23 fields ledger registrations irq config recorded reset clock offset regen restate"
+GUARDS="spi1 rcc gpioPortA gpioPortB gpioPortC gpioPortD gpioPortE gpioPortF gpioPortG gpioPortH gpioPortI gpioPortJ gpioPortK timer1 timer8 dma1 dma2 flashController usart1 usart2 usart3 uart4 uart5 usart6 uart7 uart8"
 MONITOR="fields ledger registrations irq config recorded reset clock offset regen restate"
 # The planted firmware's paths: every case but the monitor-driven ones.
 PATHS=$(for c in $CASES; do case " $MONITOR " in *" $c "*) ;; *) printf '"%s",' "$c" ;; esac; done | sed 's/,$//')
@@ -147,6 +147,8 @@ for t in ${TVIBURI_TESTS:-$CASES}; do
     "refuses sharedx TVI-DMA-SHARED predicted-fault 'r[\"peripheral\"] == \"sysbus.dma2\" and r[\"bit\"] == \"DMAMUX1_C8CR.DMAREQ_ID = 41 on channels 8 and 0\"'" ;;
   request) check "request: a peripheral-to-memory stream on 61 (spi3_rx_dma, raised by no model) refuses TVI-DMA-REQUEST, unmodeled (ruled Q5 (c))" \
     "refuses request TVI-DMA-REQUEST unmodeled 'r[\"bit\"] == \"DMAMUX1_C0CR.DMAREQ_ID = 61 (spi3_rx_dma)\"'" ;;
+  usart23) check "usart23: peripheral-to-memory streams on 43 and 45 (usart2_rx_dma, usart3_rx_dma) and a memory-to-peripheral stream on 46 (usart3_tx_dma), as ArduPilot's armed run enables them, pass: acknowledged by name (ruled 2026-11-24T18:55Z Q6)" \
+    "passes usart23" ;;
   txother) check "txother: a memory-to-peripheral stream on 44 (usart2_tx_dma, not acknowledged) refuses TVI-DMA-REQUEST, unmodeled" \
     "refuses txother TVI-DMA-REQUEST unmodeled 'r[\"bit\"] == \"DMAMUX1_C0CR.DMAREQ_ID = 44 (usart2_tx_dma)\"'" ;;
   fields)
@@ -247,15 +249,19 @@ tviburiDma2:\
     check "clock: NDTR written with DMA1EN = 0 is dropped by the bus lock with no record (p373; ruled Q7): it reads 0 once clocked, and the run passes" \
       "passed clock && grep -q 'Tried to write a locked peripheral: machine-0.dma1. Address 0x40020014' '$work/clock/renode.out' && [ \"\$(readout clock NDTR)\" = 0x00000000 ]" ;;
   offset)
-    # The stock model keeps its transfer offset when a stream is disabled part-way (STM32DMA.cs L160, L256, L262): three
-    # requests raised by hand on an 8-item P2M stream, a disable, a new M0AR and NDTR, then the enable.
-    run_case offset - "$clk" 'sysbus WriteDoubleWord 0x40020800 0x29' 'sysbus WriteDoubleWord 0x40020018 0x40011024' \
+    # TVI-WO-1305 (ruled 2026-11-24T18:55Z Q6): software clearing EN while a stream runs suspends it as silicon does: TCIF
+    # set (§15.3.16 p654), and the next transfer at the programmed base (p654, p666), not the stock model's old offset
+    # (STM32DMA.cs L160, L256, L262). Three requests raised by hand on an 8-item P2M stream, a disable, LISR read; a new M0AR
+    # over 0xFF bytes and NDTR, the enable, one request: the byte lands at the new base. Replaces TVI-DMA-OFFSET.
+    run_case offset - "$clk" 'sysbus WriteDoubleWord 0x38001A00 0xFFFFFFFF' 'sysbus WriteDoubleWord 0x40020800 0x29' 'sysbus WriteDoubleWord 0x40020018 0x40011024' \
       'sysbus WriteDoubleWord 0x4002001C 0x38001900' 'sysbus WriteDoubleWord 0x40020014 0x8' 'sysbus WriteDoubleWord 0x40020010 0x401' \
       'sysbus.dmamux1 OnGPIO 41 true' 'sysbus.dmamux1 OnGPIO 41 false' 'sysbus.dmamux1 OnGPIO 41 true' 'sysbus.dmamux1 OnGPIO 41 false' \
-      'sysbus.dmamux1 OnGPIO 41 true' 'sysbus.dmamux1 OnGPIO 41 false' 'sysbus WriteDoubleWord 0x40020010 0x400' \
-      'sysbus WriteDoubleWord 0x4002001C 0x38001A00' 'sysbus WriteDoubleWord 0x40020014 0x8' 'sysbus WriteDoubleWord 0x40020010 0x401'
-    check "offset: a stream disabled after 3 of 8 items and enabled again refuses TVI-DMA-OFFSET, unmodeled: the stock model would resume at its old offset where silicon starts at M0AR (p666)" \
-      "[ \$rc = 3 ] && first offset 'r[\"rule\"] == \"TVI-DMA-OFFSET\" and r[\"kind\"] == \"unmodeled\" and \"p666\" in r[\"citation\"]'" ;;
+      'sysbus.dmamux1 OnGPIO 41 true' 'sysbus.dmamux1 OnGPIO 41 false' 'echo "R-LISR0"' 'sysbus ReadDoubleWord 0x40020000' \
+      'sysbus WriteDoubleWord 0x40020010 0x400' 'echo "R-LISR"' 'sysbus ReadDoubleWord 0x40020000' 'echo "R-NDTR"' 'sysbus ReadDoubleWord 0x40020014' \
+      'sysbus WriteDoubleWord 0x40020008 0x3D' 'sysbus WriteDoubleWord 0x4002001C 0x38001A00' 'sysbus WriteDoubleWord 0x40020014 0x8' \
+      'sysbus WriteDoubleWord 0x40020010 0x401' 'sysbus.dmamux1 OnGPIO 41 true' 'sysbus.dmamux1 OnGPIO 41 false' 'echo "R-BASE"' 'sysbus ReadDoubleWord 0x38001A00'
+    check "offset: a stream disabled by software after 3 of 8 items has TCIF0 set (p654; it was clear before) and NDTR 5; re-armed on a new M0AR, its next item lands at the new base (p654, p666), and the run passes" \
+      "passed offset && [ \"\$(readout offset LISR0)\" = 0x00000000 ] && [ \"\$(readout offset LISR)\" = 0x00000020 ] && [ \"\$(readout offset NDTR)\" = 0x00000005 ] && [ \"\$(readout offset BASE)\" = 0xFFFFFF00 ]" ;;
   regen)
     rc=0; python3 -I "$src/tests/1303/fields.py" > "$work/fields.cs" || rc=$?
     check "regen: the guard's Fields table regenerates from tests/1303/fields.py, byte for byte (RUL-16)" \

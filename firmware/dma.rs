@@ -31,6 +31,8 @@
 //!   path="sharedx"  - DMA1 S0 P2M on 41 running, then DMA2 S0 (channel 8) on 41: TVI-DMA-SHARED across controllers.
 //!   path="request"  - P2M on 61 (spi3_rx_dma: no model raises it): TVI-DMA-REQUEST, unmodeled.
 //!   path="txother"  - M2P on 44 (usart2_tx_dma: not acknowledged): TVI-DMA-REQUEST, unmodeled.
+//!   path="usart23"  - P2M on 43 (usart2_rx_dma) and 45 (usart3_rx_dma), M2P on 46 (usart3_tx_dma), as ArduPilot's armed run
+//!                     enables them (TVI-WO-1305.measure.md §2.6): passes, acknowledged by name (ruled 2026-11-24T18:55Z Q6).
 //!   path="reload"   - M2M AXI to AXI, 4 words (completed at EN), disabled, then enabled again without NDTR: silicon
 //!                     reloads NDT = 4 (p665), the stock model never does: TVI-DMA-RELOAD, unmodeled.
 //!   path="reassert" - M2P on 42 (completed at EN), then CR written again unchanged with EN = 1: silicon cleared EN at the
@@ -57,6 +59,9 @@ const SRAM4: usize = 0x3800_1900;
 const DTCM: usize = 0x2000_0400;
 const USART1_RDR: usize = 0x4001_1024;
 const USART1_TDR: usize = 0x4001_1028;
+const USART2_RDR: usize = 0x4000_4424;
+const USART3_RDR: usize = 0x4000_4824;
+const USART3_TDR: usize = 0x4000_4828;
 const MARK_AFTER: *mut u32 = 0x2000_0104 as *mut u32;
 const MARK_READ: *mut u32 = 0x2000_0108 as *mut u32;
 const MARK_READ2: *mut u32 = 0x2000_010C as *mut u32;
@@ -285,6 +290,15 @@ pub unsafe extern "C" fn reset() -> ! {
         w(s(DMA1, 0, CR), M2M);
         w(s(DMA1, 0, M0AR), DTCM as u32);
         en(DMA1, 0);
+    }
+    #[cfg(path = "usart23")]
+    {
+        cfg(DMA1, 0, 0, Some(43), USART2_RDR, SRAM4, 4, P2M);
+        en(DMA1, 0);
+        cfg(DMA1, 1, 1, Some(45), USART3_RDR, SRAM4 + 0x40, 4, P2M);
+        en(DMA1, 1);
+        cfg(DMA1, 2, 2, Some(46), USART3_TDR, SRAM4 + 0x80, 4, M2P);
+        en(DMA1, 2);
     }
     #[cfg(path = "reassert")]
     {
