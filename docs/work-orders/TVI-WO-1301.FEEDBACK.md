@@ -8,7 +8,7 @@
   - no valid path refuses (both firmwares, all 15 boots);
   - the package is declared;
   - the memory is judged in CI per 18:30Z, and passes locally as a proxy (§3).
-- **The memory:** CI could not meet the bound on a slow runner (19:57Z, §3). It was measured as ruled at 20:20Z (§3a); the peak follows the runner's speed. **Ruled at 20:58Z:** the regular CI step passing on the runner CI gives is the gate until Scotty rules on the bound. The temporary measurement step is removed, and its figures stay in §3a.
+- **The memory:** CI could not meet the bound on a slow runner (19:57Z, §3). It was measured as ruled at 20:20Z (§3a); the peak followed the runner's speed there, though a later green run is a counterexample (§3b). **Ruled at 20:58Z:** the regular CI step passing on the runner CI gives is the gate until Scotty rules on the bound. The temporary measurement step is removed, and its figures stay in §3a.
 - **Ruled at 19:47Z:** F1 (follow-up `TVI-WO-1301a`), F5 kept, the harness deleted, rows (§5). The merge order: 1300a (#21) first, then `main` merged here, the suite rerun, and CI re-measuring the combined file.
 - Steering documents, `README.md`, `docs/reviews/` and Aethelgard are untouched. `model/Refusal.cs` changed only as granted at 19:08Z (Q1). One PR, left unmerged.
 
@@ -76,7 +76,7 @@
 
 - **The regular memory step** in the same run (1301) **passed**: 980,536; 981,432; 973,928; 972,420; 970,364 KiB.
 - **The GC settings:** `DOTNET_gcServer=0`, `DOTNET_gcConcurrent=0`, `DOTNET_GCConserveMemory=9`. Renode is a self-contained .NET 8 application, and its CoreCLR reads `DOTNET_*` at start. The runtime's own report, from inside Renode, shows them applied: `ServerGC=False ConcurrentGC=False GCConserveMem=9 LatencyMode=Batch`, where the default is `ConcurrentGC=True GCConserveMem=0 Interactive`. **They lower nothing:** the medians are equal or a few MiB higher.
-- **The same code failed a run earlier** (45249617507: 1,018,148 to 1,049,556 KiB at 18.9–20.3 s a boot). This runner took 13–14 s a boot, and every configuration, `main` included, peaked about 30–40 MiB lower. **The peak follows the runner's speed** (as §8 found on Furnace, r = 0.978). On this runner, 1301 costs about 10 MiB over `main` at the median, and the margin is about 26 MiB at the worst run.
+- **The same code failed a run earlier** (45249617507: 1,018,148 to 1,049,556 KiB at 18.9–20.3 s a boot). This runner took 13–14 s a boot, and every configuration, `main` included, peaked about 30–40 MiB lower. **Across these two runs, the peak followed the runner's speed** (as §8 found on Furnace, r = 0.978). §3b's run is a counterexample: slower, and lower. On this runner, 1301 costs about 10 MiB over `main` at the median, and the margin is about 26 MiB at the worst run.
 - **For Scotty (northstar §6; `RUL-09` (a)):** the bound is judged on whatever runner GitHub gives, and runners vary. `main` alone was not measured on the slow runner. **Inferred, not measured:** the slow run's 1301 peaks less about 10 MiB give about 1,007,900 to 1,039,300 KiB, so `main` alone would likely have failed the 32 MiB-spare limit there too.
 
 ## 3b. The gate on the combined tree (ruled 20:58Z)
@@ -85,6 +85,9 @@
 - The ELF was `a799dfb6`.
 - **Memory peaks:** 775,980; 772,932; 773,500; 776,020; 768,856 KiB, at 15.2–16.2 s wall. All five are under 1,015,808 KiB, with 0 GPIO would-refuse.
 - **These peaks are about 200 MiB below every other measurement, and I cannot say why.** The same tree on Furnace, one run, peaked at 983,816 KiB. That boot did exactly the work of the pre-merge boots: instructions `0x53EABA5`, 4,741 CFG2 lines, 609 USART1 lines, 74,258 console lines, no record, and 1300a's 22 locked accesses. So 1300a's lock does not change what ArduPilot does. CI keeps only the summary, so its boots' work could not be compared. **Read the CI figure as this runner's, not as the overlay's cost.**
+- **This run contradicts "the peak follows the runner's speed" (§3a):** it was slower per boot (15.2–16.2 s) than §3a's 13–14 s run, yet about 200 MiB lower. Wall time alone does not predict the peak.
+- **The runners, from each run's "Set up job":** the failing run 45249617507 (1,018,148–1,049,556 KiB, 18.9–20.3 s) and this run were both on Azure `centralus`, runner image `ubuntu-24.04` `20261116.376.1`, runner `2.338.2`. §3a's run 45257810560 was on `us-east-1` (no cloud named), image `20261116.133.1`. So the region and the image do not separate the high peaks from the low. What does, I did not find; it goes to the follow-up, not this WO.
+- **The 14 generated boards under enforcing** (WO §2; 0 refusals, motor observers equal to stock) were run before 1300a was merged and not since. The combined suite runs ArduPilot and sentinel-03's GPIO sequences, enforcing, and both pass.
 
 ## 4. The adversarial pass (WO §5)
 
@@ -165,7 +168,7 @@ Each finding was verified in the code or the manual before acting.
 ## 7. Close
 
 **Suites, each run from an export of HEAD:**
-- **`1449153`, the combined tree after `main` with TVI-WO-1300a (#21) was merged:** `tests/spike.sh` gave **ALL PASS (137 checks**, 1300a's cases and all 32 GPIO cases among them). `tests/adversarial.sh` gave **ALL PASS (33 checks)**.
+- **`1449153`, the combined tree after `main` with TVI-WO-1300a (#21) was merged:** `tests/spike.sh` gave **ALL PASS (137 checks**, 1300a's cases and all 32 GPIO cases among them, each checked by name against the log). The earlier figure of 145 was the two suites together: 112 acceptance and 33 adversarial. Of the 112, one name is gone, gen-s03's "the measured RCC sequence…", which 1300a replaced with sentinel-03's own sequence. `tests/adversarial.sh` gave **ALL PASS (33 checks)**.
   - Since 1300a's lock, a monitor-driven case must enable the ports' clocks first. Eight GPIO cases did not: their accesses were "Tried to write a locked peripheral", and they failed. They now write `RCC_AHB4ENR` = `0x7FF` first, as the firmware does.
 - **`bfc1594`:** `tests/spike.sh` gave **144 of 145 checks**, with all 32 GPIO cases among them. The one failure was `rcc-resetfwd`: the teardown flake (§5 item 5). Its answers were all correct, and 11 of 13 end records were written before Renode exited. It passed on rerun. `tests/adversarial.sh`: **ALL PASS**.
 - **`ec04588`,** after the reduction pass: `rcc-resetfwd`, `afcheck`, `unit`, `gpio-valid`, `-ledger`, `-fields` and `-registrations` give **ALL PASS**. `tests/1301/ci-memory.sh` (one run, the trimmed fixture) gives the ELF `a799dfb6` and a peak of 991,676 KiB: **ALL PASS**.
