@@ -170,9 +170,9 @@ G11-resetCheck	model/GuardedSTM32_GPIOPort.cs	if(resets[i] != want[i])	if(false)
 G12-subWordMerge	model/GuardedSTM32_GPIOPort.cs	var word = width == 32 ? value : (Served(b) & ~(mask << shift)) | ((value & mask) << shift);	var word = width == 32 ? value : (value & mask);	gpio-bsrrhalf gpio-afrh
 G13-portFromAddress	model/GuardedSTM32_GPIOPort.cs	port = (char)('A' + (int)((start - PortsBase) / 0x400));	port = 'A';	gpio-package
 G14-tableData	model/GuardedSTM32_GPIOPort.cs	PA5:89:	PA5:90:	afcheck
-G15-restatedRoute	model/stm32h7-gpio-restate.repl	timer1:\n    0 -> tviburiGpioA#07@01 | tviburiGpioA#08@01 |	timer1:\n    0 -> tviburiGpioA#07@01 |	gpio-registrations
+G15-restatedRoute	model/stm32h7-gpio-restate.repl	tviburiTimer1:\n    0 -> tviburiGpioA#07@01 | tviburiGpioA#08@01 |	tviburiTimer1:\n    0 -> tviburiGpioA#07@01 |	gpio-registrations
 G16-boardPackage	model/tviburi-nucleo-h753zi.repl	tviburiGpioH:\n    mode: "enforcing"\n    package: "LQFP144"	tviburiGpioH:\n    mode: "enforcing"	gpio-package
-G17-namesLine	scripts/tviburi-spike	gpioPortJ gpioPortK >	gpioPortJ >	modeled
+G17-namesLine	scripts/tviburi-spike	gpioPortJ gpioPortK timer1 timer8 >	gpioPortJ timer1 timer8 >	modeled
 G18-unlistedPinAf	model/GuardedSTM32_GPIOPort.cs	if(cell == null || cell.Text == "-")	if(cell != null && cell.Text == "-")	gpio-pk8af
 G19-unlistedPinPackage	model/GuardedSTM32_GPIOPort.cs	(!bonding.TryGetValue("P" + port + pin, out var b) || b.Pin == null)	(bonding.TryGetValue("P" + port + pin, out var b) && b.Pin == null)	gpio-pk8out
 G20-staleRefresh	model/GuardedSTM32_GPIOPort.cs	base.ReadDoubleWord(b);\n            }\n            var before = Selection();	}\n            var before = Selection();	gpio-resetwrite
@@ -202,3 +202,37 @@ H18-resetDrive	model/GuardedSTM32_GPIOPort.cs	Drive(0xFFFF);   // the declared l
 H19-senderBeforeConfig	model/GuardedSTM32_GPIOPort.cs	SetPin(number, value);   // before the first access	;   //	gpio-button
 H20-senderKeptOnReset	model/GuardedSTM32_GPIOPort.cs	            odr = 0;   // a sender	            senderKnown = 0;\n            odr = 0;   // a sender	gpio-button
 H21-afNoSourceHold	model/GuardedSTM32_GPIOPort.cs	m == 2 ? Peripheral(pin) ?? Outside(pin, m)	m == 2 ? Peripheral(pin) ?? false	gpio-afnosrc
+# TVI-WO-1302: one mutant per guard the timer guard adds, and the restatement (variant B, ruled Q3).
+TM01-moeGate	model/GuardedSTM32_Timer.cs	if((bdtr & MoeBit) != 0)	if(true)	timer-moe0
+TM02-cceGate	model/GuardedSTM32_Timer.cs	return e && (base.Connections[i].IsSet ^ p);	return (base.Connections[i].IsSet ^ p);	timer-cce0 timer-force
+TM03-polarity	model/GuardedSTM32_Timer.cs	return e && (base.Connections[i].IsSet ^ p);	return e && base.Connections[i].IsSet;	timer-polarity
+TM04-ossiIdle	model/GuardedSTM32_Timer.cs	return e && (bdtr & OssiBit) != 0 && (cr2 >> (8 + 2 * i) & 1) == 1;	return false;	timer-ossi
+TM05-ccr0Lowers	model/GuardedSTM32_Timer.cs	                    base.Connections[i].Unset();	                    ;	timer-ccr0
+TM06-ccrResetZero	model/GuardedSTM32_Timer.cs	                base.WriteDoubleWord(Ccr1Offset + 4 * i, 0);	                ;	timer-ccrreset timer-ap-m
+TM07-ownOutputs	model/GuardedSTM32_Timer.cs	ToDictionary(i => i, i => (IGPIO)outs[i]);	ToDictionary(i => i, i => base.Connections[i]);	timer-moe0 timer-registrations
+TM08-tapDrives	model/GuardedSTM32_Timer.cs	                parent.outs[channel]?.Set(parent.Level(channel));	                ;	timer-pwm
+TM09-passDrives	model/GuardedSTM32_Timer.cs	base.WriteDoubleWord(b, b == CcerOffset ? word | AllOutputs : word);\n            }\n            DriveAll();	base.WriteDoubleWord(b, b == CcerOffset ? word | AllOutputs : word);\n            }	timer-ccr0 timer-locksame
+TM10-lockLevel	model/GuardedSTM32_Timer.cs	private int lockLevel => (int)(bdtr >> 8 & 3);	private int lockLevel => 0;	timer-lock2
+TM11-lockFrozenBits	model/GuardedSTM32_Timer.cs	(bdtrWritten ? 0x300u : 0)	0u	timer-lockfrozen
+TM12-lock2Ccer	model/GuardedSTM32_Timer.cs	return lockLevel >= 2 ? 0xAAAAu : 0;	return 0;	timer-lock2
+TM13-lock1Cr2	model/GuardedSTM32_Timer.cs	return lockLevel >= 1 ? 0x7F00u : 0;	return 0;	timer-lock1
+TM14-lock3Ccmr	model/GuardedSTM32_Timer.cs	return lockLevel >= 3 ? 0x01017878u : 0;	return 0;	timer-lock3
+TM15-lockSamePasses	model/GuardedSTM32_Timer.cs	var changed = (word ^ Served(b)) & Locked(b);	var changed = Locked(b);	timer-locksame
+TM16-resetUnlocks	model/GuardedSTM32_Timer.cs	ccmr3 = 0;\n            bdtrWritten = false;	ccmr3 = 0;	timer-reset
+TM17-dmar	model/GuardedSTM32_Timer.cs	if(b != DmarOffset)	if(true)	timer-dmar
+TM18-width	model/GuardedSTM32_Timer.cs	if(width != 8 && (offset & (width / 8 - 1)) == 0)	if((offset & (width / 8 - 1)) == 0)	timer-byte
+TM19-field	model/GuardedSTM32_Timer.cs	if(f.Allowed != null && !f.Allowed.Contains(v))	if(false)	timer-ccne timer-aoe
+TM20-read	model/GuardedSTM32_Timer.cs	if(b == DmarOffset || !Fields.Any(f => f.Offset == b))	if(false)	timer-read
+TM21-config	model/GuardedSTM32_Timer.cs	if(limit != 0xFFFF)	if(false)	timer-config
+TM22-recordedAll	model/GuardedSTM32_Timer.cs	                RefusedField(offset, b, word, width);\n            }	            }	timer-recorded
+TM23-ccmrCopy	model/GuardedSTM32_Timer.cs	            case Ccmr1Offset: return ccmr1;\n	(empty)	timer-pwm
+TM24-restateTim1	model/stm32h7-gpio-restate.repl	tviburiTimer1:\n    0 -> tviburiGpioA#07@01	timer1:\n    0 -> tviburiGpioA#07@01	gpio-afenterhigh
+TM25-lock2NotAt1	model/GuardedSTM32_Timer.cs	return lockLevel >= 2 ? 0xAAAAu : 0;	return lockLevel >= 1 ? 0xAAAAu : 0;	timer-lockbelow
+TM26-lock3NotAt2	model/GuardedSTM32_Timer.cs	return lockLevel >= 3 ? 0x01017878u : 0;	return lockLevel >= 2 ? 0x01017878u : 0;	timer-lockbelow2
+TM27-ossNotAt1	model/GuardedSTM32_Timer.cs	(lockLevel >= 2 ? 0x0C00u : 0)	(lockLevel >= 1 ? 0x0C00u : 0)	timer-lockbelow
+TM28-halfShift	model/GuardedSTM32_Timer.cs	| ((value & mask) << shift);	| (value & mask);	timer-halfhigh
+TM29-stockSeesEnable	model/GuardedSTM32_Timer.cs	b == CcerOffset ? word | AllOutputs : word	word	timer-reenable
+TM30-restateTim8	model/stm32h7-gpio-restate.repl	tviburiTimer8:\n    0 -> tviburiGpioA#05@03	timer8:\n    0 -> tviburiGpioA#05@03	timer-tim8on
+TM31-regen	model/GuardedSTM32_Timer.cs	the stock model: the auto-reload value; probed (T1)	the stock model: the auto-reload value	timer-regen
+TM32-gcUnsubscribe	model/GuardedSTM32_Timer.cs	            ((Machine)machine).StateChanged -= CollectAtStart;\n	(empty)	timer-gconce
+TM33-gcSubscribe	model/GuardedSTM32_Timer.cs	                m.StateChanged += CollectAtStart;	                ;	timer-gconce

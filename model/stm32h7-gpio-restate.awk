@@ -9,7 +9,9 @@
 #   `timerN: k -> gpioPortX#pin@af`; a port's pins into the timers, `gpioPortX: k -> timerN@m`): restated with every
 #   `gpioPortX` replaced by the guard's variable `tviburiGpioX`.
 # A cancelled port's connections stay in Renode's CombinedInput combiners as inputs that never drive (measured,
-# TVI-WO-1301.rm0433.md §4). Usage: awk -v sha=<sha256 of stm32h7.repl> -f stm32h7-gpio-restate.awk stm32h7.repl
+# TVI-WO-1301.rm0433.md §4).
+# TVI-WO-1302 (ruled 2026-11-24T06:10Z Q3): TIM1 and TIM8 are guarded too, so a block's `timer1`/`timer8` is the guard's
+# variable `tviburiTimer1`/`tviburiTimer8` (model/stm32h7-timer-restate.repl). Usage: awk -v sha=<sha256 of stm32h7.repl> -f stm32h7-gpio-restate.awk stm32h7.repl
 function flush(   b, m, o, u) {
     if (kind == "port") {
         print name ": @none"
@@ -27,8 +29,8 @@ function flush(   b, m, o, u) {
         print ""
         ports++
     } else if (kind == "update" && (name ~ /^gpioPort[A-K]$/ || blk ~ /gpioPort[A-K]/)) {
-        b = name ":\n" blk
-        gsub(/gpioPort/, "tviburiGpio", b)
+        b = (name ~ /^timer[18]$/ ? "tviburiT" substr(name, 2) : name) ":\n" blk
+        gsub(/gpioPort/, "tviburiGpio", b); gsub(/timer1@/, "tviburiTimer1@", b); gsub(/timer8@/, "tviburiTimer8@", b)
         printf "%s\n", b
         updates++
     }
