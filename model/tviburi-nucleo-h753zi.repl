@@ -8,6 +8,7 @@ using "platforms/boards/nucleo_h753zi.repl"
 using "./stm32h7-rcc-restate.repl"
 using "./stm32h7-gpio-restate.repl"
 using "./stm32h7-timer-restate.repl"
+using "./stm32h7-flash-restate.repl"
 
 // The guard's mode (RUL-19), and the stock board's `rcc: hseFrequency: 8_000_000` restated on the guard: that update
 // lands on the cancelled stock entry (TVI-WO-1300.rm0433.md §6.4).
@@ -76,6 +77,13 @@ tviburiTimer1:
     mode: "enforcing"
 tviburiTimer8:
     mode: "enforcing"
+// TVI-WO-1304: the flash controller is guarded (stm32h7-flash-restate.repl cancels the stock controller and declares the
+// guard as "flashController"). Its mode (RUL-19), and the option-byte image this board's part holds, served as
+// FLASH_OPTSR_CUR (ruled 2026-11-24T15:50Z Q3): 0x1BC6AAF0, read from a NUCLEO-H753ZI rev V on the bench (Aethelgard
+// AET-WO-3302, 2026-11-16; named in Aethelgard's ledger.rs FLASH OPTSR_CUR row). Never the stock model's reset value.
+tviburiFlash:
+    mode: "enforcing"
+    optionBytes: 0x1BC6AAF0
 // The stock board's LEDs and button are registered on, and connected to, the cancelled ports: restated onto the guards
 // (without this the load fails, E39, and Renode exits 0: TVI-WO-1301.rm0433.md §6.5).
 GreenLED: @ tviburiGpioB 0
