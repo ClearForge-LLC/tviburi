@@ -140,13 +140,30 @@ Checked and found clean by the review:
 - **`model/Refusal.cs`'s recorded-mode comment** ("evaluates no further rule for that access") disagrees with both the timer and the DMA guards, which evaluate every rule (RUL-19: "measure ArduPilot's real queue"). For the records owner.
 - **The wrapper's prices** (as the RCC's): the access log names its registers `unknown`, and the owned model's warnings lose their source name.
 - **The WO's Q7 sentence** ("already refuses through `1300a`'s lock") is the architect's to correct (14:10Z).
+- **The budget's judge tests only the branch's boots against the ceiling** (ruled 15:50Z): main broke it in both Furnace runs unflagged. A row for `1201`'s budget program.
+- **Furnace's contention** when six builders run Renode: boot walls of 18–44 s, against about 11 s, carry peaks of 1.25–1.86 GB.
 
 ## 8. Suites, mutants, memory and CI
 
 All on Furnace, in the pinned image (`aethelgard-tools@sha256:1e0ab105…`), one capped container at a time.
-- **The DMA suite:** FILL.
-- **The full suite and the adversarial group:** FILL.
-- **Mutants:** DM01–DM42, 42 of 42 killed on `55773ea` through `tests/mutants.sh`; G17 (re-keyed) killed. After the reduction: FILL.
-- **Memory, `1201`'s budget,** eleven boots a side, `main` `d71d410` against HEAD: FILL.
-- **Acceptance:** FILL.
+- **The DMA suite** on the reduced tree (`609a2c9`): 41 of 41 pass.
+- **The full suite and the adversarial group** (`TVIBURI_TESTS=all`, 221 tests, 267 checks) on `609a2c9`: 261 ok, 6 FAIL.
+  - All six (`gpio-ardupilot`, `-odrfirst`, `-afout`, `timer-force`, `-polarity`, `-half`) lost every guard's end record at teardown, with Renode exiting 0: the teardown race.
+  - All six pass on rerun.
+  - **The race, measured:** 15 runs of `gpio-odrfirst` a side, main `d71d410` against this branch, gave 1 FAIL against 1 FAIL. No increase from `dma1`/`dma2` is measurable (ruled 15:50Z: recorded, nothing more).
+- **Mutants,** through `tests/mutants.sh`:
+  - DM01–DM42: 42 of 42 killed on `55773ea`;
+  - after the reduction, the five nearest the reduced text (DM01, DM04, DM06, DM07, DM35) killed again on `609a2c9`;
+  - G17 (re-keyed) killed.
+- **Memory, `1201`'s budget,** eleven boots a side, `main` `d71d410` against `609a2c9`, on a Furnace shared by six builders:
+
+  | Run | Medians (KiB) | Difference | Judge |
+  |---|---|---|---|
+  | 1 | main 989,080, branch 983,048 | −5.9 MiB | refused the ceiling: branch boot 10 at 1,597,364 KiB, wall 31.3 s |
+  | 2 | main 986,564, branch 991,768 | +5.1 MiB | refused the ceiling: branch boot 2 at 1,862,576 KiB, wall 43.8 s |
+
+  - Every peak over about 1.25 GB, on either side, had a wall over 18 s. **Main broke the ceiling in run 2 too** (1,580,336 KiB at 28.7 s), and it did so in §1.1 (1,818,296 KiB at 40.1 s).
+  - A §7 stop, ruled at 15:50Z: host contention (the roadmap's wall-time row), with CI's budget the decider. CI's result is below.
+- **Acceptance** on `609a2c9` (§3): all 16 boots identical to main, 0 DMA `would-refuse`, both DMA guards witnessing.
+- **`tviburi-route inventory`:** passes.
 - **CI:** see the PR. A green CI is not live acceptance.
