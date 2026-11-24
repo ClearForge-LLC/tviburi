@@ -61,6 +61,7 @@ const GPIOA: usize = 0x5802_0000;
 const GPIOB: usize = 0x5802_0400;
 const GPIOD: usize = 0x5802_0C00;
 const RCC_APB2ENR: *mut u32 = 0x5802_44F0 as *mut u32;
+const RCC_APB1LENR: *mut u32 = 0x5802_44E8 as *mut u32;
 const TIM1: usize = 0x4001_0000;
 const IDR: usize = 0x10;
 const GPIOC: usize = 0x5802_0800;
@@ -98,38 +99,22 @@ unsafe fn afsel(port: usize, pin: u32, af: u32) {
     w(port, off, (r(port, off) & !(0xF << sh)) | (af << sh));
 }
 
-/// TIM1 CH1 in PWM mode 1 (OC1M = 0110, RM0433 Rev 9 §38.4.7 p1599; p1557), its output enabled (CC1E, §38.4.11
-/// p1605) and the counter running, CCR1 = `ccr` with ARR = 99: 0 holds the output low, more than ARR high. A busy loop
-/// then lets virtual time pass, so the stock timer has set its output before the caller goes on.
-#[cfg(any(path = "afodr", path = "afenter", path = "afenterhigh", path = "afout", path = "afentern"))]
-unsafe fn tim1(ccr: u32) {
-    write_volatile(RCC_APB2ENR, read_volatile(RCC_APB2ENR) | 1);
-    w(TIM1, 0x28, 0);
-    w(TIM1, 0x2C, 99);
-    w(TIM1, 0x34, ccr);
-    w(TIM1, 0x18, 0x68);
-    w(TIM1, 0x20, 1);
-    w(TIM1, 0x44, 0x8000);
-    w(TIM1, 0x14, 1);
-    w(TIM1, 0x00, 0x81);
-    let mut i = 0u32;
-    while i < 20000 {
-        write_volatile(MARK_READ2, i);
-        i += 1;
-    }
-}
-
-/// A general-purpose timer's CH1 (TIM2, TIM5) as tim1 sets TIM1's, without the break register: PWM mode 1
-/// (§39.4.7 p1688), CC1E, ARR = 99, CCR1 = `ccr`; its clock enabled in RCC_APB1LENR bit `en` (TIM5EN is bit 3, p464).
-#[cfg(path = "afswitch")]
-unsafe fn gtim(base: usize, en: u32, ccr: u32) {
-    let apb1lenr = 0x5802_44E8 as *mut u32;
-    write_volatile(apb1lenr, read_volatile(apb1lenr) | 1 << en);
+/// A timer's CH1 in PWM mode 1 (OC1M = 0110, RM0433 Rev 9 §38.4.7 p1599 for TIM1, §39.4.7 p1688 for TIM2-5; p1557), its
+/// output enabled (CC1E, §38.4.11 p1605), ARR = 99 and CCR1 = `ccr` (0 holds the output low, more than ARR high), the
+/// counter running, and its clock enabled by bit `bit` of `enr` (TIM1EN, APB2ENR bit 0; TIM2EN, TIM5EN, APB1LENR bits 0
+/// and 3, p464). TIM1 also gets MOE (BDTR). A busy loop then lets virtual time pass, so the stock timer has set its
+/// output before the caller goes on.
+#[cfg(any(path = "afodr", path = "afenter", path = "afenterhigh", path = "afout", path = "afentern", path = "afswitch"))]
+unsafe fn tim(base: usize, enr: *mut u32, bit: u32, ccr: u32) {
+    write_volatile(enr, read_volatile(enr) | 1 << bit);
     w(base, 0x28, 0);
     w(base, 0x2C, 99);
     w(base, 0x34, ccr);
     w(base, 0x18, 0x68);
     w(base, 0x20, 1);
+    if base == TIM1 {
+        w(base, 0x44, 0x8000);
+    }
     w(base, 0x14, 1);
     w(base, 0x00, 0x81);
     let mut i = 0u32;
@@ -1256,7 +1241,7 @@ pub unsafe extern "C" fn reset() -> ! {
     {
         afsel(GPIOA, 8, 1);
         mode(GPIOA, 8, 2);
-        tim1(0);
+        tim(TIM1, RCC_APB2ENR, 0, 0);
         w(GPIOA, ODR, 0x100);
         write_volatile(MARK_READ, (r(GPIOA, ODR) & 0xFFFF) << 16 | (r(GPIOA, IDR) & 0xFFFF));
     }
@@ -1264,7 +1249,7 @@ pub unsafe extern "C" fn reset() -> ! {
     {
         w(GPIOA, BSRR, 1 << 8);
         mode(GPIOA, 8, 1);
-        tim1(0);
+        tim(TIM1, RCC_APB2ENR, 0, 0);
         afsel(GPIOA, 8, 1);
         mode(GPIOA, 8, 2);
         write_volatile(MARK_READ, r(GPIOA, IDR));
@@ -1272,7 +1257,7 @@ pub unsafe extern "C" fn reset() -> ! {
     #[cfg(path = "afenterhigh")]
     {
         mode(GPIOA, 8, 1);
-        tim1(200);
+        tim(TIM1, RCC_APB2ENR, 0, 200);
         afsel(GPIOA, 8, 1);
         mode(GPIOA, 8, 2);
         write_volatile(MARK_READ, r(GPIOA, IDR));
@@ -1281,7 +1266,7 @@ pub unsafe extern "C" fn reset() -> ! {
     {
         afsel(GPIOA, 8, 1);
         mode(GPIOA, 8, 2);
-        tim1(0);
+        tim(TIM1, RCC_APB2ENR, 0, 0);
         w(GPIOA, BSRR, 1 << 8);
         mode(GPIOA, 8, 1);
         let out = r(GPIOA, IDR) >> 8 & 1;
@@ -1291,15 +1276,15 @@ pub unsafe extern "C" fn reset() -> ! {
     #[cfg(path = "afentern")]
     {
         mode(GPIOA, 7, 1);
-        tim1(0);
+        tim(TIM1, RCC_APB2ENR, 0, 0);
         afsel(GPIOA, 7, 1);
         mode(GPIOA, 7, 2);
         write_volatile(MARK_READ, r(GPIOA, IDR));
     }
     #[cfg(path = "afswitch")]
     {
-        gtim(0x4000_0000, 0, 0);
-        gtim(0x4000_0C00, 3, 200);
+        tim(0x4000_0000, RCC_APB1LENR, 0, 0);
+        tim(0x4000_0C00, RCC_APB1LENR, 3, 200);
         afsel(GPIOA, 0, 1);
         mode(GPIOA, 0, 2);
         let before = r(GPIOA, IDR) & 1;
