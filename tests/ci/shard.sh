@@ -17,7 +17,7 @@ cases=$(sed -n 's/^case //p' "$ci/plan.txt" | paste -sd' ')
 mutants=$(sed -n 's/^mutant //p' "$ci/plan.txt" | paste -sd' ')
 echo "shard $1 of $2: $(wc -w <<<"$cases") cases, $(wc -w <<<"$mutants") mutants"
 # The runner's speed varies by its CPU (1202 measure §1.1; one run's five shards ran at 0.85-1.29 x): name it.
-echo "shard $1 of $2: cpu $(sed -n 's/^model name[[:space:]]*: //p' /proc/cpuinfo | head -n1); nproc $(nproc)"
+echo "shard $1 of $2: cpu $(sed -n 's/^model name[[:space:]]*: //p;T;q' /proc/cpuinfo); nproc $(nproc)"
 
 crc=0 mrc=0
 if [ -n "$cases" ]; then
