@@ -1,38 +1,78 @@
 #!/usr/bin/env bash
-# tests/1301/ci-memory.sh [SRC] — TVI-WO-1301's memory check (ruled 2026-11-23T18:30Z, 19:08Z): ArduPilot's full 5 s
-# boot, as Aethelgard runs it (tests/1301/fixtures/aet-1c32c8ea-ardupilot/), on this source's one-file overlay, five
-# runs, each peak at least 32 MiB under Aethelgard's bound of 1,048,576 KiB. The ELF is built first from Aethelgard's
-# pinned ArduPilot image and must be a799dfb6… (SOURCE.md there). Each run is tests/1301/replay-1301.sh `accept`,
-# every guard recorded, one container at a time, no network. Meant for CI (an unshared runner, TVIBURI_CI=1); on
-# Furnace it runs capped, and only an unslowed run is a proxy (ruled 18:30Z).
-# Exit 0 only if the ELF matches, every run reaches the boot's end with no GPIO would-refuse, and every peak is
-# at most 1,015,808 KiB.
+# tests/1301/ci-memory.sh [MAIN BRANCH] — TVI-WO-1201's memory budget (Scotty, 2026-11-23 evening), replacing
+# TVI-WO-1301's absolute step. ArduPilot's full 5 s boot, as Aethelgard runs it (tests/1301/fixtures/
+# aet-1c32c8ea-ardupilot/), on main's one-file overlay and on the branch's, in this one job, interleaved.
+#   MAIN, BRANCH  each a directory holding a source tree, or a commit of this checkout (extracted by `git archive`).
+#                 Default: HEAD^1 and HEAD. In CI on a pull request HEAD is GitHub's merge commit and HEAD^1 is main's
+#                 tip; on a push to main HEAD^1 is main before the push. TVIBURI_HEAD_SHA, when set (CI sets it to a
+#                 pull request's head), must be BRANCH's second parent, so BRANCH is that pull request's merge.
+# Only the release comes from each tree, built once by that tree's own scripts/build-release; the harness
+# (replay-1301.sh), the captured run and the ELF are this checkout's, the same for both sides. The ELF is built from
+# Aethelgard's pinned ArduPilot image and must be a799dfb6… (the fixture's SOURCE.md).
+# This script only boots and hands off (RUL-14, ruled 2026-11-24T01:05Z): one row per boot of what it sampled (the
+# peak, the boot's end, the witnesses of each side's release, GPIO would-refuse), under a header naming the columns.
+# The judge is tools/tviburi-budget, built from this checkout and unit-tested here before it judges. It decides
+# whether each boot counts and computes the two medians, and it refuses by name: failed-boot, too-few-boots (fewer
+# than 5 a side), ceiling (a branch boot over 1,572,864 KiB), budget (the branch's median more than 32 MiB over
+# main's). Exit 0 only on its PASS. In CI (TVIBURI_CI=1) containers run bare on the unshared runner; elsewhere
+# under capped-run.
 set -euo pipefail
 
 here=$(cd "$(dirname "$0")/../.." && pwd)
 IMAGE=$(sed -n 's/^IMAGE=//p' "$here/tests/spike.sh")
 AP_IMAGE=ghcr.io/clearforge-llc/aethelgard-ardupilot@sha256:e1809b909b02c7fd01b593a65f32d191169a5027ef61ceeae8e74cc08117c2b6
 ELF_SHA=a799dfb6633537e74a8c3b7d8b6a464f185c255e377a612b7f9fcf8378dab1ef
-RUNS=${TVIBURI_MEMORY_RUNS:-5}
-LIMIT=$((1048576 - 32 * 1024))
+
 scratch=${TVIBURI_SCRATCH:-$HOME/.cache/tviburi}
 mkdir -p "$scratch"
 work=$(mktemp -d "$scratch/memory.XXXXXX")
-
 if [ "${TVIBURI_CI:-}" = 1 ]; then
   container() { podman run --rm --network none "$@"; }
 else
   [ -x "$HOME/bin/capped-run" ] || { echo "no ~/bin/capped-run; TVIBURI_CI=1 is for CI runners only" >&2; exit 2; }
   container() { nice -n 10 "$HOME/bin/capped-run" --mem 12G -- --rm --network none "$@"; }
 fi
-if [ $# -ge 1 ]; then
-  src=$(cd "$1" && pwd)
-else
-  src=$work/src
-  mkdir "$src"
-  git -C "$here" archive HEAD | tar -x -C "$src"
+runs=${TVIBURI_MEMORY_RUNS:-5}   # the judge refuses fewer than 5 a side
+fix=$here/tests/1301/fixtures/aet-1c32c8ea-ardupilot
+
+# The two trees, then each one's release, built once by its own release program; its hash is what every witness of
+# a boot on that side must report.
+# On a pull request, BRANCH must be its merge ref (ruled 2026-11-24T02:24Z): the second parent is the pull request's
+# head, which GitHub refreshes on every push, so the first parent is the main GitHub actually merges into. The event's
+# base.sha is never used, because a push does not refresh it. Checked before any container.
+if [ -n "${TVIBURI_HEAD_SHA:-}" ]; then
+  b=${2:-HEAD}
+  p2=$(git -C "$here" rev-parse --verify -q "$b^2" || true)
+  [ "$p2" = "$TVIBURI_HEAD_SHA" ] || { echo "FAIL $b is not this pull request's merge: its second parent is ${p2:-none}," \
+    "the pull request's head is $TVIBURI_HEAD_SHA"; exit 1; }
+  echo "branch $b is this pull request's merge: its second parent is the pull request's head, $p2"
 fi
-fix=$src/tests/1301/fixtures/aet-1c32c8ea-ardupilot
+declare -A tree hash label
+for s in main branch; do
+  if [ $s = main ]; then a=${1:-HEAD^1}; else a=${2:-HEAD}; fi
+  if [ -d "$a" ]; then
+    tree[$s]=$(cd "$a" && pwd); label[$s]="the directory ${tree[$s]}"
+  else
+    tree[$s]=$work/$s; mkdir "${tree[$s]}"
+    git -C "$here" archive "$a" | tar -x -C "${tree[$s]}"
+    label[$s]="commit $(git -C "$here" rev-parse "$a") ($a)"
+  fi
+  echo "$s: ${label[$s]}"
+  mkdir "$work/rel-$s"
+  hash[$s]=$(container -v "${tree[$s]}:/repo:ro" -v "$work/rel-$s:/out" "$IMAGE" sh /repo/scripts/build-release /repo /out/release \
+    2>"$work/rel-$s.err") || { cat "$work/rel-$s.err"; echo "FAIL $s's release did not build"; exit 1; }
+  case ${hash[$s]} in sha256:????????????????????????????????????????????????????????????????) ;; *) echo "FAIL $s's release printed '${hash[$s]}', not a hash"; exit 1 ;; esac
+  echo "$s release ${hash[$s]}"
+done
+
+# The judge, from this checkout like the harness, the same for both sides. Its unit tests pin the refusals; a judge
+# that fails them judges nothing.
+container -v "$here/tools/tviburi-budget:/src:ro" -v "$work:/w" "$IMAGE" sh -c 'export PATH=/opt/cargo/bin:$PATH
+  export RUSTUP_HOME=/opt/rustup CARGO_HOME=/w/cargo-home
+  cargo test --quiet --offline --locked --manifest-path /src/Cargo.toml --target-dir /w/judge &&
+  cargo build --quiet --offline --locked --manifest-path /src/Cargo.toml --target-dir /w/judge' >"$work/judge.txt" 2>&1 \
+  || { tail -30 "$work/judge.txt"; echo "FAIL the judge (tools/tviburi-budget) did not build or pass its tests"; exit 1; }
+echo "judge: $(grep -a 'test result' "$work/judge.txt")"
 
 # The ELF, built as Aethelgard's CI builds it, then held to its hash.
 mkdir -p "$work/elf"
@@ -40,25 +80,76 @@ container -v "$fix/container:/container:ro" -v "$fix/boards:/boards:ro" -v "$wor
   bash /container/ardupilot-build.sh boards sentinel-02 >"$work/elf.log" 2>&1 || { tail -5 "$work/elf.log"; echo "FAIL the ArduPilot build"; exit 1; }
 got=$(sha256sum "$work/elf/sentinel-02/arducopter.elf" | cut -c1-64)
 echo "ELF sha256 $got (want $ELF_SHA)"
-[ "$got" = "$ELF_SHA" ] || { echo "FAIL the ELF built is $got, not $ELF_SHA: a question for Scotty (ruled 19:08Z)"; exit 1; }
+[ "$got" = "$ELF_SHA" ] || { echo "FAIL the ELF built is $got, not $ELF_SHA: a question for Scotty (1301, ruled 19:08Z)"; exit 1; }
+cap=$work/cap/2
+mkdir -p "$cap"
+cp -r "$fix/argv.bin" "$fix/varlib" "$cap/"
+tool=$(echo "$cap"/varlib/*/tool)
+mkdir -p "$tool/.config"
+cp "$work/elf/sentinel-02/arducopter.elf" "$tool/firmware.elf"
 
-fails=0
-for r in $(seq 1 "$RUNS"); do
-  cap=$work/cap$r/2 out=$work/out$r
-  mkdir -p "$cap" "$out"
-  cp -r "$fix/argv.bin" "$fix/varlib" "$cap/"
-  tool=$(echo "$cap"/varlib/*/tool)
-  mkdir -p "$tool/.config"
-  cp "$work/elf/sentinel-02/arducopter.elf" "$tool/firmware.elf"
-  # Sentinel-02's I2C1 lines are "open-drain, pulled up off-chip" (fixtures/…/boards/sentinel-02.hwdef.dat L24-25), which
-  # the consumer's platform does not yet declare: declared here, as TVI-WO-1301a was ruled (2026-11-23T23:52Z).
-  container -e ACCEPT_MODE=recorded -e ACCEPT_EXTERNAL="PB6:up PB7:up" -v "$work/cap$r:/cap:ro" -v "$src:/repo:ro" -v "$out:/out" "$IMAGE" \
-    bash /repo/tests/1301/replay-1301.sh 2 accept >"$out/replay.txt" 2>&1 || true
-  peak=$(sed -n 's/.*peak_tree_vmrss_kib=\([0-9]*\).*/\1/p' "$out/2-accept.cost.txt")
-  end=$(grep -a -c '^AETHELGARD-BOOT-END' "$out/2-accept.console.txt" || true)
-  would=$(grep -a -c 'gpioPort[A-K]: {"tviburi":"would-refuse"' "$out/2-accept.console.txt" || true)
-  line="run $r: $(cat "$out/2-accept.cost.txt"); boot end $end; GPIO would-refuse $would"
-  if [ -n "$peak" ] && [ "$peak" -le $LIMIT ] && [ "$end" = 1 ] && [ "$would" = 0 ]; then echo "ok   $line"; else echo "FAIL $line"; fails=$((fails + 1)); fi
+# The runner, for the spread between runs (WO (4)): recorded, not judged.
+{
+  echo "cpu $(sed -n 's/^model name[[:space:]]*: //p' /proc/cpuinfo | head -1); nproc $(nproc); $(lscpu 2>/dev/null | grep -m1 '^L3' | tr -s ' ')"
+  echo "memory $(awk '/^MemTotal:|^MemAvailable:|^SwapTotal:/ {printf "%s %s kB; ", $1, $2}' /proc/meminfo)"
+  echo "thp enabled=$(cat /sys/kernel/mm/transparent_hugepage/enabled 2>/dev/null) defrag=$(cat /sys/kernel/mm/transparent_hugepage/defrag 2>/dev/null)"
+  echo "kernel $(uname -r); runner image ${ImageOS:-none} ${ImageVersion:-none}"
+} | tee "$work/runner.txt"
+
+# Interleaved, and the order alternates each round (main first, then branch first), so a drift over the job or a
+# first boot's extra cost falls on both sides alike.
+printf '%s\t' side run peak_kib wall_s boot_end witnesses_own witnesses_other would_refuse rss_anon_kib rss_file_kib \
+  rss_shmem_kib anon_huge_kib threads processes >"$work/runs.tsv"
+printf 'snapshot_sum_kib\n' >>"$work/runs.tsv"
+for r in $(seq 1 "$runs"); do
+  order="main branch"; [ $((r % 2)) = 0 ] && order="branch main"
+  for s in $order; do
+    out=$work/out-$s-$r
+    mkdir -p "$out"
+    avail=$(awk '/^MemAvailable:/ {print $2}' /proc/meminfo)
+    # Sentinel-02's I2C1 lines are "open-drain, pulled up off-chip" (fixtures/…/boards/sentinel-02.hwdef.dat L24-25),
+    # which the consumer's platform does not yet declare: declared here (TVI-WO-1301a, ruled 2026-11-23T23:52Z). The
+    # harness gives it only to a tree whose guard takes it, so main before 1301a boots as it always has.
+    container -e ACCEPT_MODE=recorded -e ACCEPT_EXTERNAL="PB6:up PB7:up" -v "$work/cap:/cap:ro" -v "${tree[$s]}:/repo:ro" -v "$here/tests/1301:/h:ro" \
+      -v "$work/rel-$s/release:/tmp/release:ro" -v "$out:/out" "$IMAGE" bash /h/replay-1301.sh 2 accept >"$out/replay.txt" 2>&1 || true
+    con=$out/2-accept.console.txt cost=$(cat "$out/2-accept.cost.txt" 2>/dev/null || true)
+    peak=$(sed -n 's/.*peak_tree_vmrss_kib=\([0-9]*\).*/\1/p' <<<"$cost")
+    wall=$(sed -n 's/.*wall_s=\([0-9.]*\).*/\1/p' <<<"$cost")
+    end=$(grep -a -c '^AETHELGARD-BOOT-END' "$con" 2>/dev/null || true)
+    mine=$(grep -a -c "\"tviburi\":\"witness\".*\"model_version\":\"${hash[$s]}\"" "$con" 2>/dev/null || true)
+    other=$(grep -a '"tviburi":"witness"' "$con" 2>/dev/null | grep -a -c -v "\"model_version\":\"${hash[$s]}\"" || true)
+    would=$(grep -a -c 'gpioPort[A-K]: {"tviburi":"would-refuse"' "$con" 2>/dev/null || true)
+    # What the peak is made of (WO (4)): the Renode process's own breakdown at its peak sample, in KiB.
+    # The snapshot is the last whole one, at or before the peak; its own sample's sum is the last column.
+    parts=$'\t\t\t\t\t\t'   # no whole snapshot: empty fields, so the row stays whole and the judge names the boot
+    [ -s "$out/2-accept.peak-proc.txt" ] && parts=$(awk '/^(RssAnon|RssFile|RssShmem|AnonHugePages|Threads):/ {v[$1] = $2} /^pid / {v["n"] = $4; v["s"] = $7}
+      END {printf "%s\t%s\t%s\t%s\t%s\t%s\t%s", v["RssAnon:"], v["RssFile:"], v["RssShmem:"], v["AnonHugePages:"], v["Threads:"], v["n"], v["s"]}' \
+      "$out/2-accept.peak-proc.txt")
+    printf '%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n' $s $r "$peak" "${wall:-none}" "${end:-0}" "${mine:-0}" "${other:-0}" "${would:-0}" \
+      "$parts" >> "$work/runs.tsv"
+    echo "$s boot $r: peak ${peak:-none} KiB, wall ${wall:-none} s, boot end ${end:-0}, witnesses of its release ${mine:-0}" \
+      "and of another ${other:-0}, GPIO would-refuse ${would:-0}, host MemAvailable before $avail kB; at the peak" \
+      "RssAnon/RssFile/RssShmem/AnonHugePages/Threads/processes/snapshot-sum $(tr '\t' / <<<"$parts")"
+  done
 done
-echo "limit $LIMIT KiB (1,048,576 less 32 MiB); outputs: $work"
-[ $fails = 0 ] && echo "ALL PASS" || { echo "$fails FAILED"; exit 1; }
+
+verdict=0
+echo "MEASURED main ${label[main]}; branch ${label[branch]}" >"$work/verdict.txt"
+container -v "$work:/w:ro" "$IMAGE" /w/judge/debug/tviburi-budget /w/runs.tsv >>"$work/verdict.txt" 2>&1 || verdict=$?
+cat "$work/verdict.txt"
+echo "outputs: $work"
+if [ -n "${GITHUB_STEP_SUMMARY:-}" ]; then
+  {
+    echo "### Memory budget: ${TVIBURI_MEMORY_LABEL:-the branch against main}"
+    echo
+    echo "main ${hash[main]} · branch ${hash[branch]}"
+    echo
+    echo '```'; cat "$work/verdict.txt"; echo '```'
+    echo
+    awk -F'\t' '{for (i = 1; i <= NF; i++) printf "| %s ", $i; print "|"} NR == 1 {for (i = 1; i <= NF; i++) printf "|---"; print "|"}' \
+      "$work/runs.tsv"
+    echo
+    echo '```'; cat "$work/runner.txt"; echo '```'
+  } >> "$GITHUB_STEP_SUMMARY"
+fi
+exit $verdict

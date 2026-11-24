@@ -1,0 +1,9 @@
+[package]
+name = "tviburi-budget"
+version = "0.1.0"
+edition = "2021"
+license = "MIT OR Apache-2.0"
+description = "Tviburi's memory budget judge: each pull request's boots against main's, in one CI job (TVI-WO-1201)"
+publish = false
+
+[dependencies]

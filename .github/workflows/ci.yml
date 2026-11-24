@@ -18,16 +18,24 @@ jobs:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
           persist-credentials: false
+          # TVI-WO-1201: the memory budget compares HEAD with HEAD^1 (main's tip, under a pull request's merge commit).
+          fetch-depth: 2
       - name: Pull the pinned tools image, by digest
         run: podman pull "$(sed -n 's/^IMAGE=//p' tests/spike.sh)"
       - name: Acceptance suite
         run: TVIBURI_SCRATCH="$RUNNER_TEMP/tviburi" tests/spike.sh
-      # TVI-WO-1301 (ruled 2026-11-23T18:30Z, 19:08Z): Aethelgard's memory bound is judged here, on an unshared
-      # runner. ArduPilot's ELF is built from Aethelgard's pinned image and held to its sha256; five full boots.
+      # TVI-WO-1201 (Scotty, 2026-11-23 evening): the memory budget, main's one file against this change's in this
+      # one job. ArduPilot's ELF is built from Aethelgard's pinned image and held to its sha256; five full boots a
+      # side, interleaved. Every branch boot at or under 1,572,864 KiB; the branch's median at most 32 MiB over main's.
       - name: Pull Aethelgard's pinned ArduPilot image, by digest
         run: podman pull "$(sed -n 's/^AP_IMAGE=//p' tests/1301/ci-memory.sh)"
-      - name: Memory on ArduPilot's full boot (each peak 32 MiB under 1,048,576 KiB)
+      - name: Memory budget (this change against main, same job; median at most 32 MiB over, every boot under 1.5 GiB)
+        env:
+          # The merge ref's second parent must be this head, so its first is the main GitHub merges into (02:24Z).
+          TVIBURI_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
         run: TVIBURI_SCRATCH="$RUNNER_TEMP/tviburi" tests/1301/ci-memory.sh
+      - name: Memory budget's own tests (main bound to the PR's base; a planted 64 MiB branch refused by budget)
+        run: TVIBURI_SCRATCH="$RUNNER_TEMP/tviburi" tests/1201/test-budget.sh
       - name: Adversarial cases
         run: TVIBURI_SCRATCH="$RUNNER_TEMP/tviburi" tests/adversarial.sh
       - name: Mutation run (one mutant per guard this change adds; each must be killed)
