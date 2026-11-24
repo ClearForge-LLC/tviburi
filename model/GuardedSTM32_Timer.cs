@@ -66,6 +66,14 @@ namespace Antmicro.Renode.Peripherals.Tviburi
             }
             connections = Enumerable.Range(0, Channels).ToDictionary(i => i, i => (IGPIO)outs[i]);
             records = new Records(machine, this, nameof(GuardedSTM32_Timer), mode);
+            // A deliberate, load-time-only side effect (ruled 2026-11-24T10:30Z (A)): one full, blocking, compacting
+            // collection. The platform is loaded after the overlay's compile and before emulation, so this reclaims the
+            // compile's garbage, which otherwise stays in gen2 through the consumer's boot and counts in its peak
+            // (measured: +22 MB of managed heap after `include` and `mach create`, +0.4 MB after a full GC; ArduPilot's
+            // boot +35.6 MiB at the median over main, +11.6 with one full GC on both sides; TVI-WO-1302.FEEDBACK.md
+            // §8). Each instance collects once, so TIM1 and TIM8 make two, tens of milliseconds at load. It changes no
+            // virtual time, no access and no record.
+            GC.Collect(GC.MaxGeneration, GCCollectionMode.Forced, true, true);
         }
 
         // The platform's routes bind here (measured: the probe of TVI-WO-1302.measure.md §2.3), not to the stock lines.
