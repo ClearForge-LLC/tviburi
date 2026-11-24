@@ -18,7 +18,8 @@
 //!   path="lockedsame"   - FLASH_CR2 written with the value it holds while locked: passes. MARK_READ = CR2 (0x31).
 //!   path="badkey"       - a first key other than KEY1: TVI-FLASH-KEY, predicted-fault (p182).
 //!   path="keytwice"     - bank 2 unlocked, then KEY1 again: TVI-FLASH-KEY (p163).
-//!   path="keymid"       - KEY1, then a CR2 write before KEY2: TVI-FLASH-KEY (p182).
+//!   path="keymid"       - KEY1, an ACR write (common to both banks, Table 20 p172: passes), then a CR2 write before
+//!                         KEY2: TVI-FLASH-KEY at the CR2 write (p182).
 //!   path="keyhalf"      - KEY1 written by a 16-bit store: TVI-FLASH-KEY (p182: "writing less than 32 bits").
 //!   path="wrhlow"       - VOS1, 200 MHz, LATENCY 2 with WRHIGHFREQ 01, a sector erase started: TVI-FLASH-PROG at START2.
 //!   path="wrhpg"        - the same with PG2 set: TVI-FLASH-PROG at the PG2 write.
@@ -29,6 +30,13 @@
 //!                         MARK_READ2 = SR2 after the SR2 write (0: read-only, F5).
 //!   path="gen"          - the generated hse-crystal-16's PWR, RCC and FLASH_ACR writes (TVI-WO-1304.measure.md §2.3),
 //!                         then its one OPTSR_CUR read: passes. MARK_READ = OPTSR_CUR.
+//!   path="edge"         - VOS1, LATENCY 1, an AXI clock of 140 MHz, the top of 1 WS's band (Table 17 p160): passes.
+//!   path="vos2"         - VOS2, LATENCY 1, 120 MHz: Table 17 needs 2 at VOS2 (1 at VOS1): TVI-FLASH-WAIT.
+//!   path="d1cpre"       - VOS1, LATENCY 1, 100 MHz with D1CPRE /2, then D1CPRE /1: TVI-FLASH-WAIT at D1CFGR (p394).
+//!   path="wrhrcc"       - VOS1, WRHIGHFREQ 01, PG2 set at HSI, then the clock to 200 MHz: TVI-FLASH-PROG at CFGR.
+//!   path="locking"      - FLASH_CR2 written setting LOCK2 and PG2 at once: TVI-FLASH-LOCK (p229: "the other bits ... do
+//!                         not change").
+//!   path="worse"        - (recorded) LATENCY 1 at 200 MHz, then LATENCY 0: two would-refuses, the second a new mismatch.
 //!   path="optsr"        - OPTSR_CUR read, then its alias 0x11C: MARK_READ, MARK_READ2.
 //!   path="optwrite"     - FLASH_OPTKEYR written: TVI-FLASH-REG, unmodeled (option-byte programming; ruled Q3).
 //!   path="bank1"        - bank 1 unlocked, then PG1: TVI-FLASH-FIELD, unmodeled (bank 1 programming).
@@ -73,12 +81,17 @@ unsafe fn vos1() {
     w(PWR_D3CR, 0xC000);
 }
 
-unsafe fn pll400(hpre: u32) {
+unsafe fn pll400(d1cfgr: u32) {
+    pll(50, d1cfgr);
+}
+
+// PLL1 from HSI / 4 (16 MHz) * DIVN1 / 2: sys_ck = 8 MHz * divn; then D1CFGR (D1CPRE, HPRE).
+unsafe fn pll(divn: u32, d1cfgr: u32) {
     w(RCC + 0x28, (r(RCC + 0x28) & !0x3F3) | (4 << 4));   // PLLCKSELR: PLLSRC = HSI, DIVM1 = 4 (p398-399)
-    w(RCC + 0x30, 0x0101_0000 | (1 << 9) | 49);           // PLL1DIVR: DIVP1 = 2, DIVN1 = 50 (p403)
+    w(RCC + 0x30, 0x0101_0000 | (1 << 9) | (divn - 1));   // PLL1DIVR: DIVP1 = 2, DIVN1 (p403)
     w(RCC, r(RCC) | 1 << 24);                             // PLL1ON (p385)
     while r(RCC) >> 25 & 1 == 0 {}
-    w(RCC + 0x18, hpre);                                  // D1CFGR: HPRE (p395)
+    w(RCC + 0x18, d1cfgr);                                // D1CFGR: D1CPRE, HPRE (p394-395)
 }
 
 unsafe fn switch(sw: u32) {
@@ -249,6 +262,7 @@ pub unsafe extern "C" fn reset() -> ! {
     #[cfg(path = "keymid")]
     {
         w(KEYR2, KEY1);
+        w(ACR, 0x37);   // a register common to both banks (Table 20 p172): not "of the same bank", passes
         w(CR2, 0x30);
     }
     #[cfg(path = "keyhalf")]
@@ -269,6 +283,52 @@ pub unsafe extern "C" fn reset() -> ! {
         }
         #[cfg(path = "wrhpg")]
         w(CR2, 0x22);
+    }
+    #[cfg(path = "edge")]
+    {
+        vos1();
+        w(ACR, 0x01);
+        pll(35, 0x8);   // 280 MHz, HPRE /2: an AXI clock of 140 MHz, the top of 1 WS's band at VOS1
+        switch(3);
+        write_volatile(MARK_READ, r(ACR));
+    }
+    #[cfg(path = "vos2")]
+    {
+        w(PWR_D3CR, 0x8000);
+        w(ACR, 0x01);
+        pll(30, 0x8);   // 240 MHz, HPRE /2: 120 MHz
+        switch(3);
+    }
+    #[cfg(path = "d1cpre")]
+    {
+        vos1();
+        w(ACR, 0x01);
+        pll400(0x808);   // D1CPRE /2, HPRE /2: 100 MHz
+        switch(3);
+        w(RCC + 0x18, 0x8);
+    }
+    #[cfg(path = "wrhrcc")]
+    {
+        vos1();
+        w(ACR, 0x12);
+        unlock(KEYR2);
+        w(CR2, 0x22);
+        pll400(0x8);
+        switch(3);
+    }
+    #[cfg(path = "locking")]
+    {
+        unlock(KEYR2);
+        w(CR2, 0x33);
+    }
+    #[cfg(path = "worse")]
+    {
+        vos1();
+        w(ACR, 0x11);
+        pll400(0x8);
+        switch(3);
+        w(ACR, 0x10);
+        write_volatile(MARK_READ, r(ACR));
     }
     #[cfg(path = "optsr")]
     {

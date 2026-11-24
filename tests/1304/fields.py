@@ -8,7 +8,7 @@ import re, sys
 G, I, RES, RO, T, U = ('modeled by the guard', 'inherited, unaudited (acknowledged by name)', 'reserved', 'read-only', 'tag',
                        'undefined in the stock model')
 RULED = 'ruled 2026-11-24T15:50Z'
-BANK1 = '0 only: bank 1 programming and erase are not modeled (TVI-WO-1304 (2), outside the allow-list)'
+BANK1 = '0 only: bank 1 programming and erase are not modeled (TVI-WO-1304 (2), outside the allow-list); a store into bank 1, which silicon rejects with PGSERR1 while PG1 = 0 (p164), is not seen by the guard (a row)'
 
 
 def cls(reg, f, page):
@@ -18,12 +18,14 @@ def cls(reg, f, page):
     if f == 'Reserved':
         if reg.startswith('FLASH_CCR'):
             return ('Any', I, 'ArduPilot writes 1 here (CCRx = 0xFFFFFFFF, TVI-WO-1304.measure.md §2.1); RM0433 says "must be kept at reset value"; ignored')
-        if reg.startswith('FLASH_SR') or reg == 'FLASH_OPTSR_CUR':
+        if reg == 'FLASH_OPTSR_CUR':
+            return ('Any', RO, 'reserved: served as the declared optionBytes image has it (the board\'s 0x1BC6AAF0 and the consumer\'s 0x0406AAFC set reserved bits), never invented; a write is ignored (read-only, p212-214)')
+        if reg.startswith('FLASH_SR'):
             return ('Any', RO, 'reserved in a read-only register: a write is ignored and changes nothing (no record, RUL-18 as amended); reads 0')
         return ('Zero', RES, 'reserved: dropped, reads 0')
     if reg == 'FLASH_ACR':
         if f == 'LATENCY':
-            return ('Latencies', G, 'kept and served, also at its bank 2 alias 0x100 (p201); TVI-FLASH-WAIT: wait states below Table 17\'s for the AXI clock at the voltage scale in force are a predicted-fault, at the write (ACR or RCC) that makes them so (p159-161); where the voltage scale cannot be read (a pwr whose D3CR reads VOS 00, as the stock stub does), decided at VOS1, the most permissive scale that can be known, so a mismatch only at VOS2/VOS3 passes, acknowledged (' + RULED + ' Q1); an AXI clock above 225 MHz is unmodeled (VOS0\'s ODEN cannot be read); 8-15 not modeled (p201 lists 0-7)')
+            return ('Latencies', G, 'kept and served, also at its bank 2 alias 0x100 (p201); TVI-FLASH-WAIT: wait states below Table 17\'s for the AXI clock at the voltage scale in force are a predicted-fault, at the write (ACR or RCC) that makes them so (p159-161); where PWR_D3CR reads VOS 00, decided at VOS1, the most permissive scale that can be known, so a mismatch only at VOS2/VOS3 passes, acknowledged (' + RULED + ' Q1): that is the stock stub, which drops every write, and also a firmware that writes VOS 00 itself on a pwr that stores it ("Reserved (Scale 3 selected)", p310), which the guard cannot tell from the stub without a name; a VOS write is not seen, so a mismatch it makes is judged at the next ACR or RCC clock write, or never; an AXI clock above 225 MHz is unmodeled (VOS0\'s ODEN cannot be read); 8-15 not modeled (p201 lists 0-7)')
         return ('Any', G, 'kept and served, also at 0x100 (p201); TVI-FLASH-PROG: at a program or erase start, a value below Table 17\'s for the AXI clock at the voltage scale is a predicted-fault ("too tight", p164; p160); 11 read as at least as lax as 10 is inferred, no RM page: it is the reset value (p201), and every ArduPilot H7 programs flash at it, field evidence, not a page (' + RULED + ' Q2)')
     if reg.startswith('FLASH_KEYR'):
         return ('Any', G, 'the unlock keys (p182): KEY1 then KEY2 unlock FLASH_CR' + bank + '; a wrong key, a key while unlocked, a third key, another bank ' + bank + ' register written between the two, or a key of less than 32 bits is TVI-FLASH-KEY, a predicted-fault (locked until reset with a bus error, p182, p163); write-only: a read is TVI-FLASH-READ')

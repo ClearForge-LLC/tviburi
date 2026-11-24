@@ -10,7 +10,7 @@ set -euo pipefail
 
 here=$(cd "$(dirname "$0")/../.." && pwd)
 IMAGE=$(sed -n 's/^IMAGE=//p' "$here/tests/spike.sh")
-CASES="order clockfirst lowerfast prescaler alias vosunknown vosunknownlow vos3 over225 lockedcr lockedsame badkey keytwice keymid keyhalf wrhlow wrhpg ap gen optsr optsrnone optwrite bank1 readreg fields ledger registrations recorded reset config regen"
+CASES="order clockfirst lowerfast prescaler alias vosunknown vosunknownlow vos3 over225 edge vos2 d1cpre wrhrcc lockedcr lockedsame locking badkey keytwice keymid keyhalf wrhlow wrhpg worse ap gen optsr optsrnone optwrite bank1 readreg fields ledger registrations recorded reset config regen"
 GUARDS="spi1 rcc gpioPortA gpioPortB gpioPortC gpioPortD gpioPortE gpioPortF gpioPortG gpioPortH gpioPortI gpioPortJ gpioPortK timer1 timer8 flashController"
 # The planted firmware's paths (firmware/flash.rs): every case but optsrnone (optsr's firmware) and the monitor-driven ones.
 PATHS=$(for c in $CASES; do case $c in optsrnone|fields|ledger|registrations|recorded|reset|config|regen) ;; *) printf '"%s",' "$c" ;; esac; done | sed 's/,$//')
@@ -86,7 +86,7 @@ hse16='s/^    hseFrequency: 8000000$/    hseFrequency: 16000000/'
 
 for t in ${TVIBURI_TESTS:-$CASES}; do
   case $t in
-  order|clockfirst|lowerfast|prescaler|alias|vos3|wrhlow|wrhpg)
+  order|clockfirst|lowerfast|prescaler|alias|vos3|wrhlow|wrhpg|edge|vos2|d1cpre|wrhrcc)
     PWR=1 run_case "$t" "$t" 'emulation RunFor "0.001"' "${marks[@]}"
     case $t in
     order) check "order: VOS1, LATENCY raised before the clock to 200 MHz, the clock lowered before LATENCY (p160-161): passes; ACR reads 0" \
@@ -105,8 +105,16 @@ for t in ${TVIBURI_TESTS:-$CASES}; do
       "refuses wrhlow TVI-FLASH-PROG predicted-fault 'r[\"access\"][\"offset\"] == \"0x10C\" and r[\"access\"][\"value\"] == \"0x7A4\" and r[\"bit\"] == \"WRHIGHFREQ = 01\" and \"p164\" in r[\"citation\"]'" ;;
     wrhpg) check "wrhpg: PG2 set at 200 MHz with WRHIGHFREQ 01 refuses TVI-FLASH-PROG at the PG2 write" \
       "refuses wrhpg TVI-FLASH-PROG predicted-fault 'r[\"access\"][\"value\"] == \"0x22\"'" ;;
+    edge) check "edge: LATENCY 1 at an AXI clock of exactly 140 MHz at VOS1, the top of the band (Table 17 p160: ]70 MHz;140 MHz]), passes" \
+      "passes edge && [ \"\$(readout edge READ)\" = 0x00000001 ]" ;;
+    vos2) check "vos2: LATENCY 1 at 120 MHz at VOS2 refuses TVI-FLASH-WAIT: Table 17 needs 2 there (VOS1 would need 1)" \
+      "refuses vos2 TVI-FLASH-WAIT predicted-fault '\"120000000 Hz at VOS2: Table 17 needs 2\" in r[\"condition\"]'" ;;
+    d1cpre) check "d1cpre: the clock raised from 100 to 200 MHz by D1CPRE alone refuses TVI-FLASH-WAIT at the RCC_D1CFGR write (p394)" \
+      "refuses d1cpre TVI-FLASH-WAIT predicted-fault 'r[\"access\"][\"offset\"] == \"0x58024418\" and \"D1CPRE /1\" in r[\"condition\"]'" ;;
+    wrhrcc) check "wrhrcc: with PG2 set and WRHIGHFREQ 01, the clock raised to 200 MHz refuses TVI-FLASH-PROG at the RCC_CFGR write" \
+      "refuses wrhrcc TVI-FLASH-PROG predicted-fault 'r[\"access\"][\"offset\"] == \"0x58024410\" and \"while PG is set\" in r[\"condition\"]'" ;;
     esac ;;
-  vosunknown|vosunknownlow|over225|lockedcr|lockedsame|badkey|keytwice|keymid|keyhalf|optsr|optwrite|bank1|readreg)
+  vosunknown|vosunknownlow|over225|lockedcr|lockedsame|locking|badkey|keytwice|keymid|keyhalf|optsr|optwrite|bank1|readreg)
     run_case "$t" "$t" 'emulation RunFor "0.001"' "${marks[@]}"
     case $t in
     vosunknown) check "vosunknown: with the stock pwr (VOS reads 00), LATENCY 2 at 200 MHz is decided at VOS1 and passes (ruled Q1); ACR reads 0x22" \
@@ -119,12 +127,14 @@ for t in ${TVIBURI_TESTS:-$CASES}; do
       "refuses lockedcr TVI-FLASH-LOCK predicted-fault 'r[\"register\"] == \"FLASH_CR2\" and r[\"bit\"] == \"FLASH_CR2 bits 0x00000002 while LOCK2 = 1\" and \"p226-229\" in r[\"citation\"]'" ;;
     lockedsame) check "lockedsame: FLASH_CR2 written with the value it holds while locked passes (RUL-18 amended); it reads 0x31" \
       "passes lockedsame && [ \"\$(readout lockedsame READ)\" = 0x00000031 ]" ;;
+    locking) check "locking: FLASH_CR2 written setting LOCK2 with PG2 refuses TVI-FLASH-LOCK: the other bits do not change (p229)" \
+      "refuses locking TVI-FLASH-LOCK predicted-fault 'r[\"bit\"] == \"FLASH_CR2 bits 0x00000002 with LOCK2 set\"'" ;;
     badkey) check "badkey: a first key other than KEY1 refuses TVI-FLASH-KEY, predicted-fault (p182)" \
       "refuses badkey TVI-FLASH-KEY predicted-fault 'r[\"bit\"] == \"a first key other than KEY1 (0x45670123)\" and \"p182\" in r[\"citation\"]'" ;;
     keytwice) check "keytwice: a key written while FLASH_CR2 is unlocked refuses TVI-FLASH-KEY (p163)" \
       "refuses keytwice TVI-FLASH-KEY predicted-fault 'r[\"bit\"].startswith(\"a key written while FLASH_CR2 is unlocked\")'" ;;
     keymid) check "keymid: a CR2 write between KEY1 and KEY2 refuses TVI-FLASH-KEY (p182)" \
-      "refuses keymid TVI-FLASH-KEY predicted-fault '\"between KEY1 and KEY2\" in r[\"bit\"] and r[\"access\"][\"offset\"] == \"0x10C\"'" ;;
+      "refuses keymid TVI-FLASH-KEY predicted-fault '\"between KEY1 and KEY2\" in r[\"bit\"] and r[\"access\"][\"offset\"] == \"0x10C\" and r[\"register\"] == \"FLASH_CR2\"'" ;;
     keyhalf) check "keyhalf: KEY1 written by a 16-bit store refuses TVI-FLASH-KEY (p182: less than 32 bits)" \
       "refuses keyhalf TVI-FLASH-KEY predicted-fault 'r[\"bit\"] == \"a key written in less than 32 bits (16)\" and r[\"access\"][\"width\"] == 16'" ;;
     optsr) check "optsr: OPTSR_CUR and its alias 0x11C read the board's declared image, 0x1BC6AAF0, not the stock model's 0x0406AAF0 (ruled Q3)" \
@@ -136,6 +146,10 @@ for t in ${TVIBURI_TESTS:-$CASES}; do
     readreg) check "readreg: a FLASH_PRAR_CUR1 read refuses TVI-FLASH-READ, unmodeled" \
       "refuses readreg TVI-FLASH-READ unmodeled 'r[\"bit\"] == \"read of FLASH_PRAR_CUR1\"'" ;;
     esac ;;
+  worse)
+    PWR=1 PLATFORM_SED='/^tviburiFlash:$/{n;s/enforcing/recorded/}' run_case worse worse 'emulation RunFor "0.001"' "${marks[@]}"
+    check "worse: (recorded) LATENCY 1 at 200 MHz, then LATENCY 0: each is a would-refuse, TVI-FLASH-WAIT, the second a new mismatch (RUL-19); ACR reads 0x10" \
+      "[ \$rc = 1 ] && [ \$(grep -c '\"tviburi\":\"would-refuse\".*TVI-FLASH-WAIT' '$work/worse/renode-log.txt') = 2 ] && [ \"\$(readout worse READ)\" = 0x00000010 ]" ;;
   optsrnone)
     PLATFORM_SED='/^    optionBytes: /d' run_case optsrnone optsr 'emulation RunFor "0.001"'
     check "optsrnone: with no optionBytes declared, the OPTSR_CUR read refuses TVI-FLASH-OPTSR, unmodeled: the twin does not invent the option bytes (ruled Q3)" \
@@ -181,6 +195,8 @@ for r in recs:
     kind, name = cases[k]
     if k[0] in keys:
         if r['rule'] != 'TVI-FLASH-KEY': bad.append(('key', r['rule']))
+    elif k[0] in (0xC, 0x10C) and k[1] & 1 and r['rule'] == 'TVI-FLASH-LOCK':
+        pass   # setting LOCK with other bits changed (p206, p229): the CR cases start from the unlocked 0x30
     elif k[0] in (0x100, 0x11C):
         bad.append(('alias refused', r['rule'], r['bit']))
     elif name == 'none':
@@ -219,9 +235,10 @@ sys.exit(0 if ok else 1)
     check "registrations: peripherals lists flashController as the guard, and the access log names its registers as the stock model's (AccessControl, OptionStatusCurrent; TVI-WO-1304.measure.md §2.4)" \
       "passed registrations && grep -q 'flashController (GuardedSTM32H7_Flash)' '$work/registrations/renode.out' && grep -q 'flashController: .*ReadUInt32 from 0x0 (AccessControl), returned 0x37' '$work/registrations/renode-log.txt' && grep -q 'flashController: .*ReadUInt32 from 0x1C (OptionStatusCurrent), returned 0x1BC6AAF0' '$work/registrations/renode-log.txt'" ;;
   recorded)
-    PLATFORM_SED='/^tviburiFlash:$/{n;s/enforcing/recorded/}' run_case recorded - 'sysbus WriteDoubleWord 0x52002104 0x12345678' 'sysbus WriteDoubleWord 0x52002008 0x08192A3B' 'echo "R-CR2"' 'sysbus ReadDoubleWord 0x5200210C'
-    check "recorded: flashController recorded: a wrong key and an OPTKEYR write each record a would-refuse and pass on (RUL-19); CR2 stays locked (the stock model's lock); never a pass at the check" \
-      "[ \$rc = 1 ] && [ \$(grep -c '\"tviburi\":\"would-refuse\".*TVI-FLASH-' '$work/recorded/renode-log.txt') = 2 ] && [ \"\$(readout recorded CR2)\" = 0x00000031 ]" ;;
+    PLATFORM_SED='/^tviburiFlash:$/{n;s/enforcing/recorded/}' run_case recorded - 'sysbus WriteDoubleWord 0x52002104 0x12345678' \
+      'sysbus WriteDoubleWord 0x52002104 0x45670123' 'sysbus WriteDoubleWord 0x52002104 0xCDEF89AB' 'sysbus WriteDoubleWord 0x52002008 0x08192A3B' 'echo "R-CR2"' 'sysbus ReadDoubleWord 0x5200210C'
+    check "recorded: flashController recorded: a wrong key, then both right keys (locked until reset, p182), and an OPTKEYR write each record a would-refuse and pass on (RUL-19); CR2 stays locked; never a pass at the check" \
+      "[ \$rc = 1 ] && [ \$(grep -c '\"tviburi\":\"would-refuse\".*TVI-FLASH-' '$work/recorded/renode-log.txt') = 4 ] && [ \"\$(readout recorded CR2)\" = 0x00000031 ]" ;;
   reset)
     run_case reset - 'sysbus WriteDoubleWord 0x52002104 0x45670123' 'sysbus WriteDoubleWord 0x52002104 0xCDEF89AB' 'sysbus WriteDoubleWord 0x5200210C 0x20' \
       'echo "R-BEFORE"' 'sysbus ReadDoubleWord 0x5200210C' 'machine Reset' 'echo "R-AFTER"' 'sysbus ReadDoubleWord 0x5200210C' \

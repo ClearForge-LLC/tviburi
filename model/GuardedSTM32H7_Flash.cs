@@ -37,9 +37,10 @@
 //   TVI-FLASH-KEY     a wrong key sequence: a wrong key, a key while FLASH_CRx is unlocked, a key after a wrong sequence,
 //                     another register of the bank written between KEY1 and KEY2, or a key of less than 32 bits. Silicon
 //                     locks FLASH_CRx until reset and raises a bus error (p182; p163). predicted-fault.
-//   TVI-FLASH-LOCK    a FLASH_CRx write that changes a field while LOCKx = 1: silicon ignores it (p182: "not allowed after
-//                     reset"; every field "can be programmed only when LOCKx is cleared", pp. 202-206, 226-229).
-//                     predicted-fault. The same value passes (RUL-18, amended).
+//   TVI-FLASH-LOCK    a FLASH_CRx write that changes a field while LOCKx = 1 (p182: "not allowed after reset"; every field
+//                     "can be programmed only when LOCKx is cleared", pp. 202-206, 226-229: read as ignored, bench row
+//                     F5), or one that sets LOCKx and changes another bit ("When LOCKx changes from 0 to 1, the other
+//                     bits ... do not change", p206, p229). predicted-fault. The same value passes (RUL-18, amended).
 //   TVI-FLASH-FIELD   the allow-list (`Fields`): a field given a value the model does not implement. unmodeled.
 //   TVI-FLASH-WAIT    the AXI clock above what LATENCY covers at the voltage scale (Table 17 p160), at the ACR or RCC
 //                     write that makes it so. predicted-fault; unmodeled when the clock cannot be computed or is above
@@ -48,7 +49,9 @@
 //                     with SER or BER), or at an ACR or RCC write while PG is set ("too tight", p164). predicted-fault;
 //                     unmodeled as TVI-FLASH-WAIT.
 // Enforcing: the first rule that fires refuses the access. Recorded mode (RUL-19): every rule is evaluated and records
-// what it finds, and the access goes on as if none had fired (model/Refusal.cs).
+// what it finds, and the access goes on as if none had fired (model/Refusal.cs). Recorded records after the first rank
+// paths, they do not prove them: the guard's own state (the key sequence, a mismatch already recorded) follows the
+// firmware's writes, the stock model's follows the stock model's rules.
 
 using System;
 using System.Collections.Generic;
@@ -92,7 +95,7 @@ namespace Antmicro.Renode.Peripherals.Tviburi
             psize[0] = psize[1] = 3;
             key[0] = key[1] = 0;
             keyLost[0] = keyLost[1] = false;
-            waitBad = progBad = false;
+            waitWhy = progWhy = null;
         }
 
         public void Dispose()
@@ -202,7 +205,7 @@ namespace Antmicro.Renode.Peripherals.Tviburi
             {
                 records.Refuse("TVI-FLASH-CONFIG", Unmodeled, Name(Canon(offset & ~3L)), "none",
                     "the platform gives this flash guard what it cannot model: " + c + "; every access refuses",
-                    "RM0433 Rev 9 §2.3.2 Table 8 (the FLASH registers at 0x52002000); §4.9.8 p212", "none", offset, value, width);
+                    "RM0433 Rev 9 §2.3.2 Table 8 p133 (the FLASH registers at 0x52002000); §4.9.8 p212", "none", offset, value, width);
                 return true;
             }
             return false;
@@ -265,7 +268,7 @@ namespace Antmicro.Renode.Peripherals.Tviburi
                 }
                 else if(keyLost[k])
                 {
-                    why = "a key after a wrong sequence: FLASH_CR" + (k + 1) + " stays locked until reset";
+                    why = "a key after a wrong sequence: FLASH_CR" + (k + 1) + " stays locked until reset (p182; whether this key also raises a bus error, RM0433 does not say)";
                 }
                 else if(!LockedCr(k))
                 {
@@ -285,7 +288,7 @@ namespace Antmicro.Renode.Peripherals.Tviburi
                     return false;
                 }
             }
-            else if(key[k] == 1 && b != Acr && b != OptsrCur)
+            else if(key[k] == 1 && !Common.Contains(b))
             {
                 why = "a write to " + Name(b) + ", another bank " + (k + 1) + " register, between KEY1 and KEY2";
             }
@@ -295,7 +298,7 @@ namespace Antmicro.Renode.Peripherals.Tviburi
             }
             key[k] = 0;
             keyLost[k] = true;
-            records.Refuse("TVI-FLASH-KEY", PredictedFault, "FLASH_KEYR" + (k + 1), why,
+            records.Refuse("TVI-FLASH-KEY", PredictedFault, Name(b), why,
                 "a wrong FLASH_CR" + (k + 1) + " unlock sequence: " + why + "; silicon locks FLASH_CR" + (k + 1) + " until the next system reset and raises a bus error",
                 "RM0433 Rev 9 §4.5.1 p182; §4.3.9 p163; §4.9." + (k == 0 ? "2 p201" : "24 p225"), State(), offset, word, width);
             return true;
@@ -303,19 +306,24 @@ namespace Antmicro.Renode.Peripherals.Tviburi
 
         private bool RefusedLock(long offset, long b, uint word, int width)
         {
-            if((b != Cr1 && b != Cr2) || !LockedCr(Bank(b)))
+            if(b != Cr1 && b != Cr2)
             {
                 return false;
             }
+            var locked = LockedCr(Bank(b));
+            var locking = !locked && (word & LockBit) != 0;
             var changed = (word ^ Served(b)) & ~LockBit;
-            if(changed == 0)
+            if((!locked && !locking) || changed == 0)
             {
                 return false;
             }
             var reg = Name(b);
-            records.Refuse("TVI-FLASH-LOCK", PredictedFault, reg, reg + " bits 0x" + changed.ToString("X8") + " while LOCK" + (Bank(b) + 1) + " = 1",
-                reg + " written with a change while it is locked: every field \"can be programmed only when LOCK" + (Bank(b) + 1)
-                    + " is cleared\", so silicon ignores the write, and the flash does not do what the firmware wrote",
+            var n = Bank(b) + 1;
+            records.Refuse("TVI-FLASH-LOCK", PredictedFault, reg, reg + " bits 0x" + changed.ToString("X8") + (locked ? " while LOCK" + n + " = 1" : " with LOCK" + n + " set"),
+                locked ? reg + " written with a change while it is locked: every field \"can be programmed only when LOCK" + n
+                    + " is cleared\", and FLASH_CR" + n + " writes \"are not allowed after reset\" until it is unlocked (p182), so the write is read as ignored (inferred from those pages; bench row F5), and the flash does not do what the firmware wrote"
+                    : reg + " written setting LOCK" + n + " with other bits changed: \"When LOCK" + n + " changes from 0 to 1, the other bits of FLASH_CR" + n
+                    + " register do not change\", so the flash does not do what the firmware wrote",
                 "RM0433 Rev 9 §4.5.1 p182; §4.9." + (b == Cr1 ? "4 p202-206" : "25 p226-229"), State(), offset, word, width);
             return true;
         }
@@ -361,16 +369,17 @@ namespace Antmicro.Renode.Peripherals.Tviburi
         // 26,000 enables and resets in 5 s (TVI-WO-1300 §4), are not judged.
         private void OnRccWritten(long offset, uint value)
         {
-            if(!ClockRegisters.Contains(offset))
+            if(!ClockRegisters.Contains(offset) || records.LoadFailed || Config() != null)
             {
-                return;
+                return;   // a guard that did not load, or cannot model the platform, refuses its own accesses instead
             }
             Judge(base.ReadDoubleWord(Acr), new Access(RccBase + offset, value, 32));
         }
 
         // The wait states (TVI-FLASH-WAIT) and, while a bank is programming, the programming delay (TVI-FLASH-PROG), for the
         // ACR word `acr` against the clock now, at `at`, the write being judged (an ACR write, an RCC write). A mismatch
-        // refuses once, at the write that makes it (waitBad, progBad): a later write that leaves it as it was refuses nothing.
+        // refuses at the write that makes it, and again only at a write that changes it (waitWhy, progWhy: its description,
+        // clock and latency included); a later write that leaves it as it was refuses nothing.
         private bool Judge(uint acr, Access at)
         {
             var fired = false;
@@ -382,7 +391,7 @@ namespace Antmicro.Renode.Peripherals.Tviburi
             {
                 kind = Unmodeled;
                 why = clock.Hz == null ? "the AXI clock cannot be computed (" + clock.Note + ")"
-                    : "the AXI clock is " + clock.Hz + " Hz, above 225 MHz: Table 17 covers it only at VOS0, whose SYSCFG_PWRCR.ODEN the twin cannot read";
+                    : "the AXI clock is " + clock.Hz + " Hz, above 225 MHz: Table 17 covers it only at VOS0 (VOS1 with SYSCFG_PWRCR.ODEN), which the twin cannot read; " + clock.Scale;
             }
             else
             {
@@ -392,14 +401,14 @@ namespace Antmicro.Renode.Peripherals.Tviburi
                     why = "LATENCY " + latency + " wait states with the AXI clock at " + clock.Hz + " Hz at " + clock.Scale + ": Table 17 needs " + need + " (" + clock.Note + ")";
                 }
             }
-            if(why != null && !waitBad)
+            if(why != null && why != waitWhy)
             {
                 fired = true;
                 records.Refuse("TVI-FLASH-WAIT", kind, "FLASH_ACR", "LATENCY = " + latency, why + (at.Offset >= RccBase ? ", at the RCC write to 0x" + at.Offset.ToString("X8") : ", at the FLASH_ACR write")
                     + ": too few wait states for the clock fetch the wrong instructions or data (from memory; RM0433 says LATENCY \"must be correctly programmed\")",
                     "RM0433 Rev 9 §4.3.8 Table 17 p160; p159-161 (the order: raise LATENCY before the clock, lower the clock before LATENCY)", State(), at.Offset, at.Value, at.Width);
             }
-            waitBad = why != null;
+            waitWhy = why;
             var programming = (base.ReadDoubleWord(Cr1) & PgBit) != 0 || (base.ReadDoubleWord(Cr2) & PgBit) != 0;
             if(programming)
             {
@@ -407,13 +416,13 @@ namespace Antmicro.Renode.Peripherals.Tviburi
             }
             else
             {
-                progBad = false;
+                progWhy = null;
             }
             return fired;
         }
 
         // TVI-FLASH-PROG: WRHIGHFREQ against Table 17 for the clock. `start`: a program or erase start, judged each time;
-        // otherwise once per mismatch (progBad).
+        // otherwise as Judge's (progWhy).
         private bool Program(uint acr, Access at, string when, bool start)
         {
             var clock = Clock();
@@ -434,10 +443,10 @@ namespace Antmicro.Renode.Peripherals.Tviburi
                         + ": Table 17's programming delay is " + Convert.ToString(need, 2).PadLeft(2, '0') + " (" + clock.Note + ")";
                 }
             }
-            var fire = why != null && (start || !progBad);
+            var fire = why != null && (start || why != progWhy);
             if(!start)
             {
-                progBad = why != null;
+                progWhy = why;
             }
             if(!fire)
             {
@@ -673,7 +682,7 @@ namespace Antmicro.Renode.Peripherals.Tviburi
         private readonly int[] key = { 0, 0 };
         private readonly bool[] keyLost = { false, false };
         private GuardedSTM32H7_RCC rcc;
-        private bool waitBad, progBad;
+        private string waitWhy, progWhy;
         private string config;
 
         private const ulong FlashBase = 0x52002000;
@@ -703,6 +712,9 @@ namespace Antmicro.Renode.Peripherals.Tviburi
         private static readonly long[] ClockRegisters = { 0x00, 0x10, 0x18, 0x28, 0x2C, 0x30, 0x34 };   // RCC CR, CFGR, D1CFGR, PLLCKSELR, PLLCFGR, PLL1DIVR, PLL1FRACR
         private static readonly long[] Aliases = { 0x100, 0x108, 0x118, 0x11C, 0x120, 0x124, 0x140, 0x144, 0x15C };
         private static readonly long[] Options = { 0x008, 0x018, 0x020, 0x024 };
+        // The registers common to both banks (Table 20 p172): a write to one between KEY1 and KEY2 is not "a different
+        // register belonging to the same bank" (p182).
+        private static readonly long[] Common = { 0x000, 0x008, 0x018, 0x01C, 0x020, 0x024, 0x040, 0x044, 0x05C };
         private static readonly Dictionary<long, string> Names = new Dictionary<long, string>
         {
             { 0x000, "FLASH_ACR" }, { 0x004, "FLASH_KEYR1" }, { 0x008, "FLASH_OPTKEYR" }, { 0x00C, "FLASH_CR1" }, { 0x010, "FLASH_SR1" },
@@ -776,7 +788,7 @@ namespace Antmicro.Renode.Peripherals.Tviburi
         {
             R("FLASH_ACR", 0x000, "§4.9.1", "Reserved", 31, 6, Zero, "reserved", "reserved: dropped, reads 0", 201),
             R("FLASH_ACR", 0x000, "§4.9.1", "WRHIGHFREQ", 5, 4, Any, "modeled by the guard", "kept and served, also at 0x100 (p201); TVI-FLASH-PROG: at a program or erase start, a value below Table 17's for the AXI clock at the voltage scale is a predicted-fault (\"too tight\", p164; p160); 11 read as at least as lax as 10 is inferred, no RM page: it is the reset value (p201), and every ArduPilot H7 programs flash at it, field evidence, not a page (ruled 2026-11-24T15:50Z Q2)", 201),
-            R("FLASH_ACR", 0x000, "§4.9.1", "LATENCY", 3, 0, Latencies, "modeled by the guard", "kept and served, also at its bank 2 alias 0x100 (p201); TVI-FLASH-WAIT: wait states below Table 17's for the AXI clock at the voltage scale in force are a predicted-fault, at the write (ACR or RCC) that makes them so (p159-161); where the voltage scale cannot be read (a pwr whose D3CR reads VOS 00, as the stock stub does), decided at VOS1, the most permissive scale that can be known, so a mismatch only at VOS2/VOS3 passes, acknowledged (ruled 2026-11-24T15:50Z Q1); an AXI clock above 225 MHz is unmodeled (VOS0's ODEN cannot be read); 8-15 not modeled (p201 lists 0-7)", 201),
+            R("FLASH_ACR", 0x000, "§4.9.1", "LATENCY", 3, 0, Latencies, "modeled by the guard", "kept and served, also at its bank 2 alias 0x100 (p201); TVI-FLASH-WAIT: wait states below Table 17's for the AXI clock at the voltage scale in force are a predicted-fault, at the write (ACR or RCC) that makes them so (p159-161); where PWR_D3CR reads VOS 00, decided at VOS1, the most permissive scale that can be known, so a mismatch only at VOS2/VOS3 passes, acknowledged (ruled 2026-11-24T15:50Z Q1): that is the stock stub, which drops every write, and also a firmware that writes VOS 00 itself on a pwr that stores it (\"Reserved (Scale 3 selected)\", p310), which the guard cannot tell from the stub without a name; a VOS write is not seen, so a mismatch it makes is judged at the next ACR or RCC clock write, or never; an AXI clock above 225 MHz is unmodeled (VOS0's ODEN cannot be read); 8-15 not modeled (p201 lists 0-7)", 201),
             R("FLASH_KEYR1", 0x004, "§4.9.2", "KEY1R", 31, 0, Any, "modeled by the guard", "the unlock keys (p182): KEY1 then KEY2 unlock FLASH_CR1; a wrong key, a key while unlocked, a third key, another bank 1 register written between the two, or a key of less than 32 bits is TVI-FLASH-KEY, a predicted-fault (locked until reset with a bus error, p182, p163); write-only: a read is TVI-FLASH-READ", 202),
             R("FLASH_CR1", 0x00C, "§4.9.4", "Res31_29", 31, 29, Zero, "reserved", "reserved: dropped, reads 0", 203),
             R("FLASH_CR1", 0x00C, "§4.9.4", "CRCRDERRIE1", 28, 28, Zero, "inherited, unaudited (acknowledged by name)", "0 only: the flash interrupts are not audited", 203),
@@ -796,12 +808,12 @@ namespace Antmicro.Renode.Peripherals.Tviburi
             R("FLASH_CR1", 0x00C, "§4.9.4", "Res14_14", 14, 14, Zero, "reserved", "reserved: dropped, reads 0", 204),
             R("FLASH_CR1", 0x00C, "§4.9.4", "Res13_11", 13, 11, Zero, "reserved", "reserved: dropped, reads 0", 204),
             R("FLASH_CR1", 0x00C, "§4.9.4", "SNB1", 10, 8, Any, "inherited, unaudited (acknowledged by name)", "the stock model: stored; used only by a bank 1 sector erase, which is not modeled (SER1 0 only)", 204),
-            R("FLASH_CR1", 0x00C, "§4.9.4", "START1", 7, 7, Zero, "inherited, unaudited (acknowledged by name)", "0 only: bank 1 programming and erase are not modeled (TVI-WO-1304 (2), outside the allow-list)", 204),
-            R("FLASH_CR1", 0x00C, "§4.9.4", "FW1", 6, 6, Zero, "inherited, unaudited (acknowledged by name)", "0 only: bank 1 programming and erase are not modeled (TVI-WO-1304 (2), outside the allow-list)", 205),
+            R("FLASH_CR1", 0x00C, "§4.9.4", "START1", 7, 7, Zero, "inherited, unaudited (acknowledged by name)", "0 only: bank 1 programming and erase are not modeled (TVI-WO-1304 (2), outside the allow-list); a store into bank 1, which silicon rejects with PGSERR1 while PG1 = 0 (p164), is not seen by the guard (a row)", 204),
+            R("FLASH_CR1", 0x00C, "§4.9.4", "FW1", 6, 6, Zero, "inherited, unaudited (acknowledged by name)", "0 only: bank 1 programming and erase are not modeled (TVI-WO-1304 (2), outside the allow-list); a store into bank 1, which silicon rejects with PGSERR1 while PG1 = 0 (p164), is not seen by the guard (a row)", 205),
             R("FLASH_CR1", 0x00C, "§4.9.4", "PSIZE1", 5, 4, Any, "modeled by the guard", "kept and served as written (p205; the stock model's tag reads 11, TVI-WO-1304.measure.md F7); no value is an error: \"There is no hardware limitation on programming parallelism\" (Table 18 p164; ruled 2026-11-24T15:50Z Q4, Q5)", 205),
-            R("FLASH_CR1", 0x00C, "§4.9.4", "BER1", 3, 3, Zero, "inherited, unaudited (acknowledged by name)", "0 only: bank 1 programming and erase are not modeled (TVI-WO-1304 (2), outside the allow-list)", 205),
-            R("FLASH_CR1", 0x00C, "§4.9.4", "SER1", 2, 2, Zero, "inherited, unaudited (acknowledged by name)", "0 only: bank 1 programming and erase are not modeled (TVI-WO-1304 (2), outside the allow-list)", 206),
-            R("FLASH_CR1", 0x00C, "§4.9.4", "PG1", 1, 1, Zero, "inherited, unaudited (acknowledged by name)", "0 only: bank 1 programming and erase are not modeled (TVI-WO-1304 (2), outside the allow-list)", 206),
+            R("FLASH_CR1", 0x00C, "§4.9.4", "BER1", 3, 3, Zero, "inherited, unaudited (acknowledged by name)", "0 only: bank 1 programming and erase are not modeled (TVI-WO-1304 (2), outside the allow-list); a store into bank 1, which silicon rejects with PGSERR1 while PG1 = 0 (p164), is not seen by the guard (a row)", 205),
+            R("FLASH_CR1", 0x00C, "§4.9.4", "SER1", 2, 2, Zero, "inherited, unaudited (acknowledged by name)", "0 only: bank 1 programming and erase are not modeled (TVI-WO-1304 (2), outside the allow-list); a store into bank 1, which silicon rejects with PGSERR1 while PG1 = 0 (p164), is not seen by the guard (a row)", 206),
+            R("FLASH_CR1", 0x00C, "§4.9.4", "PG1", 1, 1, Zero, "inherited, unaudited (acknowledged by name)", "0 only: bank 1 programming and erase are not modeled (TVI-WO-1304 (2), outside the allow-list); a store into bank 1, which silicon rejects with PGSERR1 while PG1 = 0 (p164), is not seen by the guard (a row)", 206),
             R("FLASH_CR1", 0x00C, "§4.9.4", "LOCK1", 0, 0, Any, "modeled by the guard", "the stock model's lock (p206); a CR1 write that changes another field while locked is TVI-FLASH-LOCK, a predicted-fault (\"can be programmed only when LOCK1 is cleared\", p182: not allowed after reset); silicon ignores it", 206),
             R("FLASH_SR1", 0x010, "§4.9.5", "Res31_28", 31, 28, Any, "read-only", "reserved in a read-only register: a write is ignored and changes nothing (no record, RUL-18 as amended); reads 0", 207),
             R("FLASH_SR1", 0x010, "§4.9.5", "CRCEND1", 27, 27, Any, "read-only", "read-only (p207): a write is ignored and changes nothing (no record, RUL-18 as amended; the stock model's EOP is writable, TVI-WO-1304.measure.md F5); reads the stock model's: set only by the stock model's own checks", 207),
@@ -838,21 +850,21 @@ namespace Antmicro.Renode.Peripherals.Tviburi
             R("FLASH_OPTSR_CUR", 0x01C, "§4.9.8", "SWAP_BANK_OPT", 31, 31, Any, "read-only", "served from the declared optionBytes image, also at 0x11C, never the stock model's reset value (ruled 2026-11-24T15:50Z Q3); an undeclared read is TVI-FLASH-OPTSR; read-only: a write is ignored (p212-214)", 213),
             R("FLASH_OPTSR_CUR", 0x01C, "§4.9.8", "OPTCHANGEERR", 30, 30, Any, "read-only", "served from the declared optionBytes image, also at 0x11C, never the stock model's reset value (ruled 2026-11-24T15:50Z Q3); an undeclared read is TVI-FLASH-OPTSR; read-only: a write is ignored (p212-214)", 213),
             R("FLASH_OPTSR_CUR", 0x01C, "§4.9.8", "IO_HSLV", 29, 29, Any, "read-only", "served from the declared optionBytes image, also at 0x11C, never the stock model's reset value (ruled 2026-11-24T15:50Z Q3); an undeclared read is TVI-FLASH-OPTSR; read-only: a write is ignored (p212-214)", 213),
-            R("FLASH_OPTSR_CUR", 0x01C, "§4.9.8", "Res28_26", 28, 26, Any, "read-only", "reserved in a read-only register: a write is ignored and changes nothing (no record, RUL-18 as amended); reads 0", 213),
-            R("FLASH_OPTSR_CUR", 0x01C, "§4.9.8", "Res25_24", 25, 24, Any, "read-only", "reserved in a read-only register: a write is ignored and changes nothing (no record, RUL-18 as amended); reads 0", 213),
-            R("FLASH_OPTSR_CUR", 0x01C, "§4.9.8", "Res23_22", 23, 22, Any, "read-only", "reserved in a read-only register: a write is ignored and changes nothing (no record, RUL-18 as amended); reads 0", 213),
+            R("FLASH_OPTSR_CUR", 0x01C, "§4.9.8", "Res28_26", 28, 26, Any, "read-only", "reserved: served as the declared optionBytes image has it (the board's 0x1BC6AAF0 and the consumer's 0x0406AAFC set reserved bits), never invented; a write is ignored (read-only, p212-214)", 213),
+            R("FLASH_OPTSR_CUR", 0x01C, "§4.9.8", "Res25_24", 25, 24, Any, "read-only", "reserved: served as the declared optionBytes image has it (the board's 0x1BC6AAF0 and the consumer's 0x0406AAFC set reserved bits), never invented; a write is ignored (read-only, p212-214)", 213),
+            R("FLASH_OPTSR_CUR", 0x01C, "§4.9.8", "Res23_22", 23, 22, Any, "read-only", "reserved: served as the declared optionBytes image has it (the board's 0x1BC6AAF0 and the consumer's 0x0406AAFC set reserved bits), never invented; a write is ignored (read-only, p212-214)", 213),
             R("FLASH_OPTSR_CUR", 0x01C, "§4.9.8", "SECURITY", 21, 21, Any, "read-only", "served from the declared optionBytes image, also at 0x11C, never the stock model's reset value (ruled 2026-11-24T15:50Z Q3); an undeclared read is TVI-FLASH-OPTSR; read-only: a write is ignored (p212-214)", 213),
             R("FLASH_OPTSR_CUR", 0x01C, "§4.9.8", "ST_RAM_SIZE", 20, 19, Any, "read-only", "served from the declared optionBytes image, also at 0x11C, never the stock model's reset value (ruled 2026-11-24T15:50Z Q3); an undeclared read is TVI-FLASH-OPTSR; read-only: a write is ignored (p212-214)", 213),
             R("FLASH_OPTSR_CUR", 0x01C, "§4.9.8", "IWDG_FZ_SDBY", 18, 18, Any, "read-only", "served from the declared optionBytes image, also at 0x11C, never the stock model's reset value (ruled 2026-11-24T15:50Z Q3); an undeclared read is TVI-FLASH-OPTSR; read-only: a write is ignored (p212-214)", 213),
             R("FLASH_OPTSR_CUR", 0x01C, "§4.9.8", "IWDG_FZ_STOP", 17, 17, Any, "read-only", "served from the declared optionBytes image, also at 0x11C, never the stock model's reset value (ruled 2026-11-24T15:50Z Q3); an undeclared read is TVI-FLASH-OPTSR; read-only: a write is ignored (p212-214)", 213),
-            R("FLASH_OPTSR_CUR", 0x01C, "§4.9.8", "Res16_16", 16, 16, Any, "read-only", "reserved in a read-only register: a write is ignored and changes nothing (no record, RUL-18 as amended); reads 0", 213),
+            R("FLASH_OPTSR_CUR", 0x01C, "§4.9.8", "Res16_16", 16, 16, Any, "read-only", "reserved: served as the declared optionBytes image has it (the board's 0x1BC6AAF0 and the consumer's 0x0406AAFC set reserved bits), never invented; a write is ignored (read-only, p212-214)", 213),
             R("FLASH_OPTSR_CUR", 0x01C, "§4.9.8", "RDP", 15, 8, Any, "read-only", "served from the declared optionBytes image, also at 0x11C, never the stock model's reset value (ruled 2026-11-24T15:50Z Q3); an undeclared read is TVI-FLASH-OPTSR; read-only: a write is ignored (p212-214)", 214),
             R("FLASH_OPTSR_CUR", 0x01C, "§4.9.8", "NRST_STDY_D1", 7, 7, Any, "read-only", "served from the declared optionBytes image, also at 0x11C, never the stock model's reset value (ruled 2026-11-24T15:50Z Q3); an undeclared read is TVI-FLASH-OPTSR; read-only: a write is ignored (p212-214)", 214),
             R("FLASH_OPTSR_CUR", 0x01C, "§4.9.8", "NRST_STOP_D1", 6, 6, Any, "read-only", "served from the declared optionBytes image, also at 0x11C, never the stock model's reset value (ruled 2026-11-24T15:50Z Q3); an undeclared read is TVI-FLASH-OPTSR; read-only: a write is ignored (p212-214)", 214),
-            R("FLASH_OPTSR_CUR", 0x01C, "§4.9.8", "Res5_5", 5, 5, Any, "read-only", "reserved in a read-only register: a write is ignored and changes nothing (no record, RUL-18 as amended); reads 0", 214),
+            R("FLASH_OPTSR_CUR", 0x01C, "§4.9.8", "Res5_5", 5, 5, Any, "read-only", "reserved: served as the declared optionBytes image has it (the board's 0x1BC6AAF0 and the consumer's 0x0406AAFC set reserved bits), never invented; a write is ignored (read-only, p212-214)", 214),
             R("FLASH_OPTSR_CUR", 0x01C, "§4.9.8", "IWDG1_SW", 4, 4, Any, "read-only", "served from the declared optionBytes image, also at 0x11C, never the stock model's reset value (ruled 2026-11-24T15:50Z Q3); an undeclared read is TVI-FLASH-OPTSR; read-only: a write is ignored (p212-214)", 214),
             R("FLASH_OPTSR_CUR", 0x01C, "§4.9.8", "BOR_LEV", 3, 2, Any, "read-only", "served from the declared optionBytes image, also at 0x11C, never the stock model's reset value (ruled 2026-11-24T15:50Z Q3); an undeclared read is TVI-FLASH-OPTSR; read-only: a write is ignored (p212-214)", 214),
-            R("FLASH_OPTSR_CUR", 0x01C, "§4.9.8", "Res1_1", 1, 1, Any, "read-only", "reserved in a read-only register: a write is ignored and changes nothing (no record, RUL-18 as amended); reads 0", 214),
+            R("FLASH_OPTSR_CUR", 0x01C, "§4.9.8", "Res1_1", 1, 1, Any, "read-only", "reserved: served as the declared optionBytes image has it (the board's 0x1BC6AAF0 and the consumer's 0x0406AAFC set reserved bits), never invented; a write is ignored (read-only, p212-214)", 214),
             R("FLASH_OPTSR_CUR", 0x01C, "§4.9.8", "OPT_BUSY", 0, 0, Any, "read-only", "served from the declared optionBytes image, also at 0x11C, never the stock model's reset value (ruled 2026-11-24T15:50Z Q3); an undeclared read is TVI-FLASH-OPTSR; read-only: a write is ignored (p212-214)", 214),
             R("FLASH_KEYR2", 0x104, "§4.9.24", "KEY2R", 31, 0, Any, "modeled by the guard", "the unlock keys (p182): KEY1 then KEY2 unlock FLASH_CR2; a wrong key, a key while unlocked, a third key, another bank 2 register written between the two, or a key of less than 32 bits is TVI-FLASH-KEY, a predicted-fault (locked until reset with a bus error, p182, p163); write-only: a read is TVI-FLASH-READ", 225),
             R("FLASH_CR2", 0x10C, "§4.9.25", "Res31_29", 31, 29, Zero, "reserved", "reserved: dropped, reads 0", 226),
