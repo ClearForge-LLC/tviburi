@@ -2,15 +2,17 @@
 # TVI-WO-1301: replay one captured `aethelgard simulate` Renode invocation inside the pinned tools image, --network
 # none, in the CLI's environment (HOME and TMPDIR = the tool directory, the two DOTNET variables), without the CLI's
 # sandbox and reaper, on the guard built from /repo (WO §2). From tests/1300/replay-1300.sh's `accept` mode. Used by
-# tests/1301/ci-memory.sh. (§1.1's other modes, which measured the prototype, are in this file's git history before
-# the 19:47Z ruling deleted them.)
+# tests/1301/ci-memory.sh, TVI-WO-1201's memory budget. (§1.1's other modes, which measured the prototype, are in this
+# file's git history before the 19:47Z ruling deleted them.)
 # Mounts: /cap = capture directory (ro), /repo = this repository (ro), /out (rw). Usage: replay-1301.sh N accept
 #   accept  the release built from /repo, its one file included before `mach create`; spi1/spi2 re-typed to the
 #           guarded SPI and recorded; the RCC restated and recorded (its properties moved onto `tviburiRcc`); the
 #           committed model/stm32h7-gpio-restate.repl appended, each port on LQFP144 in ACCEPT_MODE (default recorded;
 #           spi1, spi2 and the RCC stay recorded); the consumer's own references to a port moved onto the guard's
 #           variable (its untyped `gpioPortX:` blocks re-appended after the restatement; `@ gpioPortX` and
-#           `-> gpioPortX` repointed). Writes /out/N-accept.{argv.txt,platform-booted.repl,console.txt,cost.txt}.
+#           `-> gpioPortX` repointed); a tree without the GPIO restate file runs with its ports stock. Writes
+#           /out/N-accept.{argv.txt,platform-booted.repl,console.txt,cost.txt,peak-proc.txt}; peak-proc.txt is the
+#           Renode process's /proc status and smaps_rollup at its peak sample.
 set -u
 n=$1
 [ "${2:-}" = accept ] || { echo "replay-1301: usage: replay-1301.sh N accept" >&2; exit 2; }
@@ -31,13 +33,17 @@ for i in "${!args[@]}"; do
   props=$(awk '/^rcc:$/{f=1; next} f && /^ /{print; next} {f=0}' "$plat")
   awk '/^rcc:$/{f=1; next} f && /^ /{next} {f=0; print}' "$plat" > "$plat.new" && cat "$plat.new" > "$plat" && rm "$plat.new"
   { cat /repo/model/stm32h7-rcc-restate.repl; printf '\ntviburiRcc:\n    mode: "recorded"\n'; [ -n "$props" ] && printf '%s\n' "$props"; } >> "$plat"
-  awk '/^gpioPort[A-K]:$/{f=1; sub(/gpioPort/, "tviburiGpio"); print; next} f && /^ /{print; next} {f=0}' "$plat" > /out/$n-$mode.moved-gpio.txt
-  awk '/^gpioPort[A-K]:$/{f=1; next} f && /^ /{next} {f=0; print}' "$plat" > "$plat.new" && cat "$plat.new" > "$plat" && rm "$plat.new"
-  grep -n '@ gpioPort[A-K]\|-> gpioPort[A-K]' "$plat" > /out/$n-$mode.repointed-gpio.txt
-  sed -i 's/@ gpioPort\([A-K]\)/@ tviburiGpio\1/; s/-> gpioPort\([A-K]\)/-> tviburiGpio\1/g' "$plat"
-  { echo; cat /repo/model/stm32h7-gpio-restate.repl; echo
-    for x in A B C D E F G H I J K; do printf 'tviburiGpio%s:\n    mode: "%s"\n    package: "LQFP144"\n\n' $x "${ACCEPT_MODE:-recorded}"; done
-    cat /out/$n-$mode.moved-gpio.txt; } >> "$plat"
+  # A tree without a guard's restate file (main before 1301) replays without that guard: one harness wires both
+  # trees of TVI-WO-1201's budget (ruled 2026-11-23T23:12Z).
+  if [ -f /repo/model/stm32h7-gpio-restate.repl ]; then
+    awk '/^gpioPort[A-K]:$/{f=1; sub(/gpioPort/, "tviburiGpio"); print; next} f && /^ /{print; next} {f=0}' "$plat" > /out/$n-$mode.moved-gpio.txt
+    awk '/^gpioPort[A-K]:$/{f=1; next} f && /^ /{next} {f=0; print}' "$plat" > "$plat.new" && cat "$plat.new" > "$plat" && rm "$plat.new"
+    grep -n '@ gpioPort[A-K]\|-> gpioPort[A-K]' "$plat" > /out/$n-$mode.repointed-gpio.txt
+    sed -i 's/@ gpioPort\([A-K]\)/@ tviburiGpio\1/; s/-> gpioPort\([A-K]\)/-> tviburiGpio\1/g' "$plat"
+    { echo; cat /repo/model/stm32h7-gpio-restate.repl; echo
+      for x in A B C D E F G H I J K; do printf 'tviburiGpio%s:\n    mode: "%s"\n    package: "LQFP144"\n\n' $x "${ACCEPT_MODE:-recorded}"; done
+      cat /out/$n-$mode.moved-gpio.txt; } >> "$plat"
+  fi
   args[$((i + 1))]=${c/'mach create; '/'include @/tmp/release/Tviburi.cs; mach create; '}
 done
 printf '%s\n' "${args[@]}" > /out/$n-$mode.argv.txt
@@ -48,9 +54,18 @@ env -i HOME="$d" TMPDIR="$d" DOTNET_EnableDiagnostics=0 DOTNET_EnableWriteXorExe
 sleep 0.05
 peak=0; hwm=0
 while kill -0 $! 2>/dev/null; do
-  s=0; for p in $(pgrep -f 'enode'); do r=$(awk '/^VmRSS:/{print $2}' /proc/$p/status 2>/dev/null); s=$((s + ${r:-0})); h=$(awk '/^VmHWM:/{print $2}' /proc/$p/status 2>/dev/null); [ "${h:-0}" -gt $hwm ] && hwm=$h; done
-  [ $s -gt $peak ] && peak=$s
+  s=0; k=0; top=0; topr=0
+  for p in $(pgrep -f 'enode'); do r=$(awk '/^VmRSS:/{print $2}' /proc/$p/status 2>/dev/null); s=$((s + ${r:-0})); k=$((k + 1)); [ "${r:-0}" -gt $topr ] && { topr=$r; top=$p; }; h=$(awk '/^VmHWM:/{print $2}' /proc/$p/status 2>/dev/null); [ "${h:-0}" -gt $hwm ] && hwm=$h; done
+  # At each new peak, the breakdown of the largest matched process, Renode (TVI-WO-1201 (4)): its status and
+  # smaps_rollup. Kept only if it has RssAnon: a peak sampled as Renode exits finds its memory already gone (no Rss
+  # lines, 2 threads; seen in CI run 45286469273 and on Furnace), so the last whole snapshot stays, with its own sum.
+  if [ $s -gt $peak ]; then
+    peak=$s
+    { echo "pid $top of $k matched; rss_sum_kib $s"; cat /proc/$top/status /proc/$top/smaps_rollup 2>/dev/null; } > /tmp/peak-proc.new
+    grep -q '^RssAnon:' /tmp/peak-proc.new && mv /tmp/peak-proc.new /tmp/peak-proc.txt
+  fi
   sleep 0.1
 done
 wait $!
+cp /tmp/peak-proc.txt /out/$n-$mode.peak-proc.txt 2>/dev/null
 echo "mode=$mode wall_s=$(awk -v a=$start -v b=$(date +%s.%N) 'BEGIN{printf "%.2f", b-a}') peak_tree_vmrss_kib=$peak vmhwm_kib=$hwm load=$(cut -d' ' -f1-3 /proc/loadavg)" | tee /out/$n-$mode.cost.txt
