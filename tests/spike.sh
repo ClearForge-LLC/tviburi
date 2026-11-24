@@ -5,7 +5,10 @@
 # mounted read-only. Outputs go under ${TVIBURI_SCRATCH:-$HOME/.cache/tviburi}.
 #
 #   TVIBURI_TESTS="modf conditions ..."  run only these tests, or a group: "acceptance" (the default),
-#                                        "adversarial" (tests/adversarial.sh) or "all".
+#                                        "adversarial" (tests/adversarial.sh) or "all". After each test returns,
+#                                        a line `RAN <test>` (TVI-WO-1202: a CI shard's record of what it ran).
+#   TVIBURI_TESTS=list                   print every test of "all", one per line, in the suite's order, and run
+#                                        nothing (TVI-WO-1202: the tree's own list, for the shard plan and the aggregate).
 #   TVIBURI_CI=1                         run containers with plain `podman run`. Only for a
 #                                        disposable CI runner; elsewhere ~/bin/capped-run is required.
 # Exit 0 only if every selected test passed.
@@ -27,6 +30,7 @@ ACCEPTANCE="$ACCEPTANCE $(for c in $GPIO_CASES; do printf 'gpio-%s ' "$c"; done)
 TIMER_CASES=$(sed -n 's/^CASES="\(.*\)"$/\1/p' "$(dirname "$0")/1302/timer.sh")
 ACCEPTANCE="$ACCEPTANCE $(for c in $TIMER_CASES; do printf 'timer-%s ' "$c"; done)"
 ALL="$ACCEPTANCE $ADVERSARIAL"
+if [ "${TVIBURI_TESTS:-}" = list ]; then printf '%s\n' $ALL; exit 0; fi
 here=$(cd "$(dirname "$0")/.." && pwd)
 scratch=${TVIBURI_SCRATCH:-$HOME/.cache/tviburi}
 mkdir -p "$scratch"
@@ -674,11 +678,12 @@ for c in $TIMER_CASES; do eval "t_timer-$c() { t_timer $c; }"; done
 
 for t in ${TVIBURI_TESTS:-acceptance}; do
   case "$t" in
-    acceptance) for u in $ACCEPTANCE; do "t_$u"; done ;;
-    adversarial) for u in $ADVERSARIAL; do "t_$u"; done ;;
-    all) for u in $ALL; do "t_$u"; done ;;
-    *) case " $ALL " in *" $t "*) "t_$t" ;; *) echo "unknown test: $t" >&2; exit 2 ;; esac ;;
+    acceptance) sel=$ACCEPTANCE ;;
+    adversarial) sel=$ADVERSARIAL ;;
+    all) sel=$ALL ;;
+    *) case " $ALL " in *" $t "*) sel=$t ;; *) echo "unknown test: $t" >&2; exit 2 ;; esac ;;
   esac
+  for u in $sel; do "t_$u"; echo "RAN $u"; done
 done
 
 echo "outputs: $work"

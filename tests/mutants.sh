@@ -3,7 +3,9 @@
 # the source with that one edit, then the named tests of tests/spike.sh on it. A mutant is killed
 # only when those tests exit 1 with a FAIL line; any other failure (a setup error, an aborted
 # fixture) counts as not killed.
-# Exit 0 only if every mutant was killed. Same environment as tests/spike.sh (TVIBURI_CI, scratch).
+#   TVIBURI_MUTANTS="M01-slave ..."  run only these rows (TVI-WO-1202: one CI shard's share, from tools/tviburi-route
+#                                    plan); every id must be a row. Unset: every row.
+# Exit 0 only if every mutant run was killed. Same environment as tests/spike.sh (TVIBURI_CI, scratch).
 set -euo pipefail
 
 here=$(cd "$(dirname "$0")/.." && pwd)
@@ -18,9 +20,16 @@ else
   git -C "$here" archive HEAD | tar -x -C "$src"
 fi
 
+if [ -n "${TVIBURI_MUTANTS+set}" ]; then
+  for m in $TVIBURI_MUTANTS; do
+    awk -F'\t' -v m="$m" '$1 == m { f = 1 } END { exit !f }' "$src/tests/mutants.tsv" || { echo "unknown mutant: $m" >&2; exit 2; }
+  done
+fi
+
 alive=0
 while IFS=$'\t' read -r id file old new tests; do
   case "$id" in ''|'#'*) continue ;; esac
+  [ -z "${TVIBURI_MUTANTS+set}" ] || case " $TVIBURI_MUTANTS " in *" $id "*) ;; *) continue ;; esac
   [ -n "$tests" ] && [ -z "${tests##*[a-z]*}" ] || { echo "bad row $id: five non-empty fields required" >&2; exit 2; }
   tree=$work/$id
   mkdir "$tree"
