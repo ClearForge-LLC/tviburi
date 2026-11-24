@@ -17,3 +17,4 @@ class	Miscellaneous.STM32H7_RCC	Tviburi.GuardedSTM32H7_RCC
 class	GPIOPort.STM32_GPIOPort	Tviburi.GuardedSTM32_GPIOPort
 class	Timers.STM32_Timer	Tviburi.GuardedSTM32_Timer
 class	DMA.STM32DMA	Tviburi.GuardedSTM32DMA	dma1 dma2
+class	MTD.STM32H7_FlashController	Tviburi.GuardedSTM32H7_Flash	flashController

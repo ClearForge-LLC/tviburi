@@ -75,6 +75,20 @@ for i in "${!args[@]}"; do
     { echo; cat /repo/model/stm32h7-dma-restate.repl; echo
       printf 'tviburiDma1:\n    mode: "%s"\n\ntviburiDma2:\n    mode: "%s"\n\n' "${ACCEPT_MODE:-recorded}" "${ACCEPT_MODE:-recorded}"; } >> "$plat"
   fi
+  # TVI-WO-1304: a tree with the flash restatement gets it after the timers'. The consumer's untyped `flashController:`
+  # block (its option-byte init sequence, Aethelgard AET-WO-4230 §1.6) cannot stay on the cancelled entry (E29: the load
+  # fails, measured, TVI-WO-1304.measure.md §2.4): the OPTSR_PRG word it writes becomes the guard's `optionBytes` (ruled
+  # 2026-11-24T15:50Z Q3), written to /out/N-accept.moved-flash.txt, and the block is dropped. A tree without it replays
+  # as before.
+  if [ -f /repo/model/stm32h7-flash-restate.repl ]; then
+    awk '/^flashController:$/{f=1; print; next} f && /^ /{print; next} {f=0}' "$plat" > /out/$n-$mode.moved-flash.txt
+    ob=$(awk '$1 == "WriteDoubleWord" && $2 == "0x20" {print $3}' /out/$n-$mode.moved-flash.txt | tail -n 1)
+    awk '/^flashController:$/{f=1; next} f && /^ /{next} {f=0; print}' "$plat" > "$plat.new" && cat "$plat.new" > "$plat" && rm "$plat.new"
+    { echo; cat /repo/model/stm32h7-flash-restate.repl; echo
+      printf 'tviburiFlash:\n    mode: "%s"\n' "${ACCEPT_MODE:-recorded}"
+      [ -z "$ob" ] || printf '    optionBytes: %s\n' "$ob"
+      echo; } >> "$plat"
+  fi
   args[$((i + 1))]=${c/'mach create; '/'include @/tmp/release/Tviburi.cs; mach create; '}
 done
 printf '%s\n' "${args[@]}" > /out/$n-$mode.argv.txt
