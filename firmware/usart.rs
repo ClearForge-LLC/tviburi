@@ -14,8 +14,10 @@
 //!                       all with UE = 1: passes, acknowledged by name (ruled 2026-11-24T18:55Z Q2 (c)). MARK_READ = BRR (the
 //!                       stock model takes the write), MARK_READ2 = CR2.
 //!   path="reinitstop" - the same re-init also changing STOP: TVI-USART-UE at the CR2 write (outside the pattern).
-//!   path="disable"    - config, then CR1 = 0 (ChibiOS's sdStop: UE and FIFOEN cleared in one write): passes (judged as UE = 0).
-//!   path="same"       - config, then BRR, CR2 and CR1 written again unchanged with UE = 1: passes (RUL-18).
+//!   path="disable"    - configured with PCE|PS (8O, PS outside the acknowledged pattern), then CR1 = 0 (ChibiOS's sdStop: UE,
+//!                       FIFOEN, PCE and PS cleared in one write): passes (judged as UE = 0).
+//!   path="same"       - configured with CR2.STOP = 10 and CR1.PCE|PS, then BRR, CR2 and CR1 written again unchanged with
+//!                       UE = 1: passes (RUL-18; STOP and PS lie outside the acknowledged pattern, so only "unchanged" lets them).
 //!   path="ap"         - ArduPilot's USART1 sequence (measure.md §2.1): BRR 0x271, CR2 0x40, CR3 0xC1, CR1 0x2000013D, ICR all
 //!                       ones, then CR1's read-modify-write clearing RXNEIE: passes. MARK_READ = CR1 (0x2000011D: FIFOEN and
 //!                       IDLEIE kept, as silicon), MARK_READ2 = CR2 (0x40).
@@ -67,7 +69,7 @@ pub unsafe extern "C" fn reset() -> ! {
     #[cfg(path = "kernel")]
     write_volatile(RCC_D2CCIP2R, 2 << 3);
     write_volatile(RCC_APB2ENR, 1 << 4);
-    #[cfg(path = "config")]
+    #[cfg(any(path = "config", path = "kernel"))]
     {
         config();
         write_volatile(MARK_READ, r(CR1));
@@ -117,16 +119,21 @@ pub unsafe extern "C" fn reset() -> ! {
     }
     #[cfg(path = "disable")]
     {
-        config();
+        w(BRR, 0x22C);
+        w(CR1, FIFOEN_TE_RE | 3 << 9);
+        w(CR1, FIFOEN_TE_RE | 3 << 9 | 1);
         w(CR1, 0);
         write_volatile(MARK_READ, r(CR1));
     }
     #[cfg(path = "same")]
     {
-        config();
         w(BRR, 0x22C);
-        w(CR2, 0);
-        w(CR1, FIFOEN_TE_RE | 1);
+        w(CR2, 2 << 12);
+        w(CR1, FIFOEN_TE_RE | 3 << 9);
+        w(CR1, FIFOEN_TE_RE | 3 << 9 | 1);
+        w(BRR, 0x22C);
+        w(CR2, 2 << 12);
+        w(CR1, FIFOEN_TE_RE | 3 << 9 | 1);
     }
     #[cfg(path = "ap")]
     {
@@ -161,10 +168,6 @@ pub unsafe extern "C" fn reset() -> ! {
     #[cfg(path = "nine")]
     {
         w(CR1, FIFOEN_TE_RE | 1 << 12);
-    }
-    #[cfg(path = "kernel")]
-    {
-        config();
     }
     write_volatile(MARK_AFTER, 0xAF7E_0002);
     loop {}

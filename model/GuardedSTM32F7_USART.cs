@@ -59,7 +59,6 @@
 // from the stock model with the guard's IDLE; the rest from the stock model.
 
 using System;
-using System.Collections.Generic;
 using System.Linq;
 using Antmicro.Renode.Core;
 using Antmicro.Renode.Peripherals.Bus;
@@ -345,7 +344,7 @@ namespace Antmicro.Renode.Peripherals.Tviburi
             {
                 return false;
             }
-            var changed = (Copy(offset) ^ word) & mask;
+            var changed = (Served(offset) ^ word) & mask;
             changed &= ~Acknowledged(offset);   // the re-init pattern's own fields are never the offence (ruled Q2 (c))
             if(changed == 0)
             {
@@ -353,7 +352,7 @@ namespace Antmicro.Renode.Peripherals.Tviburi
             }
             var rows = Fields.Where(f => f.Offset == offset && (changed & f.Mask) != 0).ToArray();
             records.Refuse("TVI-USART-UE", Unmodeled, RegisterAt(offset), string.Join(", ", rows.Select(f => f.Name + " (" + f.Bits + ")")) + " changed with UE = 1",
-                RegisterAt(offset) + " written with UE = 1, changing " + string.Join(", ", rows.Select(f => f.Name + " " + f.Format(f.Of(Copy(offset))) + " -> " + f.Format(f.Of(word))))
+                RegisterAt(offset) + " written with UE = 1, changing " + string.Join(", ", rows.Select(f => f.Name + " " + f.Format(f.Of(Served(offset))) + " -> " + f.Format(f.Of(word))))
                     + ": RM0433 says it \"can only be written when the USART is disabled (UE = 0)\" and does not say what silicon does with such a write, so the twin cannot say",
                 "RM0433 Rev 9 " + string.Join(", ", rows.Select(f => f.Section + " p" + f.Page).Distinct()) + "; ruled 2026-11-24T18:55Z Q2",
                 State(), offset, word, width);
@@ -422,11 +421,6 @@ namespace Antmicro.Renode.Peripherals.Tviburi
         private static bool Running(uint cr)
         {
             return (cr & UeBit) != 0 && (cr & (TeBit | ReBit)) != 0;
-        }
-
-        private uint Copy(long offset)
-        {
-            return offset == BrrOffset ? inner.ReadDoubleWord(BrrOffset) : Served(offset);
         }
 
         private uint Protected(long offset)
@@ -573,7 +567,7 @@ namespace Antmicro.Renode.Peripherals.Tviburi
 
         private static bool Defined(long offset)
         {
-            return offset >= 0 && offset <= PrescOffset && (offset & 3) == 0;
+            return offset >= 0 && offset <= PrescOffset;   // aligned: Narrow ran first
         }
 
         private static string RegisterAt(long offset)

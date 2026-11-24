@@ -107,9 +107,9 @@ for t in ${TVIBURI_TESTS:-$CASES}; do
     "passes reinit && [ \"\$(readout reinit READ)\" = 0x000002D0 ] && [ \"\$(readout reinit READ2)\" = 0x00010000 ]" ;;
   reinitstop) check "reinitstop: the same re-init also changing STOP refuses TVI-USART-UE at the CR2 write, naming STOP only (outside the pattern)" \
     "refuses reinitstop TVI-USART-UE unmodeled 'r[\"access\"][\"offset\"] == \"0x4\" and r[\"bit\"] == \"STOP (13:12) changed with UE = 1\"'" ;;
-  disable) check "disable: CR1 = 0 from UE = 1 (ChibiOS's sdStop, clearing FIFOEN in the same write) passes, judged as with UE = 0 (ruled Q2); CR1 reads 0" \
+  disable) check "disable: CR1 = 0 from UE = 1 (ChibiOS's sdStop, clearing FIFOEN and the unacknowledged PS in the same write) passes, judged as with UE = 0 (ruled Q2); CR1 reads 0" \
     "passes disable && [ \"\$(readout disable READ)\" = 0x00000000 ]" ;;
-  same) check "same: BRR, CR2 and CR1 written again unchanged with UE = 1 pass (RUL-18)" "passes same" ;;
+  same) check "same: BRR, CR2 (STOP = 10) and CR1 (PCE|PS) written again unchanged with UE = 1 pass (RUL-18): STOP and PS are outside the acknowledged pattern" "passes same" ;;
   ap) check "ap: ArduPilot's USART1 sequence (BRR 0x271, CR2 0x40, CR3 0xC1, CR1 0x2000013D, ICR all ones, CR1's read-modify-write) passes, enforcing; CR1 reads 0x2000011D (FIFOEN and IDLEIE kept, as silicon: the stock model reads 0x10D) and CR2 0x40" \
     "passes ap && [ \"\$(readout ap READ)\" = 0x2000011D ] && [ \"\$(readout ap READ2)\" = 0x00000040 ]" ;;
   width) check "width: a byte write to CR1 refuses TVI-USART-WIDTH, unmodeled (p2067)" \

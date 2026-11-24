@@ -1,8 +1,5 @@
-# TVI-WO-1305: model/stm32h7-usart-restate.repl from Renode 1.17.0's pinned platforms/cpus/stm32h7.repl (RUL-07; RUL-09
-# (b)), as model/stm32h7-dma-restate.awk does the DMA controllers'. Each typed entry `usartN:`/`uartN: UART.STM32F7_USART
-# @ { ... }` but `lpuart1` (outside TVI-WO-1305, a row): the stock instance cancelled (`usartN: @none`), the guard declared
-# at its address `as "usartN"` with the same block (its `rcc` registration on `tviburiRcc`), and the stock entry's
-# properties and interrupt line. Measured as a form in TVI-WO-1305.measure.md §2.3 (ruled 2026-11-24T18:55Z Q1: all 8).
+# TVI-WO-1305: model/stm32h7-usart-restate.repl from Renode 1.17.0's pinned stm32h7.repl, as stm32h7-dma-restate.awk does the
+# DMA controllers'; what it writes is said in the header it prints. Measured as a form in TVI-WO-1305.measure.md §2.3.
 # Usage: awk -v sha=<sha256 of stm32h7.repl> -f stm32h7-usart-restate.awk stm32h7.repl
 function flush(   b, v) {
     if (name != "") {

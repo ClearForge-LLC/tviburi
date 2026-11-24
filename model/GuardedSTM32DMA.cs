@@ -76,11 +76,11 @@
 // silicon does: TCIF is set "to indicate the end of transfer due to the stream interruption", and the stream's next transfer
 // starts at the addresses software programs (§15.3.16 p654; PAR, M0AR p666), where the stock model sets no flag and resumes
 // from the offset its earlier transfer reached (STM32DMA.cs L160, L256, L262). The guard reaches the stock model's private
-// `transferCompleteIrqStatus` and per-stream `dataOffset` by reflection; a build without them is TVI-DMA-CONFIG.
+// `transferCompleteIrqStatus` and per-stream `dataOffset` by reflection; a build without them is TVI-DMA-CONFIG. ArduPilot's
+// USART receive path ends a frame so (UARTDriver.cpp rx_irq_cb, rxbuff_full_irq; TVI-WO-1305.measure.md §2.6).
 //   TVI-DMA-OFFSET (narrowed by TVI-WO-1305, which models the offset) a stream enabled again after such a suspension with no
 //                     NDTR write since: the manual has software rewrite NDTR (p654), and says NDT reloads after a completed
-//                     transfer (p665), so whether the remaining or the programmed count runs is not stated. unmodeled. ArduPilot's USART receive path ends a frame so
-// (UARTDriver.cpp rx_irq_cb, rxbuff_full_irq; TVI-WO-1305.measure.md §2.6).
+//                     transfer (p665), so whether the remaining or the programmed count runs is not stated. unmodeled.
 //
 // Reads: CR from the guard's copy (every field but EN, which is the stock model's), so a read-modify-write keeps the
 // fields the stock model drops (PL, TEIE, DMEIE, TRBUFF; measure.md §2.1); FCR from its copy, reset 0x21 (p667; the stock
@@ -274,16 +274,11 @@ namespace Antmicro.Renode.Peripherals.Tviburi
 
         private void Pass(long offset, int s, long r, uint word)
         {
+            // Software clears EN while the stream runs: silicon's suspension (p654), after the stock model takes the write.
+            var suspend = r == CrOffset && (word & EnBit) == 0 && Enabled(s) && Items(s) != 0;
             if(r == CrOffset)
             {
                 cr[s] = word & CrBits;
-                // Software clears EN while the stream runs: silicon's suspension (p654), after the stock model takes the write.
-                if((word & EnBit) == 0 && Enabled(s) && Items(s) != 0)
-                {
-                    inner.WriteDoubleWord(offset, word);
-                    Suspend(s);
-                    return;
-                }
             }
             else if(r == FcrOffset)
             {
@@ -295,6 +290,10 @@ namespace Antmicro.Renode.Peripherals.Tviburi
                 suspended[s] = false;
             }
             inner.WriteDoubleWord(offset, word);
+            if(suspend)
+            {
+                Suspend(s);
+            }
         }
 
         // Software cleared EN while stream s ran (NDT > 0): silicon sets TCIF "to indicate the end of transfer due to the

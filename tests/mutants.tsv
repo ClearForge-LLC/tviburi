@@ -261,7 +261,7 @@ DM21-generator	model/GuardedSTM32DMA.cs	            if(id <= 8)	            if(f
 DM22-shared	model/GuardedSTM32DMA.cs	var state = OtherState(other);	var state = Off;	dma-shared
 DM23-sharedAcross	model/GuardedSTM32DMA.cs	return other == null ? Off : other.StreamState(c % Streams);	return Off;	dma-sharedx
 DM24-request	model/GuardedSTM32DMA.cs	if(!raised.Contains(id))	if(false)	dma-request
-DM25-txAck	model/GuardedSTM32DMA.cs	private static readonly uint[] RaisedFromMemory = { 38, 40, 42 };	private static readonly uint[] RaisedFromMemory = { 38, 40, 42, 44 };	dma-txother
+DM25-txAck	model/GuardedSTM32DMA.cs	private static readonly uint[] RaisedFromMemory = { 38, 40, 42, 46 };	private static readonly uint[] RaisedFromMemory = { 38, 40, 42, 44, 46 };	dma-txother
 DM26-bench	model/bench-checks.tsv	DMA_S0M0AR = 0x20000400 (DTCM (0x20000000-0x2001FFFF))	DMA_S0M0AR = 0x20000401 (DTCM (0x20000000-0x2001FFFF))	dma-ledger
 DM27-route	model/stm32h7-dma-restate.repl	    [0-7] -> tviburiDma1@[0-7]\n	(empty)	dma-registrations
 DM28-irq	model/GuardedSTM32DMA.cs	public IReadOnlyDictionary<int, IGPIO> Connections => inner.Connections;	public IReadOnlyDictionary<int, IGPIO> Connections => Enumerable.Range(0, Streams).ToDictionary(i => i, i => (IGPIO)new GPIO());	dma-irq
@@ -322,7 +322,7 @@ US01-ueRule	model/GuardedSTM32F7_USART.cs	            if((cr1 & UeBit) == 0 || (
 US02-disableAsOff	model/GuardedSTM32F7_USART.cs	            if((cr1 & UeBit) == 0 || (offset == Cr1Offset && (word & UeBit) == 0))	            if((cr1 & UeBit) == 0)	usart-disable
 US03-reinitAck	model/GuardedSTM32F7_USART.cs	            changed &= ~Acknowledged(offset);	(empty)	usart-reinit usart-psue
 US04-reinitPce	model/GuardedSTM32F7_USART.cs	offset == Cr1Offset ? M0Bit | PceBit | FifoenBit :	offset == Cr1Offset ? M0Bit | FifoenBit :	usart-reinit
-US05-sameValue	model/GuardedSTM32F7_USART.cs	var changed = (Copy(offset) ^ word) & mask;	var changed = word & mask;	usart-same
+US05-sameValue	model/GuardedSTM32F7_USART.cs	var changed = (Served(offset) ^ word) & mask;	var changed = word & mask;	usart-same
 US06-cr2Protected	model/GuardedSTM32F7_USART.cs	return 0x000FFF30 |	return 0x000FCF30 |	usart-stopue
 US07-field	model/GuardedSTM32F7_USART.cs	if(f.Offset != offset || f.Allowed == null || f.Allowed.Contains(f.Of(word)))	if(true)	usart-field
 US08-nine	model/GuardedSTM32F7_USART.cs	(word & M0Bit) != 0 && (word & PceBit) == 0	false	usart-nine
@@ -351,7 +351,7 @@ US30-classRow	tools/tviburi-release/pins.tsv	Tviburi.GuardedSTM32F7_USART\tusart
 US31-bench	model/bench-checks.tsv	Tviburi.GuardedSTM32F7_USART\tU1\t	Tviburi.GuardedSTM32F7_USART\tU2\t	usart-ledger
 DM43-suspendTcif	model/GuardedSTM32DMA.cs	            ((IFlagRegisterField[])IrqStatusField.GetValue(inner))[s].Value = true;\n	(empty)	dma-offset
 DM44-suspendOffset	model/GuardedSTM32DMA.cs	            OffsetField.SetValue(((Array)StreamsField.GetValue(inner)).GetValue(s), 0ul);\n	(empty)	dma-offset
-DM45-suspendRunning	model/GuardedSTM32DMA.cs	                if((word & EnBit) == 0 && Enabled(s) && Items(s) != 0)	                if(false)	dma-offset
+DM45-suspendRunning	model/GuardedSTM32DMA.cs	var suspend = r == CrOffset && (word & EnBit) == 0 && Enabled(s) && Items(s) != 0;	var suspend = false;	dma-offset
 DM46-request43	model/GuardedSTM32DMA.cs	{ 9, 37, 39, 41, 43, 45, 77, 83, 115 }	{ 9, 37, 39, 41, 45, 77, 83, 115 }	dma-usart23
 DM47-request46	model/GuardedSTM32DMA.cs	{ 38, 40, 42, 46 }	{ 38, 40, 42 }	dma-usart23
 US32-idleRe	model/GuardedSTM32F7_USART.cs	if((before & (UeBit | ReBit)) == (UeBit | ReBit) && (word & (UeBit | ReBit)) != (UeBit | ReBit))	if((before & UeBit) != 0 && (word & UeBit) == 0)	usart-idlere
