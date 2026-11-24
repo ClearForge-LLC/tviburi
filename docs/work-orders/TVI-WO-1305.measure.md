@@ -181,7 +181,7 @@ By board: the ten generated boards with a serial port (§2.1), ArduPilot's two (
 | P2 `RTOF` | held in kind (set only with `RTOIE`); the 8× timing is by source, not probed |
 | P2 reset `ISR` `0x200000C0` | held |
 | P3 | **held, one detail wrong:** each port writes `CR2` = 0 explicitly, and `RE` and `FIFOEN` are set; the firmware also receives (8 bytes a port, polled) |
-| P4 | **held:** the read-modify-write reads `0x12D` and writes `0x10D`; with copies, no protected change |
+| P4 | **held:** the read-modify-write reads `0x12D` and writes `0x10D`; with copies, no protected change. **By analysis, not by run:** no copy-serving prototype was booted, so that ArduPilot's control flow is unchanged when `CR1`–`CR3` read back silicon's values is a prediction for the build, which boots the guard recorded on the fixture and the armed capture |
 | P5 USART1, USART3's first init | held |
 | P5 "each USART2 change goes through `UE` = 0" | **wrong:** 16 changes on `usart2` and 2 on `usart3` are made with `UE` = 1 by ChibiOS's `usart_init` on a running port (§2.1). This is §5 Q2 (c) |
 | P6 | not measured: it needs the guard (§5 Q5, Q6) |
