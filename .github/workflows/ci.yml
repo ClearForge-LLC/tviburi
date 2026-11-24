@@ -46,27 +46,27 @@ jobs:
     needs: route
     if: needs.route.outputs.class == 'code'
     uses: ./.github/workflows/shard.yml
-    with: { shard: 1, of: 5 }
+    with: { shard: 1 }
   shard-2:
     needs: route
     if: needs.route.outputs.class == 'code'
     uses: ./.github/workflows/shard.yml
-    with: { shard: 2, of: 5 }
+    with: { shard: 2 }
   shard-3:
     needs: route
     if: needs.route.outputs.class == 'code'
     uses: ./.github/workflows/shard.yml
-    with: { shard: 3, of: 5 }
+    with: { shard: 3 }
   shard-4:
     needs: route
     if: needs.route.outputs.class == 'code'
     uses: ./.github/workflows/shard.yml
-    with: { shard: 4, of: 5 }
+    with: { shard: 4 }
   shard-5:
     needs: route
     if: needs.route.outputs.class == 'code'
     uses: ./.github/workflows/shard.yml
-    with: { shard: 5, of: 5 }
+    with: { shard: 5 }
 
   # TVI-WO-1201 (Scotty, 2026-11-23 evening): the memory budget, main's one file against this change's in this one
   # job. ArduPilot's ELF is built from Aethelgard's pinned image and held to its sha256; five full boots a side,

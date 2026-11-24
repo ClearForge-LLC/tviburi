@@ -6,7 +6,7 @@ set -euo pipefail
 [ $# -ge 1 ] || { echo "usage: tests/ci/aggregate.sh RAN..." >&2; exit 2; }
 . "$(dirname "$0")/common.sh"
 cargo_route build
-TVIBURI_TESTS=list "$here/tests/spike.sh" >"$ci/cases.txt"
+cases_list
 args=() i=0
 for r in "$@"; do i=$((i + 1)); cp "$r" "$ci/ran-$i.txt"; args+=("/w/ran-$i.txt"); done
 route aggregate /w/cases.txt tests/mutants.tsv "${args[@]}"

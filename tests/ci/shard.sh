@@ -11,7 +11,7 @@ ran=${TVIBURI_RAN:-$ci/ran.txt}
 : >"$ran"
 
 cargo_route build || exit 2
-TVIBURI_TESTS=list "$here/tests/spike.sh" >"$ci/cases.txt" || exit 2
+cases_list || exit 2
 route plan "$2" "$1" tests/ci/times.tsv /w/cases.txt tests/mutants.tsv >"$ci/plan.txt" || exit 2
 cases=$(sed -n 's/^case //p' "$ci/plan.txt" | paste -sd' ')
 mutants=$(sed -n 's/^mutant //p' "$ci/plan.txt" | paste -sd' ')

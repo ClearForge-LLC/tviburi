@@ -44,8 +44,8 @@ fn under(list: &[&str], p: &str) -> bool {
 }
 
 /// (docs, budget) for a diff: docs only if it is not empty and every path is documentation.
-fn classify(paths: &[&str], docs: fn(&str) -> bool) -> (bool, bool) {
-    (!paths.is_empty() && paths.iter().all(|p| docs(p)), paths.iter().any(|p| under(&BUDGET, p)))
+fn classify(paths: &[&str]) -> (bool, bool) {
+    (!paths.is_empty() && paths.iter().all(|p| is_docs(p)), paths.iter().any(|p| under(&BUDGET, p)))
 }
 
 fn lines(text: &str) -> Vec<&str> {
@@ -211,7 +211,7 @@ fn run(a: &[String]) -> Result<bool, String> {
     match a.as_slice() {
         ["classify", changed] => {
             let text = read(changed)?;
-            let (docs, budget) = classify(&lines(&text), is_docs);
+            let (docs, budget) = classify(&lines(&text));
             println!("class={}", if docs { "docs" } else { "code" });
             println!("budget={}", if budget { "yes" } else { "no" });
             Ok(true)
@@ -314,12 +314,12 @@ mod tests {
             "spike/1150/predictions.md", "docs/../model/x.md", "docs//x.md", "\"docs/\\303\\251.md\"", "sub/README.md", "model/x.cs"] {
             assert!(!is_docs(p), "{p}");
         }
-        assert_eq!(classify(&["docs/a.md", "README.md"], is_docs), (true, false));
-        assert_eq!(classify(&["docs/a.md", "docs/b.tsv"], is_docs), (false, false), "one unclassified path routes code");
-        assert_eq!(classify(&[], is_docs), (false, false), "an empty diff routes code");
-        assert_eq!(classify(&["tests/1301/gpio.sh"], is_docs), (false, true));
-        assert_eq!(classify(&[".github/workflows/ci.yml"], is_docs).1, true);
-        assert_eq!(classify(&["tests/spike.sh.bak"], is_docs).1, false, "a file is matched whole, a directory by prefix");
+        assert_eq!(classify(&["docs/a.md", "README.md"]), (true, false));
+        assert_eq!(classify(&["docs/a.md", "docs/b.tsv"]), (false, false), "one unclassified path routes code");
+        assert_eq!(classify(&[]), (false, false), "an empty diff routes code");
+        assert_eq!(classify(&["tests/1301/gpio.sh"]), (false, true));
+        assert_eq!(classify(&[".github/workflows/ci.yml"]).1, true);
+        assert_eq!(classify(&["tests/spike.sh.bak"]).1, false, "a file is matched whole, a directory by prefix");
     }
 
     #[test]

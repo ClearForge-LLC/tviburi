@@ -9,8 +9,9 @@ on:
         type: number
         required: true
       of:
+        # The number of shards: ci.yml calls shard-1 .. shard-5 (ruled 2026-11-24T10:30Z, Q1).
         type: number
-        required: true
+        default: 5
     outputs:
       ran:
         value: ${{ jobs.shard.outputs.ran }}
@@ -45,4 +46,3 @@ jobs:
         if: always()
         run: |
           { echo 'ran<<END_OF_RAN'; cat "$RUNNER_TEMP/ran.txt" 2>/dev/null || true; echo 'END_OF_RAN'; } >>"$GITHUB_OUTPUT"
-          echo "recorded $(wc -l <"$RUNNER_TEMP/ran.txt" 2>/dev/null || echo 0) items"

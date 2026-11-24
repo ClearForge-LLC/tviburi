@@ -15,4 +15,5 @@ fi
 in_image() { container -v "$here:/repo:ro,Z" -v "$ci:/w:Z" -w /repo "$IMAGE" sh -c \
   "export PATH=/opt/cargo/bin:\$PATH RUSTUP_HOME=/opt/rustup CARGO_HOME=/w/cargo-home; $1"; }
 cargo_route() { in_image "cargo $1 --quiet --offline --locked --manifest-path tools/tviburi-route/Cargo.toml --target-dir /w/target"; }
+cases_list() { TVIBURI_TESTS=list "$here/tests/spike.sh" >"$ci/cases.txt"; }   # the tree's own case ids, in order
 route() { container -v "$here:/repo:ro,Z" -v "$ci:/w:Z" -w /repo "$IMAGE" /w/target/debug/tviburi-route "$@"; }
