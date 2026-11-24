@@ -106,6 +106,7 @@ There were two passes: mine through the build, and an independent one by a fresh
 - Both pass on the reverted tree, as do the TIM1-dependent GPIO cases (`afodr`, `afenter`, `afenterhigh`, `afout`, `afentern`, `afswitch`, `registrations`), `rcc-reset` and `rcc-registrations` (the 58 restated registrations).
 - **The diff to the other guards' test files** (`git diff 9e61b81 -- tests/1300/rcc.sh tests/1301/gpio.sh scripts/tviburi-spike`, and the six lines in `tests/spike.sh`) appends only `timer1 timer8`.
 - `tests/mutants.tsv` row G17 now names the extended runner line, and still drops `gpioPortK` from it.
+- **Row G15** (from 1301) needed one more change beyond the names. It named the GPIO restatement's `timer1:` route block, which the granted rename (Q3) made `tviburiTimer1:`. Its old and new text now name `tviburiTimer1:`, with the same meaning, and `gpio-registrations` still kills it. CI's first run on PR #31 aborted at it: "mutant text not found exactly once". My pre-push check had covered only my own TM rows.
 - **Additive changes, inside this WO's `tests/` fence:**
   - `tests/spike.sh` registers the `timer-*` cases, as it does the `gpio-*` ones;
   - `tests/1301/replay-1301.sh` gains the timer restatement for a tree that has it (§1).
@@ -172,4 +173,7 @@ All on Furnace, in the pinned image (`aethelgard-tools@sha256:1e0ab105…`), one
     - `timer-gconce` reads each instance's collection count: 0 before the start, then 1 after it, after a pause and resume, and after a `machine Reset` and a start. TM32 (no unsubscribe) and TM33 (no subscription) are killed by it.
   - **The budget's own figure then compares a collecting branch with a non-collecting main:** `MEDIANS main 1003476 KiB, branch 1004332 KiB, difference 856 KiB (+0.8 MiB)`, PASS, eleven boots a side on `24d4155`. With the collection at the first start against a non-collecting main, an earlier run measured −51.2 MiB. **The guard's cost is the like-for-like +11.6 MiB;** the budget's figure also hides main's own ~12 MiB of garbage, once.
   - **A slip:** during the diagnosis, one `podman run` (checking that the image has `python3`) ran outside `~/bin/capped-run`, against the house rule. It was a single `command -v` in a throwaway container.
-- **CI:** see the PR. A green suite here is not live acceptance.
+- **CI on PR #31:**
+  - **Run 45380915687, on `514dc3d`:** acceptance, the memory budget, the budget's own tests and the adversarial cases passed. CI's budget: `MEDIANS main 877980 KiB, branch 865996 KiB, difference -11984 KiB (-11.7 MiB)`. The mutation run aborted at G15 (§6).
+  - **The run on `3005d71` or later:** see the PR.
+  - A green CI is not live acceptance.
