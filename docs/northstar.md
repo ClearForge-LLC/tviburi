@@ -51,9 +51,10 @@ The gap ledger for that model is a separate, versioned artifact. A consumer reco
 - **More than one family, under one contract.**
   - The STM32H7 is the first family. Others arrive by `roadmap.md` Phase 5's trigger, as a register-truth layer per vendor rather than a new emulator.
   - **Each family is held to invariants 1 to 8 in full.** A family whose unmodeled paths pass silently is not supported. It is a family Tviburi does not yet claim, and the consumer is told so.
-- **A cold start, through the consumer.**
-  - A user meets Tviburi through Aethelgard's verdict, which names Tviburi's model and ledger by hash (invariant 7).
-  - Tviburi alone is also usable: a binary, a supported board, and one of §3's two answers.
+- **Standalone, and seamless beside Aethelgard** (Scotty, 2026-11-24: "functionally independent … but the seam between Aet and Tvi should be nearly seamless with cohesive integration").
+  - Tviburi alone serves a cold start: a firmware binary, a supported board, and one of §3's two answers, with no Aethelgard installed.
+  - Beside Aethelgard, the seam is one declared step: Aethelgard pins a Tviburi release by hash, and its verdict carries Tviburi's records and ledger hash (invariant 7) with nothing for the user to write in between.
+  - Neither project needs the other to run.
 - **The first application is an agent-flown drone.** Aethelgard's Sentinel boards fly ArduPilot, commanded by an agent rather than a pilot. The paths an armed, commanded autopilot takes are the ones modeled first (`RUL-13`).
 
 ## 4. Invariants — true regardless of what any work order asks
@@ -87,6 +88,7 @@ The gap ledger for that model is a separate, versioned artifact. A consumer reco
 - Downstream tools start treating its traces as proof of the physical board.
 - A second family is added with a weaker contract than the first: its gaps pass where the H7's refuse.
 - A firmware is judged by what it reports about itself rather than by what the models witness.
+- Tviburi becomes unusable without Aethelgard, or the seam between them needs glue each user writes for themselves.
 
 ## 7. Amendments
 

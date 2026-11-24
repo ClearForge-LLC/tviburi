@@ -160,7 +160,16 @@ Not planned until Phase 4 has run once. *(Amended 2026-11-23: was "until Phase 2
 
 **Exit gate:** none yet; it is written when the phase is scoped.
 
-**Shape:** not scoped yet. The spike that shapes it is the first target past the trigger. When it starts, decide whether it needs its own repository, and if so, name it then (Scotty, 2026-11-23: "if our Renode-like extension or a total rework project needs its own repo home ... we will come up with an appropriate name and create that repo"). The research behind the trigger and the order of vendors is `docs/reviews/2026-11-23-chip-families-research.md`.
+**The family order** (Scotty, 2026-11-24, named and ranked, the same order as Aethelgard's P5):
+1. **RP2350, next.** It is Aethelgard's `RUL-08` planned second target, kept by Scotty. Renode ships no RP2350 platform, so **this is the first target past the trigger**: scheduling it starts this phase.
+2. **Then the 2026-11-23 research's ranking** (`docs/reviews/2026-11-23-chip-families-research.md`):
+   - nRF52840, STM32F405/F407, LiteX on iCE40/ECP5, i.MX RT1062;
+   - then STM32G4, STM32U5/H5, nRF54L15, STM32H723/F7, RP2040, ESP32-S3, AT32F435;
+   - then TI C2000, dsPIC33, ESP32-C6, i.MX RT1176, nRF54H20.
+   - SAM E70 is a cheap audit only.
+   - Finishing the H753/H743 is Phase 1's work, not this phase's.
+
+**Shape:** not scoped yet. The spike that shapes it is the first target past the trigger: the RP2350. When it starts, decide whether it needs its own repository, and if so, name it then (Scotty, 2026-11-23: "if our Renode-like extension or a total rework project needs its own repo home ... we will come up with an appropriate name and create that repo"). The research behind the trigger and the order of vendors is `docs/reviews/2026-11-23-chip-families-research.md`.
 
 ## Critical path
 
@@ -201,6 +210,7 @@ Not planned until Phase 4 has run once. *(Amended 2026-11-23: was "until Phase 2
 | 2026-11-24 | Phase 1 | `TVI-WO-1202` written: CI wall time, measured at 52.6 min on main (run 67) | Scotty, 2026-11-24 |
 | 2026-11-24 | Phase 1 | `TVI-WO-1302` merged (#31); `TVI-WO-1303` (the DMA guard) written | the merge; `1302` FEEDBACK §7 |
 | 2026-11-24 | Phase 1 | `TVI-WO-1202` merged (#33); `1303` ruled at §1.1 (its clock clause corrected: an access with the DMA clock off is silicon's ignored write, covered with no record, not a refusal); `TVI-WO-1304` (the flash guard) written; the rows of `1302` FEEDBACK §7, `1303` §1.1 and `1202` FEEDBACK §6 recorded | the merges; the architect's rulings of 14:10Z and 14:45Z |
+| 2026-11-24 | Phase 5 | The family order named and ranked: the RP2350 next (Aethelgard `RUL-08`, kept by Scotty), which is the first target past the trigger; then the 2026-11-23 research's ranking | Scotty, 2026-11-24; the northstar §3.1 PR |
 
 ## Provenance
 
