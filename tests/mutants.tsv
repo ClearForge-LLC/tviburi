@@ -277,7 +277,6 @@ DM37-restart	model/GuardedSTM32DMA.cs	var restart = state == Completed && r == C
 DM38-size	model/GuardedSTM32DMA.cs	if(((word >> 11) & 3) != ((word >> 13) & 3))	if(false)	dma-sizes
 DM39-fthProtected	model/GuardedSTM32DMA.cs	case FcrOffset: return DmdisBit | FthBits;	case FcrOffset: return DmdisBit;	dma-fth
 DM40-fthAny	tests/1303/fields.py	"FTH[1:0]", 1, 0, A,	"FTH[1:0]", 1, 0, Z,	dma-regen
-DM41-offset	model/GuardedSTM32DMA.cs	            if(stale[s])	            if(false)	dma-offset
 DM42-reloadSpan	model/GuardedSTM32DMA.cs	var items = (ulong)(reload ? programmed[s] : Items(s));	var items = (ulong)Items(s);	dma-reloadtcm
 FL01-waitShort	model/GuardedSTM32H7_Flash.cs	                if(latency < need)	                if(false)	flash-clockfirst
 FL03-vosUnknownAtVos1	model/GuardedSTM32H7_Flash.cs	var row = table[c.Vos == 0 ? 1 : c.Vos];	var row = table[c.Vos == 0 ? 3 : c.Vos];	flash-vosunknown
@@ -319,3 +318,39 @@ FL38-table17vos2	model/GuardedSTM32H7_Flash.cs	new[] { 55, 110, 165, 225 }	new[]
 FL39-d1cpre	model/GuardedSTM32H7_Flash.cs	c.Hz = sys / Div(d1 >> 8 & 0xF) / Div(d1 & 0xF);	c.Hz = sys / Div(d1 & 0xF);	flash-d1cpre
 FL40-progWhileProgramming	model/GuardedSTM32H7_Flash.cs	            if(programming)\n	            if(false)\n	flash-wrhrcc
 FL41-commonRegisters	model/GuardedSTM32H7_Flash.cs	else if(key[k] == 1 && !Aliases.Contains(b + 0x100))	else if(key[k] == 1)	flash-keymid
+US01-ueRule	model/GuardedSTM32F7_USART.cs	            if((cr1 & UeBit) == 0 || (offset == Cr1Offset && (word & UeBit) == 0))	            if(true)	usart-m1ue usart-stopue
+US02-disableAsOff	model/GuardedSTM32F7_USART.cs	            if((cr1 & UeBit) == 0 || (offset == Cr1Offset && (word & UeBit) == 0))	            if((cr1 & UeBit) == 0)	usart-disable
+US03-reinitAck	model/GuardedSTM32F7_USART.cs	            if(changed == 0 || (changed & ~Acknowledged(offset)) == 0)	            if(changed == 0)	usart-reinit
+US04-reinitPce	model/GuardedSTM32F7_USART.cs	offset == Cr1Offset ? M0Bit | PceBit | FifoenBit :	offset == Cr1Offset ? M0Bit | FifoenBit :	usart-reinit
+US05-sameValue	model/GuardedSTM32F7_USART.cs	var changed = (Copy(offset) ^ word) & mask;	var changed = word & mask;	usart-same
+US06-cr2Protected	model/GuardedSTM32F7_USART.cs	return 0x000FFF30 |	return 0x000FCF30 |	usart-stopue
+US07-field	model/GuardedSTM32F7_USART.cs	if(f.Offset != offset || f.Allowed == null || f.Allowed.Contains(f.Of(word)))	if(true)	usart-field
+US08-nine	model/GuardedSTM32F7_USART.cs	(word & M0Bit) != 0 && (word & PceBit) == 0	false	usart-nine
+US09-kernelStart	model/GuardedSTM32F7_USART.cs	if(offset == Cr1Offset && !Running(cr1) && Running(value)	if(false && offset == Cr1Offset && !Running(cr1) && Running(value)	usart-kernel
+US10-kernelRunning	model/GuardedSTM32F7_USART.cs	if(k != null && k.Modeled && k.Running)	if(k != null && k.Modeled)	usart-kernel
+US11-widthData	model/GuardedSTM32F7_USART.cs	offset == RdrOffset || offset == TdrOffset)	true)	usart-width
+US12-widthTdr	model/GuardedSTM32F7_USART.cs	offset == RdrOffset || offset == TdrOffset)	offset == RdrOffset)	usart-tdrbyte
+US13-read	model/GuardedSTM32F7_USART.cs	                if(!Defined(offset))\n                {\n                    records.Refuse("TVI-USART-READ"	                if(false)\n                {\n                    records.Refuse("TVI-USART-READ"	usart-read
+US14-copyCr1	model/GuardedSTM32F7_USART.cs	            case Cr1Offset: return cr1;	            case Cr1Offset: return inner.ReadDoubleWord(Cr1Offset);	usart-config usart-ap
+US15-copyCr2	model/GuardedSTM32F7_USART.cs	            case Cr2Offset: return cr2;	            case Cr2Offset: return inner.ReadDoubleWord(Cr2Offset);	usart-ap usart-reset
+US16-idleSet	model/GuardedSTM32F7_USART.cs	                        idle = true;\n	(empty)	usart-idle
+US17-idleRestart	model/GuardedSTM32F7_USART.cs	if(g == idleGen && (cr1 & UeBit) != 0	if((cr1 & UeBit) != 0	usart-idle
+US18-idleIrq	model/GuardedSTM32F7_USART.cs	IRQ.Set(innerIrq || (idle && (cr1 & IdleieBit) != 0));	IRQ.Set(innerIrq);	usart-idle
+US19-idlecf	model/GuardedSTM32F7_USART.cs	                if((word & IdleBit) != 0)\n                {\n                    idle = false;	                if(false)\n                {\n                    idle = false;	usart-idle
+US20-ueOffFlush	model/GuardedSTM32F7_USART.cs	                if((before & UeBit) != 0 && (word & UeBit) == 0)	                if(false)	usart-idle
+US21-innerIrq	model/GuardedSTM32F7_USART.cs	            inner.IRQ.AddStateChangedHook(v => { innerIrq = v; UpdateIrq(); });\n	(empty)	usart-idle
+US22-request	model/GuardedSTM32F7_USART.cs	                    ReceiveDmaRequest.Set();\n	(empty)	usart-dmarx
+US23-requestPeriodic	model/GuardedSTM32F7_USART.cs	if(RequestLevel() && !repulse &&	if(RequestLevel() && repulse &&	usart-dmarx
+US24-requestRdr	model/GuardedSTM32F7_USART.cs	                var v = inner.ReadDoubleWord(RdrOffset);\n                Request();	                var v = inner.ReadDoubleWord(RdrOffset);	usart-dmarx
+US25-requestDmar	model/GuardedSTM32F7_USART.cs	                cr3 = word;\n                inner.WriteDoubleWord(offset, word);\n                Request();	                cr3 = word;\n                inner.WriteDoubleWord(offset, word);	usart-dmarx
+US26-config	model/GuardedSTM32F7_USART.cs	            if(lowPowerMode)	            if(false)	usart-config2
+US27-names	model/GuardedSTM32F7_USART.cs	            ControlRegister1 = 0x0,	            ControlRegisterOne = 0x0,	usart-registrations
+US28-restate	model/stm32h7-usart-restate.repl	    IRQ -> exti@26\n	(empty)	usart-regen
+US29-fieldsM1	tests/1305/fields.py	'M1': ('Zero', T,	'M1': ('Any', T,	usart-regen usart-ledger
+US30-classRow	tools/tviburi-release/pins.tsv	Tviburi.GuardedSTM32F7_USART\tusart1 usart2	Tviburi.GuardedSTM32F7_USART\tusart2	usart-ledger
+US31-bench	model/bench-checks.tsv	Tviburi.GuardedSTM32F7_USART\tU1\t	Tviburi.GuardedSTM32F7_USART\tU2\t	usart-ledger
+DM43-suspendTcif	model/GuardedSTM32DMA.cs	            ((IFlagRegisterField[])IrqStatusField.GetValue(inner))[s].Value = true;\n	(empty)	dma-offset
+DM44-suspendOffset	model/GuardedSTM32DMA.cs	            OffsetField.SetValue(((Array)StreamsField.GetValue(inner)).GetValue(s), 0ul);\n	(empty)	dma-offset
+DM45-suspendRunning	model/GuardedSTM32DMA.cs	                if((word & EnBit) == 0 && Enabled(s) && Items(s) != 0)	                if(false)	dma-offset
+DM46-request43	model/GuardedSTM32DMA.cs	{ 9, 37, 39, 41, 43, 45, 77, 83, 115 }	{ 9, 37, 39, 41, 45, 77, 83, 115 }	dma-usart23
+DM47-request46	model/GuardedSTM32DMA.cs	{ 38, 40, 42, 46 }	{ 38, 40, 42 }	dma-usart23
