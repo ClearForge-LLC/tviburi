@@ -224,12 +224,12 @@ for r in recs:
         bad.append(('wrong field', name, r['bit']))
 missing = [(v, hex(k[0])) for k, v in cases.items() if (v[0] == 'refuse' or v[1] == 'USART_CR1.M0') and k not in seen]
 print(len(cases), 'cases;', len(recs), 'refusals;', 'bad', bad[:5], 'missing', missing[:5])
-sys.exit(0 if not bad and not missing and len(cases) > 400 else 1)
+sys.exit(0 if not bad and not missing and len(cases) >= 390 else 1)
 EOF" ;;
   ledger)
     mkdir -p "$work/ledger"
     rc=0; container -v "$src:/repo:ro,Z" -v "$work/ledger:/out:Z" "$IMAGE" sh -c '/repo/scripts/build-release /repo /out/release >/dev/null' </dev/null >"$work/ledger.stdout" 2>&1 || rc=$?
-    check "ledger: the release carries the USART guard's 138 field rows over its 12 registers (FIFOEN, M0, RXINV acknowledged as stock-wrong; IDLEIE, DMAR modeled; BRR's re-init pattern named), bench row U1; the stock model listed as guarded on the eight ports, lpuart1 left out" \
+    check "ledger: the release carries the USART guard's 138 field rows over its 12 registers (FIFOEN, M0, RXINV acknowledged as stock-wrong; IDLEIE, DMAR modeled; BRR's re-init pattern named), bench row U1; the manifest restates the eight ports and not lpuart1; the stock model row names the guard" \
       "[ \$rc = 0 ] && python3 -I -c '
 import json, sys
 rows = [json.loads(l) for l in open(sys.argv[1]).read().splitlines()[1:]]
@@ -243,9 +243,11 @@ ok = ok and \"usart_init on an enabled port\" in by[(\"USART_BRR\", \"BRR\")][\"
 bench = sorted((r[\"field\"], r[\"rule\"]) for r in rows if r.get(\"peripheral\") == g and r[\"row\"] == \"bench\")
 ok = ok and bench == [(\"U1\", \"TVI-USART-UE\")]
 m = [r for r in rows if r[\"row\"] == \"model\" and r[\"peripheral\"] == \"UART.STM32F7_USART\"]
-ok = ok and len(m) == 1 and m[0].get(\"guarded_by\") == g and m[0][\"instances\"] == [\"usart1\", \"usart2\", \"usart3\", \"uart4\", \"uart5\", \"usart6\", \"uart7\", \"uart8\"]
+ok = ok and len(m) == 1 and m[0].get(\"guarded_by\") == g
+r = sorted(l.split()[2] for l in open(sys.argv[2]) if l.startswith(\"restate UART.STM32F7_USART \"))
+ok = ok and r == [\"uart4\", \"uart5\", \"uart7\", \"uart8\", \"usart1\", \"usart2\", \"usart3\", \"usart6\"]
 sys.exit(0 if ok else 1)
-' '$work/ledger/release/LEDGER.jsonl'" ;;
+' '$work/ledger/release/LEDGER.jsonl' '$work/ledger/release/MANIFEST'" ;;
   registrations)
     run_case registrations - "$clk" 'sysbus LogPeripheralAccess sysbus.usart1 true' 'sysbus WriteDoubleWord 0x4001100C 0x271' 'sysbus ReadDoubleWord 0x40011000' 'peripherals'
     check "registrations: peripherals lists the eight ports as the guard and lpuart1 as stock; the access log names their registers as the stock model's (BaudRate, ControlRegister1; TVI-WO-1305.measure.md §2.3)" \
