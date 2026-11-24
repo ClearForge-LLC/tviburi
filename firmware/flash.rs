@@ -18,8 +18,8 @@
 //!   path="lockedsame"   - FLASH_CR2 written with the value it holds while locked: passes. MARK_READ = CR2 (0x31).
 //!   path="badkey"       - a first key other than KEY1: TVI-FLASH-KEY, predicted-fault (p182).
 //!   path="keytwice"     - bank 2 unlocked, then KEY1 again: TVI-FLASH-KEY (p163).
-//!   path="keymid"       - KEY1, an ACR write (common to both banks, Table 20 p172: passes), then a CR2 write before
-//!                         KEY2: TVI-FLASH-KEY at the CR2 write (p182).
+//!   path="keymid"       - bank 1's KEY1, an ACR write (common to both banks, Table 20 p172: passes), then a CR1 write
+//!                         before KEY2: TVI-FLASH-KEY at the CR1 write (p182).
 //!   path="keyhalf"      - KEY1 written by a 16-bit store: TVI-FLASH-KEY (p182: "writing less than 32 bits").
 //!   path="wrhlow"       - VOS1, 200 MHz, LATENCY 2 with WRHIGHFREQ 01, a sector erase started: TVI-FLASH-PROG at START2.
 //!   path="wrhpg"        - the same with PG2 set: TVI-FLASH-PROG at the PG2 write.
@@ -261,9 +261,9 @@ pub unsafe extern "C" fn reset() -> ! {
     }
     #[cfg(path = "keymid")]
     {
-        w(KEYR2, KEY1);
-        w(ACR, 0x37);   // a register common to both banks (Table 20 p172): not "of the same bank", passes
-        w(CR2, 0x30);
+        w(KEYR1, KEY1);
+        w(ACR, 0x37);   // a register common to both banks (Table 20 p172), at bank 1's offsets: not "of the same bank", passes
+        w(CR1, 0x30);
     }
     #[cfg(path = "keyhalf")]
     {

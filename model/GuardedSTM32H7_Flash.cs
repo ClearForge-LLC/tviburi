@@ -175,19 +175,17 @@ namespace Antmicro.Renode.Peripherals.Tviburi
                     return;
                 }
             }
-            else if(records.Recorded)
+            else
             {
-                // Recorded mode (RUL-19) measures every path: each rule is evaluated and records what it finds.
-                RefusedRegister(offset, b, word, width);
-                RefusedKey(offset, b, word, width);
-                RefusedLock(offset, b, word, width);
-                RefusedField(offset, b, word, width);
-                RefusedClock(offset, b, word, width);
-            }
-            else if(RefusedRegister(offset, b, word, width) || RefusedKey(offset, b, word, width) || RefusedLock(offset, b, word, width)
-                || RefusedField(offset, b, word, width) || RefusedClock(offset, b, word, width))
-            {
-                return;
+                // In the header's order. Enforcing: the first rule that fires refuses. Recorded mode (RUL-19) measures every
+                // path: each rule is evaluated and records what it finds.
+                foreach(var rule in new Func<long, long, uint, int, bool>[] { RefusedRegister, RefusedKey, RefusedLock, RefusedField, RefusedClock })
+                {
+                    if(rule(offset, b, word, width) && !records.Recorded)
+                    {
+                        return;
+                    }
+                }
             }
             Pass(raw, b, word);
         }
@@ -288,7 +286,7 @@ namespace Antmicro.Renode.Peripherals.Tviburi
                     return false;
                 }
             }
-            else if(key[k] == 1 && !Common.Contains(b))
+            else if(key[k] == 1 && !Aliases.Contains(b + 0x100))
             {
                 why = "a write to " + Name(b) + ", another bank " + (k + 1) + " register, between KEY1 and KEY2";
             }
@@ -351,13 +349,13 @@ namespace Antmicro.Renode.Peripherals.Tviburi
         {
             if(b == Acr)
             {
-                return Judge(word, new Access(offset, word, width));
+                return Judge(word, offset, word, width);
             }
             if(b == Cr1 || b == Cr2)
             {
                 var before = Served(b);
                 var starts = ((word & PgBit) != 0 && (before & PgBit) == 0) || ((word & (StartBit | FwBit)) != 0 && (word & (SerBit | BerBit)) != 0);
-                return starts && Program(base.ReadDoubleWord(Acr), new Access(offset, word, width), Name(b) + " = 0x" + word.ToString("X8") + " starts a program or erase", true);
+                return starts && Program(base.ReadDoubleWord(Acr), offset, word, width, Name(b) + " = 0x" + word.ToString("X8") + " starts a program or erase", true);
             }
             return false;
         }
@@ -373,14 +371,14 @@ namespace Antmicro.Renode.Peripherals.Tviburi
             {
                 return;   // a guard that did not load, or cannot model the platform, refuses its own accesses instead
             }
-            Judge(base.ReadDoubleWord(Acr), new Access(RccBase + offset, value, 32));
+            Judge(base.ReadDoubleWord(Acr), RccBase + offset, value, 32);
         }
 
         // The wait states (TVI-FLASH-WAIT) and, while a bank is programming, the programming delay (TVI-FLASH-PROG), for the
-        // ACR word `acr` against the clock now, at `at`, the write being judged (an ACR write, an RCC write). A mismatch
+        // ACR word `acr` against the clock now, at the write being judged (an ACR write, an RCC write at its absolute address). A mismatch
         // refuses at the write that makes it, and again only at a write that changes it (waitWhy, progWhy: its description,
         // clock and latency included); a later write that leaves it as it was refuses nothing.
-        private bool Judge(uint acr, Access at)
+        private bool Judge(uint acr, long offset, uint value, int width)
         {
             var fired = false;
             var clock = Clock();
@@ -404,15 +402,15 @@ namespace Antmicro.Renode.Peripherals.Tviburi
             if(why != null && why != waitWhy)
             {
                 fired = true;
-                records.Refuse("TVI-FLASH-WAIT", kind, "FLASH_ACR", "LATENCY = " + latency, why + (at.Offset >= RccBase ? ", at the RCC write to 0x" + at.Offset.ToString("X8") : ", at the FLASH_ACR write")
+                records.Refuse("TVI-FLASH-WAIT", kind, "FLASH_ACR", "LATENCY = " + latency, why + (offset >= RccBase ? ", at the RCC write to 0x" + offset.ToString("X8") : ", at the FLASH_ACR write")
                     + ": too few wait states for the clock fetch the wrong instructions or data (from memory; RM0433 says LATENCY \"must be correctly programmed\")",
-                    "RM0433 Rev 9 §4.3.8 Table 17 p160; p159-161 (the order: raise LATENCY before the clock, lower the clock before LATENCY)", State(), at.Offset, at.Value, at.Width);
+                    "RM0433 Rev 9 §4.3.8 Table 17 p160; p159-161 (the order: raise LATENCY before the clock, lower the clock before LATENCY)", State(), offset, value, width);
             }
             waitWhy = why;
             var programming = (base.ReadDoubleWord(Cr1) & PgBit) != 0 || (base.ReadDoubleWord(Cr2) & PgBit) != 0;
             if(programming)
             {
-                fired |= Program(acr, at, "while PG is set", false);
+                fired |= Program(acr, offset, value, width, "while PG is set", false);
             }
             else
             {
@@ -423,7 +421,7 @@ namespace Antmicro.Renode.Peripherals.Tviburi
 
         // TVI-FLASH-PROG: WRHIGHFREQ against Table 17 for the clock. `start`: a program or erase start, judged each time;
         // otherwise as Judge's (progWhy).
-        private bool Program(uint acr, Access at, string when, bool start)
+        private bool Program(uint acr, long offset, uint value, int width, string when, bool start)
         {
             var clock = Clock();
             var wrh = (int)(acr >> 4 & 3);
@@ -454,7 +452,7 @@ namespace Antmicro.Renode.Peripherals.Tviburi
             }
             records.Refuse("TVI-FLASH-PROG", kind, "FLASH_ACR", "WRHIGHFREQ = " + Convert.ToString(wrh, 2).PadLeft(2, '0'),
                 why + ", " + when + ": a programming delay too tight for the clock, \"the non-volatile memory will not operate correctly\"",
-                "RM0433 Rev 9 §4.3.9 p164; §4.3.8 Table 17 p160; §4.9.1 p201", State(), at.Offset, at.Value, at.Width);
+                "RM0433 Rev 9 §4.3.9 p164; §4.3.8 Table 17 p160; §4.9.1 p201", State(), offset, value, width);
             return true;
         }
 
@@ -572,20 +570,6 @@ namespace Antmicro.Renode.Peripherals.Tviburi
             public string Note;
         }
 
-        private sealed class Access
-        {
-            public Access(long offset, uint value, int width)
-            {
-                Offset = offset;
-                Value = value;
-                Width = width;
-            }
-
-            public long Offset { get; }
-            public uint Value { get; }
-            public int Width { get; }
-        }
-
         // Table 17 (p160): per scale (index 1 VOS1, 2 VOS2, 3 VOS3), the top of each band in MHz. LATENCY n covers the n-th
         // band; WRHIGHFREQ 00, 01, 10 the three delay bands. Read from the rendered page (TVI-WO-1304.measure.md §2.2).
         private static readonly int[][] Latencies17 = { null, new[] { 70, 140, 210, 225 }, new[] { 55, 110, 165, 225 }, new[] { 45, 90, 135, 180, 225 } };
@@ -593,7 +577,9 @@ namespace Antmicro.Renode.Peripherals.Tviburi
 
         // ---- the registers -------------------------------------------------------------------------------------
 
-        // A bank 2 alias of a common register (Table 20 p172; ACR p201, OPTSR_CUR p212) is that register.
+        // A bank 2 alias of a common register (Table 20 p172; ACR p201, OPTSR_CUR p212) is that register. The registers with
+        // an alias are the common ones: a write to one between KEY1 and KEY2 is not "a different register belonging to the
+        // same bank" (p182).
         private static long Canon(long b)
         {
             return Aliases.Contains(b) ? b - 0x100 : b;
@@ -712,9 +698,6 @@ namespace Antmicro.Renode.Peripherals.Tviburi
         private static readonly long[] ClockRegisters = { 0x00, 0x10, 0x18, 0x28, 0x2C, 0x30, 0x34 };   // RCC CR, CFGR, D1CFGR, PLLCKSELR, PLLCFGR, PLL1DIVR, PLL1FRACR
         private static readonly long[] Aliases = { 0x100, 0x108, 0x118, 0x11C, 0x120, 0x124, 0x140, 0x144, 0x15C };
         private static readonly long[] Options = { 0x008, 0x018, 0x020, 0x024 };
-        // The registers common to both banks (Table 20 p172): a write to one between KEY1 and KEY2 is not "a different
-        // register belonging to the same bank" (p182).
-        private static readonly long[] Common = { 0x000, 0x008, 0x018, 0x01C, 0x020, 0x024, 0x040, 0x044, 0x05C };
         private static readonly Dictionary<long, string> Names = new Dictionary<long, string>
         {
             { 0x000, "FLASH_ACR" }, { 0x004, "FLASH_KEYR1" }, { 0x008, "FLASH_OPTKEYR" }, { 0x00C, "FLASH_CR1" }, { 0x010, "FLASH_SR1" },

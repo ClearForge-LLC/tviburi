@@ -250,7 +250,7 @@ FL12-lock	model/GuardedSTM32H7_Flash.cs	            if((!locked && !locking) || 
 FL13-lockSame	model/GuardedSTM32H7_Flash.cs	var changed = (word ^ Served(b)) & ~LockBit;	var changed = word & ~LockBit;	flash-lockedsame
 FL14-keyWrong	model/GuardedSTM32H7_Flash.cs	else if(key[k] == 0 && word != Key1)	else if(false)	flash-badkey
 FL15-keyUnlocked	model/GuardedSTM32H7_Flash.cs	else if(!LockedCr(k))	else if(false)	flash-keytwice
-FL16-keyMid	model/GuardedSTM32H7_Flash.cs	else if(key[k] == 1 && !Common.Contains(b))	else if(false)	flash-keymid
+FL16-keyMid	model/GuardedSTM32H7_Flash.cs	else if(key[k] == 1 && !Aliases.Contains(b + 0x100))	else if(false)	flash-keymid
 FL17-keyWidth	model/GuardedSTM32H7_Flash.cs	                if(width != 32)\n	                if(false)\n	flash-keyhalf
 FL18-keyAdvance	model/GuardedSTM32H7_Flash.cs	key[k] = key[k] == 0 ? 1 : 0;	key[k] = 0;	flash-ap
 FL19-psize	model/GuardedSTM32H7_Flash.cs	return (base.ReadDoubleWord(b) & ~PsizeMask) | (psize[Bank(b)] << 4);	return base.ReadDoubleWord(b);	flash-ap flash-reset
@@ -275,4 +275,4 @@ FL37-bandEdge	model/GuardedSTM32H7_Flash.cs	if(c.Hz <= (ulong)row[i] * 1000000)	
 FL38-table17vos2	model/GuardedSTM32H7_Flash.cs	new[] { 55, 110, 165, 225 }	new[] { 55, 140, 165, 225 }	flash-vos2
 FL39-d1cpre	model/GuardedSTM32H7_Flash.cs	c.Hz = sys / Div(d1 >> 8 & 0xF) / Div(d1 & 0xF);	c.Hz = sys / Div(d1 & 0xF);	flash-d1cpre
 FL40-progWhileProgramming	model/GuardedSTM32H7_Flash.cs	            if(programming)\n	            if(false)\n	flash-wrhrcc
-FL41-commonRegisters	model/GuardedSTM32H7_Flash.cs	else if(key[k] == 1 && !Common.Contains(b))	else if(key[k] == 1)	flash-keymid
+FL41-commonRegisters	model/GuardedSTM32H7_Flash.cs	else if(key[k] == 1 && !Aliases.Contains(b + 0x100))	else if(key[k] == 1)	flash-keymid

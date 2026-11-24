@@ -133,8 +133,8 @@ for t in ${TVIBURI_TESTS:-$CASES}; do
       "refuses badkey TVI-FLASH-KEY predicted-fault 'r[\"bit\"] == \"a first key other than KEY1 (0x45670123)\" and \"p182\" in r[\"citation\"]'" ;;
     keytwice) check "keytwice: a key written while FLASH_CR2 is unlocked refuses TVI-FLASH-KEY (p163)" \
       "refuses keytwice TVI-FLASH-KEY predicted-fault 'r[\"bit\"].startswith(\"a key written while FLASH_CR2 is unlocked\")'" ;;
-    keymid) check "keymid: a CR2 write between KEY1 and KEY2 refuses TVI-FLASH-KEY (p182)" \
-      "refuses keymid TVI-FLASH-KEY predicted-fault '\"between KEY1 and KEY2\" in r[\"bit\"] and r[\"access\"][\"offset\"] == \"0x10C\" and r[\"register\"] == \"FLASH_CR2\"'" ;;
+    keymid) check "keymid: between bank 1's KEY1 and KEY2, an ACR write (common, Table 20 p172) passes and a CR1 write refuses TVI-FLASH-KEY (p182)" \
+      "refuses keymid TVI-FLASH-KEY predicted-fault '\"between KEY1 and KEY2\" in r[\"bit\"] and r[\"access\"][\"offset\"] == \"0xC\" and r[\"register\"] == \"FLASH_CR1\"'" ;;
     keyhalf) check "keyhalf: KEY1 written by a 16-bit store refuses TVI-FLASH-KEY (p182: less than 32 bits)" \
       "refuses keyhalf TVI-FLASH-KEY predicted-fault 'r[\"bit\"] == \"a key written in less than 32 bits (16)\" and r[\"access\"][\"width\"] == 16'" ;;
     optsr) check "optsr: OPTSR_CUR and its alias 0x11C read the board's declared image, 0x1BC6AAF0, not the stock model's 0x0406AAF0 (ruled Q3)" \
