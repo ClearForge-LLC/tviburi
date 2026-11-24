@@ -268,3 +268,4 @@ FL29-config	model/GuardedSTM32H7_Flash.cs	if(optionBytes < -1 || optionBytes > 0
 FL30-ledgerLatency	model/GuardedSTM32H7_Flash.cs	"LATENCY", 3, 0, Latencies,	"LATENCY", 3, 0, Any,	flash-ledger flash-regen
 FL31-bank	model/GuardedSTM32H7_Flash.cs	return b >= 0x100 ? 1 : 0;	return 0;	flash-keytwice
 FL32-restate	model/stm32h7-flash-restate.repl	    -> nvic@4\n	(empty)	flash-regen
+FL33-clockRegisters	model/GuardedSTM32H7_Flash.cs	{ 0x00, 0x10, 0x18, 0x28, 0x2C, 0x30, 0x34 }	{ 0x00, 0x10, 0x28, 0x2C, 0x30, 0x34 }	flash-prescaler

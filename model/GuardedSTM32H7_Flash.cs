@@ -357,8 +357,14 @@ namespace Antmicro.Renode.Peripherals.Tviburi
         // ---- the clock (Table 17 p160) -------------------------------------------------------------------------
 
         // After every write the RCC guard passes (its event `Written`, ruled Q6): the clock that write leaves, against ACR.
+        // Only the registers the AXI clock is computed from can change it (Clock, Pll1); ArduPilot's other RCC writes, about
+        // 26,000 enables and resets in 5 s (TVI-WO-1300 §4), are not judged.
         private void OnRccWritten(long offset, uint value)
         {
+            if(!ClockRegisters.Contains(offset))
+            {
+                return;
+            }
             Judge(base.ReadDoubleWord(Acr), new Access(RccBase + offset, value, 32));
         }
 
@@ -694,6 +700,7 @@ namespace Antmicro.Renode.Peripherals.Tviburi
         private const long Sr2 = 0x110;
         private const long Ccr2 = 0x114;
 
+        private static readonly long[] ClockRegisters = { 0x00, 0x10, 0x18, 0x28, 0x2C, 0x30, 0x34 };   // RCC CR, CFGR, D1CFGR, PLLCKSELR, PLLCFGR, PLL1DIVR, PLL1FRACR
         private static readonly long[] Aliases = { 0x100, 0x108, 0x118, 0x11C, 0x120, 0x124, 0x140, 0x144, 0x15C };
         private static readonly long[] Options = { 0x008, 0x018, 0x020, 0x024 };
         private static readonly Dictionary<long, string> Names = new Dictionary<long, string>
