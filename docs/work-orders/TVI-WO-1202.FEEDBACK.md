@@ -36,30 +36,35 @@
 
 | Clause | Result |
 |---|---|
-| A code PR's `ci` under 20 min, measured on this PR | **15.2 min** (run 45402235650) and **14.5 min** (run 45405253648), wall time from the run's creation to its end |
+| A code PR's `ci` under 20 min, measured on this PR | **15.2 min** (run 45402235650), **14.5 min** (45405253648) and **15.0 min** (45408008635), wall time from the run's creation to its end |
 | A docs-only PR under 3 min | **65 s** (run 45405252803, PR #34: one Markdown line against this branch, so it ran this workflow; branch deleted, PR closed, never merged). `route` said `class=docs`, `budget=no`; every other job was skipped |
-| Every case and mutant from main runs exactly once on a code PR, proven by the aggregate | Both runs: `aggregate: 410 expected (180 cases, 230 mutants), 410 ran across 5 shards, 0 failures` |
+| Every case and mutant from main runs exactly once on a code PR, proven by the aggregate | All three runs: `aggregate: 410 expected (180 cases, 230 mutants), 410 ran across 5 shards, 0 failures` |
 | A planted shard that drops one fails it | `aggregate_refuses_a_dropped_a_doubled_and_a_foreign_item`. Also run on the real lists: one case dropped from a shard's record gives `FAIL case unit did not run in any shard`, exit 1 |
 | The inventory test fails on a planted path | `inventory_refuses_code_classed_as_documentation` (`docs/board.resc`, `docs/Guard.cs` under a broadened classifier), plus a test that reads `docs/`, a stale citation, a symlink into `docs/`, and each budget path dropped |
-| The memory budget still runs in one job, main against the branch, on every code PR | `budget`: 6.1 and 5.9 min, `PASS` both times |
-| CI green | Both code runs and the docs run: every job green |
+| The memory budget still runs in one job, main against the branch, on every code PR | `budget`: 6.1, 5.9 and 6.2 min, `PASS` each time |
+| CI green | Three code runs and the docs run: every job green |
 
 ## 3. Measured on this PR
 
-| Job | run 1 (45402235650) | run 2 (45405253648) |
-|---|---|---|
-| route | 0.8 | 0.8 |
-| shard 1 / 2 / 3 / 4 / 5 | 9.3 / **13.5** / 12.2 / 8.8 / 9.2 | **12.6** / 9.0 / 9.3 / 10.3 / 8.9 |
-| budget | 6.1 | 5.9 |
-| budget-tests | 5.9 | 7.5 |
-| ci (pull, then the aggregate) | 0.8 | 0.9 |
-| **wall** | **15.2** | **14.5** |
-| runner time, summed | about 67 min | about 65 min (the serial run took 44–53) |
+| Job | run 1 (45402235650) | run 2 (45405253648) | run 3 (45408008635) |
+|---|---|---|---|
+| route | 0.8 | 0.8 | 0.9 |
+| shard 1 / 2 / 3 / 4 / 5 | 9.3 / **13.5** / 12.2 / 8.8 / 9.2 | **12.6** / 9.0 / 9.3 / 10.3 / 8.9 | 9.2 / 12.1 / 8.7 / **13.2** / 9.1 |
+| budget | 6.1 | 5.9 | 6.2 |
+| budget-tests | 5.9 | 7.5 | 6.1 |
+| ci (pull, then the aggregate) | 0.8 | 0.9 | 0.8 |
+| **wall** | **15.2** | **14.5** | **15.0** |
+| runner time, summed | about 67 min | about 65 min | about 66 min (the serial run took 44–53) |
 
-- **The limit is the slowest runner, not the plan.**
-  - Run 2's shards name their CPUs. The two AMD EPYC 9V74 shards took 12.6 and 10.3 min; the three Intel Xeon 6975P-C shards took 8.9–9.3.
-  - Run 1's five shards ran at 0.85–1.29 × their planned weights.
-  - The plan balances weights to within 0.1 min, so a shard's time is its runner's speed.
+- **The limit is the slowest runner, not the plan.** The plan balances weights to within 0.1 min, so a shard's time is
+  its runner's speed. Measured, not fully explained:
+  - Run 1's five shards ran at 0.85–1.29 × their weights.
+  - Run 2's shards name their CPUs:
+    - the three Intel Xeon 6975P-C shards ran at 0.86–0.89 × (median item);
+    - the two AMD EPYC 9V74 shards ran at **1.23 ×** and **0.97 ×**.
+  - The slow shard was slow across the board (p10–p90 1.17–1.29 ×), not in a few items.
+  - So the CPU model accounts for part of the spread; two runners of one model still differed by a quarter.
+  - Run 3 met two more CPU models. Its slowest shard (13.2 min) ran on an AMD EPYC 7763, and the next (12.1) on an Intel Xeon Platinum 8573C. Its three others ran 8.7–9.2 min, on an AMD EPYC 9V45 and two Intel 6975P-C.
 - **Headroom.** At the slowest shard seen (13.5 min, about 1.3 × the weights), each guard work order adds about 9–10 min of serial work. That is about 2 min a shard, so about two more guards fit under 20 min before a sixth shard is needed.
 - **The re-measure (asked at 13:20Z).**
   - Every item's time on this PR's run is in `TVI-WO-1202.times.tsv`, column `run33`.
@@ -67,7 +72,7 @@
   - Its slowest: `timer-half` 10.5 s, `TM09-passDrives` 20.5 s, `TM19-field` 17.6 s.
 - **The fixtures a shard repeats (measure P3).** `identity` took 46 s in its shard, against 28 s serially, because it built the `modeled` run itself.
 - **The teardown race (Q5).**
-  - 0 lost end records in 2 × 180 shard case runs, and 0 in the serial runs before.
+  - 0 lost end records in 3 × 180 shard case runs, and 0 in the serial runs before.
   - The rate did not rise, so there is no stop.
   - Nothing reruns itself.
 
@@ -77,7 +82,9 @@
 |---|---|
 | A shard plan that drops a case or mutant | The aggregate fails it (tested on the real 410-item lists, and in unit tests) |
 | A renamed case, or a new case with no measured time | The expected set is the tree's own lists, never `times.tsv`. A new id weighs its kind's median and runs; a stale id in `times.tsv` is ignored. A renamed id that a shard ran under its old name: "not in the tree's lists" |
-| A mutant row the harness skips (empty id) | `items` keeps it, so the aggregate fails "did not run"; fail closed |
+| A mutant row with an empty id | Run: bash's `read` collapses the leading tab, so `tests/mutants.sh` sees a row with four fields and refuses it ("bad row", exit 2). `items` keeps the empty id, so the aggregate also fails "did not run". Fail closed twice |
+| A case that fails, or a mutant that survives, in a shard | Run on a fixture tree (two cases, one broken; one mutant made a no-op), through `tests/ci/shard.sh 1 1` on Furnace. `FAIL …`, `ALIVE R01-refusalFirst`, and the shard exited 1. Its record still held all three items, so the aggregate passes exactly-once, as designed. The failure reaches `ci` through the shard job's result, which the gate requires to be `success` |
+| A push to main | `tests/ci/route.sh --all` run locally: the inventory, then `class=code`, `budget=yes` |
 | A `.md` file a test reads | The inventory fails on any code file naming a docs file or `docs/` that is not a listed citation. 48 citations, each read in its file: comments, and strings that records or the ledger carry. 1302's ten new ones were caught by the inventory on the merge, then read and listed |
 | A script under `docs/` | Not `.md`, so code. A broadened classifier fails the inventory's check 1 |
 | **A symlink in code that points into `docs/`** | **Found:** the inventory read through the link and saw only the target's bytes, so a docs-only change could have changed what a test reads. **Fixed:** the inventory refuses a symlink that is or reaches documentation, or that leaves the repository. No symlink is tracked today |
@@ -104,7 +111,7 @@ Run by a fresh reviewer. Of its six proposals, four were taken. After them, the 
 ## 6. Rows and findings
 
 - **F1. Runner speed sets the wall time.**
-  - GitHub's 4-vCPU runners are AMD EPYC 9V74, Intel Xeon 6975P-C, or Intel Xeon Platinum 8573C.
+  - GitHub's 4-vCPU runners seen here: AMD EPYC 9V74, 9V45 and 7763; Intel Xeon 6975P-C and Platinum 8573C.
   - The same shard takes about 1.3 × as long on the slowest.
   - The shard count is one number (`shard.yml`'s default, and the five jobs in `ci.yml`).
   - A sixth shard is the remedy when the slowest projected shard passes about 17 min: roughly two guard work orders from now.
@@ -117,10 +124,19 @@ Run by a fresh reviewer. Of its six proposals, four were taken. After them, the 
 - **F8. A required status check, if branch protection has one, should name `ci`.** The read-only token cannot read branch protection (403). The organisation's rulesets it can read name no status check.
 - **F9. The PR body cannot be edited by `gh-write`,** so it was written once, at opening, to hold through READY. The measured numbers are here, not in the body.
 - **F10. A breach, owned:** in §1.1 I ran one bare `podman run` outside `capped-run` (a 1-second `ls` in the pinned image). Every other container went through `capped-run`, one at a time.
-- **F11. Tokens.** Two mints. The first was revoked at once after the push and the PR. The second was revoked after the second push, the docs demonstration and its branch's deletion. Both returned `revoked (HTTP 204)`, and neither was in any command line: each was filled from the transcript by pattern.
+- **F11. Tokens.** Four mints, each revoked right after its last use, each `revoked (HTTP 204)`:
+  - the first push and the PR;
+  - the second push, the docs demonstration, and its branch's deletion;
+  - the FEEDBACK push;
+  - the final push.
+
+  No token was ever in a command line: each was filled from the transcript by pattern.
+- **F12. `tests/ci/citations.tsv` is a cost on every later work order.** The inventory fails on any code comment that newly names, or stops naming, a documentation file, until the list is edited. 1302 alone needed ten rows. The file is under `tests/ci/`, which is in the budget's list, so editing it also runs the budget's tests (about 6–7 min of runner time, off the critical path). It is also outside a guard work order's usual fence. **A ruling is wanted:** a standing fence note that any WO may add its own citation rows, or a narrower check (for example, references only from scripts, not from model comments).
+- **F13. The Q5 remedy is not exercised.** A person re-running one failed shard ("re-run failed jobs") also re-runs `ci`. Whether `ci` then receives the four passed shards' outputs from the first attempt is not tested here: the read-only token cannot re-run jobs. From memory, not checked: outputs of jobs that are not re-run are kept. If they are not, the aggregate reports their items as not run, which fails closed, and the remedy is to re-run all jobs.
+- **F14. A protected document is stale:** `docs/roadmap.md` Phase 1's row "CI runs the full suite (about 19 minutes) on a docs-only pull request" describes what this WO replaces. It is for the architect to update.
 
 ## 7. Suites, mutants and CI
 
 - `tools/tviburi-route`: 11 tests pass in the pinned image. Its 17 guard mutants are all killed.
-- PR #33: two code runs, both green, with the aggregate at 410 of 410 both times. The docs run is green. The third code run (this FEEDBACK and the reductions) is in the READY note.
+- PR #33: three code runs, all green, with the aggregate at 410 of 410 each time; the third ran the reductions and this FEEDBACK's first version. The docs run is green. The run on this FEEDBACK's final commit is in the READY note.
 - One local shard (1 of 40) ran through the real harness on Furnace: 7 of 7 mutants killed and recorded.
