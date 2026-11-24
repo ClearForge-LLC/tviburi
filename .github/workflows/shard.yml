@@ -9,9 +9,9 @@ on:
         type: number
         required: true
       of:
-        # The number of shards: ci.yml calls shard-1 .. shard-5 (ruled 2026-11-24T10:30Z, Q1).
+        # The number of shards: ci.yml calls shard-1 .. shard-6 (five ruled 2026-11-24T10:30Z, Q1; six TVI-WO-1202a).
         type: number
-        default: 5
+        default: 6
     outputs:
       ran:
         value: ${{ jobs.shard.outputs.ran }}
