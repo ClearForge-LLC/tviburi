@@ -8,6 +8,7 @@ using "platforms/boards/nucleo_h753zi.repl"
 using "./stm32h7-rcc-restate.repl"
 using "./stm32h7-gpio-restate.repl"
 using "./stm32h7-timer-restate.repl"
+using "./stm32h7-dma-restate.repl"
 
 // The guard's mode (RUL-19), and the stock board's `rcc: hseFrequency: 8_000_000` restated on the guard: that update
 // lands on the cancelled stock entry (TVI-WO-1300.rm0433.md §6.4).
@@ -75,6 +76,12 @@ tviburiGpioK:
 tviburiTimer1:
     mode: "enforcing"
 tviburiTimer8:
+    mode: "enforcing"
+// TVI-WO-1303: DMA1 and DMA2 are guarded (stm32h7-dma-restate.repl cancels each stock controller and declares the guard
+// as "dma1"/"dma2", and routes DMAMUX1's channels to the guards' variables). Each controller's mode (RUL-19).
+tviburiDma1:
+    mode: "enforcing"
+tviburiDma2:
     mode: "enforcing"
 // The stock board's LEDs and button are registered on, and connected to, the cancelled ports: restated onto the guards
 // (without this the load fails, E39, and Renode exits 0: TVI-WO-1301.rm0433.md §6.5).

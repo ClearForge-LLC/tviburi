@@ -23,6 +23,9 @@ mode=accept
 rm -rf /var/lib/aethelgard; cp -r /cap/$n/varlib /var/lib/aethelgard
 mapfile -d '' args < /cap/$n/argv.bin
 args=("${args[@]:1}")
+# Aethelgard >= 65c74788 runs Renode under its reaper (`... -- /usr/local/bin/renode ...`): keep only what follows `--` and
+# the renode path (TVI-WO-1302 FEEDBACK §7 row, taken by TVI-WO-1303 for its recaptured boots). An argv without it is unchanged.
+for i in "${!args[@]}"; do [ "${args[$i]}" = "--" ] && { args=("${args[@]:$((i + 2))}"); break; }; done
 d=""; cfg=""
 for i in "${!args[@]}"; do [ "${args[$i]}" = "--config" ] && { cfg=${args[$((i + 1))]}; d=$(dirname "$cfg"); }; done
 plat=$d/platform-booted.repl
@@ -64,6 +67,13 @@ for i in "${!args[@]}"; do
     { echo; cat /repo/model/stm32h7-timer-restate.repl; echo
       printf 'tviburiTimer1:\n    mode: "%s"\n\ntviburiTimer8:\n    mode: "%s"\n\n' "${ACCEPT_MODE:-recorded}" "${ACCEPT_MODE:-recorded}"
       cat /out/$n-$mode.moved-timer.txt; } >> "$plat"
+  fi
+  # TVI-WO-1303: a tree with the DMA restatement (DMA1 and DMA2 guarded) gets it last, with each controller's mode.
+  # The consumer's platforms declare no `dma1:`/`dma2:` of their own (measured on the 16 captured platforms); their
+  # references to `dmamux1` stay bound, since DMAMUX1 is not cancelled (ruled 2026-11-24T14:10Z Q1).
+  if [ -f /repo/model/stm32h7-dma-restate.repl ]; then
+    { echo; cat /repo/model/stm32h7-dma-restate.repl; echo
+      printf 'tviburiDma1:\n    mode: "%s"\n\ntviburiDma2:\n    mode: "%s"\n\n' "${ACCEPT_MODE:-recorded}" "${ACCEPT_MODE:-recorded}"; } >> "$plat"
   fi
   args[$((i + 1))]=${c/'mach create; '/'include @/tmp/release/Tviburi.cs; mach create; '}
 done

@@ -172,7 +172,7 @@ G13-portFromAddress	model/GuardedSTM32_GPIOPort.cs	port = (char)('A' + (int)((st
 G14-tableData	model/GuardedSTM32_GPIOPort.cs	PA5:89:	PA5:90:	afcheck
 G15-restatedRoute	model/stm32h7-gpio-restate.repl	tviburiTimer1:\n    0 -> tviburiGpioA#07@01 | tviburiGpioA#08@01 |	tviburiTimer1:\n    0 -> tviburiGpioA#07@01 |	gpio-registrations
 G16-boardPackage	model/tviburi-nucleo-h753zi.repl	tviburiGpioH:\n    mode: "enforcing"\n    package: "LQFP144"	tviburiGpioH:\n    mode: "enforcing"	gpio-package
-G17-namesLine	scripts/tviburi-spike	gpioPortJ gpioPortK timer1 timer8 >	gpioPortJ timer1 timer8 >	modeled
+G17-namesLine	scripts/tviburi-spike	gpioPortJ gpioPortK timer1 timer8 dma1 dma2 >	gpioPortJ timer1 timer8 dma1 dma2 >	modeled
 G18-unlistedPinAf	model/GuardedSTM32_GPIOPort.cs	if(cell == null || cell.Text == "-")	if(cell != null && cell.Text == "-")	gpio-pk8af
 G19-unlistedPinPackage	model/GuardedSTM32_GPIOPort.cs	(!bonding.TryGetValue("P" + port + pin, out var b) || b.Pin == null)	(bonding.TryGetValue("P" + port + pin, out var b) && b.Pin == null)	gpio-pk8out
 G20-staleRefresh	model/GuardedSTM32_GPIOPort.cs	base.ReadDoubleWord(b);\n            }\n            var before = Selection();	}\n            var before = Selection();	gpio-resetwrite
@@ -236,3 +236,46 @@ TM30-restateTim8	model/stm32h7-gpio-restate.repl	tviburiTimer8:\n    0 -> tvibur
 TM31-regen	model/GuardedSTM32_Timer.cs	the stock model: the auto-reload value; probed (T1)	the stock model: the auto-reload value	timer-regen
 TM32-gcUnsubscribe	model/GuardedSTM32_Timer.cs	            ((Machine)machine).StateChanged -= CollectAtStart;\n	(empty)	timer-gconce
 TM33-gcSubscribe	model/GuardedSTM32_Timer.cs	                m.StateChanged += CollectAtStart;	                ;	timer-gconce
+# TVI-WO-1303: the DMA guard, one mutant per test of tests/1303/dma.sh (and DM35 for the release's class row), each killed by the dma-<case> it names.
+DM01-axiMapped	model/GuardedSTM32DMA.cs	Tuple.Create(0x24000000ul, 0x2407FFFFul),	(empty)	dma-axi
+DM02-dtcm	model/GuardedSTM32DMA.cs	if(start <= DtcmEnd && end >= DtcmStart)	if(false)	dma-tcm dma-partcm
+DM03-itcm	model/GuardedSTM32DMA.cs	if(start <= ItcmEnd)	if(false)	dma-itcm
+DM04-parSpan	model/GuardedSTM32DMA.cs	refused |= RefusedSpan(offset, s, word, "PAR", par,	refused |= par == 1 && RefusedSpan(offset, s, word, "PAR", par,	dma-partcm
+DM05-below	model/GuardedSTM32DMA.cs	if(start <= DtcmEnd && end >= DtcmStart)	if(start >= DtcmStart && start <= DtcmEnd)	dma-below
+DM06-wrap	model/GuardedSTM32DMA.cs	if(end > 0xFFFFFFFFul)	if(false)	dma-wrap
+DM07-unmapped	model/GuardedSTM32DMA.cs	                    return "0x" + a.ToString("X8");	                    return null;	dma-unmapped
+DM08-ndt0	model/GuardedSTM32DMA.cs	if(items != 0)	if(true)	dma-ndt0
+DM09-running	model/GuardedSTM32DMA.cs	return !Enabled(s) ? Off : Items(s) != 0 ? Running : Completed;	return !Enabled(s) ? Off : Completed;	dma-en
+DM10-before	model/GuardedSTM32DMA.cs	            var state = StreamState(s);\n            if(state == Off)	            var state = (word & EnBit) == 0 ? Off : StreamState(s);\n            if(state == Off)	dma-enoff
+DM11-completed	model/GuardedSTM32DMA.cs	return !Enabled(s) ? Off : Items(s) != 0 ? Running : Completed;	return !Enabled(s) ? Off : Running;	dma-done
+DM12-sameValue	model/GuardedSTM32DMA.cs	var changed = (word ^ old) & mask;	var changed = mask;	dma-same
+DM13-tcieProtected	model/GuardedSTM32DMA.cs	private const uint CrProtected = 0x01EFFEE0;	private const uint CrProtected = 0x01EFFEF0;	dma-disable
+DM14-crCopy	model/GuardedSTM32DMA.cs	return (cr[s] & ~EnBit) | (inner.ReadDoubleWord(offset) & EnBit);	return inner.ReadDoubleWord(offset);	dma-disable
+DM15-width	model/GuardedSTM32DMA.cs	if(width == 32 && (offset & 3) == 0)	if(true)	dma-width
+DM16-read	model/GuardedSTM32DMA.cs	if(RegisterOffset(offset) < 0)\n            {\n                records.Refuse("TVI-DMA-READ"	if(false)\n            {\n                records.Refuse("TVI-DMA-READ"	dma-read
+DM17-field	model/GuardedSTM32DMA.cs	if(f.Allowed != null && !f.Allowed.Contains(v))	if(false)	dma-field dma-fields
+DM18-sizes	model/GuardedSTM32DMA.cs	private static readonly uint[] Sizes = { 0, 1, 2 };	private static readonly uint[] Sizes = { 0, 2 };	dma-msize16
+DM19-noRequest	model/GuardedSTM32DMA.cs	if(id == 0 || id == 54 || id >= 116)	if(id == 54 || id >= 116)	dma-route0
+DM20-reserved	model/GuardedSTM32DMA.cs	if(id == 0 || id == 54 || id >= 116)	if(id == 0 || id >= 116)	dma-route54
+DM21-generator	model/GuardedSTM32DMA.cs	            if(id <= 8)	            if(false)	dma-mux
+DM22-shared	model/GuardedSTM32DMA.cs	var state = OtherState(other);	var state = Off;	dma-shared
+DM23-sharedAcross	model/GuardedSTM32DMA.cs	return other == null ? Off : other.StreamState(c % Streams);	return Off;	dma-sharedx
+DM24-request	model/GuardedSTM32DMA.cs	if(!raised.Contains(id))	if(false)	dma-request
+DM25-txAck	model/GuardedSTM32DMA.cs	private static readonly uint[] RaisedFromMemory = { 38, 40, 42 };	private static readonly uint[] RaisedFromMemory = { 38, 40, 42, 44 };	dma-txother
+DM26-bench	model/bench-checks.tsv	DMA_S0M0AR = 0x20000400 (DTCM (0x20000000-0x2001FFFF))	DMA_S0M0AR = 0x20000401 (DTCM (0x20000000-0x2001FFFF))	dma-ledger
+DM27-route	model/stm32h7-dma-restate.repl	    [0-7] -> tviburiDma1@[0-7]\n	(empty)	dma-registrations
+DM28-irq	model/GuardedSTM32DMA.cs	public IReadOnlyDictionary<int, IGPIO> Connections => inner.Connections;	public IReadOnlyDictionary<int, IGPIO> Connections => Enumerable.Range(0, Streams).ToDictionary(i => i, i => (IGPIO)new GPIO());	dma-irq
+DM29-config	model/GuardedSTM32DMA.cs	if(dmamux == null)	if(false)	dma-config
+DM30-recordedKeep	model/GuardedSTM32DMA.cs	            word = (word & ~mask) | (old & mask);\n	(empty)	dma-recorded
+DM31-reset	model/GuardedSTM32DMA.cs	            inner.Reset();\n            ResetCopies();	            inner.Reset();	dma-reset
+DM32-clockReg	model/stm32h7-dma-restate.repl	        tviburiRcc RegistrationPeripheralAlias.DMA1\n	(empty)	dma-clock
+DM33-regen	tests/1303/fields.py	"00 only: a stock tag; burst transfers are not modeled", 662),\n        (reg, off, sec, "PBURST	"00 only: a stock tag; bursts are not modeled", 662),\n        (reg, off, sec, "PBURST	dma-regen
+DM34-restateGen	model/stm32h7-dma-restate.awk	    print "    dmamux: dmamux1"	    print "    dmamux:  dmamux1"	dma-restate
+DM35-instances	tools/tviburi-release/src/main.rs	Ok(all.into_iter().filter(|(i, _)| names.iter().any(|n| n == i)).collect())	Ok(all)	unit
+DM36-reload	model/GuardedSTM32DMA.cs	var reload = Items(s) == 0 && programmed[s] != 0;	var reload = false;	dma-reload
+DM37-restart	model/GuardedSTM32DMA.cs	var restart = state == Completed && r == CrOffset && (word & EnBit) != 0 && programmed[s] != 0;	var restart = false;	dma-reassert
+DM38-size	model/GuardedSTM32DMA.cs	if(((word >> 11) & 3) != ((word >> 13) & 3))	if(false)	dma-sizes
+DM39-fthProtected	model/GuardedSTM32DMA.cs	case FcrOffset: return DmdisBit | FthBits;	case FcrOffset: return DmdisBit;	dma-fth
+DM40-fthAny	tests/1303/fields.py	"FTH[1:0]", 1, 0, A,	"FTH[1:0]", 1, 0, Z,	dma-regen
+DM41-offset	model/GuardedSTM32DMA.cs	            if(stale[s])	            if(false)	dma-offset
+DM42-reloadSpan	model/GuardedSTM32DMA.cs	var items = (ulong)(reload ? programmed[s] : Items(s));	var items = (ulong)Items(s);	dma-reloadtcm
