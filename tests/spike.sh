@@ -382,7 +382,9 @@ t_crash() {
     v=$(/repo/scripts/build-release) || exit 9
     printf "include @/repo/scripts/prelude.resc\nemulation RunFor \"100\"\nquit\n" >/out/long.resc
     renode --disable-gui --console --plain /out/long.resc </dev/null >/out/renode.out 2>&1 & pid=$!
-    for i in $(seq 600); do grep -q "spi1: {\"tviburi\":\"witness\"" /out/renode-log.txt 2>/dev/null && break; sleep 0.1; done
+    # the whole witness line, its closing brace included: the log is flushed in blocks, and a kill inside the line leaves it
+    # malformed (TVI-WO-1304: after the DMA and flash witnesses, spi1'"'"'s line straddled a block on every run)
+    for i in $(seq 600); do grep -q "spi1: {\"tviburi\":\"witness\".*}\$" /out/renode-log.txt 2>/dev/null && break; sleep 0.1; done
     kill -9 $pid; wait $pid; echo renode-exit=$?
     /check/debug/tviburi-check $v /out/renode-log.txt spi1 rcc gpioPortA gpioPortB gpioPortC gpioPortD gpioPortE gpioPortF gpioPortG gpioPortH gpioPortI gpioPortJ gpioPortK timer1 timer8 dma1 dma2 flashController'
   check "a simulator killed after its witness does not PASS (1, no end record, the witness seen)" \
