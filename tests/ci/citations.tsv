@@ -5,6 +5,7 @@
 firmware/gpio.rs	TVI-WO-1301.rm0433.md
 firmware/rcc.rs	TVI-WO-1300.rm0433.md
 firmware/spi1.rs	TVI-WO-0100b.rm0433.md
+firmware/timer.rs	TVI-WO-1302.measure.md
 model/bench-checks.tsv	FEEDBACK.md
 model/bench-checks.tsv	TVI-WO-0100b.FEEDBACK.md
 model/GuardedSTM32_GPIOPort.cs	docs/
@@ -17,7 +18,13 @@ model/GuardedSTM32H7_RCC.cs	TVI-WO-1300.rm0433.md
 model/GuardedSTM32H7_SPI.cs	docs/
 model/GuardedSTM32H7_SPI.cs	TVI-WO-0100a.rm0433.md
 model/GuardedSTM32H7_SPI.cs	TVI-WO-0100b.rm0433.md
+model/GuardedSTM32_Timer.cs	docs/
+model/GuardedSTM32_Timer.cs	FEEDBACK.md
+model/GuardedSTM32_Timer.cs	TVI-WO-1302.FEEDBACK.md
+model/GuardedSTM32_Timer.cs	TVI-WO-1302.measure.md
 model/stm32h7-gpio-restate.awk	TVI-WO-1301.rm0433.md
+model/stm32h7-timer-restate.awk	TVI-WO-1302.measure.md
+model/stm32h7-timer-restate.repl	TVI-WO-1302.measure.md
 model/tviburi-nucleo-h753zi.repl	TVI-WO-1300.rm0433.md
 model/tviburi-nucleo-h753zi.repl	TVI-WO-1301.rm0433.md
 spike/1150/overlay/GuardedSpi1150.cs	docs/
@@ -28,6 +35,9 @@ tests/1300/rcc.sh	TVI-WO-1300.rm0433.md
 tests/1300/replay-1300.sh	TVI-WO-1300.rm0433.md
 tests/1301/fixtures/aet-1c32c8ea-ardupilot/SOURCE.md	FEEDBACK.md
 tests/1301/fixtures/aet-1c32c8ea-ardupilot/SOURCE.md	TVI-WO-1301.rm0433.md
+tests/1301/replay-1301.sh	TVI-WO-1302.measure.md
+tests/1302/fields.py	TVI-WO-1302.measure.md
+tests/1302/timer.sh	TVI-WO-1302.measure.md
 tests/conditions.resc	TVI-WO-0100b.rm0433.md
 tests/mutants.tsv	TVI-WO-0100b.rm0433.md
 tests/mutants.tsv	TVI-WO-1300.rm0433.md
