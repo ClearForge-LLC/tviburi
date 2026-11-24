@@ -134,14 +134,16 @@ for t in ${TVIBURI_TESTS:-$CASES}; do
     run_case idle - 'cpu IsHalted true' "$clk" 'sysbus WriteDoubleWord 0x4001100C 0x271' 'sysbus WriteDoubleWord 0x40011000 0x2000001D' \
       'emulation RunFor "0.001"' 'echo "R-START"' 'sysbus ReadDoubleWord 0x4001101C' \
       'sysbus.usart1 WriteChar 0x41' 'emulation RunFor "0.00002"' 'echo "R-EARLY"' 'sysbus ReadDoubleWord 0x4001101C' \
+      'sysbus.usart1 WriteChar 0x42' 'emulation RunFor "0.00002"' 'echo "R-RESTART"' 'sysbus ReadDoubleWord 0x4001101C' \
       'emulation RunFor "0.00002"' 'echo "R-IDLE"' 'sysbus ReadDoubleWord 0x4001101C' 'echo "R-IRQ"' 'sysbus.usart1 IRQ' \
       'sysbus WriteDoubleWord 0x40011020 0x10' 'echo "R-CLEARED"' 'sysbus ReadDoubleWord 0x4001101C' 'echo "R-IRQ2"' 'sysbus.usart1 IRQ' \
       'emulation RunFor "0.001"' 'echo "R-AGAIN"' 'sysbus ReadDoubleWord 0x4001101C' \
-      'sysbus.usart1 WriteChar 0x42' 'emulation RunFor "0.0001"' 'sysbus WriteDoubleWord 0x40011000 0x2000001C' 'echo "R-OFF"' 'sysbus ReadDoubleWord 0x4001101C'
-    check "idle: no IDLE at a start with nothing received (ruled Q5); a byte, then IDLE only after one idle frame (31.25 us: clear at 20, set at 40), raising the interrupt with IDLEIE; IDLECF clears it and it is not set again with no new byte (p2090); UE cleared resets IDLE and RXFNE (p2070)" \
-      "passed idle && bit \"\$(readout idle START)\" 4 0 && bit \"\$(readout idle EARLY)\" 4 0 && bit \"\$(readout idle EARLY)\" 5 1 && bit \"\$(readout idle IDLE)\" 4 1 \
+      'sysbus.usart1 WriteChar 0x43' 'emulation RunFor "0.0001"' 'sysbus WriteDoubleWord 0x40011000 0x2000001C' 'echo "R-OFF"' 'sysbus ReadDoubleWord 0x4001101C' \
+      'sysbus WriteDoubleWord 0x40011000 0x2000004D' 'sysbus WriteDoubleWord 0x40011028 0x44' 'echo "R-IRQ3"' 'sysbus.usart1 IRQ'
+    check "idle: no IDLE at a start with nothing received (ruled Q5); a byte, then IDLE only after one idle frame (31.25 us), a newer byte restarting it (clear at 20 us after each, set at 40 us after the last), raising the interrupt with IDLEIE; IDLECF clears it and it is not set again with no new byte (p2090); UE cleared resets IDLE and RXFNE (p2070); the stock model's own interrupt (TC with TCIE) passes through the guard's IRQ" \
+      "passed idle && bit \"\$(readout idle START)\" 4 0 && bit \"\$(readout idle EARLY)\" 4 0 && bit \"\$(readout idle EARLY)\" 5 1 && bit \"\$(readout idle RESTART)\" 4 0 && bit \"\$(readout idle IDLE)\" 4 1 \
        && [ \"\$(readout idle IRQ)\" = 'GPIO: set' ] && bit \"\$(readout idle CLEARED)\" 4 0 && [ \"\$(readout idle IRQ2)\" = 'GPIO: unset' ] \
-       && bit \"\$(readout idle AGAIN)\" 4 0 && bit \"\$(readout idle OFF)\" 4 0 && bit \"\$(readout idle OFF)\" 5 0" ;;
+       && bit \"\$(readout idle AGAIN)\" 4 0 && bit \"\$(readout idle OFF)\" 4 0 && bit \"\$(readout idle OFF)\" 5 0 && [ \"\$(readout idle IRQ3)\" = 'GPIO: set' ]" ;;
   dmarx)
     # The receive request (p2048, p2070; ruled Q6), with the platform's request line: DMA1 stream 0 peripheral-to-memory on
     # request 41 into AXI SRAM. (1) armed first, three bytes; (2) a byte while the stream is disabled, then re-armed (the stock
@@ -153,16 +155,16 @@ for t in ${TVIBURI_TESTS:-$CASES}; do
       'sysbus WriteDoubleWord 0x40011008 0x40' 'sysbus WriteDoubleWord 0x40011000 0x2000000D' \
       'sysbus.usart1 WriteChar 0x81' 'sysbus.usart1 WriteChar 0x82' 'sysbus.usart1 WriteChar 0x83' \
       'echo "R-NDTR1"' 'sysbus ReadDoubleWord 0x40020014' 'echo "R-MEM1"' 'sysbus ReadDoubleWord 0x24000000' \
-      'sysbus WriteDoubleWord 0x40020010 0x400' 'sysbus.usart1 WriteChar 0x91' \
+      'sysbus WriteDoubleWord 0x40020010 0x400' 'sysbus.usart1 WriteChar 0x91' 'sysbus.usart1 WriteChar 0x92' \
       'sysbus WriteDoubleWord 0x40020008 0x3D' 'sysbus WriteDoubleWord 0x4002001C 0x24000100' 'sysbus WriteDoubleWord 0x40020014 0x8' \
-      'sysbus WriteDoubleWord 0x40020010 0x401' 'emulation RunFor "0.0001"' \
+      'sysbus WriteDoubleWord 0x40020010 0x401' 'emulation RunFor "0.00004"' \
       'echo "R-NDTR2"' 'sysbus ReadDoubleWord 0x40020014' 'echo "R-MEM2"' 'sysbus ReadDoubleWord 0x24000100' \
       'sysbus WriteDoubleWord 0x40011008 0x0' 'sysbus.usart1 WriteChar 0xA1' 'sysbus WriteDoubleWord 0x40011008 0x40' \
       'echo "R-NDTR3"' 'sysbus ReadDoubleWord 0x40020014' 'echo "R-MEM3"' 'sysbus ReadDoubleWord 0x24000100'
-    check "dmarx: with DMAR = 1 each received byte moves (NDTR 8 -> 5); a byte received while the stream was disabled moves once it is armed (within a frame), and one waiting when DMAR is set moves at that write: silicon's level request (p2048), where the stock model moved neither (U11, U12)" \
+    check "dmarx: with DMAR = 1 each received byte moves (NDTR 8 -> 5); two bytes received while the stream was disabled both move within a frame of its arming (one request, then one after each RDR read), and one waiting when DMAR is set moves at that write: silicon's level request (p2048), where the stock model moved none (U11, U12)" \
       "passed dmarx && [ \"\$(readout dmarx NDTR1)\" = 0x00000005 ] && [ \"\$(readout dmarx MEM1)\" = 0xFF838281 ] \
-       && [ \"\$(readout dmarx NDTR2)\" = 0x00000007 ] && [ \"\$(readout dmarx MEM2)\" = 0xFFFFFF91 ] \
-       && [ \"\$(readout dmarx NDTR3)\" = 0x00000006 ] && [ \"\$(readout dmarx MEM3)\" = 0xFFFFA191 ]" ;;
+       && [ \"\$(readout dmarx NDTR2)\" = 0x00000006 ] && [ \"\$(readout dmarx MEM2)\" = 0xFFFF9291 ] \
+       && [ \"\$(readout dmarx NDTR3)\" = 0x00000005 ] && [ \"\$(readout dmarx MEM3)\" = 0xFFA19291 ]" ;;
   fields)
     # Gate clause 6 (RUL-17), the cases generated from the release's ledger, each from reset with USART1EN set: each field
     # row's disallowed value refuses TVI-USART-FIELD, unmodeled, naming the field; each allowed value passes, but CR1.M0 = 1

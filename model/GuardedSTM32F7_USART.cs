@@ -336,10 +336,6 @@ namespace Antmicro.Renode.Peripherals.Tviburi
                 return false;
             }
             var changed = (Copy(offset) ^ word) & mask;
-            if(offset == Cr3Offset && (word & ScarcntMask) == 0)
-            {
-                changed &= ~ScarcntMask;   // SCARCNT may be written to 0 while UE = 1 (p2079)
-            }
             if(changed == 0 || (changed & ~Acknowledged(offset)) == 0)
             {
                 return false;
@@ -421,6 +417,7 @@ namespace Antmicro.Renode.Peripherals.Tviburi
             case Cr2Offset:                      // MSBFIRST..ADDM7 (pp. 2075-2077); ADD with RE = 1; ABRMOD with ABREN = 1
                 return 0x000FFF30 | ((cr1 & ReBit) != 0 ? 0xFF000000 : 0) | ((cr2 & AbrenBit) != 0 ? 0x00600000u : 0);
             case Cr3Offset: return 0x003EFB3E;   // WUS, SCARCNT, DEP, DEM, DDRE, OVRDIS, ONEBIT, CTSE, RTSE, SCEN, NACK, HDSEL, IRLP, IREN
+                                                 // (SCARCNT's write of 0 under UE, p2079, cannot arise: any other value refuses by the allow-list)
             case BrrOffset: return 0xFFFF;       // p2082
             case GtprOffset: return 0xFFFF;      // p2083
             case PrescOffset: return 0xF;        // p2099
@@ -475,7 +472,8 @@ namespace Antmicro.Renode.Peripherals.Tviburi
 
         private bool RequestLevel()
         {
-            return (cr3 & DmarBit) != 0 && (cr1 & UeBit) != 0 && (inner.ReadDoubleWord(IsrOffset) & RxfneBit) != 0;
+            // UE = 0 flushes the queue (p2070), and the stock model takes no byte then, so a waiting byte implies UE = 1.
+            return (cr3 & DmarBit) != 0 && (inner.ReadDoubleWord(IsrOffset) & RxfneBit) != 0;
         }
 
         // The request as a level (p2048, p2070): an edge for the DMA whenever it holds, again after each byte the DMA takes
@@ -604,7 +602,6 @@ namespace Antmicro.Renode.Peripherals.Tviburi
         private const uint RxinvBit = 1u << 16;
         private const uint AbrenBit = 1u << 20;
         private const uint DmarBit = 1u << 6;
-        private const uint ScarcntMask = 7u << 17;
         private const uint IdleBit = 1u << 4;     // ISR.IDLE and ICR.IDLECF
         private const uint RxfneBit = 1u << 5;
         private const uint TccfBit = 1u << 6;
