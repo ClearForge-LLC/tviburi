@@ -1,5 +1,6 @@
 # TVI-WO-1202: each case's and mutant's measured wall time in seconds, the weight tools/tviburi-route plan packs shards
-# by. The slower of CI runs 67 (45329914754) and 66 (45322946066), from the work order's TVI-WO-1202.times.tsv.
+# by. The slower of CI runs 67 (45329914754) and 66 (45322946066); TVI-WO-1302's items from PR #33's run 45402235650,
+# each divided by its shard's speed against the rest (0.85-1.35), from the work order's TVI-WO-1202.times.tsv.
 # Never the list of what runs: that is the tree's own (tests/spike.sh, tests/mutants.tsv); an item missing here
 # weighs its kind's median and still runs. KIND<tab>ID<tab>SECONDS.
 case	unit	2.3
@@ -342,3 +343,73 @@ mutant	H18-resetDrive	6.1
 mutant	H19-senderBeforeConfig	6.6
 mutant	H20-senderKeptOnReset	6.6
 mutant	H21-afNoSourceHold	4.8
+case	timer-force	7.6
+case	timer-ccne	6.7
+case	timer-lockfrozen	6.7
+case	timer-aoe	6.7
+case	timer-lockbelow	6.7
+case	timer-fields	9.3
+case	timer-reset	6.1
+mutant	TM01-moeGate	8.0
+mutant	TM06-ccrResetZero	14.7
+mutant	TM11-lockFrozenBits	7.0
+mutant	TM16-resetUnlocks	6.2
+mutant	TM21-config	6.3
+mutant	TM26-lock3NotAt2	7.0
+mutant	TM31-regen	0.1
+case	timer-moe0	7.9
+case	timer-ccr0	8.0
+case	timer-lock2	6.9
+case	timer-half	8.1
+case	timer-tim8on	8.0
+case	timer-gen-pwm	6.8
+case	timer-config	6.3
+case	timer-gconce	7.1
+mutant	TM04-ossiIdle	8.0
+mutant	TM09-passDrives	15.8
+mutant	TM14-lock3Ccmr	7.0
+mutant	TM19-field	13.6
+mutant	TM24-restateTim1	7.9
+mutant	TM29-stockSeesEnable	7.0
+case	timer-cce0	8.0
+case	timer-ossi	8.0
+case	timer-lock3	6.9
+case	timer-byte	6.9
+case	timer-reenable	7.0
+case	timer-ap-m	7.0
+case	timer-recorded	6.1
+mutant	TM05-ccr0Lowers	7.9
+mutant	TM10-lockLevel	7.0
+mutant	TM15-lockSamePasses	8.0
+mutant	TM20-read	7.1
+mutant	TM25-lock2NotAt1	7.1
+mutant	TM30-restateTim8	8.0
+case	timer-pwm	8.3
+case	timer-ccrreset	7.8
+case	timer-lock1	6.6
+case	timer-dmar	6.7
+case	timer-tim8	7.6
+case	timer-halfhigh	8.0
+case	timer-registrations	6.4
+case	timer-regen	0.0
+mutant	TM03-polarity	7.7
+mutant	TM08-tapDrives	7.8
+mutant	TM13-lock1Cr2	6.7
+mutant	TM18-width	6.7
+mutant	TM23-ccmrCopy	7.6
+mutant	TM28-halfShift	7.7
+mutant	TM33-gcSubscribe	6.6
+case	timer-polarity	8.2
+case	timer-ccnp	6.9
+case	timer-locksame	8.1
+case	timer-read	7.0
+case	timer-lockbelow2	7.0
+case	timer-ledger	1.3
+case	timer-rccreset	6.3
+mutant	TM02-cceGate	16.3
+mutant	TM07-ownOutputs	14.6
+mutant	TM12-lock2Ccer	7.0
+mutant	TM17-dmar	6.9
+mutant	TM22-recordedAll	6.3
+mutant	TM27-ossNotAt1	7.1
+mutant	TM32-gcUnsubscribe	7.6
