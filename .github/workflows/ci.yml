@@ -128,11 +128,16 @@ jobs:
         run: |
           echo "route $ROUTE (class '$CLASS', budget '$BUDGET'); shards $SHARDS; budget $MEMORY; budget-tests $MEMORY_TESTS"
           [ "$ROUTE" = success ] || { echo "FAIL the route did not succeed"; exit 1; }
+          # Five shards and the budget, each named: a result that is missing (a job renamed or dropped from `needs`) is
+          # an empty word, so count them.
+          set -- $SHARDS $MEMORY
+          [ $# = 6 ] || { echo "FAIL want 5 shard results and the budget's, got $#: '$SHARDS' '$MEMORY'"; exit 1; }
           case "$CLASS" in
-            code) for r in $SHARDS $MEMORY; do [ "$r" = success ] || { echo "FAIL a code change needs every shard and the budget: one was $r"; exit 1; }; done ;;
-            docs) for r in $SHARDS $MEMORY; do [ "$r" = skipped ] || { echo "FAIL a docs-only change ran the suite's jobs: $r"; exit 1; }; done ;;
+            code) want=success ;;
+            docs) want=skipped ;;
             *) echo "FAIL the route gave no class"; exit 1 ;;
           esac
+          for r in "$@"; do [ "$r" = "$want" ] || { echo "FAIL a $CLASS change wants every shard and the budget $want: one was $r"; exit 1; }; done
           case "$BUDGET" in
             yes) [ "$MEMORY_TESTS" = success ] || { echo "FAIL the budget's own tests were needed: $MEMORY_TESTS"; exit 1; } ;;
             no) [ "$MEMORY_TESTS" = skipped ] || { echo "FAIL the budget's own tests: $MEMORY_TESTS"; exit 1; } ;;
