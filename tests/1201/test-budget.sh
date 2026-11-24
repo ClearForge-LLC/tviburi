@@ -5,8 +5,13 @@
 # 1. A TVIBURI_MAIN_SHA that is not main's commit must stop the step before any boot.
 # 2. Unless --no-boots: the planted branch. MAIN's tree (a directory, or a commit; default HEAD^1, main's tip in CI)
 #    with tests/1201/fixtures/Planted64MiB.cs in its model/, booted against MAIN by the real step. The step must
-#    refuse it by `budget` and by nothing else, with the medians 48–80 MiB apart (64 MiB, give or take the 16 MiB
-#    that WO §7 allows main against main).
+#    refuse it by `budget` and by nothing else, with the medians more than 32 MiB and at most 128 MiB apart.
+#    Why that window (ruled 2026-11-24T02:22Z, on TVI-WO-1201 FEEDBACK F4): the test proves the budget refuses a
+#    real increase, so the bound that matters is the lower one, above the 32 MiB budget. The upper bound, twice the
+#    plant, only catches a sampler that counts twice. The first window, 48–80 MiB (64 ± 16), was breached on Furnace
+#    at +88.4 MiB (one process, RssAnon about 90 MiB over main's: no double count), while CI measured +54.0 to
+#    +64.3 MiB (runs 45285950556, 45286469273, 45294287114, 45302732365). The plant costs what the GC around it
+#    makes it cost, not exactly 64 MiB.
 # Exit 0 only if every case gives what it should.
 set -uo pipefail
 here=$(cd "$(dirname "$0")/../.." && pwd)
@@ -38,10 +43,10 @@ if [ "${1:-}" = --no-boots ]; then shift; else
   ran=$(cat "$outs"/out-branch-*/2-accept.console.txt 2>/dev/null | grep -a -c '^TVIBURI-PLANTED 67108864 ' || true)
   boots=$(ls -d "$outs"/out-branch-* 2>/dev/null | wc -l)
   echo "     the plant ran in $ran of $boots branch boots"
-  if [ $rc = 1 ] && [ "$names" = budget ] && [ "$boots" -ge 5 ] && [ "$ran" = "$boots" ] && [ -n "$d" ] && [ "$d" -ge $((48 * 1024)) ] && [ "$d" -le $((80 * 1024)) ]; then
+  if [ $rc = 1 ] && [ "$names" = budget ] && [ "$boots" -ge 5 ] && [ "$ran" = "$boots" ] && [ -n "$d" ] && [ "$d" -gt $((32 * 1024)) ] && [ "$d" -le $((128 * 1024)) ]; then
     echo "ok   planted-64-MiB: refused by budget alone, the medians $d KiB apart"
   else
-    echo "FAIL planted-64-MiB: exit $rc, refusals '$names', difference '${d:-none}' KiB, the plant in $ran of $boots boots (want exit 1, 'budget', 49152–81920, every boot)"
+    echo "FAIL planted-64-MiB: exit $rc, refusals '$names', difference '${d:-none}' KiB, the plant in $ran of $boots boots (want exit 1, 'budget', over 32768 and at most 131072, every boot)"
     fails=$((fails + 1))
   fi
 fi

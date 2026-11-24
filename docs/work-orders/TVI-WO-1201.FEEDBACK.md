@@ -31,7 +31,7 @@ Every figure is a peak in KiB, as defined in §2: the sampled sum of Renode's Vm
   - Main's release was booted twice in each job, once in the gate and once as the plant test's main. The two medians are 0.8 MiB apart in the AMD job (809,404 and 808,588) and 7.0 MiB apart in the Intel job (991,280 and 998,488).
   - Main against main lands within 3.1 MiB of zero, well under the 16 MiB stop.
   - Single boots of one release span up to 40 MiB within a job (the Intel job's plant-test main: 981,848–1,022,820). On Furnace, one boot a side of main against main differed by −15.6 MiB. The judge therefore never decides on fewer than 5 a side.
-- **The plant's cost is 57–69 MiB, not exactly 64 MiB.** The array is 64 MiB and is written page by page. **A guess, not measured:** the GC's other garbage at the peak shifts around it. Its window in the test is 48–80 MiB (§2).
+- **The plant's cost is 54–88 MiB, not exactly 64 MiB.** The array is 64 MiB and is written page by page. **A guess, not measured:** the GC's other garbage at the peak shifts around it. Its window in the test is over 32 and at most 128 MiB (§2, F4).
 - **1301 measured +5.6 MiB here,** where the WO expected about 10. 1301's own side-by-side measurement (run 45257810560, `e831735`'s `ci-memory-gc.sh`) gave about 10 MiB. That used the same kind of harness (the branch's `replay-1301.sh` for every configuration) but no witness check, and a different pair of trees: 1301's pre-merge branch against the main of its time. The gap between 5.6 and 10 MiB is inside the within-job spread of medians above. The `b019105` boots carry 3 witnesses (SPI1, SPI2, RCC) and the `d598442` boots carry 14 (11 GPIO ports more), so each side ran its own guard set.
 - **The first boot of a job can be an outlier.** Furnace's main boot 1 reached 1,171,940 KiB at 16 s. The median absorbs it, and the alternating order (main first, then branch first) spreads it across sides.
 
@@ -95,7 +95,7 @@ The median of an even count is the mean of the middle two, rounded down.
 - **The main-SHA binding:** a base that is not main stops the step before any boot.
 - **The planted branch:**
   - main's tree with the fixture added to a scratch copy's `model/` (`tools/tviburi-release` concatenates every `model/*.cs`), booted against main by the real step;
-  - it must be refused by `budget` and by nothing else, with the medians 48–80 MiB apart;
+  - it must be refused by `budget` and by nothing else, with the medians more than 32 MiB and at most 128 MiB apart (ruled 02:22Z, F4);
   - `TVIBURI-PLANTED 67108864` must be on the console of every branch boot.
 - **How the fixture runs:** a `[ModuleInitializer]`, which runs before the first use of any type in the compiled assembly. It writes every page of a 64 MiB array and holds it in a static field.
 
@@ -171,7 +171,7 @@ The budget no longer depends on the answer, because each job compares against it
 | **A median over too few boots** | The judge counts boots itself, not `TVIBURI_MEMORY_RUNS`. Mutant `n < MIN_BOOTS - 1`: killed |
 | **A failed boot counted as a low peak** | **Real case, run twice:** a branch whose C# does not compile peaked at 642,044 KiB (shell judge), then 641,148 KiB (the Rust judge), in about 2.5 s, with no witness and no boot end. Both gave `REFUSE failed-boot: branch boot 1 does not count (boot end 0; no witness of its release)`. **Mutants:** failed boots in the median, and each of the five faults off: killed |
 | **The Rust judge's guards** (one mutant each, against its 17 unit tests) | **13 of 13 killed.** The mutants: no-peak check off; boot end `!= 1` to `> 1`; own-witness check off; other-witness check off; would-refuse moved to main; the 5-boot minimum lowered; failed boots in the median; the no-median refusal off; ceiling `>` to `>=`; the ceiling applied to main; budget `>` to `>=`; the even median taken as the upper middle; the row length `!=` to `<`. **The last first survived:** no test had a row longer than its header, so a test was added and it is now killed. The shell judge's 8 mutants (killed in the earlier pass) went with it |
-| **A plant that passes for the wrong reason** | It must be shown running (its console line, every boot), resident (a difference of at least 48 MiB) and refused by `budget` alone. A plant that broke the boot would refuse by `failed-boot` and fail the test |
+| **A plant that passes for the wrong reason** | It must be shown running (its console line, every boot), resident (a difference over the 32 MiB budget, and at most 128 MiB, which catches a double count) and refused by `budget` alone. A plant that broke the boot would refuse by `failed-boot` and fail the test |
 | **The same sampler on both sides** | One `replay-1301.sh`, from the checkout, for both; its snapshot overhead falls on both alike |
 
 **Not defended, by design:** a branch that edits the harness so that it measures the two sides differently. One harness runs both, but a PR can change that harness. That is review's job, not a gate's.
@@ -197,7 +197,7 @@ The budget no longer depends on the answer, because each job compares against it
   - The gate took 4 min 51 s and the plant test 4 min 58 s. 1301's absolute step took 4 min 41 s (45273210903). So the memory steps cost about 5 min more a job.
   - Each comparison builds the ELF again (the plant test runs a second step invocation); sharing it was not worth a cache.
   - That job took 45 min in all, including the 4 min 52 s temporary step since removed. The timeout is 150 min.
-- **F4 — the plant's window (48–80 MiB) can be breached. For the architect: left unchanged.**
+- **F4 — the plant's window (48–80 MiB) could be breached. Ruled at 02:22Z: now over 32 MiB and at most 128 MiB, with the reason in the test's comment.** The original finding follows.
   - **What happened:** the window was mine, 64 MiB ± the 16 MiB stop line. The three CI runs measured the plant at +62.0, +56.8 and +64.3 MiB, all inside it.
   - On Furnace, after the port to Rust (01:0xZ, 10–11 s a boot, load average 7.7), it measured **+88.4 MiB** (main 985,296, branch 1,075,844). The test failed on the upper bound. The step itself was right: it refused by `budget` alone.
   - **It is not double counting:** one process matched, and the branch's RssAnon sat about 90 MiB over main's. An earlier Furnace run gave +68.9.
