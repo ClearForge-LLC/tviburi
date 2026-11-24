@@ -199,3 +199,82 @@ By board: the ten generated boards with a serial port (§2.1), ArduPilot's two (
 | `main` + the wrapper ×8 | 1,016,232; 1,024,660; 1,058,304; 1,006,212; 983,140; 1,007,408; 1,011,868; 1,000,368; 1,005,816; 1,008,524; 1,029,552 | 1,008,524 |
 
 `MEDIANS main 1015168 KiB, branch 1008524 KiB, difference -6644 KiB (-6.5 MiB)`, **PASS**; every branch boot under the 1,572,864 KiB ceiling; walls 10.5–12.3 s. The wrapper costs nothing this measurement can see: main already collects the overlay's compile garbage at its first start (1302). The built guard (rules, a field table, scheduled `IDLE`, records) will cost more; the build reports the budget again, in CI.
+
+### 2.6 ArduPilot's receive path, end to end (after the advisor's review; M2b and ArduPilot's source)
+
+- **ArduPilot's code** (`/opt/ardupilot/libraries/AP_HAL_ChibiOS/UARTDriver.cpp` in Aethelgard's pinned ArduPilot image `e1809b90…`, sha256 `cdc7e370…`): on the H7, `rx_irq_cb` (the USART interrupt, with receive DMA on) clears the RX stream's `EN`, "triggering DMA transfer complete interrupt"; `rxbuff_full_irq` (the DMA's `TCIF`) takes `64 − NDTR` bytes, then re-arms the stream on the other bounce buffer (`dma_rx_enable`: new `M0AR`, `NDTR` = 64, `EN`).
+- **Silicon:** "A transfer complete interrupt flag (TCIF …) is set to indicate the end of transfer due to the stream interruption" (§15.3.16 "DMA transfer suspension", p654); a re-enabled stream starts at its programmed base address (p666).
+- **The stock DMA, by probe (`probe/probes-dma.body`, through main's DMA guard, recorded):** three bytes moved (`NDTR` 64 → 61); the software disable **leaves `TCIF0` clear** (`LISR` 0); the re-arm on `0x24000100` fires the DMA guard's **`TVI-DMA-OFFSET`** (`unmodeled`), and the stock model writes the next bytes at the **old offset in the new buffer** (`0x44` at `0x24000103`).
+- **So an unpadded frame cannot reach ArduPilot through a USART guard alone.** `IDLE` (this guard) raises the interrupt and the stream is disabled, but no `TCIF` follows, so `rxbuff_full_irq` never runs; and the re-arm refuses in the DMA guard. Both are the DMA guard's (§5 Q6). The armed run on a fully guarded twin also meets main's DMA guard first: Sentinel-03 routes `usart2` RX (43), `usart3` RX (45) and TX (46) through DMAMUX1 (32,585 `C2`/`C6` writes in 13 s), and `RaisedToMemory`/`RaisedFromMemory` list none of them (`TVI-DMA-REQUEST`, `unmodeled`).
+- **Every `TDR` write in ArduPilot's runs is a byte** (`WriteByte`, the DMA's `PSIZE` = byte: 2,687 on `usart1` in the armed run), where RM0433 says "The peripheral registers have to be accessed by words (32 bits)" (p2067). 1302/1303 refuse sub-word accesses `unmodeled`; here that would refuse every ArduPilot transmission (§5 Q7).
+
+## 5. The stop (WO §1.1, §7), and the questions
+
+**Stops.** §1.1's stop, with the measurement. Two findings bear on §7 and the acceptance:
+- **The armed run would refuse under the WO's own rule** (Q2 (c)): ChibiOS's `usart_init`, run on an enabled port, writes `BRR`, `M0`/`PCE` and `RXINV` with `UE` = 1, first at 0.2018 s (`usart2`). RM0433 says those writes are not taken (they "can only be written when the USART is disabled"), so this is not §7's "a path RM0433 says is valid". But the WO's rule and its acceptance ("the armed run show[s] no USART `would-refuse` outside the acknowledged table") cannot both hold, and `RUL-17`'s acknowledgement does not cover a `predicted-fault`.
+- **The receive acceptance runs through the DMA guard** (Q6): an unpadded frame needs `TCIF` on a software disable and a clean re-arm, both DMA-side, outside this fence (§2.6).
+
+Nothing in the generated boots or ArduPilot's fixture boot would refuse under the rules proposed below; no consumer observer changes from the rules, and two change from the form (§2.4).
+
+**Q1. The form.** `STM32F7_USART` is sealed (§2.3).
+- **Proposal:** `RUL-07`'s wrapper, `GuardedSTM32F7_USART`, owning an unregistered stock instance; forwarding every access, `IRQ`, `ReceiveDmaRequest`, the `IUART` surface and reset; a nested `Registers` enum so the access log keeps its names. The stock instances cancelled and restated on `tviburiRcc` with their alias, `frequency` and `IRQ -> exti@N` (`model/stm32h7-usart-restate.repl`, generated from the pinned file, as 1302/1303). The consumer's untyped `usartN:` blocks move onto the guard's variable (`RUL-09` (b)), as the replay does.
+- **Which instances:** `usart1`, `usart2`, `usart3` (the RCC query covers their clocks; every committed board uses only these), or all eight USART/UARTs (`usart6`, `uart4/5/7/8` would answer every start `unmodeled`, after the RCC guard already refuses their `*EN`). **I propose all eight**, so that every port is guarded by one rule set; the memory cost of eight was nil (§4). `lpuart1` stays stock (the WO's NOT: LPUART1; it is declared without `lowPowerMode`, a `stock-wrong` row).
+- **Prices, named for the consumer:** the `peripherals` kind (`STM32F7_USART` → `GuardedSTM32F7_USART`, the class map), the guard's INFO witness and end records on the port's own source line, which Aethelgard's serial access parser rejects as not an access (§2.4: a new consumer step), and the owned instance's WARNING lines without a source name.
+- **Ask:** this form, and three or eight instances?
+
+**Q2. Fields protected while `UE` = 1** (`predicted-fault`, per field, cited by page).
+- **(a) The fields:** `CR1` `FIFOEN` (p2067), `M1`, `DEAT`, `DEDT`, `OVER8` (p2068), `M0`, `WAKE`, `PCE`, `PS` (p2069); `CR2` `MSBFIRST`, `DATAINV`, `TXINV`, `RXINV` (p2075), `SWAP`, `LINEN`, `STOP`, `CLKEN`, `CPOL` (p2076), `CPHA`, `LBCL`, `LBDL`, `ADDM7` (p2077), `ADD` with `RE` = 1 (p2074), `ABRMOD` with `ABREN` = 1 (p2075); `CR3` `WUS`, `SCARCNT` to a non-zero value, `DEP` (p2079), `DEM`, `DDRE`, `OVRDIS`, `ONEBIT`, `CTSE` (p2080), `RTSE`, `SCEN`, `NACK`, `HDSEL`, `IRLP`, `IREN` (p2081); `BRR` (p2082), `GTPR` (p2083), `PRESC` (p2099). The same value passes (`RUL-18`). The field keeps its old value (what recorded mode passes on). `UE` set together with a protected change, from `UE` = 0, is a configuration and passes (the generated firmware's `0x2000000C` → `0x2000000D` is the same word plus `UE`).
+- **(b) A write that clears `UE`.** ChibiOS's `sdStop` writes `CR1` = 0 from `UE` = 1, clearing `FIFOEN` (and `M0`/`PCE` after an SBUS step) in the same write (26 times on `usart2`). RM0433 does not say whether such a write takes its other fields. **Recommendation:** judge it as written with `UE` = 0 (it passes), naming the reading in the guard; the alternative refuses every `sdStop` on a FIFO port, which RM0433 does not show to be wrong.
+- **(c) `usart_init` on an enabled port** (§2.1): 16 changes on `usart2`, 2 on `usart3`, in the armed run only. Options:
+  - **(i) `predicted-fault`, as the WO says,** with a bench row (`RUL-18`): on the Nucleo, USART3 at 115,200 baud, `BRR` written for 9,600 with `UE` = 1, then a byte sent and its bit time measured, expecting 115,200 (from the manual; no result). The armed run then refuses at 0.2018 s, and the acceptance is amended to say so: a finding for ArduPilot/ChibiOS, not the twin.
+  - **(ii) `unmodeled` until the bench row has a result** ("the twin cannot say"): the armed run still refuses, attributed to the twin.
+  - **(iii) Acknowledge by name,** with the stock behaviour (the write taken at once): the armed run passes; a row.
+  - **No recommendation on silicon's behaviour:** the manual is clear, and I hold no bench result. Recorded mode keeps the old value (as on silicon under (i)), so in a recorded armed run the RC port stays at its first baud, which changes nothing the twin can see (nothing is injected on `usart2`).
+- **Ask:** the field list, (b), and (i)/(ii)/(iii).
+
+**Q3. A start with no kernel clock** (WO (2)).
+- **Proposal:** at a start (`UE` rising with `TE` or `RE` set, or `TE`/`RE` rising with `UE` = 1), ask the RCC guard's existing `QueryKernelClock` with the port's own name, as `1300a` wired SPI1's: not running is `predicted-fault` (p371; p2019 `usart_ker_ck`; the query's own citation); not modeled is `unmodeled`. A test shows the clock-off case covered by the bus lock with no record (U0), and the query's answer at each start; no RCC code is added.
+- **Not covered:** a kernel clock lost while a USART runs (the RCC guard's `TVI-RCC-CLOCK` watches SPI guards only). A row for the RCC guard.
+- **Neither firmware starts a USART without its clock** (§2.5).
+
+**Q4. Reads.** `CR1`, `CR2`, `CR3`, `GTPR`, `PRESC` from the guard's copies (`RUL-17`), so ArduPilot's read-modify-write keeps `FIFOEN` and `IDLEIE` as on silicon (§2.1); `BRR`, `RTOR`, `RDR`, `TDR` from the stock model; `ISR` from the stock model with the guard's `IDLE` (Q5). The boot block's masks exclude every copy-served bit (§2.4). **Ask:** accept.
+
+**Q5. `IDLE`, modeled** (p2090, p2021).
+- **Proposal:** after each byte the port receives, one idle frame later (1 start bit, the data bits by `M`, the stop bits by `STOP`, at the stock model's baud, `frequency / BRR` and `OVER8`; baud accuracy is Aethelgard's), if no newer byte arrived and `UE` and `RE` are set, the guard sets `IDLE`; with `IDLEIE` = 1 it raises the port's interrupt (the guard ORs its own source into `IRQ`). `ICR.IDLECF` clears it. It is not set again until a byte is received (p2090). Virtual time, by `ScheduleAction`, as the stock model's receiver timeout.
+- **At a start with nothing received:** p2040 says "If the USART is activated while the line is IDLE, the idle state is detected after the duration of one IDLE frame", in the mute-mode section. **Recommendation:** not modeled at a start (`IDLE` only after a received byte), a row naming p2040; or the architect rules it applies generally.
+- **Mute mode** (`MME` = 1) refuses `unmodeled` (Q8), so p2090's `RWU` condition does not arise.
+
+**Q6. The receive DMA request, and the DMA side.**
+- **The request, proposed** (p2048, p2070): the guard drives `ReceiveDmaRequest` itself: asserted while `DMAR` = 1, `UE` = 1 and a byte waits; re-asserted after each `RDR` read that leaves a byte, at `DMAR` set with a byte waiting (U12), and once per frame time while a byte waits (U11: the stream may be enabled after the byte arrived, and the guard cannot see the DMA's `EN`; silicon's request is a level, from memory); reset at `UE` = 0 (p2070). `DMAR` with `RE` = 0 raises nothing (no byte is received).
+- **What blocks the WO's receive acceptance (outside this fence):**
+  - `TCIF` on a software disable (p654): the stock DMA does not set it (§2.6), so ArduPilot never takes the frame;
+  - the re-arm on the other bounce buffer: main's DMA guard refuses it `TVI-DMA-OFFSET`, and the stock model writes at the old offset;
+  - withdrawing 1303's acknowledgement of request 41 means editing `RaisedToMemory`'s row in `GuardedSTM32DMA.cs`, and the armed run's 43, 45 (RX) and 46 (TX) are not in its lists at all.
+- **Ask:** (a) a DMA work order (a `1303a`) for the three, with this one building the USART side and testing the request and `IDLE` at the USART's own boundary (a planted firmware that receives by DMA with the stream armed first, U10, and `IDLE` read by polling); or (b) widen this fence to `GuardedSTM32DMA.cs` for those three items.
+
+**Q7. Access width.** "The peripheral registers have to be accessed by words (32 bits)" (p2067), yet ArduPilot's DMA writes `TDR` by bytes (§2.6), as does any byte DMA to a UART. **Proposal:** a byte or half-word access to `TDR` or `RDR` passes (the data register's low byte is the datum; a byte DMA to it is the normal use, from memory); any other sub-word access `unmodeled` (1302/1303's precedent). **Ask:** accept, or refuse all sub-word accesses.
+
+**Q8. The allow-list (`RUL-17`), proposed classes.**
+- **Modeled by the guard:** `CR1.UE`, `TE`, `RE` (the start, Q3); every Q2 field's protection; `IDLEIE`, `ISR.IDLE`, `ICR.IDLECF` (Q5); `CR3.DMAR` (Q6); the copies served (Q4).
+- **Inherited, probed:** `BRR`; `CR1` `RXFNEIE`, `TCIE`, `TXFNFIE`, `PEIE` (stored; the stock interrupts); `M0`/`M1` = 00 (8 bits), `OVER8`, `PCE` = 0; `CR2.STOP`; `CR3.DMAT`; `TDR`, `RDR`; `ICR.TCCF`; `RQR.RXFRQ` (U15).
+- **Acknowledged by name** (a firmware writes them; the twin delivers bytes whole):
+  - `FIFOEN` = 1 (every port of both firmwares): the receive queue is unbounded and `ORE` never sets (U8); the transmit side never fills. A firmware that falls 16 bytes behind passes;
+  - `M0` = 1 with `PCE` = 1 (ArduPilot's SBUS probe, 8E): parity is neither generated nor checked;
+  - `CR2.RXINV` (the SBUS probe) and `STOP` = 10: the twin's line has no polarity or framing; `STOP` enters only `IDLE`'s frame time;
+  - `CR2.LBDIE` and `CR3.EIE` (ChibiOS sets both on every port): no LIN break, framing, noise or overrun error is ever raised, so neither interrupt fires;
+  - `ICR` written all ones (ChibiOS, every init): `PECF`, `FECF`, `NCF`, `ORECF`, `IDLECF`, `TCCF` and the rest clear flags the twin never sets (or sets, for `IDLE`/`TC`); its reserved bits are ignored (write-only, from memory).
+- **`unmodeled` at any value but reset:** LIN (`LINEN`, `LBDL`, `LBCL`), smartcard (`SCEN`, `NACK`, `SCARCNT`, `GTPR`, `EOBIE`, `TCBGTIE`), IrDA (`IREN`, `IRLP`), synchronous and SPI slave (`CLKEN`, `CPOL`, `CPHA`, `SLVEN`, `DIS_NSS`), auto baud (`ABREN`, `ABRMOD`, `RQR.ABRRQ`), modem and RS-485 (`RTSE`, `CTSE`, `CTSIE`, `DEM`, `DEP`, `DEAT`, `DEDT`), mute mode and address match (`MME`, `WAKE`, `ADD`, `ADDM7`, `CMIE`, `RQR.MMRQ`), wake-up from Stop (`UESM`, `WUS`, `WUFIE`), `HDSEL`, `SWAP`, `TXINV`, `DATAINV`, `MSBFIRST`, `ONEBIT`, `OVRDIS`, `DDRE`, `RTOEN`, `RTOIE` and a non-zero `RTOR` (the stock receiver timeout ignores `RTOEN` and runs 8× long), the FIFO interrupts and thresholds (`RXFFIE`, `TXFEIE`, `RXFTIE`, `TXFTIE`, `RXFTCFG`, `TXFTCFG` ≠ 000), `M` = 01/10/11 (7 or 9 data bits), `OVER8` = 1 (stock stored; to probe if a firmware needs it), `PRESC` ≠ 0, `RQR.SBKRQ`, `TXFRQ`, and any write to a reserved field or offset.
+- **Predicted:** neither firmware's boot nor the armed run writes a field this list refuses, apart from Q2 (c).
+
+**Q9. Fences and harness.**
+- **(a) The guard-name lists** add the instances (Q1) to every list: `scripts/tviburi-spike`, `tests/1300/rcc.sh`, `tests/1301/gpio.sh`, `tests/1302/timer.sh`, `tests/1303/dma.sh`, `tests/spike.sh` (six), and `tests/mutants.tsv` G17. The WO's fence names them.
+- **(b) The replay** (`tests/1301/replay-1301.sh`) appends the USART restatement and moves the consumer's untyped `usartN:`/`uartN:` blocks onto it, as for the timers (inside `tests/`).
+- **(c) The class row:** `class UART.STM32F7_USART Tviburi.GuardedSTM32F7_USART <instances>`.
+- **(d) Where the armed-run check lives:** CI has only the fixture ELF (`a799dfb6`, `sentinel-02-own`, 5 s, built in CI). The Sentinel-03 ELF (`dbf598d8`) is neither committed nor built by CI. **Proposal:** the armed run measured on Furnace in the build, from the 4400h capture, recorded, and reported in FEEDBACK; CI runs the fixture boot recorded (no USART `would-refuse`) and the planted firmwares.
+
+**Rows, outside this WO:**
+- **The DMA side of reception** (Q6): `TCIF` on a software disable (p654), the re-arm offset (p666), and requests 43, 45, 46 in the DMA guard's lists. Until then, a foreign firmware that receives by DMA with the IDLE path hears nothing unpadded.
+- **`lpuart1`** is declared as a full USART (no `lowPowerMode`); LPUART1 is out of this WO.
+- **The receive line has no timing:** injected bytes arrive at once (`WriteChar`), so a firmware that reads too slowly is never overrun.
+- **A kernel clock lost under a running USART** (Q3), for the RCC guard.
+- **For Aethelgard (findings, not changes):** its serial access parser will reject a guarded port's records (§2.4); ChibiOS's `usart_init` on an enabled port writes `BRR` and framing with `UE` = 1, so ArduPilot's RC-protocol probing on an H7 may not switch baud on silicon (the manual's statement; no bench result).
