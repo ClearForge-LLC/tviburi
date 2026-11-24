@@ -150,9 +150,9 @@ for t in ${TVIBURI_TESTS:-$CASES}; do
     ccne) check "ccne: CC1NE = 1 refuses TVI-TIM-FIELD, unmodeled (ruled Q5 (a)), at the CCER store" "refuses ccne TVI-TIM-FIELD unmodeled 'r[\"bit\"].startswith(\"TIMx_CCER.CC1NE (\")'" ;;
     ccnp) check "ccnp: CC1NP = 1 refuses TVI-TIM-FIELD, unmodeled" "refuses ccnp TVI-TIM-FIELD unmodeled 'r[\"bit\"].startswith(\"TIMx_CCER.CC1NP (\")'" ;;
     lock1) check "lock1: under LOCK 1, a CR2.OIS1 change refuses TVI-TIM-LOCK, predicted-fault (p1615)" "refuses lock1 TVI-TIM-LOCK predicted-fault 'r[\"register\"] == \"TIMx_CR2\" and \"p1615\" in r[\"citation\"]'" ;;
-    lock2) check "lock2: under LOCK 2, a CCER.CC1P change refuses TVI-TIM-LOCK, predicted-fault (p1607, p1615)" "refuses lock2 TVI-TIM-LOCK predicted-fault 'r[\"register\"] == \"TIMx_CCER\" and \"p1607\" in r[\"citation\"]'" ;;
+    lock2) check "lock2: under LOCK 2, a CCER.CC1P change refuses TVI-TIM-LOCK, predicted-fault (p1607, p1615)" "refuses lock2 TVI-TIM-LOCK predicted-fault 'r[\"bit\"] == \"TIMx_CCER bits 0x00000002 under LOCK level 2\" and \"p1607\" in r[\"citation\"]'" ;;
     lock3) check "lock3: under LOCK 3, a CCMR1.OC1M change refuses TVI-TIM-LOCK, predicted-fault (p1602, p1615)" "refuses lock3 TVI-TIM-LOCK predicted-fault 'r[\"register\"] == \"TIMx_CCMR1\"'" ;;
-    lockfrozen) check "lockfrozen: LOCK is frozen by the first BDTR write (p1615): a second write changing it refuses TVI-TIM-LOCK" "refuses lockfrozen TVI-TIM-LOCK predicted-fault 'r[\"register\"] == \"TIMx_BDTR\" and \"frozen\" in r[\"condition\"]'" ;;
+    lockfrozen) check "lockfrozen: LOCK is frozen by the first BDTR write (p1615): a second write changing it refuses TVI-TIM-LOCK" "refuses lockfrozen TVI-TIM-LOCK predicted-fault 'r[\"bit\"] == \"TIMx_BDTR bits 0x00000100 under LOCK level 0\" and \"frozen\" in r[\"condition\"]'" ;;
     dmar) check "dmar: a DMAR write refuses TVI-TIM-DMAR, unmodeled (p1616)" "refuses dmar TVI-TIM-DMAR unmodeled 'True'" ;;
     byte) check "byte: an 8-bit CCER store refuses TVI-TIM-WIDTH, unmodeled (p1588)" "refuses byte TVI-TIM-WIDTH unmodeled 'r[\"access\"][\"width\"] == 8'" ;;
     aoe) check "aoe: AOE = 1 refuses TVI-TIM-FIELD, unmodeled" "refuses aoe TVI-TIM-FIELD unmodeled 'r[\"bit\"].startswith(\"TIMx_BDTR.AOE (\")'" ;;
@@ -196,7 +196,7 @@ EOF" ;;
   ledger)
     mkdir -p "$work/ledger"
     rc=0; container -v "$src:/repo:ro,Z" -v "$work/ledger:/out:Z" "$IMAGE" sh -c '/repo/scripts/build-release /repo /out/release >/dev/null' </dev/null >"$work/ledger.stdout" 2>&1 || rc=$?
-    check "ledger: the release carries the timer guard's 225 field rows over its 25 registers (DMAR has none: TVI-TIM-DMAR), with the period and the first edge as stock-wrong rows citing p1558, and Hi-Z shown low stated (ruled Q1, Q4)" \
+    check "ledger: the release carries the timer guard's 225 field rows over its 25 registers (DMAR has none: TVI-TIM-DMAR), with the period and the first edge as stock-wrong rows citing p1558, Hi-Z shown low stated (ruled Q1, Q4), and bench rows T1 and T2 with the (rule, bit) lock2 and lockfrozen emit (RUL-18)" \
       "[ \$rc = 0 ] && python3 -I -c '
 import json, sys
 rows = [json.loads(l) for l in open(sys.argv[1]).read().splitlines()[1:]]
@@ -206,6 +206,8 @@ ok = len(f) == 225 and len({r[\"register\"] for r in f}) == 25 and not any(r[\"o
 ok = ok and by[(\"TIMx_ARR\", \"ARR[15:0]\")][\"state\"] == \"stock-wrong\" and \"p1558\" in by[(\"TIMx_ARR\", \"ARR[15:0]\")][\"detail\"]
 ok = ok and by[(\"TIMx_CR1\", \"CEN\")][\"state\"] == \"stock-wrong\" and \"p1558\" in by[(\"TIMx_CR1\", \"CEN\")][\"detail\"]
 ok = ok and \"driven low\" in by[(\"TIMx_CCER\", \"CC1E\")][\"behaves_as\"] and by[(\"TIMx_CCER\", \"CC1NE\")][\"allowed\"] == [0]
+bench = sorted((r[\"field\"], r[\"rule\"], r[\"bit\"]) for r in rows if r.get(\"peripheral\") == \"Tviburi.GuardedSTM32_Timer\" and r[\"row\"] == \"bench\")
+ok = ok and bench == [(\"T1\", \"TVI-TIM-LOCK\", \"TIMx_CCER bits 0x00000002 under LOCK level 2\"), (\"T2\", \"TVI-TIM-LOCK\", \"TIMx_BDTR bits 0x00000100 under LOCK level 0\")]
 sys.exit(0 if ok else 1)
 ' '$work/ledger/release/LEDGER.jsonl'" ;;
   registrations)
