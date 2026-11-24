@@ -73,8 +73,11 @@ The median of an even count is the mean of the middle two, rounded down.
 - **When a boot left no whole snapshot,** the shell still writes the row's breakdown fields, empty, so the judge names that boot instead of stopping at a short row.
 
 **What CI compares:**
-- **On a pull request,** `HEAD` is GitHub's merge commit and `HEAD^1` is main's tip. `TVIBURI_MAIN_SHA` is set to the pull request's base, and the step stops before any boot if `HEAD^1` is not that commit.
-- **On a push to main,** `HEAD^1` is main before the push. No base SHA is set there, so a push of several commits at once compares only the last against its parent.
+- **On a pull request** (ruled 2026-11-24T02:24Z): `HEAD` is GitHub's merge ref, and main is its first parent, `HEAD^1`, the tree GitHub actually merges into.
+  - `TVIBURI_HEAD_SHA` is set to the pull request's head, which GitHub refreshes on every push. The step stops before any container unless `HEAD^2` is that commit, and names both SHAs.
+  - The `MEASURED` line, in the log and in the verdict, names the commit measured as main.
+  - The event's `base.sha` is not used, because a push does not refresh it (F5).
+- **On a push to main,** `HEAD^1` is main before the push, and no head is set. So a push of several commits at once compares only the last against its parent.
 
 **`replay-1301.sh` (ruled 23:12Z):**
 - **The GPIO condition is restored.** The GPIO restatement is wired only when the tree has `model/stm32h7-gpio-restate.repl`.
@@ -167,7 +170,7 @@ The budget no longer depends on the answer, because each job compares against it
 | Attack | Result |
 |---|---|
 | **Main's file built from the branch, or the branch's from main** | Each side is its own `git archive`, built by its own tree's release program. Each boot's witnesses must carry its side's hash. **Mutant:** the branch's boots given main's release (Furnace, against the plant): `REFUSE failed-boot: … no witness of sha256:e065cb4c…; 14 witnesses of another release`. Killed |
-| **Main is not main** (checkout gives the PR head, so `HEAD^1` is the branch's previous commit) | `TVIBURI_MAIN_SHA` is the PR's base: `FAIL main is …, but the pull request's base is 0000…`, before any boot. Now a test case in `test-budget.sh` |
+| **Main is not main** (the checkout is not the PR's merge, so `HEAD^1` is not the main it merges into) | `HEAD^2` must be the PR's head: `FAIL HEAD is not this pull request's merge: its second parent is …, the pull request's head is …`, before any container. **Tests** in `test-budget.sh`: a head of zeros, and a branch that is not a merge at all. **Mutant:** the check bypassed, giving 2 FAILED: killed. The first form of this check (`base.sha`) was wrong: F5 |
 | **A median over too few boots** | The judge counts boots itself, not `TVIBURI_MEMORY_RUNS`. Mutant `n < MIN_BOOTS - 1`: killed |
 | **A failed boot counted as a low peak** | **Real case, run twice:** a branch whose C# does not compile peaked at 642,044 KiB (shell judge), then 641,148 KiB (the Rust judge), in about 2.5 s, with no witness and no boot end. Both gave `REFUSE failed-boot: branch boot 1 does not count (boot end 0; no witness of its release)`. **Mutants:** failed boots in the median, and each of the five faults off: killed |
 | **The Rust judge's guards** (one mutant each, against its 17 unit tests) | **13 of 13 killed.** The mutants: no-peak check off; boot end `!= 1` to `> 1`; own-witness check off; other-witness check off; would-refuse moved to main; the 5-boot minimum lowered; failed boots in the median; the no-median refusal off; ceiling `>` to `>=`; the ceiling applied to main; budget `>` to `>=`; the even median taken as the upper middle; the row length `!=` to `<`. **The last first survived:** no test had a row longer than its header, so a test was added and it is now killed. The shell judge's 8 mutants (killed in the earlier pass) went with it |
@@ -204,6 +207,11 @@ The budget no longer depends on the answer, because each job compares against it
   - **The range so far:** +56.8 to +88.4 MiB across six runs.
   - **What the bounds are for:** the lower bound shows the step sees most of the 64 MiB. The upper bound guards against a sampler that over-counts.
   - **The options:** keep 80 (a CI flake is possible but not yet seen); widen the upper bound to 96 MiB (64 + 32); or drop it, keeping only the lower bound and the refusal-by-name. Widening after a failure is a weakened test, so I have not done it.
+- **F5 — my error: the main check compared a stale field. CI went red on `6251ea7` (run 45309668144). Fixed as ruled at 02:24Z.**
+  - **What failed:** the step stopped before any boot with `FAIL main is 9210a8d… (HEAD^1), but the pull request's base is 0d3b4af…`.
+  - **Why:** the architect's docs PR #28 merged into main. GitHub does not refresh the event's `pull_request.base.sha` on a push, while the merge ref's `HEAD^1` was already the new main.
+  - **What I missed:** the advisor had flagged that `base.sha` might lag, and told me to verify it. I checked it once, when it happened to match, and called it sound. One matching observation was not evidence it stays fresh. As written, every docs merge to main would have turned every open PR's budget red.
+  - **Now:** main is the merge ref's `HEAD^1`, and the ref is proven to be this PR's merge by `HEAD^2` equalling the head SHA (§2, §5).
 - **F3 — for 1301a (running beside this WO):** it touches `model/` only. Its PR will be the first guard PR this budget judges. Its FEEDBACK should quote the `MEDIANS` line (WO (2)). If it adds a restate file, the harness must wire it under a condition (§2).
 
 ## 7. Close
@@ -222,7 +230,7 @@ The budget no longer depends on the answer, because each job compares against it
 - **Final CI: run 45294287114 on `ca14cbd`, green.** The runner was Azure westus2, AMD EPYC 9V74.
   - `MEDIANS main 784420 KiB, branch 785552 KiB, difference 1132 KiB (+1.1 MiB)`, then `PASS`.
   - The planted test refused by `budget` alone at +65,796 KiB, with the plant in 5 of 5 boots. `main-not-the-base` passed.
-  - **The base binding, observed with main moved:** main is `0d3b4af` (`HEAD^1`), and the PR's `base.sha` is also `0d3b4af`.
+  - **The base binding, observed once with main moved:** main is `0d3b4af` (`HEAD^1`), and the PR's `base.sha` is also `0d3b4af`. That one match was not proof the field stays fresh (F5).
   - The gate took 6 min 0 s and the plant test 5 min 55 s, on this slower runner. The job took 47 min.
 - **Then the Rust judge (ruled 01:05Z): `9011bbf`, CI run 45302732365, green.** The runner was Azure centralus, Intel Xeon Platinum 8573C.
   - The judge: `test result: ok. 17 passed`, in both memory steps.

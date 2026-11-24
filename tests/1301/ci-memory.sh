@@ -4,8 +4,8 @@
 # aet-1c32c8ea-ardupilot/), on main's one-file overlay and on the branch's, in this one job, interleaved.
 #   MAIN, BRANCH  each a directory holding a source tree, or a commit of this checkout (extracted by `git archive`).
 #                 Default: HEAD^1 and HEAD. In CI on a pull request HEAD is GitHub's merge commit and HEAD^1 is main's
-#                 tip; on a push to main HEAD^1 is main before the push. TVIBURI_MAIN_SHA, when set (CI sets it to a
-#                 pull request's base), must be MAIN's commit.
+#                 tip; on a push to main HEAD^1 is main before the push. TVIBURI_HEAD_SHA, when set (CI sets it to a
+#                 pull request's head), must be BRANCH's second parent, so BRANCH is that pull request's merge.
 # Only the release comes from each tree, built once by that tree's own scripts/build-release; the harness
 # (replay-1301.sh), the captured run and the ELF are this checkout's, the same for both sides. The ELF is built from
 # Aethelgard's pinned ArduPilot image and must be a799dfb6… (the fixture's SOURCE.md).
@@ -37,20 +37,27 @@ fix=$here/tests/1301/fixtures/aet-1c32c8ea-ardupilot
 
 # The two trees, then each one's release, built once by its own release program; its hash is what every witness of
 # a boot on that side must report.
-declare -A tree hash
+# On a pull request, BRANCH must be its merge ref (ruled 2026-11-24T02:24Z): the second parent is the pull request's
+# head, which GitHub refreshes on every push, so the first parent is the main GitHub actually merges into. The event's
+# base.sha is never used, because a push does not refresh it. Checked before any container.
+if [ -n "${TVIBURI_HEAD_SHA:-}" ]; then
+  b=${2:-HEAD}
+  p2=$(git -C "$here" rev-parse --verify -q "$b^2" || true)
+  [ "$p2" = "$TVIBURI_HEAD_SHA" ] || { echo "FAIL $b is not this pull request's merge: its second parent is ${p2:-none}," \
+    "the pull request's head is $TVIBURI_HEAD_SHA"; exit 1; }
+  echo "branch $b is this pull request's merge: its second parent is the pull request's head, $p2"
+fi
+declare -A tree hash label
 for s in main branch; do
   if [ $s = main ]; then a=${1:-HEAD^1}; else a=${2:-HEAD}; fi
   if [ -d "$a" ]; then
-    tree[$s]=$(cd "$a" && pwd); echo "$s: the directory ${tree[$s]}"
+    tree[$s]=$(cd "$a" && pwd); label[$s]="the directory ${tree[$s]}"
   else
     tree[$s]=$work/$s; mkdir "${tree[$s]}"
     git -C "$here" archive "$a" | tar -x -C "${tree[$s]}"
-    c=$(git -C "$here" rev-parse "$a")
-    echo "$s: commit $c ($a)"
-    # A pull request's main must be the base GitHub names, not whatever HEAD^1 happens to be (WO §5).
-    [ $s = branch ] || [ -z "${TVIBURI_MAIN_SHA:-}" ] || [ "$c" = "$TVIBURI_MAIN_SHA" ] \
-      || { echo "FAIL main is $c, but the pull request's base is $TVIBURI_MAIN_SHA"; exit 1; }
+    label[$s]="commit $(git -C "$here" rev-parse "$a") ($a)"
   fi
+  echo "$s: ${label[$s]}"
   mkdir "$work/rel-$s"
   hash[$s]=$(container -v "${tree[$s]}:/repo:ro" -v "$work/rel-$s:/out" "$IMAGE" sh /repo/scripts/build-release /repo /out/release \
     2>"$work/rel-$s.err") || { cat "$work/rel-$s.err"; echo "FAIL $s's release did not build"; exit 1; }
@@ -124,7 +131,8 @@ for r in $(seq 1 "$runs"); do
 done
 
 verdict=0
-container -v "$work:/w:ro" "$IMAGE" /w/judge/debug/tviburi-budget /w/runs.tsv >"$work/verdict.txt" 2>&1 || verdict=$?
+echo "MEASURED main ${label[main]}; branch ${label[branch]}" >"$work/verdict.txt"
+container -v "$work:/w:ro" "$IMAGE" /w/judge/debug/tviburi-budget /w/runs.tsv >>"$work/verdict.txt" 2>&1 || verdict=$?
 cat "$work/verdict.txt"
 echo "outputs: $work"
 if [ -n "${GITHUB_STEP_SUMMARY:-}" ]; then

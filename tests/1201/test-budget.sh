@@ -2,7 +2,8 @@
 # tests/1201/test-budget.sh [--no-boots] [MAIN] — the memory budget's own tests (TVI-WO-1201 §1.2, §5). The judge's
 # own cases (each refusal by name, the boundaries, a boot with no sample, fewer than 5) are tools/tviburi-budget's unit
 # tests, which tests/1301/ci-memory.sh runs before every verdict.
-# 1. A TVIBURI_MAIN_SHA that is not main's commit must stop the step before any boot.
+# 1. A BRANCH that is not the pull request's merge (TVIBURI_HEAD_SHA not its second parent) must stop the step
+#    before any container.
 # 2. Unless --no-boots: the planted branch. MAIN's tree (a directory, or a commit; default HEAD^1, main's tip in CI)
 #    with tests/1201/fixtures/Planted64MiB.cs in its model/, booted against MAIN by the real step. The step must
 #    refuse it by `budget` and by nothing else, with the medians more than 32 MiB and at most 128 MiB apart.
@@ -20,12 +21,18 @@ scratch=${TVIBURI_SCRATCH:-$HOME/.cache/tviburi}
 mkdir -p "$scratch"
 work=$(mktemp -d "$scratch/budget-test.XXXXXX")
 fails=0
+args=("$@")
 
-# main bound to the pull request's base (WO §5): a base that is not MAIN's commit stops the step before any boot.
-out=$(TVIBURI_MAIN_SHA=0000000000000000000000000000000000000000 "$step" HEAD HEAD 2>&1)
-if [ $? = 1 ] && grep -q "^FAIL main is .*, but the pull request's base is 0000000000000000000000000000000000000000$" <<<"$out" \
-  && ! grep -q "boot 1" <<<"$out"; then echo "ok   main-not-the-base: stopped before any boot"
-else echo "FAIL main-not-the-base:"; sed 's/^/     /' <<<"$out"; fails=$((fails + 1)); fi
+# The branch must be this pull request's merge (ruled 2026-11-24T02:24Z): a BRANCH whose second parent is not the
+# pull request's head stops the step before any boot, whether it is a merge of something else or no merge at all.
+for c in "zeros HEAD 0000000000000000000000000000000000000000" "not-a-merge HEAD^1 $(git -C "$here" rev-parse HEAD)"; do
+  set -- $c
+  out=$(TVIBURI_HEAD_SHA=$3 "$step" "$2^1" "$2" 2>&1)
+  if [ $? = 1 ] && grep -q "^FAIL $2 is not this pull request's merge: .* the pull request's head is $3$" <<<"$out" \
+    && ! grep -q "release\|boot 1" <<<"$out"; then echo "ok   not-this-prs-merge ($1): stopped before any container"
+  else echo "FAIL not-this-prs-merge ($1):"; sed 's/^/     /' <<<"$out"; fails=$((fails + 1)); fi
+done
+set -- "${args[@]}"
 
 if [ "${1:-}" = --no-boots ]; then shift; else
   main=${1:-HEAD^1}
