@@ -170,7 +170,7 @@ G11-resetCheck	model/GuardedSTM32_GPIOPort.cs	if(resets[i] != want[i])	if(false)
 G12-subWordMerge	model/GuardedSTM32_GPIOPort.cs	var word = width == 32 ? value : (Served(b) & ~(mask << shift)) | ((value & mask) << shift);	var word = width == 32 ? value : (value & mask);	gpio-bsrrhalf gpio-afrh
 G13-portFromAddress	model/GuardedSTM32_GPIOPort.cs	port = (char)('A' + (int)((start - PortsBase) / 0x400));	port = 'A';	gpio-package
 G14-tableData	model/GuardedSTM32_GPIOPort.cs	PA5:89:	PA5:90:	afcheck
-G15-restatedRoute	model/stm32h7-gpio-restate.repl	timer1:\n    0 -> tviburiGpioA#07@01 | tviburiGpioA#08@01 |	timer1:\n    0 -> tviburiGpioA#07@01 |	gpio-registrations
+G15-restatedRoute	model/stm32h7-gpio-restate.repl	tviburiTimer1:\n    0 -> tviburiGpioA#07@01 | tviburiGpioA#08@01 |	tviburiTimer1:\n    0 -> tviburiGpioA#07@01 |	gpio-registrations
 G16-boardPackage	model/tviburi-nucleo-h753zi.repl	tviburiGpioH:\n    mode: "enforcing"\n    package: "LQFP144"	tviburiGpioH:\n    mode: "enforcing"	gpio-package
 G17-namesLine	scripts/tviburi-spike	gpioPortJ gpioPortK timer1 timer8 >	gpioPortJ timer1 timer8 >	modeled
 G18-unlistedPinAf	model/GuardedSTM32_GPIOPort.cs	if(cell == null || cell.Text == "-")	if(cell != null && cell.Text == "-")	gpio-pk8af
