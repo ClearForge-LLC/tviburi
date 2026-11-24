@@ -53,6 +53,18 @@ for i in "${!args[@]}"; do
       done
       cat /out/$n-$mode.moved-gpio.txt; } >> "$plat"
   fi
+  # TVI-WO-1302: a tree with the timer restatement (TIM1 and TIM8 guarded) gets it after the GPIO one, which names the
+  # guards' variables. The consumer's untyped `timer1:`/`timer8:` blocks (its frequency) move onto `tviburiTimer1`/`8`
+  # (an untyped update binds to the cancelled entry: measured, TVI-WO-1302.measure.md §2.3), and its `timerN@` inputs
+  # are repointed. A tree without it replays as before.
+  if [ -f /repo/model/stm32h7-timer-restate.repl ]; then
+    awk '/^timer[18]:$/{f=1; sub(/timer/, "tviburiTimer"); print; next} f && /^ /{print; next} {f=0}' "$plat" > /out/$n-$mode.moved-timer.txt
+    awk '/^timer[18]:$/{f=1; next} f && /^ /{next} {f=0; print}' "$plat" > "$plat.new" && cat "$plat.new" > "$plat" && rm "$plat.new"
+    sed -i 's/\btimer\([18]\)@/tviburiTimer\1@/g' "$plat"
+    { echo; cat /repo/model/stm32h7-timer-restate.repl; echo
+      printf 'tviburiTimer1:\n    mode: "%s"\n\ntviburiTimer8:\n    mode: "%s"\n\n' "${ACCEPT_MODE:-recorded}" "${ACCEPT_MODE:-recorded}"
+      cat /out/$n-$mode.moved-timer.txt; } >> "$plat"
+  fi
   args[$((i + 1))]=${c/'mach create; '/'include @/tmp/release/Tviburi.cs; mach create; '}
 done
 printf '%s\n' "${args[@]}" > /out/$n-$mode.argv.txt
