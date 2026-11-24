@@ -32,7 +32,7 @@ def stream_flags(reg, off, sec, page, streams, cls):
 
 def flag(name):
     if name.startswith("TCIF"):
-        return (name, A, "read-only", "read-only (silicon ignores a write; so does the guard's stock model): set when the stock model completes a transfer (probed, TVI-WO-1303.measure.md D2)")
+        return (name, A, "read-only", "read-only (silicon ignores a write; so does the guard's stock model): set when the stock model completes a transfer (probed, TVI-WO-1303.measure.md D2), and by the guard when software clears EN while the stream runs (p654; TVI-WO-1305, ruled 2026-11-24T18:55Z Q6)")
     return (name, A, "read-only", "read-only (silicon ignores a write): the stock model never sets it; silicon sets HTIF at half transfer and TEIF, DMEIF, FEIF on errors, none modeled")
 
 
@@ -63,8 +63,8 @@ def cr():
         (reg, off, sec, "PINC", 9, 9, A, "inherited, unaudited (acknowledged by name)", "the stock model: peripheral address increment (probed, D2); protected under EN", 663),
         (reg, off, sec, "CIRC", 8, 8, Z, "tag", "0 only: a stock tag; circular mode is not modeled", 664),
         (reg, off, sec, "DIR[1:0]", 7, 6, "Directions",
-         "stock, wrong (a memory-to-peripheral transfer completes at the EN write, unpaced by any request, where silicon moves one item per request: acknowledged for requests 38 spi1_tx_dma, 40 spi2_tx_dma and 42 usart1_tx_dma, as ArduPilot's recorded boot uses them; a peripheral-to-memory stream on request 41 usart1_rx_dma moves no data, because no model raises it: acknowledged by name; any other request no model raises refuses TVI-DMA-REQUEST; "
-         + RULING + " Q5 (c))",
+         "stock, wrong (a memory-to-peripheral transfer completes at the EN write, unpaced by any request, where silicon moves one item per request: acknowledged for requests 38 spi1_tx_dma, 40 spi2_tx_dma, 42 usart1_tx_dma and 46 usart3_tx_dma, as ArduPilot's recorded boot and armed run use them; a peripheral-to-memory stream on request 41 usart1_rx_dma, 43 usart2_rx_dma or 45 usart3_rx_dma moves the bytes the USART guard's ReceiveDmaRequest raises where the platform wires it, and nothing where it does not: acknowledged by name; any other request no model raises refuses TVI-DMA-REQUEST; "
+         + RULING + " Q5 (c); 43, 45, 46 ruled 2026-11-24T18:55Z Q6)",
          "the stock model: 00 peripheral-to-memory, 01 memory-to-peripheral, 10 memory-to-memory (probed, D2, D9, D11); 11 is reserved; protected under EN", 664),
         (reg, off, sec, "PFCTRL", 5, 5, Z, "tag", "0 only: a stock tag; the peripheral as flow controller is not modeled", 664),
         (reg, off, sec, "TCIE", 4, 4, A, "inherited, unaudited (acknowledged by name)", "the stock model: the transfer-complete interrupt (probed, D2; ArduPilot's streams take it)", 664),
@@ -74,7 +74,7 @@ def cr():
         (reg, off, sec, "DMEIE", 1, 1, A, ack("DMEIE is a stock tag: no direct-mode error is modeled, so its interrupt never fires; its value is kept by the guard and served on read"),
          "kept by the guard and served on read; no direct-mode error is modeled", 664),
         (reg, off, sec, "EN", 0, 0, A, "modeled by the guard",
-         "the stock model starts the stream; at its rise the guard checks its sizes (TVI-DMA-SIZE, p663), a stale offset (TVI-DMA-OFFSET, p666), its addresses (TVI-DMA-TCM, TVI-DMA-ADDRESS, p108, Table 7 p131), a reload (TVI-DMA-RELOAD, p665) and its DMAMUX1 request (TVI-DMA-ROUTE, TVI-DMA-SHARED, TVI-DMA-REQUEST, TVI-DMA-MUX); while it is set, a changed protected field refuses (TVI-DMA-EN running, TVI-DMA-DONE once the twin completed the transfer); the stock model never clears it at the end of a transfer (stock-wrong, p665)", 665),
+         "the stock model starts the stream; at its rise the guard checks its sizes (TVI-DMA-SIZE, p663), its addresses (TVI-DMA-TCM, TVI-DMA-ADDRESS, p108, Table 7 p131), a reload (TVI-DMA-RELOAD, p665) and its DMAMUX1 request (TVI-DMA-ROUTE, TVI-DMA-SHARED, TVI-DMA-REQUEST, TVI-DMA-MUX); while it is set, a changed protected field refuses (TVI-DMA-EN running, TVI-DMA-DONE once the twin completed the transfer); the stock model never clears it at the end of a transfer (stock-wrong, p665); cleared by software while the stream runs, the guard sets TCIF and restarts the stream's next transfer at its programmed addresses, as silicon's suspension does (p654, p666; TVI-WO-1305, ruled 2026-11-24T18:55Z Q6)", 665),
     ]
 
 

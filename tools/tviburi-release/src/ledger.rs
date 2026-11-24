@@ -6,7 +6,7 @@
 use crate::json::{self, Value};
 use std::collections::BTreeMap;
 
-pub const SCHEMA: u32 = 1;
+pub const SCHEMA: u32 = 2;   // 2 (TVI-WO-1305): a partly guarded type's model row is split, `field` "guarded" / "unguarded"
 pub const STATES: [&str; 9] =
     ["guard", "inherited-unaudited", "acknowledged", "tag", "reserved", "canned", "read-only", "stock-wrong", "stock-undefined"];
 pub const ROWS: [&str; 5] = ["bench", "canned", "field", "model", "tag"];
@@ -143,7 +143,7 @@ mod tests {
     fn writes_sorted_canonical_lines_that_read_back() {
         let t = schema_line(H).unwrap() + &rows(vec![row("B", "R", "f"), row("A", "S", "a"), row("A", "R", "z")]).unwrap();
         let lines: Vec<&str> = t.lines().collect();
-        assert_eq!(lines[0], format!(r#"{{"ledger":"tviburi","release":"sha256:{H}","schema":1}}"#));
+        assert_eq!(lines[0], format!(r#"{{"ledger":"tviburi","release":"sha256:{H}","schema":2}}"#));
         assert_eq!(lines[1], r#"{"allowed":[7,0],"field":"z","peripheral":"A","register":"R","row":"field","state":"guard","text":"a \"q\" é\u0009"}"#);
         assert!(lines[2].contains(r#""register":"S""#) && lines[3].contains(r#""peripheral":"B""#));
         assert_eq!(check(&t, H), Ok(3));

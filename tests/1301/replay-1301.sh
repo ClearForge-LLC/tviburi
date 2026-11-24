@@ -89,6 +89,23 @@ for i in "${!args[@]}"; do
       [ -z "$ob" ] || printf '    optionBytes: %s\n' "$ob"
       echo; } >> "$plat"
   fi
+  # TVI-WO-1305: a tree with the USART restatement gets it last. The consumer's untyped `usartN:`/`uartN:` blocks (its
+  # frequency, and a receive request line where it wires one) move onto the guard's variable (an untyped update binds to
+  # the cancelled entry, RUL-09 (b); measured as a form, TVI-WO-1305.measure.md §2.3); lpuart1 stays stock. ACCEPT_USART_DMA
+  # ("usart1:41 ..."), for a tree whose guard raises the request, adds `ReceiveDmaRequest -> dmamux1@N` to those ports,
+  # standing in for the consumer (Aethelgard AET-WO-4400i). A tree without it replays as before.
+  if [ -f /repo/model/stm32h7-usart-restate.repl ]; then
+    awk '/^(usart[1236]|uart[4578]):$/{f=1; sub(/^u/, "tviburiU"); print; next} f && /^ /{print; next} {f=0}' "$plat" > /out/$n-$mode.moved-usart.txt
+    awk '/^(usart[1236]|uart[4578]):$/{f=1; next} f && /^ /{next} {f=0; print}' "$plat" > "$plat.new" && cat "$plat.new" > "$plat" && rm "$plat.new"
+    { echo; cat /repo/model/stm32h7-usart-restate.repl; echo
+      for u in usart1 usart2 usart3 uart4 uart5 usart6 uart7 uart8; do
+        v=tviburiU${u#u}
+        printf '%s:\n    mode: "%s"\n' "$v" "${ACCEPT_MODE:-recorded}"
+        for w in ${ACCEPT_USART_DMA:-}; do [ "${w%%:*}" = "$u" ] && printf '    ReceiveDmaRequest -> dmamux1@%s\n' "${w#*:}"; done
+        echo
+      done
+      cat /out/$n-$mode.moved-usart.txt; } >> "$plat"
+  fi
   args[$((i + 1))]=${c/'mach create; '/'include @/tmp/release/Tviburi.cs; mach create; '}
 done
 printf '%s\n' "${args[@]}" > /out/$n-$mode.argv.txt

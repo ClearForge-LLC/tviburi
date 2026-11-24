@@ -206,18 +206,32 @@ fn stock_rows(chain: &stock::Chain, pins: &Pins) -> Vec<Row> {
     };
     let mut rows = Vec::new();
     for (ty, (insts, files)) in models {
-        let mut m = Row::new();
-        m.insert("row".into(), s("model"));
-        m.insert("peripheral".into(), s(ty));
-        m.insert("register".into(), s(""));
-        m.insert("field".into(), s(""));
-        m.insert("state".into(), s("inherited-unaudited"));
-        m.insert("instances".into(), list(insts.into_iter().map(String::from).collect()));
-        m.insert("files".into(), list(files.into_iter().map(pinned).collect()));
-        if let Some((_, guard)) = pins.classes.iter().find(|c| c.0 == ty) {
-            m.insert("guarded_by".into(), s(guard));
+        // A type whose class row names some of its instances is split (ruled 2026-11-24T19:57Z, TVI-WO-1305): one row,
+        // `field` "guarded", for the instances the guard restates, with `guarded_by`; one, `field` "unguarded", for the
+        // rest, without it. Each row is true read alone. Any other type keeps one row, `field` "".
+        let guard = pins.classes.iter().find(|c| c.0 == ty).map(|c| c.1.as_str());
+        let named = guard.and_then(|g| pins.instances.get(g));
+        let (guarded, rest): (Vec<&str>, Vec<&str>) =
+            insts.iter().copied().partition(|i| guard.is_some() && named.map_or(true, |n| n.iter().any(|x| x == i)));
+        let groups = if guarded.is_empty() || rest.is_empty() {
+            vec![("", insts.clone(), if rest.is_empty() { guard } else { None })]
+        } else {
+            vec![("guarded", guarded, guard), ("unguarded", rest, None)]
+        };
+        for (field, group, by) in groups {
+            let mut m = Row::new();
+            m.insert("row".into(), s("model"));
+            m.insert("peripheral".into(), s(ty));
+            m.insert("register".into(), s(""));
+            m.insert("field".into(), s(field));
+            m.insert("state".into(), s("inherited-unaudited"));
+            m.insert("instances".into(), list(group.into_iter().map(String::from).collect()));
+            m.insert("files".into(), list(files.iter().map(|f| pinned(f)).collect()));
+            if let Some(g) = by {
+                m.insert("guarded_by".into(), s(g));
+            }
+            rows.push(m);
         }
-        rows.push(m);
     }
     for (name, range, file) in &chain.tags {
         let mut m = Row::new();
@@ -256,6 +270,29 @@ fn restated<'a>(declared: &'a [(String, String, String)], stock_ty: &str, named:
         }
     }
     Ok(all.into_iter().filter(|(i, _)| names.iter().any(|n| n == i)).collect())
+}
+
+/// Every instance a model row with `guarded_by` lists is one the manifest restates for that stock type (ruled
+/// 2026-11-24T19:57Z): a row that would name an unguarded instance as guarded refuses the release, by name.
+fn check_guarded(rows: &[Row], restates: &[(String, String)]) -> Result<(), String> {
+    for r in rows {
+        let str_of = |k: &str| match r.get(k) {
+            Some(Value::Str(v)) => Some(v.as_str()),
+            _ => None,
+        };
+        if str_of("row") != Some("model") || r.get("guarded_by").is_none() {
+            continue;
+        }
+        let ty = str_of("peripheral").unwrap_or_default();
+        let Some(Value::Array(insts)) = r.get("instances") else { return Err(format!("the model row for {ty} has no instances")) };
+        for i in insts {
+            let Value::Str(i) = i else { return Err(format!("the model row for {ty} lists a non-string instance")) };
+            if !restates.iter().any(|(t, x)| t == ty && x == i) {
+                return Err(format!("the model row for {ty} lists {i} as guarded, which the manifest does not restate"));
+            }
+        }
+    }
+    Ok(())
 }
 
 fn bench_rows(src: &Source, pins: &Pins) -> Result<Vec<Row>, String> {
@@ -336,6 +373,11 @@ fn build(repo: &Path, renode: &Path, out: &Path) -> Result<(String, String), Str
     m += &format!("file {} {TEMPLATE}\n", sha256::hex(&template.bytes));
     m += &format!("overlay {} {} {OVERLAY}\n", sha256::hex(body.as_bytes()), body.len());
     m += &format!("excluded {OVERLAY} the overlay's {} bytes above, then {TEMPLATE} with its placeholder replaced by this manifest's sha256\n", body.len());
+    let restates: Vec<(String, String)> = m.lines().filter_map(|l| l.strip_prefix("restate ")).filter_map(|l| {
+        let f: Vec<&str> = l.split(' ').collect();
+        (f.len() == 3).then(|| (f[0].to_string(), f[1].to_string()))
+    }).collect();
+    check_guarded(&rows, &restates)?;
     // The ledger's rows never name the release, so the manifest can bind them without naming itself.
     let rows_text = ledger::rows(rows)?;
     m += &format!("ledger-rows {} {LEDGER}\n", sha256::hex(rows_text.as_bytes()));
@@ -658,5 +700,25 @@ mod tests {
         assert_eq!(a, tar::archive(&[("A", b"x"), ("B", b"")]));
         assert_eq!(a.len(), 512 * 2 + 512 + 1024);
         assert_eq!(&a[257..263], b"ustar\0");
+    }
+
+    #[test]
+    fn a_partly_guarded_type_splits_its_model_row_and_a_planted_overclaim_refuses() {
+        let row = |field: &str, insts: &[&str], by: Option<&str>| {
+            let mut m = Row::new();
+            m.insert("row".into(), s("model"));
+            m.insert("peripheral".into(), s("UART.T"));
+            m.insert("field".into(), s(field));
+            m.insert("instances".into(), Value::Array(insts.iter().map(|x| s(x)).collect()));
+            if let Some(g) = by {
+                m.insert("guarded_by".into(), s(g));
+            }
+            m
+        };
+        let restates = vec![("UART.T".to_string(), "u1".to_string()), ("UART.T".to_string(), "u2".to_string())];
+        let good = vec![row("guarded", &["u1", "u2"], Some("Tviburi.G")), row("unguarded", &["lp1"], None)];
+        assert!(check_guarded(&good, &restates).is_ok());
+        let planted = vec![row("guarded", &["u1", "lp1"], Some("Tviburi.G"))];
+        assert_eq!(check_guarded(&planted, &restates).unwrap_err(), "the model row for UART.T lists lp1 as guarded, which the manifest does not restate");
     }
 }
