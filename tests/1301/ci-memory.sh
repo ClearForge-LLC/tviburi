@@ -136,13 +136,14 @@ for r in $(seq 1 "$runs"); do
     [ $s = main ] || [ "${would:-0}" = 0 ] || why="$why $would GPIO would-refuse;"
     status=${why:+${why# }}; status=${status:-ok}
     # What the peak is made of (WO (4)): the Renode process's own breakdown at its peak sample, in KiB.
-    parts=$(awk '/^(RssAnon|RssFile|RssShmem|AnonHugePages|Threads):/ {v[$1] = $2} /^pid / {v["n"] = $4}
-      END {printf "%s\t%s\t%s\t%s\t%s\t%s", v["RssAnon:"], v["RssFile:"], v["RssShmem:"], v["AnonHugePages:"], v["Threads:"], v["n"]}' \
+    # The snapshot is the last whole one, at or before the peak; its own sample's sum is the last column.
+    parts=$(awk '/^(RssAnon|RssFile|RssShmem|AnonHugePages|Threads):/ {v[$1] = $2} /^pid / {v["n"] = $4; v["s"] = $7}
+      END {printf "%s\t%s\t%s\t%s\t%s\t%s\t%s", v["RssAnon:"], v["RssFile:"], v["RssShmem:"], v["AnonHugePages:"], v["Threads:"], v["n"], v["s"]}' \
       "$out/2-accept.peak-proc.txt" 2>/dev/null || true)
     printf '%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n' $s $r "${peak:-0}" "${wall:-none}" "$status" "$mine" "$avail" \
       "$(cut -d' ' -f1-3 /proc/loadavg)" "$parts" >> "$work/runs.tsv"
     echo "$s boot $r: peak ${peak:-none} KiB, wall ${wall:-none} s, witnesses of its release $mine, host MemAvailable" \
-      "before $avail kB; at the peak RssAnon/RssFile/RssShmem/AnonHugePages/Threads/processes $(tr '\t' / <<<"$parts"): $status"
+      "before $avail kB; at the peak RssAnon/RssFile/RssShmem/AnonHugePages/Threads/processes/snapshot-sum $(tr '\t' / <<<"$parts"): $status"
   done
 done
 
@@ -157,9 +158,9 @@ if [ -n "${GITHUB_STEP_SUMMARY:-}" ]; then
     echo
     echo '```'; cat "$work/verdict.txt"; echo '```'
     echo
-    echo "| side | boot | peak (KiB) | wall (s) | counts? | witnesses | RssAnon | RssFile | RssShmem | AnonHugePages | threads | processes |"
-    echo "|---|---|---|---|---|---|---|---|---|---|---|---|"
-    awk -F'\t' '{printf "| %s | %s | %s | %s | %s | %s | %s | %s | %s | %s | %s | %s |\n", $1, $2, $3, $4, $5, $6, $9, $10, $11, $12, $13, $14}' \
+    echo "| side | boot | peak (KiB) | wall (s) | counts? | witnesses | RssAnon | RssFile | RssShmem | AnonHugePages | threads | processes | snapshot's sum |"
+    echo "|---|---|---|---|---|---|---|---|---|---|---|---|---|"
+    awk -F'\t' '{printf "| %s | %s | %s | %s | %s | %s | %s | %s | %s | %s | %s | %s | %s |\n", $1, $2, $3, $4, $5, $6, $9, $10, $11, $12, $13, $14, $15}' \
       "$work/runs.tsv"
     echo
     echo '```'; cat "$work/runner.txt"; echo '```'

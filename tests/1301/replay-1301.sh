@@ -57,10 +57,12 @@ while kill -0 $! 2>/dev/null; do
   s=0; k=0; top=0; topr=0
   for p in $(pgrep -f 'enode'); do r=$(awk '/^VmRSS:/{print $2}' /proc/$p/status 2>/dev/null); s=$((s + ${r:-0})); k=$((k + 1)); [ "${r:-0}" -gt $topr ] && { topr=$r; top=$p; }; h=$(awk '/^VmHWM:/{print $2}' /proc/$p/status 2>/dev/null); [ "${h:-0}" -gt $hwm ] && hwm=$h; done
   # At each new peak, the breakdown of the largest matched process, Renode (TVI-WO-1201 (4)): its status and
-  # smaps_rollup, the last peak's kept. A transient second match (seen in CI run 45286469273) is counted, not read.
+  # smaps_rollup. Kept only if it has RssAnon: a peak sampled as Renode exits finds its memory already gone (no Rss
+  # lines, 2 threads; seen in CI run 45286469273 and on Furnace), so the last whole snapshot stays, with its own sum.
   if [ $s -gt $peak ]; then
     peak=$s
-    { echo "pid $top of $k matched; rss_sum_kib $s"; cat /proc/$top/status /proc/$top/smaps_rollup 2>/dev/null; } > /tmp/peak-proc.txt
+    { echo "pid $top of $k matched; rss_sum_kib $s"; cat /proc/$top/status /proc/$top/smaps_rollup 2>/dev/null; } > /tmp/peak-proc.new
+    grep -q '^RssAnon:' /tmp/peak-proc.new && mv /tmp/peak-proc.new /tmp/peak-proc.txt
   fi
   sleep 0.1
 done

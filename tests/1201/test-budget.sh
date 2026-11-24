@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # tests/1201/test-budget.sh [--judge-only] [MAIN] — the memory budget's own tests (TVI-WO-1201 §1.2, §5).
 # 1. The judge (tests/1301/ci-memory.sh --judge) on canned tables, no container: each refusal by its name, nothing
-#    else, and the boundaries (32 MiB exactly passes; 1,572,864 KiB exactly passes).
+#    else, and the boundaries (32 MiB exactly passes; 1,572,864 KiB exactly passes). Then a TVIBURI_MAIN_SHA that is
+#    not main's commit, which must stop the step before any boot.
 # 2. Unless --judge-only: the planted branch. MAIN's tree (a directory, or a commit; default HEAD^1, main's tip in CI)
 #    with tests/1201/fixtures/Planted64MiB.cs in its model/, booted against MAIN by the real step. The step must
 #    refuse it by `budget` and by nothing else, with the medians 48–80 MiB apart (64 MiB, give or take the 16 MiB
@@ -38,6 +39,12 @@ case_ wrong-release failed-boot "$(rows main 1000000 5; rows branch 1000000 4; e
 case_ four-boots too-few-boots "$(rows main 1000000 4; rows branch 1000000 4)"
 case_ no-branch too-few-boots "$(rows main 1000000 5)"
 case_ every-branch-boot-failed "failed-boot too-few-boots" "$(rows main 1000000 5; rows branch 1000000 5 | sed 's/$/ boot_end_0;/')"
+
+# main bound to the pull request's base (WO §5): a base that is not MAIN's commit stops the step before any boot.
+out=$(TVIBURI_MAIN_SHA=0000000000000000000000000000000000000000 "$step" HEAD HEAD 2>&1)
+if [ $? = 1 ] && grep -q "^FAIL main is .*, but the pull request's base is 0000000000000000000000000000000000000000$" <<<"$out" \
+  && ! grep -q "boot 1" <<<"$out"; then echo "ok   main-not-the-base: stopped before any boot"
+else echo "FAIL main-not-the-base:"; sed 's/^/     /' <<<"$out"; fails=$((fails + 1)); fi
 
 if [ "${1:-}" = --judge-only ]; then shift; else
   main=${1:-HEAD^1}
