@@ -41,8 +41,8 @@ jobs:
           TVIBURI_SCRATCH="$RUNNER_TEMP/tviburi" tests/ci/route.sh $ALL | tee "$RUNNER_TEMP/route.txt"
           grep -E '^(class=(docs|code)|budget=(yes|no))$' "$RUNNER_TEMP/route.txt" >>"$GITHUB_OUTPUT"
 
-  # Six explicit shards (five ruled 2026-11-24T10:30Z, Q1 and Q4; the sixth TVI-WO-1202a): each its own job, so each
-  # passes its own record. Their number is also shard.yml's `of` and the counts in `ci` below.
+  # Six explicit shards (ruled 2026-11-24T10:30Z, Q1 and Q4): each its own job, so each passes its own record. Their
+  # number is also shard.yml's `of` and the counts in `ci` below.
   shard-1:
     needs: route
     if: needs.route.outputs.class == 'code'
@@ -137,7 +137,7 @@ jobs:
           # Six shards and the budget, each named: a result that is missing (a job renamed or dropped from `needs`) is
           # an empty word, so count them.
           set -- $SHARDS $MEMORY
-          [ $# = 7 ] || { echo "FAIL want 6 shard results and the budget's, got $#: '$SHARDS' '$MEMORY'"; exit 1; }
+          [ $# = 7 ] || { echo "FAIL want every shard's result and the budget's, got $#: '$SHARDS' '$MEMORY'"; exit 1; }
           case "$CLASS" in
             code) want=success ;;
             docs) want=skipped ;;
@@ -168,4 +168,4 @@ jobs:
           RAN6: ${{ needs.shard-6.outputs.ran }}
         run: |
           for i in 1 2 3 4 5 6; do v=RAN$i; printf '%s\n' "${!v}" >"$RUNNER_TEMP/ran-$i.txt"; done
-          TVIBURI_SCRATCH="$RUNNER_TEMP/tviburi" tests/ci/aggregate.sh "$RUNNER_TEMP"/ran-{1,2,3,4,5,6}.txt
+          TVIBURI_SCRATCH="$RUNNER_TEMP/tviburi" tests/ci/aggregate.sh "$RUNNER_TEMP"/ran-?.txt

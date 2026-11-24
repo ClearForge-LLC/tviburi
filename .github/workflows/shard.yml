@@ -9,7 +9,7 @@ on:
         type: number
         required: true
       of:
-        # The number of shards: ci.yml calls shard-1 .. shard-6 (five ruled 2026-11-24T10:30Z, Q1; six TVI-WO-1202a).
+        # The number of shards: one per shard-N job in ci.yml.
         type: number
         default: 6
     outputs:

@@ -2,8 +2,7 @@
 # Re-weighed from CI's own logs on main after TVI-WO-1305 (runs 45493309831, 45494954973, 45509971801: 646 items each,
 # 15 shard jobs, six CPU models): an item's time is the gap from the previous item's last line to its own. Each shard's
 # speed is its median item against the old weights, over the run's Intel Xeon 6975P-C shards; an item weighs the mean
-# of its three times, each divided by its shard's speed. So every weight is at the 6975P-C's speed (1.00). Measured
-# against it: the AMD EPYC 7763, the slowest, 1.43-1.53; the Intel Xeon Platinum 8573C 1.35; the AMD EPYC 9V74 1.17.
+# of its three times, each divided by its shard's speed. So every weight is at the 6975P-C's speed (1.00).
 # Never the list of what runs: that is the tree's own (tests/spike.sh, tests/mutants.tsv); an item missing here
 # weighs its kind's median and still runs. KIND<tab>ID<tab>SECONDS.
 case	unit	1.4
