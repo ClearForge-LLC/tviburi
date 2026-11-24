@@ -58,3 +58,4 @@ model/GuardedSTM32DMA.cs	docs/
 model/stm32h7-dma-restate.awk	TVI-WO-1303.measure.md
 tests/1303/dma.sh	TVI-WO-1303.measure.md
 tests/1303/fields.py	TVI-WO-1303.measure.md
+model/GuardedSTM32DMA.cs	TVI-WO-1303.FEEDBACK.md
