@@ -52,10 +52,34 @@ fn lines(text: &str) -> Vec<&str> {
     text.lines().map(|l| l.trim_end_matches('\r')).filter(|l| !l.is_empty()).collect()
 }
 
-/// The inventory's failures. `files`: every tracked path with its bytes; `citations`: (file, token) pairs that name
-/// documentation in a code file as a citation, not a read; `budget`: the budget's list.
-fn inventory(files: &[(String, Vec<u8>)], citations: &BTreeSet<(String, String)>, docs: fn(&str) -> bool, budget: &[&str]) -> Vec<String> {
+/// A symlink's target as a repository path, resolved lexically from the link's own directory; None if it leaves the
+/// repository.
+fn resolve(link: &str, target: &str) -> Option<String> {
+    let mut parts: Vec<&str> = if target.starts_with('/') { return None } else { link.split('/').collect() };
+    parts.pop();
+    for c in target.split('/') {
+        match c {
+            "" | "." => {}
+            ".." => { parts.pop()?; }
+            c => parts.push(c),
+        }
+    }
+    Some(parts.join("/"))
+}
+
+/// The inventory's failures. `files`: every tracked path with its bytes; `links`: every tracked symlink and its
+/// target as written; `citations`: (file, token) pairs that name documentation in a code file as a citation, not a
+/// read; `budget`: the budget's list.
+fn inventory(files: &[(String, Vec<u8>)], links: &[(String, String)], citations: &BTreeSet<(String, String)>, docs: fn(&str) -> bool, budget: &[&str]) -> Vec<String> {
     let mut fails = Vec::new();
+    // 0. No symlink is documentation, and none reaches documentation from code: a docs-only change would change what
+    //    the code reads.
+    for (l, t) in links {
+        let to = resolve(l, t);
+        if docs(l) || to.as_deref().map_or(true, |p| docs(p) || p == "docs" || p.starts_with("docs/")) {
+            fails.push(format!("{l}: a symlink to `{t}`, which is or reaches documentation (or leaves the repository)"));
+        }
+    }
     // 1. Documentation is Markdown, or one of the two licence files at the root.
     for (p, _) in files.iter().filter(|(p, _)| docs(p)) {
         if !(p.ends_with(".md") || p == "LICENSE-MIT" || p == "LICENSE-APACHE") {
@@ -193,8 +217,14 @@ fn run(a: &[String]) -> Result<bool, String> {
             Ok(true)
         }
         ["inventory", ls, citations] => {
-            let mut files = Vec::new();
+            let (mut files, mut links) = (Vec::new(), Vec::new());
             for p in lines(&read(ls)?) {
+                let meta = std::fs::symlink_metadata(p).map_err(|e| format!("{p}: {e}"))?;
+                if meta.file_type().is_symlink() {
+                    let t = std::fs::read_link(p).map_err(|e| format!("{p}: {e}"))?;
+                    links.push((p.to_string(), t.to_string_lossy().into_owned()));
+                    continue;
+                }
                 files.push((p.to_string(), std::fs::read(p).map_err(|e| format!("{p}: {e}"))?));
             }
             let mut cites = BTreeSet::new();
@@ -202,7 +232,7 @@ fn run(a: &[String]) -> Result<bool, String> {
                 let (f, t) = row.split_once('\t').ok_or(format!("{citations}: `{row}` is not FILE<tab>TOKEN"))?;
                 cites.insert((f.to_string(), t.to_string()));
             }
-            let fails = inventory(&files, &cites, is_docs, &BUDGET);
+            let fails = inventory(&files, &links, &cites, is_docs, &BUDGET);
             for f in &fails {
                 println!("FAIL {f}");
             }
@@ -294,7 +324,7 @@ mod tests {
 
     #[test]
     fn inventory_passes_the_good_tree() {
-        assert_eq!(inventory(&tree(), &cites(), is_docs, &BUDGET), Vec::<String>::new());
+        assert_eq!(inventory(&tree(), &[], &cites(), is_docs, &BUDGET), Vec::<String>::new());
     }
 
     #[test]
@@ -303,7 +333,7 @@ mod tests {
         for planted in ["docs/board.resc", "docs/Guard.cs"] {
             let mut t = tree();
             t.push(f(planted, "x"));
-            let fails = inventory(&t, &cites(), broad, &BUDGET);
+            let fails = inventory(&t, &[], &cites(), broad, &BUDGET);
             assert!(fails.iter().any(|e| e.starts_with(planted) && e.contains("not Markdown")), "{planted}: {fails:?}");
         }
     }
@@ -312,23 +342,34 @@ mod tests {
     fn inventory_refuses_a_test_that_reads_documentation() {
         let mut t = tree();
         t.push(f("tests/1300/rcc.sh", "grep -c x \"$here/docs/a.md\""));
-        let fails = inventory(&t, &cites(), is_docs, &BUDGET);
+        let fails = inventory(&t, &[], &cites(), is_docs, &BUDGET);
         assert!(fails.iter().any(|e| e.starts_with("tests/1300/rcc.sh names `a.md`")), "{fails:?}");
         assert!(fails.iter().any(|e| e.starts_with("tests/1300/rcc.sh names `docs/`")), "{fails:?}");
+    }
+
+    #[test]
+    fn inventory_refuses_a_symlink_into_documentation() {
+        for (l, t) in [("tests/notes.md", "../docs/a.md"), ("tests/1300/x", "../../docs"), ("docs/b.md", "../model/G.cs"), ("tests/y", "/etc/passwd"), ("tests/z", "../../../x")] {
+            let fails = inventory(&tree(), &[(l.into(), t.into())], &cites(), is_docs, &BUDGET);
+            assert_eq!(fails.len(), 1, "{l} -> {t}: {fails:?}");
+            assert!(fails[0].starts_with(l) && fails[0].contains("symlink"), "{fails:?}");
+        }
+        assert!(inventory(&tree(), &[("tests/w".into(), "../model/G.cs".into())], &cites(), is_docs, &BUDGET).is_empty());
+        assert_eq!(resolve("tests/1300/x", "../../docs/a.md").as_deref(), Some("docs/a.md"));
     }
 
     #[test]
     fn inventory_refuses_a_stale_citation() {
         let mut c = cites();
         c.insert(("model/Gone.cs".into(), "a.md".into()));
-        assert!(inventory(&tree(), &c, is_docs, &BUDGET).iter().any(|e| e.contains("no longer")));
+        assert!(inventory(&tree(), &[], &c, is_docs, &BUDGET).iter().any(|e| e.contains("no longer")));
     }
 
     #[test]
     fn inventory_refuses_a_budget_path_dropped_from_the_list() {
         for dropped in ["tests/1301/", "tests/spike.sh", "tools/tviburi-budget/", "tests/1201/"] {
             let short: Vec<&str> = BUDGET.iter().copied().filter(|b| *b != dropped).collect();
-            let fails = inventory(&tree(), &cites(), is_docs, &short);
+            let fails = inventory(&tree(), &[], &cites(), is_docs, &short);
             assert!(!fails.is_empty() && fails.iter().all(|e| e.contains("budget")), "{dropped}: {fails:?}");
         }
     }
