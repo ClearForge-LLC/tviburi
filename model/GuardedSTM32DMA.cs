@@ -55,11 +55,11 @@
 //   TVI-DMA-RELOAD    NDT = 0 after a non-zero NDT was programmed: silicon reloads the programmed value when the stream is
 //                     enabled again (p665), and the stock model never reloads, so the twin would move nothing. unmodeled;
 //                     the address rules below run first, on the reloaded span.
-//   TVI-DMA-ADDRESS   a span that wraps past 0xFFFF_FFFF. unmodeled.
 //   TVI-DMA-TCM       a span with a byte in ITCM (0x0000_0000-0x0000_FFFF) or DTCM (0x2000_0000-0x2001_FFFF): DMA1/DMA2's
 //                     memory and peripheral buses reach every internal memory "except ITCM and DTCM" (§2.1.6 p108; Table 7
 //                     p131). predicted-fault. The stock platform maps both TCMs as plain memory, so the twin would move it.
-//   TVI-DMA-ADDRESS   a span with a byte in no region Table 7 maps (p130-131): reserved or unmapped. unmodeled (Q4).
+//   TVI-DMA-ADDRESS   a span that wraps past 0xFFFF_FFFF (judged before TVI-DMA-TCM), or with a byte in no region Table 7
+//                     maps (p130-131): reserved or unmapped. unmodeled (Q4).
 //   For a stream that uses a request (peripheral-to-memory, memory-to-peripheral), from its DMAMUX1 channel's CxCR:
 //   TVI-DMA-ROUTE     DMAREQ_ID 0, "no DMA request line selected" (p703), or a reserved id (54, 116-127; Table 124
 //                     p697-698, printed again identically as Table 125): silicon moves nothing, where the stock model moves
@@ -70,10 +70,8 @@
 //   TVI-DMA-SHARED    the same id on another channel whose stream is running ("cannot be programmed to different x and y
 //                     DMAMUX request multiplexer channels ... except when ... not simultaneously active", p704):
 //                     predicted-fault; on one whose stream the twin has completed with EN still set: unmodeled.
-//   TVI-DMA-REQUEST   a request no model raises, other than those acknowledged by name for ArduPilot's recorded boot
-//                     (ruled Q5 (c)): peripheral-to-memory on 41 usart1_rx_dma moves no data; memory-to-peripheral on 38,
-//                     40, 42 moves at EN, unpaced. Raised by a model: 37, 39 (SPI1/SPI2 RX, wired by the consumer's
-//                     platforms; measure.md §2.2), 77 (cryp), 83 (spi4), 9, 115 (the ADCs). unmodeled.
+//   TVI-DMA-REQUEST   a request outside RaisedToMemory / RaisedFromMemory (below: those a model raises, and those
+//                     acknowledged by name for ArduPilot's recorded boot, ruled Q5 (c)). unmodeled.
 // Enforcing: the first rule that fires refuses the access. Recorded mode (RUL-19): every rule is evaluated and records what
 // it finds, and the access goes on as if none had fired (model/Refusal.cs), with protected fields kept as silicon keeps them.
 //
@@ -482,9 +480,7 @@ namespace Antmicro.Renode.Peripherals.Tviburi
             {
                 return false;
             }
-            records.Refuse(rule, kind, "DMA_SxCR", "DMA_S" + s + which + " = 0x" + start.ToString("X8") + " (" + region + ")", condition, citation,
-                State(s), offset, word, 32);
-            return true;
+            return Refuse(offset, s, word, rule, kind, "DMA_S" + s + which + " = 0x" + start.ToString("X8") + " (" + region + ")", condition, citation);
         }
 
         private static string Tcm(ulong start, ulong end)
@@ -723,19 +719,20 @@ namespace Antmicro.Renode.Peripherals.Tviburi
         private const string Unmodeled = "unmodeled";
         private const string PredictedFault = "predicted-fault";
 
-        // The regions Table 7 maps (RM0433 Rev 9 p130-131), the TCMs included (TVI-DMA-TCM judges them first). System memory
+        // The regions Table 7 maps (RM0433 Rev 9 p130-131) besides the TCMs, which TVI-DMA-TCM judges first. System memory
         // bank 2 (0x1FF40000-0x1FF5FFFF) is left out: p131 prints it inside a Reserved row (0x1FF20000-0x1FFFFFFF), so the
         // twin cannot say which holds, and a span there is unmodeled (a FEEDBACK row). 0x40000000-
         // 0x5FFFFFFF is the peripheral area as a whole (Table 8 p134 lists its holes, which this rule does not).
         private static readonly Tuple<ulong, ulong>[] Mapped =
         {
-            Tuple.Create(0x00000000ul, 0x0000FFFFul), Tuple.Create(0x08000000ul, 0x081FFFFFul), Tuple.Create(0x1FF00000ul, 0x1FF1FFFFul),
-            Tuple.Create(0x20000000ul, 0x2001FFFFul), Tuple.Create(0x24000000ul, 0x2407FFFFul),
+            Tuple.Create(0x08000000ul, 0x081FFFFFul), Tuple.Create(0x1FF00000ul, 0x1FF1FFFFul), Tuple.Create(0x24000000ul, 0x2407FFFFul),
             Tuple.Create(0x30000000ul, 0x30047FFFul), Tuple.Create(0x38000000ul, 0x3800FFFFul), Tuple.Create(0x38800000ul, 0x38800FFFul),
             Tuple.Create(0x40000000ul, 0x5FFFFFFFul), Tuple.Create(0x60000000ul, 0x9FFFFFFFul), Tuple.Create(0xC0000000ul, 0xDFFFFFFFul),
         };
 
-        // Requests a model raises (measure.md §2.2), and those acknowledged by name for ArduPilot's recorded boot (ruled Q5 (c)).
+        // Requests a model raises (measure.md §2.2): 37, 39 SPI1/SPI2 RX (wired by the consumer's platforms), 77 cryp, 83 spi4,
+        // 9, 115 the ADCs; and those acknowledged by name for ArduPilot's recorded boot (ruled Q5 (c)): 41 usart1_rx_dma
+        // (moves no data), and memory-to-peripheral 38, 40, 42 (moves at EN, unpaced).
         private static readonly uint[] RaisedToMemory = { 9, 37, 39, 41, 77, 83, 115 };
         private static readonly uint[] RaisedFromMemory = { 38, 40, 42 };
 

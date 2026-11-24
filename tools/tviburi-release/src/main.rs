@@ -57,13 +57,8 @@ struct Pins {
     instances: BTreeMap<String, Vec<String>>,
 }
 
-/// Tab-separated rows of `cols` non-empty fields; `#` lines are comments.
-fn tsv<'a>(path: &str, text: &'a str, cols: usize) -> Result<Vec<Vec<&'a str>>, String> {
-    tsv_range(path, text, cols, cols)
-}
-
 /// Tab-separated rows of `min` to `max` non-empty fields; `#` lines are comments.
-fn tsv_range<'a>(path: &str, text: &'a str, min: usize, max: usize) -> Result<Vec<Vec<&'a str>>, String> {
+fn tsv<'a>(path: &str, text: &'a str, min: usize, max: usize) -> Result<Vec<Vec<&'a str>>, String> {
     let mut out = Vec::new();
     for (i, line) in text.lines().enumerate() {
         if line.starts_with('#') {
@@ -83,7 +78,7 @@ fn pins(repo: &Path) -> Result<Pins, String> {
     let path = format!("{TOOL}/pins.tsv");
     let src = Source { path: path.clone(), bytes: fs::read(repo.join(&path)).map_err(|e| format!("{path}: {e}"))? };
     let mut p = Pins { builds: vec![], stock: vec![], classes: vec![], instances: BTreeMap::new() };
-    for f in tsv_range(&path, overlay::text(&src)?, 3, 4)? {
+    for f in tsv(&path, overlay::text(&src)?, 3, 4)? {
         if f.len() == 4 && f[0] != "class" {
             return Err(format!("{path}: only a class row takes a fourth column (its instances): {}", f.join(" ")));
         }
@@ -265,7 +260,7 @@ fn restated<'a>(declared: &'a [(String, String, String)], stock_ty: &str, named:
 
 fn bench_rows(src: &Source, pins: &Pins) -> Result<Vec<Row>, String> {
     let mut rows = Vec::new();
-    for f in tsv(&src.path, overlay::text(src)?, 9)? {
+    for f in tsv(&src.path, overlay::text(src)?, 9, 9)? {
         if !pins.classes.iter().any(|c| c.1 == f[0]) {
             return Err(format!("{}: {} is not a guard of the class map", src.path, f[0]));
         }
