@@ -3,8 +3,8 @@
 **Builder:** Claude (Opus 5.5), Furnace, 2026-11-23/24. **Branch:** `wo/tvi-1201-memory-budget`, from `main` `e891211`, with `main` merged before READY (§7). **PR:** #26.
 
 **State:**
-- §1's measurement ran first. **The §7 stop did not fire.** Main against main differed by −0.4 MiB and +3.1 MiB at the median, in two CI jobs on different clouds and CPUs (§1).
-- (1)–(4) are built, and the acceptance is met in CI (§3). The planted 64 MiB branch is refused by `budget` alone, at +62.0 and +56.8 MiB, and main against main passes.
+- §1's measurement ran first. **The §7 stop did not fire.** Main against main differed by −0.4, +3.1 and +1.1 MiB at the median, in three CI jobs on two clouds and three CPUs (§1).
+- (1)–(4) are built, and the acceptance is met in CI (§3). The planted 64 MiB branch is refused by `budget` alone, at +62.0, +56.8 and +64.3 MiB, and main against main passes.
 - **Ruled at 23:12Z (architect):** `tests/1301/replay-1301.sh` is in the fence. Its GPIO condition is restored (§2), and it now snapshots the peak.
 - `model/`, `tools/`, the steering documents, `README.md` and `docs/reviews/` are untouched. One PR, left unmerged.
 
@@ -20,12 +20,17 @@ Every figure is a peak in KiB, as defined in §2: the sampled sum of Renode's Vm
 | CI 45285950556 | main against main + the plant | 808,588 | 872,088 | **+63,500 (+62.0 MiB)**, refused by `budget` | 805,736–809,552 / 866,808–877,008 |
 | CI 45286469273, AWS us-west-2, Intel Xeon 6975P-C | main against main | 991,280 | 994,420 | **+3,140 (+3.1 MiB)** | 989,948–1,007,148 / 989,348–999,460 |
 | CI 45286469273 | main against main + the plant | 998,488 | 1,056,648 | **+58,160 (+56.8 MiB)**, refused by `budget` | 981,848–1,022,820 / 1,055,448–1,076,592 |
+| CI 45294287114 (final head), Azure westus2, AMD EPYC 9V74 | main (`0d3b4af`) against main | 784,420 | 785,552 | **+1,132 (+1.1 MiB)** | 777,620–784,784 / 780,768–804,196 |
+| CI 45294287114 | main against main + the plant | 784,572 | 850,368 | **+65,796 (+64.3 MiB)**, refused by `budget` | 784,296–795,480 / 846,844–866,092 |
 | CI 45286469273 | **1301 (`d598442`) against the commit before it (`b019105`)** | 989,392 | 995,116 | **+5,724 (+5.6 MiB)**, passes | 980,652–997,376 / 989,996–1,006,300 |
 | Furnace, unshared moment, 10–11 s a boot | main against main + the plant | 1,005,456 | 1,075,992 | +70,536 (+68.9 MiB), refused by `budget` | 994,168–1,171,940 / 1,040,728–1,088,520 |
 
-- **The noise is small within a job.** On each side the five boots span 8.5 MiB in the AMD job and 17 MiB in the Intel job. Main against main lands within 3.1 MiB of zero at the median, well under the 16 MiB stop. The budget's 32 MiB therefore has room in both jobs.
-- **The plant's cost is 57–69 MiB, not exactly 64 MiB.** The array is 64 MiB and is written page by page, but the GC's other garbage at the peak moves around it. Its window in the test is 48–80 MiB (§2).
-- **1301 measured +5.6 MiB here,** where the WO expected about 10. 1301's own side-by-side measurement (run 45257810560) gave about 10 MiB, by a different harness (each tree's own replay, with no witness check). Both are inside one job's noise. The `b019105` boots carry 3 witnesses (SPI1, SPI2, RCC) and the `d598442` boots carry 14 (11 GPIO ports more), so each side ran its own guard set.
+- **The median is stable within a job; single boots are not.**
+  - Main's release was booted twice in each job, once in the gate and once as the plant test's main. The two medians are 0.8 MiB apart in the AMD job (809,404 and 808,588) and 7.0 MiB apart in the Intel job (991,280 and 998,488).
+  - Main against main lands within 3.1 MiB of zero, well under the 16 MiB stop.
+  - Single boots of one release span up to 40 MiB within a job (the Intel job's plant-test main: 981,848–1,022,820). On Furnace, one boot a side of main against main differed by −15.6 MiB. The judge therefore never decides on fewer than 5 a side.
+- **The plant's cost is 57–69 MiB, not exactly 64 MiB.** The array is 64 MiB and is written page by page. **A guess, not measured:** the GC's other garbage at the peak shifts around it. Its window in the test is 48–80 MiB (§2).
+- **1301 measured +5.6 MiB here,** where the WO expected about 10. 1301's own side-by-side measurement (run 45257810560, `e831735`'s `ci-memory-gc.sh`) gave about 10 MiB. That used the same kind of harness (the branch's `replay-1301.sh` for every configuration) but no witness check, and a different pair of trees: 1301's pre-merge branch against the main of its time. The gap between 5.6 and 10 MiB is inside the within-job spread of medians above. The `b019105` boots carry 3 witnesses (SPI1, SPI2, RCC) and the `d598442` boots carry 14 (11 GPIO ports more), so each side ran its own guard set.
 - **The first boot of a job can be an outlier.** Furnace's main boot 1 reached 1,171,940 KiB at 16 s. The median absorbs it, and the alternating order (main first, then branch first) spreads it across sides.
 
 ## 2. What was built
@@ -86,8 +91,8 @@ The median of an even count is the mean of the middle two. The exit status is 0 
 | Criterion | Evidence |
 |---|---|
 | **The budget refuses the planted 64 MiB branch** | CI 45285950556: `REFUSE budget` at +63,500 KiB, alone, the plant in 5 of 5 boots. CI 45286469273: +58,160 KiB, the same |
-| **…and passes main against main** | CI 45285950556 (−404 KiB) and 45286469273 (+3,140 KiB): `PASS`. This PR changes no `model/`, so its own gate is main against main |
-| **CI green on the PR, the step's summary here** | Runs 45285950556 and 45286469273 are green; the final head's run is in §7 |
+| **…and passes main against main** | CI 45285950556 (−404 KiB), 45286469273 (+3,140 KiB) and 45294287114 (+1,132 KiB): `PASS`. This PR changes no `model/`, so its own gate is main against main |
+| **CI green on the PR, the step's summary here** | Runs 45285950556, 45286469273 and **45294287114 (head `ca14cbd`)** are green |
 
 **The step's summary, CI 45286469273, gate** (this PR against main):
 
@@ -112,24 +117,26 @@ PASS: every boot counts, every branch boot at or under 1572864 KiB, the median w
 | 45273210903 (1301) | Azure westus3 | 20261116.376.1 | not recorded | 775,968–795,552 | 15.9–17.1 |
 | 45285950556 (this) | Azure westus3 | 20261116.376.1 | AMD EPYC 9V45, 4, 32 MiB | 801,000–809,568 (main against main) | 12.4–13.4 |
 | 45286469273 (this) | AWS us-west-2 | 20261116.133.1 | Intel Xeon 6975P-C, 4, 480 MiB | 989,348–1,007,148 (main against main) | 13.9–14.6 |
+| 45294287114 (this) | Azure westus2 | 20261116.376.1 | AMD EPYC 9V74, 4, 32 MiB | 777,620–804,196 (main against main) | 16.2–17.7 |
 | Furnace | — | — | Intel Core Ultra 7 265K, 20, 30 MiB | 990,088–1,009,648 unslowed; 1,180,932–1,208,196 at 18–19 s | 10–19 |
 
 **What the data rule out:**
-- **Wall time alone.** The two AWS jobs ran 13–15 s and peaked high; three Azure jobs ran 15–17 s and peaked low. On Furnace, though, a contended boot does rise with wall time, as `1301` §8 found.
+- **Wall time alone.** The two AWS jobs ran 13–15 s and peaked high; four of the five Azure jobs ran 12–18 s and peaked low. The final AMD job was the slower (16–18 s) and still peaked about 200 MiB under the Intel one (about 14 s). On Furnace, though, a contended boot does rise with wall time, as `1301` §8 found.
 - **The cloud alone.** Azure centralus gave both 1.03 GB (45249617507) and 0.77 GB (45265963786).
 - **The runner image.** Its version follows the cloud (`.376` Azure, `.133` AWS), not the peak.
 - **L3 size, as a single cause.** Furnace (30 MiB of L3) peaks high, and so does the Xeon with 480 MiB, while the EPYC with 32 MiB peaks low. The link between L3 and .NET's gen0 budget is from memory, which is why it was a candidate at all.
-- **Huge pages, shared memory, file pages and threads.**
-  - THP is `madvise` everywhere, and `AnonHugePages` is 0 in every snapshot.
-  - `RssShmem` is 0, and `RssFile` sits at 89–93 MiB on every runner.
-  - Renode runs 15 threads on the 4-vCPU runners and 16–17 on Furnace.
+- **Huge pages, shared memory, file pages and threads,** measured on a high runner (Intel Xeon, 45286469273) and a low one (AMD EPYC 9V74, 45294287114):
+  - THP is `madvise` on both, and `AnonHugePages` is 0 in every snapshot.
+  - `RssShmem` is 0, and `RssFile` is 91.5–93 MiB on both.
+  - Renode runs 15 threads on both. It runs 16–17 on Furnace.
 
 **What it is:**
-- **Anonymous memory.** On the Intel runner, `RssAnon` at the peak is 888,832–914,736 KiB. On Furnace it is 870 MiB at 10 s and 1,091,004 KiB at 18 s. The whole difference sits in anon.
+- **Anonymous memory, measured on both kinds of runner.** At the peak of main against main, `RssAnon` is 888,832–914,736 KiB on the Intel runner and 685,076–711,392 KiB on the AMD runner, about 208 MiB less. `RssFile` is the same on both. So the whole runner-to-runner difference is anon.
+- On Furnace, `RssAnon` is 870 MiB at 10 s and 1,091,004 KiB at 18 s: a contended boot's extra is also all in anon.
 - This harness cannot say whether that anon is the managed heap or native memory (tlib's translation cache, Renode's own buffers). That needs `GC.GetGCMemoryInfo()` at the peak, or an `smaps` split by mapping.
 
 **The leading candidate is the CPU model,** not established:
-- The one AMD job is low (about 809 MiB). Both Intel machines measured are high (about 991 MiB on the Xeon; about 990–1,005 MiB on Furnace unslowed).
+- Both AMD jobs are low (about 809 and 784 MiB). Both Intel machines measured are high (about 991 MiB on the Xeon; about 990–1,005 MiB on Furnace unslowed).
 - Every older job is consistent with this if the slow Azure runner (45249617507) was an Intel part, but that job recorded no CPU.
 - **The step now records the CPU, nproc, L3, memory, THP, kernel and image on every PR.** So the next few PRs accumulate the table that confirms or breaks this candidate, at no extra cost.
 
@@ -157,12 +164,20 @@ The budget no longer depends on the answer, because each job compares against it
 
 ## 6. Findings
 
+**For the architect to rule on (not decided here):**
+- **Q1 — `RUL-14`.** The judge is gate logic written in shell and awk (`ci-memory.sh`'s `judge`, about 25 lines), like 1301's absolute step before it. If `RUL-14`'s "thin harness" excludes a gate's verdict, the judge belongs in a small Rust program.
+- **Q2 — main against main is not a standing test.** The planted refusal runs on every PR, because `RUL-15` requires every test that claims a refusal to run on every PR. On a PR that changes no `model/`, the gate is itself main against main, and this PR measured it twice. A guard PR never runs it. Adding it as a third comparison costs about 5 min a job. I read `RUL-15` as not requiring it, since it claims no refusal, but it is the noise floor the 32 MiB rests on. Your call.
+- **Q3 — the PR body.** PR #26's live body is the one it opened with. It omits `replay-1301.sh`'s change and the base binding. `~/.cache/tvi-1201/pr-title-body.md` is the final one; I cannot edit a PR's body with `gh-write`.
+
 - **F1 — my own error, corrected.**
   - **What I got wrong:** commit `add5f6f` says the empty peak snapshots (`Threads: 2`, no Rss lines; 2 of 30 boots in 45286469273) came from a transient second process.
   - **What it actually was:** on Furnace, with the process count recorded, 1 process matched and the snapshot was still empty. The cause is a new peak sampled while Renode exits, when its memory is already gone. The sum came from the line read just before.
   - **The fix:** `62dad14` keeps only a snapshot that has `RssAnon`, and reports that snapshot's own sum beside the peak.
   - **Still open:** whether the exit-time sample is itself the peak in some boots. The snapshot's sum makes that visible.
-- **F2 — CI time.** The memory steps now take 20 boots a job (gate 10, plant test 10) instead of 5. At 13–15 s a boot, plus two release builds per comparison, that is about 4–6 minutes more. Run 45286469273's whole job stayed under 60 minutes of the 150-minute timeout.
+- **F2 — CI time, measured in run 45286469273.**
+  - The gate took 4 min 51 s and the plant test 4 min 58 s. 1301's absolute step took 4 min 41 s (45273210903). So the memory steps cost about 5 min more a job.
+  - Each comparison builds the ELF again (the plant test runs a second step invocation); sharing it was not worth a cache.
+  - That job took 45 min in all, including the 4 min 52 s temporary step since removed. The timeout is 150 min.
 - **F3 — for 1301a (running beside this WO):** it touches `model/` only. Its PR will be the first guard PR this budget judges. Its FEEDBACK should quote the `MEDIANS` line (WO (2)). If it adds a restate file, the harness must wire it under a condition (§2).
 
 ## 7. Close
@@ -178,4 +193,9 @@ The budget no longer depends on the answer, because each job compares against it
     - `test-budget.sh` repeats the 5-boot minimum (`-ge 5`), because the step has no sourcing mode.
   - The judge's mutants were rerun after the cut: all killed. The summary table was checked by a one-boot run.
 - **Main merged:** `0d3b4af` (#25, docs only).
-- **Final CI:** the run on this PR's last head; its step summary has the same shape as §3's.
+- **Final CI: run 45294287114 on `ca14cbd`, green.** The runner was Azure westus2, AMD EPYC 9V74.
+  - `MEDIANS main 784420 KiB, branch 785552 KiB, difference 1132 KiB (+1.1 MiB)`, then `PASS`.
+  - The planted test refused by `budget` alone at +65,796 KiB, with the plant in 5 of 5 boots. `main-not-the-base` passed.
+  - **The base binding, observed with main moved:** main is `0d3b4af` (`HEAD^1`), and the PR's `base.sha` is also `0d3b4af`.
+  - The gate took 6 min 0 s and the plant test 5 min 55 s, on this slower runner. The job took 47 min.
+- **What follows `ca14cbd`:** one docs-only commit (this FEEDBACK, completed from that run). The measured code is `ca14cbd`'s.
