@@ -10,9 +10,9 @@ set -euo pipefail
 
 here=$(cd "$(dirname "$0")/../.." && pwd)
 IMAGE=$(sed -n 's/^IMAGE=//p' "$here/tests/spike.sh")
-CASES="config m1ue over8ue psue psoff stopue reinit reinitstop disable same ap width tdrbyte read field nine kernel clock idle dmarx fields ledger registrations recorded reset config2 regen"
+CASES="config m1ue over8ue psue psoff stopue reinit reinitstop disable same ap width tdrbyte read field nine kernel clock idle idlere dmarx fields ledger registrations recorded reset config2 regen"
 GUARDS="spi1 rcc gpioPortA gpioPortB gpioPortC gpioPortD gpioPortE gpioPortF gpioPortG gpioPortH gpioPortI gpioPortJ gpioPortK timer1 timer8 dma1 dma2 flashController usart1 usart2 usart3 uart4 uart5 usart6 uart7 uart8"
-MONITOR="clock idle dmarx fields ledger registrations recorded reset config2 regen"
+MONITOR="clock idle idlere dmarx fields ledger registrations recorded reset config2 regen"
 PATHS=$(for c in $CASES; do case " $MONITOR " in *" $c "*) ;; *) printf '"%s",' "$c" ;; esac; done | sed 's/,$//')
 scratch=${TVIBURI_SCRATCH:-$HOME/.cache/tviburi}
 mkdir -p "$scratch"
@@ -144,6 +144,14 @@ for t in ${TVIBURI_TESTS:-$CASES}; do
       "passed idle && bit \"\$(readout idle START)\" 4 0 && bit \"\$(readout idle EARLY)\" 4 0 && bit \"\$(readout idle EARLY)\" 5 1 && bit \"\$(readout idle RESTART)\" 4 0 && bit \"\$(readout idle IDLE)\" 4 1 \
        && [ \"\$(readout idle IRQ)\" = 'GPIO: set' ] && bit \"\$(readout idle CLEARED)\" 4 0 && [ \"\$(readout idle IRQ2)\" = 'GPIO: unset' ] \
        && bit \"\$(readout idle AGAIN)\" 4 0 && bit \"\$(readout idle OFF)\" 4 0 && bit \"\$(readout idle OFF)\" 5 0 && [ \"\$(readout idle IRQ3)\" = 'GPIO: set' ]" ;;
+  idlere)
+    # WO §5: a frame that ends without IDLE. RE cleared before the idle frame elapses: the receiver is off, so no idle line is
+    # detected (p2070 RE; p2090), and the guard's timer must not set IDLE.
+    run_case idlere - 'cpu IsHalted true' "$clk" 'sysbus WriteDoubleWord 0x4001100C 0x271' 'sysbus WriteDoubleWord 0x40011000 0x2000001D' \
+      'sysbus.usart1 WriteChar 0x41' 'emulation RunFor "0.00001"' 'sysbus WriteDoubleWord 0x40011000 0x20000019' \
+      'emulation RunFor "0.0001"' 'echo "R-ISR"' 'sysbus ReadDoubleWord 0x4001101C'
+    check "idlere: RE cleared 10 us after a byte, before its idle frame (31.25 us) elapses: no IDLE (WO §5)" \
+      "passed idlere && bit \"\$(readout idlere ISR)\" 4 0" ;;
   dmarx)
     # The receive request (p2048, p2070; ruled Q6), with the platform's request line: DMA1 stream 0 peripheral-to-memory on
     # request 41 into AXI SRAM. (1) armed first, three bytes; (2) a byte while the stream is disabled, then re-armed (the stock

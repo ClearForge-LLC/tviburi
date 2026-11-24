@@ -354,3 +354,4 @@ DM44-suspendOffset	model/GuardedSTM32DMA.cs	            OffsetField.SetValue(((A
 DM45-suspendRunning	model/GuardedSTM32DMA.cs	                if((word & EnBit) == 0 && Enabled(s) && Items(s) != 0)	                if(false)	dma-offset
 DM46-request43	model/GuardedSTM32DMA.cs	{ 9, 37, 39, 41, 43, 45, 77, 83, 115 }	{ 9, 37, 39, 41, 45, 77, 83, 115 }	dma-usart23
 DM47-request46	model/GuardedSTM32DMA.cs	{ 38, 40, 42, 46 }	{ 38, 40, 42 }	dma-usart23
+US32-idleRe	model/GuardedSTM32F7_USART.cs	if(g == idleGen && (cr1 & UeBit) != 0 && (cr1 & ReBit) != 0)	if(g == idleGen && (cr1 & UeBit) != 0)	usart-idlere
