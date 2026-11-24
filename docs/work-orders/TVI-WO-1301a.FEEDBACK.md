@@ -78,4 +78,7 @@ Reduction pass (diff): −15 net · 1 duplicate removed (the planted firmware's 
 - **`tests/adversarial.sh`:** all pass.
 - **The mutation run, diff-sized:** H01–H21, G05, G06 and G20, each killed by its named case. 24 of 24. CI runs every row.
 - **Memory:** §1.
-- **CI:** see the PR.
+- **CI, run 45298104566 on `6814046` (hold, before the 01:05Z change): green.** Memory: 987,040; 990,156; 991,344; 989,100; 1,006,584 KiB at 14.1–14.6 s a boot, all under the step's 1,015,808.
+- **CI, run 45303012230 on `826fdf4` (after it): the memory step failed; the adversarial and mutation steps were skipped.** The peaks were 1,026,232; 1,016,668; 1,028,648; 1,037,904; 1,008,196 KiB at 15.4–16.6 s a boot. All five are under 1,048,576 and under the ruled 1,572,864 KiB ceiling, but four are over the step's 32 MiB margin. Every boot reached its end with 0 GPIO would-refuse.
+- **The change is not the cause, measured:** on Furnace, the two heads interleaved, 3 boots each at about 10.3 s: `6814046` peaked at 991,864; 1,001,144; 1,002,840 KiB, and `826fdf4` at 985,572; 991,308; 1,005,028. This is the runner spread the roadmap records (L66: ~200 MiB between CI runs, cause unknown); the slower runner again peaked higher.
+- **Stopped for a ruling (global contract: never weaken a test so CI passes).** The step still checks the WO's 1,048,576 less 32 MiB, which predates Scotty's ruling. The options: raise `tests/1301/ci-memory.sh`'s limit to the ruled ceiling (`.github/workflows/ci.yml`'s step name, outside my fence, would then be stale); wait for `TVI-WO-1201`'s same-job budget and merge it; or re-run CI.
