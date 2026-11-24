@@ -372,6 +372,10 @@ mod tests {
             let fails = inventory(&tree(), &[], &cites(), is_docs, &short);
             assert!(!fails.is_empty() && fails.iter().all(|e| e.contains("budget")), "{dropped}: {fails:?}");
         }
+        // A script of the budget's tests outside the list, though everything it reads is inside it.
+        let narrow = ["tests/1201/", "tests/1301/ci-memory.sh", "tests/1301", "tests/spike.sh", "tools/tviburi-budget/"];
+        let fails = inventory(&tree(), &[], &cites(), is_docs, &narrow);
+        assert_eq!(fails, vec!["tests/1301/replay-1301.sh: a script of the budget's tests, outside the budget's list".to_string()]);
     }
 
     fn its(n_cases: usize, n_mutants: usize) -> (String, String) {
