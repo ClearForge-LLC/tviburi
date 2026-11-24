@@ -355,3 +355,4 @@ DM45-suspendRunning	model/GuardedSTM32DMA.cs	                if((word & EnBit) =
 DM46-request43	model/GuardedSTM32DMA.cs	{ 9, 37, 39, 41, 43, 45, 77, 83, 115 }	{ 9, 37, 39, 41, 45, 77, 83, 115 }	dma-usart23
 DM47-request46	model/GuardedSTM32DMA.cs	{ 38, 40, 42, 46 }	{ 38, 40, 42 }	dma-usart23
 US32-idleRe	model/GuardedSTM32F7_USART.cs	if(g == idleGen && (cr1 & UeBit) != 0 && (cr1 & ReBit) != 0)	if(g == idleGen && (cr1 & UeBit) != 0)	usart-idlere
+DM48-reflectCheck	model/GuardedSTM32DMA.cs	            if(StreamsField == null || IrqStatusField == null || UpdateInterruptsMethod == null || OffsetField == null)	            if(false)	dma-reflect

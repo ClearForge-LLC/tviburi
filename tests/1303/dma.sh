@@ -10,9 +10,9 @@ set -euo pipefail
 
 here=$(cd "$(dirname "$0")/../.." && pwd)
 IMAGE=$(sed -n 's/^IMAGE=//p' "$here/tests/spike.sh")
-CASES="axi tcm itcm partcm below wrap unmapped ndt0 reload reassert sizes fth fthzero reloadtcm en enoff done same disable width read field msize16 route0 route54 mux shared sharedx request txother usart23 fields ledger registrations irq config recorded reset clock offset regen restate"
+CASES="axi tcm itcm partcm below wrap unmapped ndt0 reload reassert sizes fth fthzero reloadtcm en enoff done same disable width read field msize16 route0 route54 mux shared sharedx request txother usart23 fields ledger registrations irq config recorded reset clock offset reflect regen restate"
 GUARDS="spi1 rcc gpioPortA gpioPortB gpioPortC gpioPortD gpioPortE gpioPortF gpioPortG gpioPortH gpioPortI gpioPortJ gpioPortK timer1 timer8 dma1 dma2 flashController usart1 usart2 usart3 uart4 uart5 usart6 uart7 uart8"
-MONITOR="fields ledger registrations irq config recorded reset clock offset regen restate"
+MONITOR="fields ledger registrations irq config recorded reset clock offset reflect regen restate"
 # The planted firmware's paths: every case but the monitor-driven ones.
 PATHS=$(for c in $CASES; do case " $MONITOR " in *" $c "*) ;; *) printf '"%s",' "$c" ;; esac; done | sed 's/,$//')
 scratch=${TVIBURI_SCRATCH:-$HOME/.cache/tviburi}
@@ -262,6 +262,16 @@ tviburiDma2:\
       'sysbus WriteDoubleWord 0x40020010 0x401' 'sysbus.dmamux1 OnGPIO 41 true' 'sysbus.dmamux1 OnGPIO 41 false' 'echo "R-BASE"' 'sysbus ReadDoubleWord 0x38001A00'
     check "offset: a stream disabled by software after 3 of 8 items has TCIF0 set (p654; it was clear before) and NDTR 5; re-armed on a new M0AR, its next item lands at the new base (p654, p666), and the run passes" \
       "passed offset && [ \"\$(readout offset LISR0)\" = 0x00000000 ] && [ \"\$(readout offset LISR)\" = 0x00000020 ] && [ \"\$(readout offset NDTR)\" = 0x00000005 ] && [ \"\$(readout offset BASE)\" = 0xFFFFFF00 ]" ;;
+  reflect)
+    # TVI-WO-1305 (ruled 2026-11-24T19:13Z): the suspension reaches the stock STM32DMA's private members by reflection; a
+    # Renode build without one must refuse by name, never pass silently. Planted: a copy of the tree whose guard asks for a
+    # member that does not exist.
+    rsrc=$work/src-reflect; rm -rf "$rsrc"; mkdir -p "$rsrc"; cp -r "$src/." "$rsrc"
+    sed -i 's/GetField("transferCompleteIrqStatus", Private)/GetField("transferCompleteIrqStatusPlanted", Private)/' "$rsrc/model/GuardedSTM32DMA.cs"
+    grep -q 'transferCompleteIrqStatusPlanted' "$rsrc/model/GuardedSTM32DMA.cs" || { echo "reflect: the plant did not apply" >&2; exit 2; }
+    tested=$src; src=$rsrc; run_case reflect - "$clk" 'sysbus ReadDoubleWord 0x40020010'; src=$tested
+    check "reflect: with a stock STM32DMA member the suspension needs missing (planted), every DMA access refuses TVI-DMA-CONFIG, unmodeled, naming the members: Renode drift is a refusal, never a silent pass" \
+      "[ \$rc = 3 ] && first reflect 'r[\"rule\"] == \"TVI-DMA-CONFIG\" and r[\"kind\"] == \"unmodeled\" and \"transferCompleteIrqStatus\" in r[\"condition\"]'" ;;
   regen)
     rc=0; python3 -I "$src/tests/1303/fields.py" > "$work/fields.cs" || rc=$?
     check "regen: the guard's Fields table regenerates from tests/1303/fields.py, byte for byte (RUL-16)" \
