@@ -75,8 +75,11 @@ previous item's last line to its own. Every list name received a line; the gaps 
 | adversarial (12 cases) | 1.8 | 1.5 | 1.6 | 1.6 |
 | mutants (197; 176 before `1301a`) | 22.2 | 18.9 | 17.0 | 16.9 |
 
-**The same tree took 52.6 min on run 67 and 43.7 on run 66: the runner's speed varies by about 20 %** (both AMD EPYC
-9V74, 4 vCPU, 16 GiB). Every plan below is sized on the slower run of the two, item by item.
+**The same tree took 52.6 min on run 67 and 43.7 on run 66: the runner's speed varies by about 20 %.** Every runner
+had 4 vCPU and 16 GiB, but not one CPU: run 67 an AMD EPYC 9V74, runs 66, 64 and 63 an Intel Xeon 6975P-C, and run
+56 (`45302732365`, before `1301a`) an Intel Xeon Platinum 8573C. **Run 56 is the slowest seen:** its median case took
+7.7 s and its median mutant 7.8 s, against run 67's 6.9 and 6.7 (runs 52 and 49: 6.6 and 5.6). So every plan below
+takes, item by item, the slower of runs 66 and 67, **then scales it by 1.14 to run 56's speed.**
 
 ### 1.2 Cases and mutants
 
@@ -85,26 +88,28 @@ previous item's last line to its own. Every list name received a line; the gaps 
 | cases (acceptance + adversarial) | 143 | 17.0 min | 6.9 s | 7.6 s | 28.3 s (`identity`) |
 | mutants | 197 | 22.2 min | 6.7 s | 10.4 s | 34.7 s (`U07-sourcesInManifest`) |
 
-The cases are nearly uniform: 133 of 143 take 5.5–8.5 s. The outliers are `identity` (28.3), `adv-removed` (20.5),
-`adv-loglevel` (20.4), `adv-release` (17.0), `adv-noend` (13.4), `rcc-hse16` (13.1) and `recorded` (12.3); the
-host-only checks (`allowlist`, `adv-extra-arg`, `adv-bad-variant`, `adv-noname`) take under 0.2 s. A mutant costs its
-named tests plus a tree copy: the 19 `R` mutants, killed by `unit`, take 0.5–0.9 s; the 4 that name two or more
-Renode tests take 14.7–34.7 s.
+The cases are nearly uniform: 125 of 143 take 5.5–8.5 s (run 67). Above that: `identity` (28.3), `adv-removed`
+(20.5), `adv-loglevel` (20.4), `adv-release` (17.0), `adv-noend` (13.4), `rcc-hse16` (13.1), `recorded` (12.3) and
+`adv-cache` (11.7). Below: `verify`, `reproducible`, `unit`, `afcheck` and the two ledger cases (1.4–2.7 s), and four
+host-only checks under 0.2 s. A mutant costs its named tests plus a tree copy: the 19 `R` mutants, all killed by
+`unit`, take 0.6–0.9 s; the 13 that name two tests take 6.7–14.0 s; the heaviest name one heavy case (`U07`,
+`identity`, 34.7 s; `M22`, `adv-loglevel`, 20.4 s; `U09` and `U08`, `adv-release`, 20.0 and 14.7 s).
 
 ### 1.3 What one case is made of (Furnace, a proxy)
 
 One capped container pinned to 4 CPUs (`taskset -c 0-3`, as many as a runner has), the pinned image, `--network none`;
-`tviburi-spike`'s own steps timed one by one, 13 runs each of `ardupilot` and `modf` (`~/.cache/tvi-1202/m/`):
+`tviburi-spike`'s own steps timed one by one, 13 serial runs each of `ardupilot` and `modf` (`~/.cache/tvi-1202/m/`;
+the host's load average 6–9 on 20 cores, and `taskset` does not keep others off those 4):
 
 | Step | seconds |
 |---|---|
-| firmware (`rustc`) | 0.03–0.23 |
-| the reference check (`cargo build`) | 0.22–0.73 |
-| the release (`cargo build` + the release program) | 0.61–1.19 |
-| Renode | 3.06–6.01 (one 10.9) |
+| firmware (`rustc`) | 0.03–0.27 |
+| the reference check (`cargo build`) | 0.22–0.92 |
+| the release (`cargo build` + the release program) | 0.61–1.90 |
+| Renode | 3.06–10.88 (most 3–5) |
 | the check on the log | ≤ 0.02 |
 
-**Renode is 65–80 % of a case; the three builds are 1.0–1.6 s.** CI's ~7 s gap also carries podman's container start.
+**Renode is most of a case; the three builds are about 1–2 s.** CI's ~7 s gap also carries podman's container start.
 
 ### 1.4 A job's fixed cost (CI)
 
@@ -128,12 +133,15 @@ cap), each in its own directory, either one after the other or both at once:
 Every `ardupilot` failure is the teardown race (roadmap Phase 1): Renode exits with the `end` records of `spi1` and
 several ports unwritten, `PROBLEM …: no end record`, `CHECK FAIL`. **Memory fits easily** (two at once is 1.1 GiB of
 16; each boot far under the 1.5 GiB ceiling). **But running two at once moved a PASS to a FAIL in 9 of 13 pairs,
-against 4 of 13 serially, on a loaded host.** On CI, serially, the race has not been seen in these runs. So two at once
-on a runner would change verdicts (§7's stop), and the plan does not use it.
+against 4 of 13 serially, on a loaded host.** On CI, serially, the race has not been seen in these seven runs. Whether
+two at once changes verdicts on a runner is not measured; on Furnace it did, the race is unplaced, and a changed
+verdict is §7's stop, so the plan does not use it.
 
 ### 1.6 The route's path classes
 
-- **Nothing reads `docs/`.** The release program reads `model/` (every file), `tools/tviburi-release/` and
+- **Nothing reads `docs/` or the root's licence files** (the `Cargo.toml`s carry `license = "MIT OR Apache-2.0"`, no
+  `license-file`).
+- **Nothing else reads `docs/` either.** The release program reads `model/` (every file), `tools/tviburi-release/` and
   `tools/tviburi-check/src/json.rs`; its `rm0433.md` names are strings in acknowledgements, not reads. The models cite
   `docs/work-orders/*.rm0433.md` in comments. `docs/work-orders/TVI-WO-1301.st-compare.tsv` is read by nothing
   (`TVI-WO-1301.ds12117.md` cites it).
@@ -153,7 +161,7 @@ on a runner would change verdicts (§7's stop), and the plan does not use it.
 | P1 | builds 3–4 s of a case, Renode 2–3 s | builds 1.0–1.6 s, Renode 3–6 s | **wrong:** Renode dominates; a reused build saves ~20 %, not half |
 | P2 | a mutant is its copy plus its tests | yes: `R` mutants 0.5–0.9 s, the two-test ones 14.7–34.7 s | right |
 | P3 | each shard repeats 10–15 s of fixtures | not measured yet | open; 20 s used in the plan |
-| P4 | 2 / 3 / 4 runners: 24 / 17.5 / 13.5 min | 25.8 / 18.0 / 14.1 min (§3.2) | close |
+| P4 | 2 / 3 / 4 runners: 24 / 17.5 / 13.5 min | 25.8 / 18.0 / 14.1 min at run 67's speed; 29.1 / 20.2 / 15.8 at run 56's (§3.2) | close at run 67's speed; **3 runners fail** at the slowest seen |
 | P5 | fixed cost 1.0–1.3 min | about 50 s, plus the shard's fixtures | right |
 | P6 | budget job ~7 min, never the longest | 6.3 + 1.0 of pulls, setup | right |
 | P7, P8 | route ~1.2 min; docs PR 1.5–2 min | not built | open |
@@ -181,23 +189,29 @@ on a runner would change verdicts (§7's stop), and the plan does not use it.
    The expected set comes from the tree, never from the times file: a case with no measured time gets the median
    and still runs. Branch protection, if any, should name `ci`.
 
-### 3.2 Shard plans (longest first, slower of runs 66 and 67 per item; with `1302`'s 36 cases and 32 mutants at today's medians)
+### 3.2 Shard plans
 
-| runners | today: longest shard | after `1302`: longest shard | projected code PR (route 1.0 + fixed 1.2 + shard + aggregate 0.25) |
+Longest first; each item the slower of runs 66 and 67, scaled by 1.14 to run 56's speed; after `1302`, its 36 cases
+and 32 mutants at the scaled medians (7.9 and 7.6 s). The projected code PR is route 1.0 + fixed 1.2 + the longest
+shard + aggregate 0.25 min; in brackets, the same at run 67's speed.
+
+| runners | today: longest shard | after `1302`: longest shard | projected code PR after `1302` |
 |---|---|---|---|
-| 2 | 19.6 min | 23.4 min | 25.8 min: **over** |
-| 3 | 13.1 | 15.6 | 18.0 min: 2.0 min of headroom |
-| 4 | 9.8 | 11.7 | **14.1 min**: 5.9 min of headroom |
-| 5 | 7.8 | 9.4 | 11.8 min |
+| 2 | 22.3 min | 26.7 min | 29.1 (25.8): **over** |
+| 3 | 14.9 | 17.8 | 20.2 (18.0): **over** at the slowest speed seen |
+| 4 | 11.2 | 13.4 | 15.8 (14.1): 4.2 min of headroom |
+| 5 | 8.9 | 10.7 | **13.1** (11.8): 6.9 min of headroom |
 
 The packing is near-perfect (every plan's shards are within 0.1 min of each other), because the items are small and
-uniform. The budget job (about 7.3 min) and the budget's tests (about 7.3 min) are never the longest. Each guard work
-order adds about 8 min of serial work, so 4 runners stay under 20 min for about five more guards at today's speed;
-the runner count is one number in the workflow.
+uniform. The budget job (about 7.3 min, about 8 at run 56's speed) and the budget's tests (the same) are never the
+longest. **Each guard work order adds about 7.7 min of serial work (8.8 at run 56's speed),** about 2.2 min a shard
+at 4 runners and 1.8 at 5. So at the slowest speed seen, 4 runners stay under 20 min for about one more guard after
+`1302`, and 5 for about three. The runner count is one number in the workflow.
 
-**Recommended: 4 shards.** Cost: about 4 × 1.2 min of extra setup per code PR in runner time (free on a public
-repository's standard runners), and up to 7 concurrent jobs per PR against the organisation's concurrent-job limit,
-which Aethelgard's CI shares.
+**Recommended: 5 shards.** 4 meets the target today with 4.2 min to spare but is spent by the next guard. Cost: each
+shard adds about 1.2 min of setup in runner time, and a PR runs up to 8 jobs at once (route, 5 shards, budget,
+budget-tests) against the organisation's concurrent-job limit, which Aethelgard's CI shares. **From memory, not
+checked:** standard runners are free for a public repository, and that limit is 20 jobs on GitHub's Free plan.
 
 ### 3.3 The docs route
 
@@ -223,13 +237,18 @@ which Aethelgard's CI shares.
 
 ## 4. Questions for the ruling
 
-1. **4 shards** (recommended, 14.1 min projected after `1302`), or 3 (18.0 min, 2 min of headroom)?
+1. **5 shards** (recommended: 13.1 min projected after `1302` at the slowest runner seen), or 4 (15.8 min, spent by
+   the next guard)? 3 is over at the slowest speed (20.2 min).
 2. **The budget's tests' trigger list** grows from the WO's four paths to `tests/1201/`, `tests/1301/`,
    `tools/tviburi-budget/`, `tests/spike.sh`, `.github/workflows/`, `tests/ci/` and `tools/tviburi-route/` (§1.6)?
 3. **The docs class is `docs/**/*.md` plus the five root files;** `docs/work-orders/*.tsv` routes as code?
-4. **How the aggregate receives each shard's list:** explicit shard jobs with job outputs (no new action; a matrix
-   cannot carry per-leg outputs), or `actions/upload-artifact` and `download-artifact` pinned by SHA? Recommended:
-   job outputs.
-5. **A harness hazard, flagged, not in scope to fix:** in `tests/spike.sh`, `identity` and `adv-version` create the
+4. **How the aggregate receives each shard's list:** explicit shard jobs with job outputs (no new action), or
+   `actions/upload-artifact` and `download-artifact` pinned by SHA? Recommended: job outputs. From memory, not
+   checked: a matrix job's legs overwrite one another's outputs, which is why the shards would be explicit jobs.
+5. **The teardown race in a shard.** The roadmap's remedy for it is a CI rerun. In a shard, a `no end record` FAIL
+   looks like "a case's verdict differs in a shard" (§7's stop). Ruling wanted: is a lost end record in a shard,
+   passing on a rerun of that shard, a rerun and a FEEDBACK row, or a stop? Without one, the first flake in the build
+   is a stop.
+6. **A harness hazard, flagged, not in scope to fix:** in `tests/spike.sh`, `identity` and `adv-version` create the
    `modeled` run if it is missing, and `t_modeled` then fails on `mkdir` under `set -e`, aborting with no `FAIL`
    line. The suite's order hides it; the plan keeps that order inside every shard.
