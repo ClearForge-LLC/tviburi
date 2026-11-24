@@ -15,7 +15,7 @@
 | IDR by mode: output, ODR; AF, the pin's level; analog, 0 (p539); input, the level from outside, else 0 (ruled: a floating pin) | `Idr` |
 | The property `external` ("PB6:up PB7:up"), checked against the port's own bus address (`TVI-GPIO-CONFIG` otherwise); the witness carries it beside `package` | constructor, `Check` |
 | The ledger: ODR, BSRR.BS and MODER move to modeled by the guard, as does PUPDR (its pulls now set undriven pins). The IDR row states the floating-pin assumption plainly | `Fields` |
-| 22 planted cases, each `gpio-<case>`: `analogled`, `analogout`, `odrfirst`, `moderfirst`, `analoghold`, `afodr`, `afenter`, `afenterhigh`, `afout`, `afentern`, `afswitch`, `afnosrc`, `inputidr`, `button`, `externalbad`, `resetodr`, `odrhalf`, `exti` (and `registrations` and `resetwrite` changed) | `firmware/gpio.rs`, `tests/1301/gpio.sh` |
+| 18 new planted cases, each `gpio-<case>`: `analogled`, `analogout`, `odrfirst`, `moderfirst`, `analoghold`, `afodr`, `afenter`, `afenterhigh`, `afout`, `afentern`, `afswitch`, `afnosrc`, `inputidr`, `button`, `externalbad`, `resetodr`, `odrhalf`, `exti` (and `registrations` and `resetwrite` changed) | `firmware/gpio.rs`, `tests/1301/gpio.sh` |
 | Mutants H01–H21, one per guard added; G05, G06 and G20 re-pointed at the code they guard now | `tests/mutants.tsv` |
 | The replay declares a board's levels (`ACCEPT_EXTERNAL`). The CI memory step declares Sentinel-02's I2C1 pull-ups, citing the hwdef (L24–25), standing in for the consumer | `tests/1301/replay-1301.sh`, `tests/1301/ci-memory.sh` |
 
