@@ -74,6 +74,7 @@ for i in "${!args[@]}"; do
   if [ -f /repo/model/stm32h7-dma-restate.repl ]; then
     { echo; cat /repo/model/stm32h7-dma-restate.repl; echo
       printf 'tviburiDma1:\n    mode: "%s"\n\ntviburiDma2:\n    mode: "%s"\n\n' "${ACCEPT_MODE:-recorded}" "${ACCEPT_MODE:-recorded}"; } >> "$plat"
+  fi
   # TVI-WO-1304: a tree with the flash restatement gets it after the timers'. The consumer's untyped `flashController:`
   # block (its option-byte init sequence, Aethelgard AET-WO-4230 §1.6) cannot stay on the cancelled entry (E29: the load
   # fails, measured, TVI-WO-1304.measure.md §2.4): the OPTSR_PRG word it writes becomes the guard's `optionBytes` (ruled
