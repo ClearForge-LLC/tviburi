@@ -9,49 +9,19 @@
 # Only the release comes from each tree, built once by that tree's own scripts/build-release; the harness
 # (replay-1301.sh), the captured run and the ELF are this checkout's, the same for both sides. The ELF is built from
 # Aethelgard's pinned ArduPilot image and must be a799dfb6… (the fixture's SOURCE.md).
-# A boot counts only if Renode reaches the boot's end, a peak was sampled, every guard's witness reports the release
-# hash of the tree that boot is labelled with (and none another), and, on the branch, no GPIO would-refuse.
-# The verdict (`judge`, below; `ci-memory.sh --judge RUNS.tsv` judges a table alone) refuses by name:
-#   failed-boot     any boot that does not count, on either side; it is never dropped from a median
-#   too-few-boots   fewer than 5 boots a side
-#   ceiling         any branch boot over 1,572,864 KiB (the consumer's ceiling, Aethelgard RUL-13 as amended 2026-11-23)
-#   budget          the branch's median more than 32 MiB over main's
-# Exit 0 only on PASS. In CI (TVIBURI_CI=1) containers run bare on the unshared runner; elsewhere under capped-run.
+# This script only boots and hands off (RUL-14, ruled 2026-11-24T01:05Z): one row per boot of what it sampled (the
+# peak, the boot's end, the witnesses of each side's release, GPIO would-refuse), under a header naming the columns.
+# The judge is tools/tviburi-budget, built from this checkout and unit-tested here before it judges. It decides
+# whether each boot counts and computes the two medians, and it refuses by name: failed-boot, too-few-boots (fewer
+# than 5 a side), ceiling (a branch boot over 1,572,864 KiB), budget (the branch's median more than 32 MiB over
+# main's). Exit 0 only on its PASS. In CI (TVIBURI_CI=1) containers run bare on the unshared runner; elsewhere
+# under capped-run.
 set -euo pipefail
 
 here=$(cd "$(dirname "$0")/../.." && pwd)
 IMAGE=$(sed -n 's/^IMAGE=//p' "$here/tests/spike.sh")
 AP_IMAGE=ghcr.io/clearforge-llc/aethelgard-ardupilot@sha256:e1809b909b02c7fd01b593a65f32d191169a5027ef61ceeae8e74cc08117c2b6
 ELF_SHA=a799dfb6633537e74a8c3b7d8b6a464f185c255e377a612b7f9fcf8378dab1ef
-MIN_BOOTS=5
-CEILING_KIB=1572864
-BUDGET_KIB=$((32 * 1024))
-
-# judge RUNS.tsv — columns: side (main|branch), run, peak KiB, wall s, status ("ok" or why the boot does not count).
-judge() {
-  local t=$1 verdict=0 s n m d
-  local -A med
-  awk -F'\t' '$5 != "ok" {printf "REFUSE failed-boot: %s boot %s does not count (%s)\n", $1, $2, $5}' "$t" | grep . && verdict=1
-  for s in main branch; do
-    n=$(awk -F'\t' -v s=$s '$1 == s' "$t" | wc -l)
-    [ "$n" -ge $MIN_BOOTS ] || { echo "REFUSE too-few-boots: $s has $n boots, at least $MIN_BOOTS are needed"; verdict=1; }
-    m=$(awk -F'\t' -v s=$s '$1 == s && $5 == "ok" {print $3}' "$t" | sort -n \
-      | awk '{a[NR] = $1} END {if (NR) print (NR % 2 ? a[(NR + 1) / 2] : int((a[NR / 2] + a[NR / 2 + 1]) / 2))}')
-    med[$s]=${m:-none}
-  done
-  awk -F'\t' -v c=$CEILING_KIB '$1 == "branch" && $3 > c {printf "REFUSE ceiling: branch boot %s peaked at %d KiB, over %d KiB\n", $2, $3, c}' "$t" \
-    | grep . && verdict=1
-  if [ "${med[main]}" = none ] || [ "${med[branch]}" = none ]; then
-    echo "REFUSE too-few-boots: no counted boot on one side (medians: main ${med[main]}, branch ${med[branch]})"; verdict=1
-  else
-    d=$((med[branch] - med[main]))
-    echo "MEDIANS main ${med[main]} KiB, branch ${med[branch]} KiB, difference $d KiB ($(awk -v d=$d 'BEGIN {printf "%+.1f", d / 1024}') MiB)"
-    [ $d -le $BUDGET_KIB ] || { echo "REFUSE budget: the branch's median is $d KiB over main's, more than $BUDGET_KIB KiB (32 MiB)"; verdict=1; }
-  fi
-  [ $verdict = 0 ] && echo "PASS: every boot counts, every branch boot at or under $CEILING_KIB KiB, the median within 32 MiB of main's"
-  return $verdict
-}
-if [ "${1:-}" = --judge ]; then judge "$2"; exit; fi
 
 scratch=${TVIBURI_SCRATCH:-$HOME/.cache/tviburi}
 mkdir -p "$scratch"
@@ -62,7 +32,7 @@ else
   [ -x "$HOME/bin/capped-run" ] || { echo "no ~/bin/capped-run; TVIBURI_CI=1 is for CI runners only" >&2; exit 2; }
   container() { nice -n 10 "$HOME/bin/capped-run" --mem 12G -- --rm --network none "$@"; }
 fi
-runs=${TVIBURI_MEMORY_RUNS:-$MIN_BOOTS}
+runs=${TVIBURI_MEMORY_RUNS:-5}   # the judge refuses fewer than 5 a side
 fix=$here/tests/1301/fixtures/aet-1c32c8ea-ardupilot
 
 # The two trees, then each one's release, built once by its own release program; its hash is what every witness of
@@ -88,6 +58,15 @@ for s in main branch; do
   echo "$s release ${hash[$s]}"
 done
 
+# The judge, from this checkout like the harness, the same for both sides. Its unit tests pin the refusals; a judge
+# that fails them judges nothing.
+container -v "$here/tools/tviburi-budget:/src:ro" -v "$work:/w" "$IMAGE" sh -c 'export PATH=/opt/cargo/bin:$PATH
+  export RUSTUP_HOME=/opt/rustup CARGO_HOME=/w/cargo-home
+  cargo test --quiet --offline --locked --manifest-path /src/Cargo.toml --target-dir /w/judge &&
+  cargo build --quiet --offline --locked --manifest-path /src/Cargo.toml --target-dir /w/judge' >"$work/judge.txt" 2>&1 \
+  || { tail -30 "$work/judge.txt"; echo "FAIL the judge (tools/tviburi-budget) did not build or pass its tests"; exit 1; }
+echo "judge: $(grep -a 'test result' "$work/judge.txt")"
+
 # The ELF, built as Aethelgard's CI builds it, then held to its hash.
 mkdir -p "$work/elf"
 container -v "$fix/container:/container:ro" -v "$fix/boards:/boards:ro" -v "$work/elf:/out" "$AP_IMAGE" \
@@ -112,7 +91,9 @@ cp "$work/elf/sentinel-02/arducopter.elf" "$tool/firmware.elf"
 
 # Interleaved, and the order alternates each round (main first, then branch first), so a drift over the job or a
 # first boot's extra cost falls on both sides alike.
-printf '' > "$work/runs.tsv"
+printf '%s\t' side run peak_kib wall_s boot_end witnesses_own witnesses_other would_refuse rss_anon_kib rss_file_kib \
+  rss_shmem_kib anon_huge_kib threads processes >"$work/runs.tsv"
+printf 'snapshot_sum_kib\n' >>"$work/runs.tsv"
 for r in $(seq 1 "$runs"); do
   order="main branch"; [ $((r % 2)) = 0 ] && order="branch main"
   for s in $order; do
@@ -128,26 +109,23 @@ for r in $(seq 1 "$runs"); do
     mine=$(grep -a -c "\"tviburi\":\"witness\".*\"model_version\":\"${hash[$s]}\"" "$con" 2>/dev/null || true)
     other=$(grep -a '"tviburi":"witness"' "$con" 2>/dev/null | grep -a -c -v "\"model_version\":\"${hash[$s]}\"" || true)
     would=$(grep -a -c 'gpioPort[A-K]: {"tviburi":"would-refuse"' "$con" 2>/dev/null || true)
-    why=""
-    [ -n "$peak" ] && [ "$peak" -gt 0 ] || why="$why no peak sampled;"
-    [ "${end:-0}" = 1 ] || why="$why boot end ${end:-0};"
-    [ "${mine:-0}" -ge 1 ] || why="$why no witness of ${hash[$s]};"
-    [ "${other:-0}" = 0 ] || why="$why $other witnesses of another release;"
-    [ $s = main ] || [ "${would:-0}" = 0 ] || why="$why $would GPIO would-refuse;"
-    status=${why:+${why# }}; status=${status:-ok}
     # What the peak is made of (WO (4)): the Renode process's own breakdown at its peak sample, in KiB.
     # The snapshot is the last whole one, at or before the peak; its own sample's sum is the last column.
-    parts=$(awk '/^(RssAnon|RssFile|RssShmem|AnonHugePages|Threads):/ {v[$1] = $2} /^pid / {v["n"] = $4; v["s"] = $7}
+    parts=$'\t\t\t\t\t\t'   # no whole snapshot: empty fields, so the row stays whole and the judge names the boot
+    [ -s "$out/2-accept.peak-proc.txt" ] && parts=$(awk '/^(RssAnon|RssFile|RssShmem|AnonHugePages|Threads):/ {v[$1] = $2} /^pid / {v["n"] = $4; v["s"] = $7}
       END {printf "%s\t%s\t%s\t%s\t%s\t%s\t%s", v["RssAnon:"], v["RssFile:"], v["RssShmem:"], v["AnonHugePages:"], v["Threads:"], v["n"], v["s"]}' \
-      "$out/2-accept.peak-proc.txt" 2>/dev/null || true)
-    printf '%s\t%s\t%s\t%s\t%s\t%s\t%s\n' $s $r "${peak:-0}" "${wall:-none}" "$status" "$mine" "$parts" >> "$work/runs.tsv"
-    echo "$s boot $r: peak ${peak:-none} KiB, wall ${wall:-none} s, witnesses of its release $mine, host MemAvailable" \
-      "before $avail kB; at the peak RssAnon/RssFile/RssShmem/AnonHugePages/Threads/processes/snapshot-sum $(tr '\t' / <<<"$parts"): $status"
+      "$out/2-accept.peak-proc.txt")
+    printf '%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n' $s $r "$peak" "${wall:-none}" "${end:-0}" "${mine:-0}" "${other:-0}" "${would:-0}" \
+      "$parts" >> "$work/runs.tsv"
+    echo "$s boot $r: peak ${peak:-none} KiB, wall ${wall:-none} s, boot end ${end:-0}, witnesses of its release ${mine:-0}" \
+      "and of another ${other:-0}, GPIO would-refuse ${would:-0}, host MemAvailable before $avail kB; at the peak" \
+      "RssAnon/RssFile/RssShmem/AnonHugePages/Threads/processes/snapshot-sum $(tr '\t' / <<<"$parts")"
   done
 done
 
 verdict=0
-judge "$work/runs.tsv" | tee "$work/verdict.txt" || verdict=1
+container -v "$work:/w:ro" "$IMAGE" /w/judge/debug/tviburi-budget /w/runs.tsv >"$work/verdict.txt" 2>&1 || verdict=$?
+cat "$work/verdict.txt"
 echo "outputs: $work"
 if [ -n "${GITHUB_STEP_SUMMARY:-}" ]; then
   {
@@ -157,9 +135,7 @@ if [ -n "${GITHUB_STEP_SUMMARY:-}" ]; then
     echo
     echo '```'; cat "$work/verdict.txt"; echo '```'
     echo
-    echo "| side | boot | peak (KiB) | wall (s) | counts? | witnesses | RssAnon | RssFile | RssShmem | AnonHugePages | threads | processes | snapshot's sum |"
-    echo "|---|---|---|---|---|---|---|---|---|---|---|---|---|"
-    awk -F'\t' '{printf "| %s | %s | %s | %s | %s | %s | %s | %s | %s | %s | %s | %s | %s |\n", $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13}' \
+    awk -F'\t' '{for (i = 1; i <= NF; i++) printf "| %s ", $i; print "|"} NR == 1 {for (i = 1; i <= NF; i++) printf "|---"; print "|"}' \
       "$work/runs.tsv"
     echo
     echo '```'; cat "$work/runner.txt"; echo '```'

@@ -33,7 +33,7 @@ jobs:
         env:
           TVIBURI_MAIN_SHA: ${{ github.event.pull_request.base.sha }}
         run: TVIBURI_SCRATCH="$RUNNER_TEMP/tviburi" tests/1301/ci-memory.sh
-      - name: Memory budget's own tests (the judge; a planted 64 MiB branch refused by budget)
+      - name: Memory budget's own tests (main bound to the PR's base; a planted 64 MiB branch refused by budget)
         run: TVIBURI_SCRATCH="$RUNNER_TEMP/tviburi" tests/1201/test-budget.sh
       - name: Adversarial cases
         run: TVIBURI_SCRATCH="$RUNNER_TEMP/tviburi" tests/adversarial.sh

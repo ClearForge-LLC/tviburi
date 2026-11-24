@@ -41,20 +41,22 @@ Every figure is a peak in KiB, as defined in §2: the sampled sum of Renode's Vm
 | **(2) The record** | `$GITHUB_STEP_SUMMARY`: the two release hashes, the verdict with both medians and their difference, and a row for every boot. |
 | **(3) 1301's absolute step** | Replaced in `.github/workflows/ci.yml`; `fetch-depth: 2`. |
 | **(4) The spread** | Every job records the runner. Every boot records Renode's breakdown at its peak (§4). |
+| **The judge** (ruled 01:05Z, Q1) | `tools/tviburi-budget`, a std-only Rust program with 17 unit tests. The step builds it from the checkout and runs its tests before every verdict. |
 | **Tests** | `tests/1201/test-budget.sh`, in CI after the step; the fixture `tests/1201/fixtures/Planted64MiB.cs`. |
 
 **What (1) does:**
 - Each tree's release is built once, by that tree's own `scripts/build-release`, into its own directory, and mounted read-only at `/tmp/release` for that side's boots.
 - The harness (`replay-1301.sh`), the captured run and the ELF come from the checkout, the same for both sides. So only the release differs.
 - The boots are interleaved, with the order alternating by round. There are at least 5 a side, enforced by the judge.
+- **The shell decides nothing** (`RUL-14`, ruled 01:05Z). It writes one row per boot of what it sampled, under a header that names the columns: the peak (empty if none was sampled), the wall time, the count of boot ends, the witnesses of the boot's own release and of another, the GPIO would-refuse, and the peak's breakdown. `tools/tviburi-budget` reads the row by header name and decides.
 
-**A boot counts only if all of these hold:**
-- it reached `AETHELGARD-BOOT-END`;
+**A boot counts, in the judge, only if all of these hold:**
+- it reached `AETHELGARD-BOOT-END` exactly once;
 - a peak was sampled;
-- every witness on the console reports the release hash of the side the boot is labelled with, and none reports another;
+- at least one witness on the console reports the release hash of the side the boot is labelled with, and none reports another;
 - on the branch, it has no GPIO would-refuse (1301's check, kept).
 
-**The judge** (`ci-memory.sh --judge RUNS.tsv` runs it alone) refuses by name:
+**The judge** (`tviburi-budget RUNS.tsv`) refuses by name:
 
 | Refusal | When |
 |---|---|
@@ -63,7 +65,10 @@ Every figure is a peak in KiB, as defined in §2: the sampled sum of Renode's Vm
 | `ceiling` | A branch boot over 1,572,864 KiB. |
 | `budget` | The branch's median more than 32,768 KiB over main's. |
 
-The median of an even count is the mean of the middle two. The exit status is 0 only on `PASS`.
+The median of an even count is the mean of the middle two, rounded down.
+- **Exit statuses:** 0 only on `PASS`; 1 on a refusal; 2 on a table it cannot read.
+- **What counts as unreadable:** no header, a missing column, a row of the wrong length, an unknown side, or a field that is not a count. An unreadable table fails the step, never passes it.
+- **When a boot left no whole snapshot,** the shell still writes the row's breakdown fields, empty, so the judge names that boot instead of stopping at a short row.
 
 **What CI compares:**
 - **On a pull request,** `HEAD` is GitHub's merge commit and `HEAD^1` is main's tip. `TVIBURI_MAIN_SHA` is set to the pull request's base, and the step stops before any boot if `HEAD^1` is not that commit.
@@ -78,7 +83,13 @@ The median of an even count is the mean of the middle two. The exit status is 0 
 - **The release is mounted read-only.** The script's existing `[ -s /tmp/release/Tviburi.cs ]` skips its own release build, so cargo no longer runs inside every boot.
 
 **The tests** (`test-budget.sh`):
-- **The judge, on 12 canned tables:** each refusal alone; the 32 MiB and 1,572,864 KiB boundaries passing exactly and refusing 1 KiB over; two high boots that must not move the median; a failed boot with a low peak; a failed boot on main; a wrong release; 4 boots; no branch; every branch boot failed.
+- **The judge's own cases are `tools/tviburi-budget`'s 17 unit tests,** which the step runs before every verdict. They replace the 12 canned shell tables.
+  - **The four the ruling names:** the planted 64 MiB, on CI 45294287114's medians; main against main, on that run's ten boots; a boot with no sample, both absent and 0; and fewer than 5 boots.
+  - **The boundaries:** the 32 MiB and 1,572,864 KiB limits pass exactly and refuse 1 KiB over. A main boot over the ceiling is not the branch's.
+  - **The median:** two high boots of five do not move it, three do. The even-count median is tested directly.
+  - **Failed boots:** a failed boot with a low peak is left out of the median; each of the five faults, alone, fails a boot; a would-refuse on main does not; a failed boot on main does; every branch boot failed.
+  - **The table:** it is read by header name, an empty peak is none, and six malformed tables are errors.
+  - **The report:** its exact lines.
 - **The main-SHA binding:** a base that is not main stops the step before any boot.
 - **The planted branch:**
   - main's tree with the fixture added to a scratch copy's `model/` (`tools/tviburi-release` concatenates every `model/*.cs`), booted against main by the real step;
@@ -152,9 +163,9 @@ The budget no longer depends on the answer, because each job compares against it
 |---|---|
 | **Main's file built from the branch, or the branch's from main** | Each side is its own `git archive`, built by its own tree's release program. Each boot's witnesses must carry its side's hash. **Mutant:** the branch's boots given main's release (Furnace, against the plant): `REFUSE failed-boot: … no witness of sha256:e065cb4c…; 14 witnesses of another release`. Killed |
 | **Main is not main** (checkout gives the PR head, so `HEAD^1` is the branch's previous commit) | `TVIBURI_MAIN_SHA` is the PR's base: `FAIL main is …, but the pull request's base is 0000…`, before any boot. Now a test case in `test-budget.sh` |
-| **A median over too few boots** | The judge counts boots itself, not `TVIBURI_MEMORY_RUNS`. Mutant `MIN_BOOTS=4`: killed by `four-boots` |
-| **A failed boot counted as a low peak** | **Real case:** a branch whose C# does not compile peaked at 642,044 KiB in 2.5 s with no witness and no boot end. It gave `REFUSE failed-boot`. **Mutants:** the failed-boot rule off (4 cases fail), failed boots in the median (`failed-boot-low-peak` fails). Killed |
-| **Other judge mutants** | Ceiling `>` to `>=`, budget `-le` to `-lt`, budget 64 MiB, median as minimum, the no-counted-boot branch removed: each killed by at least one canned case |
+| **A median over too few boots** | The judge counts boots itself, not `TVIBURI_MEMORY_RUNS`. Mutant `n < MIN_BOOTS - 1`: killed |
+| **A failed boot counted as a low peak** | **Real case, run twice:** a branch whose C# does not compile peaked at 642,044 KiB (shell judge), then 641,148 KiB (the Rust judge), in about 2.5 s, with no witness and no boot end. Both gave `REFUSE failed-boot: branch boot 1 does not count (boot end 0; no witness of its release)`. **Mutants:** failed boots in the median, and each of the five faults off: killed |
+| **The Rust judge's guards** (one mutant each, against its 17 unit tests) | **13 of 13 killed.** The mutants: no-peak check off; boot end `!= 1` to `> 1`; own-witness check off; other-witness check off; would-refuse moved to main; the 5-boot minimum lowered; failed boots in the median; the no-median refusal off; ceiling `>` to `>=`; the ceiling applied to main; budget `>` to `>=`; the even median taken as the upper middle; the row length `!=` to `<`. **The last first survived:** no test had a row longer than its header, so a test was added and it is now killed. The shell judge's 8 mutants (killed in the earlier pass) went with it |
 | **A plant that passes for the wrong reason** | It must be shown running (its console line, every boot), resident (a difference of at least 48 MiB) and refused by `budget` alone. A plant that broke the boot would refuse by `failed-boot` and fail the test |
 | **The same sampler on both sides** | One `replay-1301.sh`, from the checkout, for both; its snapshot overhead falls on both alike |
 
@@ -164,10 +175,13 @@ The budget no longer depends on the answer, because each job compares against it
 
 ## 6. Findings
 
-**For the architect to rule on (not decided here):**
-- **Q1 — `RUL-14`.** The judge is gate logic written in shell and awk (`ci-memory.sh`'s `judge`, about 25 lines), like 1301's absolute step before it. If `RUL-14`'s "thin harness" excludes a gate's verdict, the judge belongs in a small Rust program.
-- **Q2 — main against main is not a standing test.** The planted refusal runs on every PR, because `RUL-15` requires every test that claims a refusal to run on every PR. On a PR that changes no `model/`, the gate is itself main against main, and this PR measured it twice. A guard PR never runs it. Adding it as a third comparison costs about 5 min a job. I read `RUL-15` as not requiring it, since it claims no refusal, but it is the noise floor the 32 MiB rests on. Your call.
-- **Q3 — the PR body.** PR #26's live body is the one it opened with. It omits `replay-1301.sh`'s change and the base binding. `~/.cache/tvi-1201/pr-title-body.md` is the final one; I cannot edit a PR's body with `gh-write`.
+**Asked of the architect at READY, ruled 2026-11-24T01:05Z:**
+- **Q1 — `RUL-14`: port the judge to Rust now. Done.**
+  - `tools/tviburi-budget` is std only. Its unit tests include the four the ruling names.
+  - The shell keeps the boots and the file handoff. It no longer decides whether a boot counts either: that moved into the judge too, because it is the same gate logic.
+- **Q2 — no standing main against main on guard PRs.** This PR's three measurements are the calibration. A row proposes a weekly scheduled calibration run.
+- **Q3 — the PR body:** the architect replaces it from `~/.cache/tvi-1201/pr-title-body.md` at merge.
+- **(4) is recorded as the row's first measurement.**
 
 - **F1 — my own error, corrected.**
   - **What I got wrong:** commit `add5f6f` says the empty peak snapshots (`Threads: 2`, no Rss lines; 2 of 30 boots in 45286469273) came from a transient second process.
@@ -178,6 +192,13 @@ The budget no longer depends on the answer, because each job compares against it
   - The gate took 4 min 51 s and the plant test 4 min 58 s. 1301's absolute step took 4 min 41 s (45273210903). So the memory steps cost about 5 min more a job.
   - Each comparison builds the ELF again (the plant test runs a second step invocation); sharing it was not worth a cache.
   - That job took 45 min in all, including the 4 min 52 s temporary step since removed. The timeout is 150 min.
+- **F4 — the plant's window (48–80 MiB) can be breached. For the architect: left unchanged.**
+  - **What happened:** the window was mine, 64 MiB ± the 16 MiB stop line. The three CI runs measured the plant at +62.0, +56.8 and +64.3 MiB, all inside it.
+  - On Furnace, after the port to Rust (01:0xZ, 10–11 s a boot, load average 7.7), it measured **+88.4 MiB** (main 985,296, branch 1,075,844). The test failed on the upper bound. The step itself was right: it refused by `budget` alone.
+  - **It is not double counting:** one process matched, and the branch's RssAnon sat about 90 MiB over main's. An earlier Furnace run gave +68.9.
+  - **The range so far:** +56.8 to +88.4 MiB across six runs.
+  - **What the bounds are for:** the lower bound shows the step sees most of the 64 MiB. The upper bound guards against a sampler that over-counts.
+  - **The options:** keep 80 (a CI flake is possible but not yet seen); widen the upper bound to 96 MiB (64 + 32); or drop it, keeping only the lower bound and the refusal-by-name. Widening after a failure is a weakened test, so I have not done it.
 - **F3 — for 1301a (running beside this WO):** it touches `model/` only. Its PR will be the first guard PR this budget judges. Its FEEDBACK should quote the `MEDIANS` line (WO (2)). If it adds a restate file, the harness must wire it under a condition (§2).
 
 ## 7. Close
