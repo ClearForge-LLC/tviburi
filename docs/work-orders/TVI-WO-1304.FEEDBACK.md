@@ -1,6 +1,6 @@
 # TVI-WO-1304 — FEEDBACK
 
-**Builder:** Claude (Opus 5.5), Furnace, 2026-11-24. **Branch:** `wo/tvi-1304-flash-guard`, from `main` `d22dad8`; `main` `0a86577` (with `TVI-WO-1303`, the DMA guard) merged.
+**Builder:** Claude (Opus 5.5), Furnace, 2026-11-24. **Branch:** `wo/tvi-1304-flash-guard`, from `main` `d22dad8`; `main` `0a86577` (with `TVI-WO-1303`, the DMA guard) and then `1e9ce55` (docs only) merged.
 
 **State:**
 - §1.1 was measured and stopped (`TVI-WO-1304.measure.md`), then ruled at 2026-11-24T15:50Z (Q1–Q7).
