@@ -23,6 +23,9 @@ mode=accept
 rm -rf /var/lib/aethelgard; cp -r /cap/$n/varlib /var/lib/aethelgard
 mapfile -d '' args < /cap/$n/argv.bin
 args=("${args[@]:1}")
+# Aethelgard >= 65c74788 runs Renode under its reaper (`... -- /usr/local/bin/renode ...`): keep only what follows `--` and
+# the renode path (TVI-WO-1302 FEEDBACK §7 row, taken by TVI-WO-1303 for its recaptured boots). An argv without it is unchanged.
+for i in "${!args[@]}"; do [ "${args[$i]}" = "--" ] && { args=("${args[@]:$((i + 2))}"); break; }; done
 d=""; cfg=""
 for i in "${!args[@]}"; do [ "${args[$i]}" = "--config" ] && { cfg=${args[$((i + 1))]}; d=$(dirname "$cfg"); }; done
 plat=$d/platform-booted.repl
