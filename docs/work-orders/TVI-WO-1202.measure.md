@@ -251,3 +251,5 @@ checked:** standard runners are free for a public repository, and that limit is 
 6. **A harness hazard, flagged, not in scope to fix:** in `tests/spike.sh`, `identity` and `adv-version` create the
    `modeled` run if it is missing, and `t_modeled` then fails on `mkdir` under `set -e`, aborting with no `FAIL`
    line. The suite's order hides it; the plan keeps that order inside every shard.
+
+<!-- TVI-WO-1202 §2: the docs-only route, shown. This line exists only on the demonstration PR, never merged. -->
