@@ -41,6 +41,22 @@ The gap ledger for that model is a separate, versioned artifact. A consumer reco
 - each refusal it meets is a named, ordered piece of model work;
 - each new silicon scar becomes a permanent regression case in the twin, rather than a note.
 
+### 3.1 The destination: any firmware, more than one family, the same refusal
+
+*Added 2026-11-24 (Scotty: both projects "firmware agnostic … current chipset options but intended to add more for the ability to test custom kernel to custom board and chip choice combinations", for "a cold start user who will be utilizing Tvi and Aet").*
+
+- **Any firmware.**
+  - Tviburi judges register accesses against what the silicon does, so the binary's origin never matters: Aethelgard's generated firmware, an existing autopilot, or a kernel someone wrote last week.
+  - A firmware is never given a pass because of who wrote it. No firmware's own report counts as a witness.
+- **More than one family, under one contract.**
+  - The STM32H7 is the first family. Others arrive by `roadmap.md` Phase 5's trigger, as a register-truth layer per vendor rather than a new emulator.
+  - **Each family is held to invariants 1 to 8 in full.** A family whose unmodeled paths pass silently is not supported. It is a family Tviburi does not yet claim, and the consumer is told so.
+- **Standalone, and seamless beside Aethelgard** (Scotty, 2026-11-24: "functionally independent … but the seam between Aet and Tvi should be nearly seamless with cohesive integration").
+  - Tviburi alone serves a cold start: a firmware binary, a supported board, and one of §3's two answers, with no Aethelgard installed.
+  - Beside Aethelgard, the seam is one declared step: Aethelgard pins a Tviburi release by hash, and its verdict carries Tviburi's records and ledger hash (invariant 7) with nothing for the user to write in between.
+  - Neither project needs the other to run.
+- **The first application is an agent-flown drone.** Aethelgard's Sentinel boards fly ArduPilot, commanded by an agent rather than a pilot. The paths an armed, commanded autopilot takes are the ones modeled first (`RUL-13`).
+
 ## 4. Invariants — true regardless of what any work order asks
 
 | # | Invariant | How to falsify |
@@ -70,6 +86,9 @@ The gap ledger for that model is a separate, versioned artifact. A consumer reco
 - The gap ledger drifts from the model that emitted it.
 - It becomes so slow or heavy that people stop running it and go back to silent Renode.
 - Downstream tools start treating its traces as proof of the physical board.
+- A second family is added with a weaker contract than the first: its gaps pass where the H7's refuse.
+- A firmware is judged by what it reports about itself rather than by what the models witness.
+- Tviburi becomes unusable without Aethelgard, or the seam between them needs glue each user writes for themselves.
 
 ## 7. Amendments
 
@@ -78,6 +97,7 @@ The gap ledger for that model is a separate, versioned artifact. A consumer reco
 | 2026-11-21 | — | Initial version | Seed from the 2026-11-21 conversation |
 | 2026-11-23 | header, §2, §3, §5, §6 | The status names its ratification; `TVI-INV-n` for cross-repository citations; the blind build's four failures added to §2 as evidence; Aethelgard's use stated in §3; two non-goals and one failure added | The repo-genesis rework (Scotty, 2026-11-23: "give us a solid foundation for consuming Tvi output to make Aet better and not fully reliant upon Renode alone") |
 | 2026-11-23 | §4: 2, 3, 5, 7 | **2** scoped to Tviburi-authored models, with inherited models listed as unaudited. **3** defines the model's identity as everything that executed. **5** locates the access. **7** allows reading the ledger by hash | 2 was false on the first day: every inherited Renode model cites nothing (review of PR #2, ruling 6). 3 failed in practice: a hash followed an environment variable, not the compiled shim (verdict run Y5b). 5: the blind build's record carries a PC, and virtual time is quantum-granular mid-access (`TVI-WO-0100` FEEDBACK Q4). 7: a consumer that cannot read the ledger cannot predict refusals |
+| 2026-11-24 | §3.1 (new), §6 | The destination: any firmware, more than one family under the same contract (Phase 5), a cold start through the consumer, the agent-flown drone as the first application. Two failure modes. No invariant changed | Scotty, 2026-11-24, stating the end state both projects design towards (Aethelgard's northstar §3.1 the same day). Proposed by Claude; ratified by Scotty's merge |
 | 2026-11-23 | §4: 8 (new) | **8** a run fails closed at the consumer's entry point | Both builds of `TVI-WO-0100` printed a refusal through a process that exited 0 in some path (verdict §2, item 10 and R9). The consumer gates on exit status, so a refusal it cannot see is a silent pass one layer out |
 | 2026-11-23 | §3, §4: 6 | **6** replaced: every record locates its access, and the consumer's trace carries the records and both hashes; Tviburi owns no trace. §3's pass restated to match | The old 6 promised a trace that `architecture.md` §1 and §2.1 say Tviburi does not produce, with no owner (review A11 (a); `docs/reviews/2026-11-23-mythos-5-2-tviburi.response.md` §5). Ruled by Scotty, 2026-11-23 |
 
@@ -87,3 +107,4 @@ The gap ledger for that model is a separate, versioned artifact. A consumer reco
 - **Rework:** 2026-11-23, by Claude as co-architect, at Scotty's request, using the repo-genesis skill. It rests on:
   - the two builds of `TVI-WO-0100` and the blind verdict (`docs/reviews/2026-11-22-*`);
   - Aethelgard's `main` at `f42a0c88`, read for how it consumes Renode today (`architecture.md` §2).
+- **Amended 2026-11-24** (§3.1, §6) by Claude as co-architect (claude.ai session `01HXmu7fgdnAdwho5ar2zV1a`), from Scotty's statements that day, paired with Aethelgard's northstar §3.1 and `INV-08`.
