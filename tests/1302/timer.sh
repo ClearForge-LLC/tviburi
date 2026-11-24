@@ -10,7 +10,7 @@ set -euo pipefail
 
 here=$(cd "$(dirname "$0")/../.." && pwd)
 IMAGE=$(sed -n 's/^IMAGE=//p' "$here/tests/spike.sh")
-CASES="pwm moe0 cce0 force polarity ccrreset ccr0 ossi ccne ccnp lock1 lock2 lock3 lockfrozen locksame dmar half byte aoe read tim8 tim8on reenable lockbelow lockbelow2 halfhigh gen-pwm ap-m fields ledger registrations config recorded reset rccreset regen"
+CASES="pwm moe0 cce0 force polarity ccrreset ccr0 ossi ccne ccnp lock1 lock2 lock3 lockfrozen locksame dmar half byte aoe read tim8 tim8on reenable lockbelow lockbelow2 halfhigh gen-pwm ap-m fields ledger registrations config recorded reset rccreset regen gconce"
 GUARDS="spi1 rcc gpioPortA gpioPortB gpioPortC gpioPortD gpioPortE gpioPortF gpioPortG gpioPortH gpioPortI gpioPortJ gpioPortK timer1 timer8"
 # The planted firmware's paths: every case but the monitor-driven ones.
 PATHS=$(for c in $CASES; do case $c in fields|ledger|registrations|config|recorded|reset|rccreset|regen) ;; *) printf '"%s",' "$c" ;; esac; done | sed 's/,$//')
@@ -236,6 +236,13 @@ tviburiTimer8:\
       'echo "R-BDTR"' 'sysbus ReadDoubleWord 0x40010044' 'sysbus WriteDoubleWord 0x40010044 0x8100' 'sysbus WriteDoubleWord 0x40010020 0x3'
     check "rccreset: TIM1RST through the RCC resets the guard: CCER and BDTR read 0, LOCK clears, so a new LOCK and a CC1P change pass (p1615: frozen until the next reset)" \
       "passed rccreset && [ \"\$(readout rccreset CCER)\" = 0x00000000 ] && [ \"\$(readout rccreset BDTR)\" = 0x00000000 ]" ;;
+  gconce)
+    # The load-time collection (ruled 10:30Z (A), 10:55Z): once per instance at the machine's first start; a pause and
+    # resume, and a machine Reset followed by a start, do not collect again.
+    n='python "print(\"R-GC %d %d\" % (self.Machine[\"sysbus.timer1\"].Collections, self.Machine[\"sysbus.timer8\"].Collections))"'
+    run_case gconce pwm "$n" 'emulation RunFor "0.0001"' "$n" 'emulation RunFor "0.0001"' "$n" 'machine Reset' 'emulation RunFor "0.0001"' "$n"
+    check "gconce: each timer guard forces one full collection, at the machine's first start: 0 0 before it, 1 1 after it, after a pause and resume, and after a reset and a start" \
+      "[ \"\$(tr -d '\\r' < '$work/gconce/renode.out' | grep -o '^R-GC [0-9]* [0-9]*' | tr '\\n' ,)\" = 'R-GC 0 0,R-GC 1 1,R-GC 1 1,R-GC 1 1,' ]" ;;
   regen)
     rc=0; python3 -I "$src/tests/1302/fields.py" "$src/tests/1302/data/rm0433-rev9-tim18-fields.tsv" > "$work/fields.cs" || rc=$?
     check "regen: the guard's Fields table regenerates from tests/1302/data by tests/1302/fields.py, byte for byte (RUL-16)" \

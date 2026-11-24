@@ -234,3 +234,5 @@ TM28-halfShift	model/GuardedSTM32_Timer.cs	| ((value & mask) << shift);	| (value
 TM29-stockSeesEnable	model/GuardedSTM32_Timer.cs	b == CcerOffset ? word | AllOutputs : word	word	timer-reenable
 TM30-restateTim8	model/stm32h7-gpio-restate.repl	tviburiTimer8:\n    0 -> tviburiGpioA#05@03	timer8:\n    0 -> tviburiGpioA#05@03	timer-tim8on
 TM31-regen	model/GuardedSTM32_Timer.cs	the stock model: the auto-reload value; probed (T1)	the stock model: the auto-reload value	timer-regen
+TM32-gcUnsubscribe	model/GuardedSTM32_Timer.cs	            ((Machine)machine).StateChanged -= CollectAtStart;\n	(empty)	timer-gconce
+TM33-gcSubscribe	model/GuardedSTM32_Timer.cs	                m.StateChanged += CollectAtStart;	                ;	timer-gconce

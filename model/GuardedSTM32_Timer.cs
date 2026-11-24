@@ -66,14 +66,34 @@ namespace Antmicro.Renode.Peripherals.Tviburi
             }
             connections = Enumerable.Range(0, Channels).ToDictionary(i => i, i => (IGPIO)outs[i]);
             records = new Records(machine, this, nameof(GuardedSTM32_Timer), mode);
-            // A deliberate, load-time-only side effect (ruled 2026-11-24T10:30Z (A)): one full, blocking, compacting
-            // collection. The platform is loaded after the overlay's compile and before emulation, so this reclaims the
-            // compile's garbage, which otherwise stays in gen2 through the consumer's boot and counts in its peak
-            // (measured: +22 MB of managed heap after `include` and `mach create`, +0.4 MB after a full GC; ArduPilot's
-            // boot +35.6 MiB at the median over main, +11.6 with one full GC on both sides; TVI-WO-1302.FEEDBACK.md
-            // §8). Each instance collects once, so TIM1 and TIM8 make two, tens of milliseconds at load. It changes no
-            // virtual time, no access and no record.
+            if(machine is Machine m)
+            {
+                m.StateChanged += CollectAtStart;
+            }
+        }
+
+        // The number of full collections this instance has forced: 1 once the machine has started, never more
+        // (tests/1302/timer.sh `gconce`).
+        public int Collections { get; private set; }
+
+        // A deliberate, load-time-only side effect (ruled 2026-11-24T10:30Z (A); at the first start, 10:55Z): one full,
+        // blocking, compacting collection when the machine first starts, after the overlay's compile and the platform's
+        // load and before any guest instruction. It reclaims their garbage, which otherwise stays in gen2 through the
+        // consumer's boot and counts in its peak (measured: +22 MB of managed heap after `include` and `mach create`,
+        // +0.4 MB after a full GC; ArduPilot's boot +35.6 MiB at the median over main, +11.6 with one full GC on both
+        // sides, +27.7 with the collection in the constructor, which runs during the platform's load;
+        // TVI-WO-1302.FEEDBACK.md §8). Each instance collects once and then unsubscribes, so TIM1 and TIM8 make two,
+        // tens of milliseconds at the start; a pause and resume or a reset does not collect again. It changes no virtual
+        // time, no access and no record.
+        private void CollectAtStart(IMachine machine, MachineStateChangedEventArgs args)
+        {
+            if(args.CurrentState != MachineStateChangedEventArgs.State.Started)
+            {
+                return;
+            }
+            ((Machine)machine).StateChanged -= CollectAtStart;
             GC.Collect(GC.MaxGeneration, GCCollectionMode.Forced, true, true);
+            Collections++;
         }
 
         // The platform's routes bind here (measured: the probe of TVI-WO-1302.measure.md §2.3), not to the stock lines.
