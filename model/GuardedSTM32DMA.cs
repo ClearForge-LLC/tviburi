@@ -37,12 +37,16 @@
 //                     TRBUFF) and FCR's FTH and FEIE carry no such line and take the write (ruled Q2: p665's "forbidden to
 //                     write these registers when the EN bit is read as 1" would refuse every disable, which RM0433 tells
 //                     software to make). In recorded mode the protected fields keep their old values, as on silicon.
-//   TVI-DMA-DONE      the same write once the twin has completed the transfer and EN is still set. unmodeled (Q3 (c)).
+//   TVI-DMA-DONE      the same write once the twin has completed the transfer and EN is still set; and any CR write with
+//                     EN = 1 then, changed or not: silicon cleared EN at the end of the transfer (p665), so on silicon that
+//                     write starts a new transfer, reloading NDT, which the twin does not make. unmodeled (Q3 (c)).
 //   TVI-DMA-FIELD     the allow-list (`Fields`): a field given a value the model does not implement, or a write to an
 //                     offset with no register. unmodeled.
 //   At the write that sets EN (0 -> 1), on the stream's configuration as the copies and the stock model then hold it, with
 //   NDT items of PSIZE bytes on each side that increments (one item on a side that does not; from memory: NDT counts
 //   peripheral-size items, and direct mode forces MSIZE to PSIZE, p663); NDT = 0 addresses nothing (p665):
+//   TVI-DMA-RELOAD    NDT = 0 after a non-zero NDT was programmed: silicon reloads the programmed value when the stream is
+//                     enabled again (p665), and the stock model never reloads, so the twin would move nothing. unmodeled.
 //   TVI-DMA-ADDRESS   a span that wraps past 0xFFFF_FFFF. unmodeled.
 //   TVI-DMA-TCM       a span with a byte in ITCM (0x0000_0000-0x0000_FFFF) or DTCM (0x2000_0000-0x2001_FFFF): DMA1/DMA2's
 //                     memory and peripheral buses reach every internal memory "except ITCM and DTCM" (§2.1.6 p108; Table 7
@@ -263,6 +267,10 @@ namespace Antmicro.Renode.Peripherals.Tviburi
             {
                 fcr[s] = (word & FcrWritable) | FcrEmpty;   // FS is read-only: 100, FIFO empty (p667)
             }
+            else if(r == NdtrOffset)
+            {
+                programmed[s] = word & 0xFFFF;
+            }
             inner.WriteDoubleWord(offset, word);
         }
 
@@ -272,6 +280,7 @@ namespace Antmicro.Renode.Peripherals.Tviburi
             {
                 cr[i] = 0;
                 fcr[i] = FcrReset;
+                programmed[i] = 0;
             }
         }
 
@@ -310,7 +319,8 @@ namespace Antmicro.Renode.Peripherals.Tviburi
             var mask = Protected(r);
             var old = Served(offset);
             var changed = (word ^ old) & mask;
-            if(changed == 0)
+            var restart = state == Completed && r == CrOffset && (word & EnBit) != 0;
+            if(changed == 0 && !restart)
             {
                 return false;
             }
@@ -320,7 +330,9 @@ namespace Antmicro.Renode.Peripherals.Tviburi
                 reg + " bits 0x" + changed.ToString("X8") + " of stream " + s + " (EN = 1, " + (running ? "running" : "completed in the twin") + ")",
                 running
                     ? reg + " written with a change to bits that can be written only while the stream is disabled: silicon ignores the write, so the stream does not do what the firmware wrote"
-                    : reg + " written with a change to bits that can be written only while the stream is disabled, after the twin completed the transfer and with EN still set: silicon may still be transferring (the twin completes a memory-to-peripheral transfer at once) or done and disabled, and the twin cannot say which",
+                    : changed == 0
+                        ? reg + " written with EN = 1 after the twin completed the transfer: silicon cleared EN at the end of the transfer, so this write starts a new transfer with NDT reloaded, which the twin does not make"
+                        : reg + " written with a change to bits that can be written only while the stream is disabled, after the twin completed the transfer and with EN still set: silicon may still be transferring (the twin completes a memory-to-peripheral transfer at once) or done and disabled, and the twin cannot say which",
                 "RM0433 Rev 9 " + Citation(r) + "; §15.5.5 p665 (EN)", State(s), offset, word, 32);
             word = (word & ~mask) | (old & mask);
             return true;
@@ -377,6 +389,16 @@ namespace Antmicro.Renode.Peripherals.Tviburi
             var items = (ulong)Items(s);
             var size = 1ul << (int)((word >> 11) & 3);
             var refused = false;
+            if(items == 0 && programmed[s] != 0)
+            {
+                refused = Refuse(offset, s, word, "TVI-DMA-RELOAD", Unmodeled, "DMA_S" + s + "NDTR.NDT = 0 (programmed " + programmed[s] + ")",
+                    "stream " + s + " enabled again with NDT = 0 after " + programmed[s] + " items were programmed: silicon reloads the programmed value when the stream is enabled again and transfers it, and the stock model never reloads, so the twin would move nothing",
+                    "RM0433 Rev 9 §15.5.6 p665 (NDT)");
+                if(!records.Recorded)
+                {
+                    return true;
+                }
+            }
             if(items != 0)
             {
                 var par = inner.ReadDoubleWord(b + ParOffset);
@@ -623,6 +645,8 @@ namespace Antmicro.Renode.Peripherals.Tviburi
         private readonly Records records;
         private readonly uint[] cr = new uint[Streams];
         private readonly uint[] fcr = new uint[Streams];
+        // The NDT software last wrote to each stream, which silicon reloads at a re-enable (p665).
+        private readonly uint[] programmed = new uint[Streams];
         private string config;
 
         private const int Streams = 8;

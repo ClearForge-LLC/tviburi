@@ -31,6 +31,10 @@
 //!   path="sharedx"  - DMA1 S0 P2M on 41 running, then DMA2 S0 (channel 8) on 41: TVI-DMA-SHARED across controllers.
 //!   path="request"  - P2M on 61 (spi3_rx_dma: no model raises it): TVI-DMA-REQUEST, unmodeled.
 //!   path="txother"  - M2P on 44 (usart2_tx_dma: not acknowledged): TVI-DMA-REQUEST, unmodeled.
+//!   path="reload"   - M2M AXI to AXI, 4 words (completed at EN), disabled, then enabled again without NDTR: silicon
+//!                     reloads NDT = 4 (p665), the stock model never does: TVI-DMA-RELOAD, unmodeled.
+//!   path="reassert" - M2P on 42 (completed at EN), then CR written again unchanged with EN = 1: silicon cleared EN at the
+//!                     end (p665), so this starts a new transfer the twin does not make: TVI-DMA-DONE, unmodeled.
 #![no_std]
 #![no_main]
 #![allow(dead_code)]
@@ -237,6 +241,19 @@ pub unsafe extern "C" fn reset() -> ! {
     {
         cfg(DMA1, 0, 0, Some(44), USART1_TDR, SRAM4, 4, M2P);
         en(DMA1, 0);
+    }
+    #[cfg(path = "reload")]
+    {
+        cfg(DMA1, 0, 0, None, AXI, AXI + 0x1000, 4, M2M);
+        en(DMA1, 0);
+        w(s(DMA1, 0, CR), M2M);
+        en(DMA1, 0);
+    }
+    #[cfg(path = "reassert")]
+    {
+        cfg(DMA1, 0, 0, Some(42), USART1_TDR, SRAM4, 4, M2P);
+        en(DMA1, 0);
+        w(s(DMA1, 0, CR), r(s(DMA1, 0, CR)));
     }
     spin();
     write_volatile(MARK_AFTER, 0xAF7E_0002);

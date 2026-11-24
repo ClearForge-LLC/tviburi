@@ -10,7 +10,7 @@ set -euo pipefail
 
 here=$(cd "$(dirname "$0")/../.." && pwd)
 IMAGE=$(sed -n 's/^IMAGE=//p' "$here/tests/spike.sh")
-CASES="axi tcm itcm partcm below wrap unmapped ndt0 en enoff done same disable width read field msize16 route0 route54 mux shared sharedx request txother fields ledger registrations irq config recorded reset clock regen restate"
+CASES="axi tcm itcm partcm below wrap unmapped ndt0 reload reassert en enoff done same disable width read field msize16 route0 route54 mux shared sharedx request txother fields ledger registrations irq config recorded reset clock regen restate"
 GUARDS="spi1 rcc gpioPortA gpioPortB gpioPortC gpioPortD gpioPortE gpioPortF gpioPortG gpioPortH gpioPortI gpioPortJ gpioPortK timer1 timer8 dma1 dma2"
 MONITOR="fields ledger registrations irq config recorded reset clock regen restate"
 # The planted firmware's paths: every case but the monitor-driven ones.
@@ -106,6 +106,10 @@ for t in ${TVIBURI_TESTS:-$CASES}; do
   unmapped) check "unmapped: a span in Table 7's reserved 0xA0000000 refuses TVI-DMA-ADDRESS, unmodeled (p130; ruled Q4)" \
     "refuses unmapped TVI-DMA-ADDRESS unmodeled 'r[\"bit\"] == \"DMA_S0M0AR = 0xA0000000 (0xA0000000)\"'" ;;
   ndt0) check "ndt0: NDT = 0 with M0AR in DTCM passes: no item is addressed (p665)" "passes ndt0" ;;
+  reload) check "reload: a stream enabled again with NDT = 0 after 4 items were programmed refuses TVI-DMA-RELOAD, unmodeled (p665: silicon reloads; the stock model does not)" \
+    "refuses reload TVI-DMA-RELOAD unmodeled 'r[\"bit\"] == \"DMA_S0NDTR.NDT = 0 (programmed 4)\" and \"p665\" in r[\"citation\"]'" ;;
+  reassert) check "reassert: CR written unchanged with EN = 1 after the twin completed the transfer refuses TVI-DMA-DONE, unmodeled (silicon starts a new transfer, p665)" \
+    "refuses reassert TVI-DMA-DONE unmodeled '\"starts a new transfer\" in r[\"condition\"]'" ;;
   en) check "en: PAR rewritten while a stream runs refuses TVI-DMA-EN, predicted-fault (p666)" \
     "refuses en TVI-DMA-EN predicted-fault 'r[\"register\"] == \"DMA_SxPAR\" and \"running\" in r[\"bit\"] and \"p666\" in r[\"citation\"]'" ;;
   enoff) check "enoff: one CR write clearing EN and changing DIR on a running stream refuses TVI-DMA-EN (judged against the state before it)" \
