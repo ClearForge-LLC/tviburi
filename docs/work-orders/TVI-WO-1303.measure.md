@@ -94,7 +94,7 @@ Nothing has been run in this work order.
 | DMA1 S2; — | 39 `spi2_rx_dma` | P→M | 2,354 | `0x10416`/`0x10016`, `0x411`/`0x11`, `0x400`, `0` | `0x3800_2080`… (SRAM4) | `0x4000_3830` |
 
 - **Every address is in SRAM4 or a peripheral. None is in ITCM or DTCM** (and none in AXI SRAM or SRAM1–3: §3 marks P4). SRAM4 is "internal memory" that DMA1/DMA2 reach (p108).
-- **The order, every enable:** `FCR` = `0x21`, `PAR`, `M0AR`, `NDTR`, `CR` = mode with `EN` 0, then `CR` with `EN` 1. **No configuration field is written while its stream's `EN` (as written) is 1.** The DMAMUX1 channel is written before the stream's first `PAR` each time.
+- **The order, every enable:** `FCR` = `0x21`, `PAR`, `M0AR`, `NDTR`, `CR` = mode with `EN` 0, then `CR` with `EN` 1. **No configuration field is written while its stream's `EN` (as written) is 1.** **Every `EN` rise finds a non-zero, unreserved id on its stream's DMAMUX1 channel, never one held by another enabled channel** (2,775 rises on the fixture, 63 on AP-m, checked in log order by `h/dma-en-mux.py`). The channel is written in the same quantum as the stream's first `PAR`, sometimes after it.
 - **Every disable is one `CR` write** from `EN` = 1 that clears `EN` and `TCIE` together (`0x451` → `0x440`; `0x411` → `0x400`), then a wait reading `CR` (`S2CR`/`S3CR` 11,770 reads each). **`TCIE` carries no "protected" line (p664), but p665's sentence forbids writing the register while `EN` reads 1** (§5 Q2).
 - **ChibiOS sets `EN` by read-modify-write, and the stock model's tags read 0,** so `CR` = `0x10446` (`PL` = 01, `TEIE`, `DMEIE`) reads back `0x440` and is rewritten `0x441`. On silicon the stream runs with `PL` = 01, `TEIE`, `DMEIE` and (UART streams) `TRBUFF`; in the twin with all four 0. Neither is modeled, so no behaviour differs today; a guard serving `CR` from its copy (`RUL-17`) makes the read-back silicon's.
 - **Before the clocks (0.92 ms):** 20 writes, `S0CR`–`S7CR` = 0 on both controllers and `LIFCR`/`HIFCR` = `0xFFFF_FFFF`, each dropped by the bus lock with a `WARNING` naming address and value (unlocked: the stock model takes the `CR` zeros and warns on `LIFCR`'s reserved and tagged bits). All are reset values.
@@ -119,7 +119,7 @@ Nothing has been run in this work order.
 | D13 | one id on two channels, raised once | both channels see it | allowed only if the two streams are never active together (p704) |
 | D14 | byte and half-word writes to DMA1 | dropped (`WARNING`) | "accessed by words" (p659) |
 
-**Requests the stock models can raise.** In the stock include chain: `cryp` (77), `spi4` (83), the ADCs (9, 115). **The consumer's own platforms add `spi1` `DMARecieve -> dmamux1@37` and `spi2` `-> @39`** (12 of the 14 generated platforms wire `@37` and 4 of them `@39`; both ArduPilot platforms wire `@37`, the fixture `@39` too; §3 marks P2). The generated firmware never enables a stream, so only ArduPilot uses them, and the stock SPI model raises them: 552 (SPI1) and 25,073 (SPI2) requests in ArduPilot's 5 s. **Nothing raises `usart1_rx_dma` (41):** ArduPilot's USART1 RX stream is enabled once and never moves a byte. **No timer, I2C or other USART request exists.**
+**Requests the stock models can raise.** In the stock include chain: `cryp` (77), `spi4` (83), the ADCs (9, 115). **The consumer's own platforms add `spi1` `DMARecieve -> dmamux1@37` and `spi2` `-> @39`** (12 of the 14 generated platforms wire `@37` and 4 of them `@39`; both ArduPilot platforms wire `@37`, the fixture `@39` too; §3 marks P2). The generated firmware never enables a stream, so only ArduPilot uses them, and the stock SPI model raises them: 552 (SPI1) and 25,073 (SPI2) requests in ArduPilot's 5 s. **Nothing raises `usart1_rx_dma` (41):** ArduPilot's USART1 RX stream is enabled once and never moves a byte (at the end of both 5 s boots, `S0CR` = `0x411`, still enabled, and `S0NDTR` = `0x40`, as written). **No timer, I2C or other USART request exists.**
 
 ### 2.3 The form (M3)
 
@@ -132,7 +132,7 @@ Nothing has been run in this work order.
 ### 2.4 Consumer observers each write reaches
 
 - **Generated boots:** none (no access).
-- **ArduPilot's console.** Aethelgard logs `usart1`'s accesses and reads the serial output from them. **USART1 TX is a DMA stream:** its 547 `TDR` byte writes in 5 s are the stock model's synchronous copy at each `EN` write, and the access log stamps each with the PC of that `CR` store (`0x080FA1FA`). **A guard that refused, deferred or paced those transfers would change what the consumer reads.**
+- **ArduPilot's USART1 access log.** Aethelgard's foreign boot logs `usart1`'s accesses, for the width of each configuration write (`renode/foreign.rs` L859–862, `AET-WO-2311` D2). **USART1 TX is a DMA stream:** its 547 `TDR` byte writes in 5 s are the stock model's synchronous copy at each `EN` write, and land in that log stamped with the PC of the `CR` store (`0x080FA1FA`). I found no reader of those `TDR` lines in the foreign verdict (`foreign.rs` has none; the generated boards' serial witnesses read `TDR`, written there by the CPU), so **that the consumer judges ArduPilot's console is not shown.** The log's lines are still what a guard that refused, deferred or paced the transfers would change.
 - **ArduPilot's sensors.** SPI1 (19 exchanges, at 0.16 s) and SPI2 (2,354, the IMU, from 4.35 s) run by DMA, with the RX side paced by the stock SPI's requests. Their results reach the consumer only through ArduPilot's own behaviour and console.
 - **The boot block** reads `USART1_CR3` under a mask without `DMAR`/`DMAT`, and no DMA register (Aethelgard `twin/src/boot.rs` L938).
 - **The motor witness** names "a DMA write of `CR1` is not observed" (`aethelgard-cli/src/renode.rs` L3471): it anchors only on CPU stores. No firmware writes a timer by DMA.
@@ -152,7 +152,7 @@ Nothing has been run in this work order.
 
 | Prediction | Verdict |
 |---|---|
-| P1 | held; the TCM restriction is in the held text (p108), so §7's third stop does not fire |
+| P1 | held; the TCM restriction is in the held text (§2.1.6 p108, read from the rendered page), so §7's third stop does not fire. **One page corrected:** §2.1.2 (TCM buses) is p106, not p105 (rendered; the text layer drops p105's footer, a figure page) |
 | P2 form, transfers, tags, DMAMUX1 accepting any id, never locked | held (D0–D14) |
 | P2 "re-fires on a rewrite with `EN` = 1" | held (D3) |
 | P2 **requests** | **wrong in part:** the consumer's platforms wire SPI1/SPI2 RX (37, 39), and those streams run; USART, timer and I2C requests are absent as predicted |
@@ -167,7 +167,7 @@ Nothing has been run in this work order.
 | P4 USART1 RX never moves; TX moves at `EN` | held |
 | P4 "SPI RX never completes" | **wrong:** it runs (the consumer wires the request) |
 | P5 | held |
-| P6 | held in kind; the observer the guard can reach is USART1 TX's console bytes (§2.4) |
+| P6 | held in part: no observer reads a DMA register; the bytes USART1 TX's stream moves land in the consumer's `usart1` access log, which it keeps for configuration widths; that it judges them as ArduPilot's console is not shown (§2.4) |
 | P7 | held: a silent drop, not a refusal |
 | P8 | held (§2.3); the routes need no DMAMUX1 restatement |
 | P9 | **wrong in size:** +8.0 MiB for the thin wrapper, not "under +5" (§4) |
@@ -182,12 +182,13 @@ Nothing has been run in this work order.
 | `main` + the wrapper as `dma1`/`dma2` | 973,580; 1,005,148; 982,160; 989,140; 981,364; 998,744; 1,016,592; 1,013,512; 1,012,788; 989,620; 1,080,308 | 998,744 |
 
 `MEDIANS main 990584 KiB, branch 998744 KiB, difference 8160 KiB (+8.0 MiB)`, **PASS**. Every boot counted; every branch boot is under the 1,572,864 KiB ceiling. One main boot (10) peaked at 1,818,296 KiB, all of it anonymous memory (`RssAnon` 1,728,492), with a wall of 40.1 s against about 11 s for the others: the roadmap's row "Renode's peak memory rises with wall time" on a contended host. The ceiling is judged on the branch's boots, so it does not count; it is reported, not explained.
-- **More than P9's "under +5".** The thin wrapper is two instances of a small class, so most of the +8.0 is the class's compiled code, which the collection cannot reclaim. **The built guard will cost more** (rules, a field table, records), and `1302`'s like-for-like +11.6 MiB is the nearest measured guide. The build reports the budget again, in CI.
+- **More than P9's "under +5", and not attributed.** At this load the boots spread by about ±15 MiB around each median, and the +0.6 MiB noise floor (main against main, eleven boots) is `1302`'s, measured at a lower load; I did not rerun it. **The built guard will cost more** (rules, a field table, records), and `1302`'s like-for-like +11.6 MiB is the nearest measured guide. The build reports the budget again, in CI.
 - **The form control, from the same boots:** in all 11 pairs, ArduPilot's USART1 `TDR` writes (547, with their stamps, PCs and values: what the consumer reads as the console) and the boot block (instruction count included) are **identical** between `main` and the wrapper (`h/form-control.sh`). The wrapper changes nothing the consumer reads.
+- **A second wrapper serving `CR` and `FCR` from copies** (Q6: every `CR` field but `EN` from what software wrote, `EN` from the stock model; `FCR` reset `0x21`), five boots a side: the stock model's warnings for `PL`/`TEIE`/`DMEIE` writes doubled (4,746 to 9,492 in a boot), so ChibiOS's read-modify-write now writes those fields back as on silicon, and **the console bytes and the boot block are again identical in all 5 pairs.** Its budget, `MEDIANS main 987968 KiB, branch 1002204 KiB, difference 14236 KiB (+13.9 MiB)`, PASS, is a five-boot figure, which `1302` measured as too noisy to rank against the eleven-boot +8.0.
 
 ## 5. The stop (WO §1.1, §7), and the questions
 
-**No §7 stop fires on the measurement as it stands.** The TCM restriction is in the held text (p108). Neither firmware gives a stream a TCM address, writes a protected field under `EN`, or routes a reserved request (§2.1). **Three readings would make ArduPilot's boot refuse on a path RM0433 calls valid,** so each is a question, not a build choice: Q2 (p665's general sentence), Q3 (`EN` as the stock model holds it) and Q5 (c) (a request no model raises).
+**No §7 stop fires on the measurement as it stands.** The TCM restriction is in the held text (p108). Neither firmware gives a stream a TCM address, writes a protected field under `EN`, or routes a reserved request (§2.1). **Two readings would make ArduPilot's boot refuse on a path RM0433 calls valid,** so each is a question, not a build choice: Q2 (p665's general sentence) and Q5 (c) (a request no model raises). Q3 decides whether the second refusal can fire at all for two of the three directions.
 
 **Q1. The form.** `STM32DMA` is sealed (§2.3).
 - **Proposal:** a wrapper for `dma1` and `dma2`, restated as `1302` did for the timers. Each is cancelled, declared `as "dmaN"` on `tviburiRcc` with the stock entry's interrupt lines, and given the routes by an untyped `dmamux1:` update.
@@ -195,7 +196,8 @@ Nothing has been run in this work order.
 - **DMAMUX1's own gaps become rows:**
   - a write with both clocks off is taken (p455, p373; D1b);
   - byte and half-word writes are dropped, though silicon takes them (p708; D12);
-  - its synchronisation, event and generator fields are tags (Q6 refuses them at the stream's enable).
+  - its synchronisation, event and generator fields are tags (Q5 (d) refuses them at the stream's enable);
+  - **a `CxCR` rewrite under a live stream is unseen:** the rules run at the enable, so a channel rerouted, or a second channel given the same id, while its stream runs (WO §5) is not checked. The routing itself stays the stock model's, which follows the rewrite as silicon does.
 - **Ask:** accept this form, or guard DMAMUX1 itself? Guarding it means cancelling and restating it, with every consumer reference to `dmamux1` repointed.
 
 **Q2. Writes under `EN`: per field, or p665's sentence.**
@@ -212,14 +214,15 @@ Nothing has been run in this work order.
   - `EN` set together with a protected change, from `EN` = 0, is a configuration and passes. From `EN` = 1, the change refuses.
 
 **Q3. What "enabled" means.**
-- **The gap.** The stock model never clears `EN` (D2), while silicon clears it at the end of a transfer, "stream ready to be configured" (p665).
-- **The false refusal.** A rule keyed on the stock's `EN` refuses a firmware that reprograms a stream after it completed without writing `EN` = 0. That is valid on silicon. Neither firmware does it, and a planted one would.
-- **Recommendation:**
-  - the guard clears `EN` when the owned model completes the transfer, writing `EN` = 0 into the stock `CR` and serving `EN` from its copy. Completion is `NDT` reaching 0; a memory-to-peripheral or memory-to-memory transfer completes at the `EN` write itself (D2);
-  - the rule keys on that `EN`;
-  - **the price is a row:** the stock model compresses a memory-to-peripheral transfer into the `EN` instant, so a write silicon would see mid-transfer lands after completion in the twin, and passes.
-- **Not measured: whether clearing `EN` changes ArduPilot's run.** ChibiOS clears `EN` itself after every transfer and waits on it (§2.1). The build re-runs both ArduPilots recorded and compares the console bytes and the boot block with `main`, and **stops if any differs**.
-- **Ask:** model the clear as proposed, or key the rule on `EN` as written and accept the false refusal as a row?
+- **The gap.** The stock model never clears `EN` (D2), while silicon clears it at the end of a transfer, "stream ready to be configured" (p665). The stock model also completes a memory-to-peripheral or memory-to-memory transfer inside the `EN` write itself (D2, D9), where silicon takes as long as its requests do.
+- **(a) `EN` as written** (the stock's). Q2's rule fires for every direction. It refuses a firmware that reprograms a stream after a completed transfer without writing `EN` = 0, which is valid on silicon. **Neither firmware does that** (§2.1), so it refuses nothing either firmware does; a planted valid firmware would meet a false `predicted-fault`.
+- **(b) `EN` cleared at the twin's completion,** written into the stock `CR`. **Then Q2's rule can never fire for memory-to-peripheral or memory-to-memory:** `EN` is 0 as soon as the `EN` write returns. The WO's second refusal would exist for peripheral-to-memory only. It also changes what `CR` reads on ArduPilot's live path.
+- **(c) Recommended: three states, `EN` read as the stock holds it.**
+  - **Running** (software set `EN`, and the twin's transfer has not completed: `NDT` > 0): a changed protected field is a `predicted-fault` (Q2).
+  - **Completed in the twin, `EN` still set by software:** a changed protected field is `unmodeled`. Silicon may still be mid-transfer (a paced memory-to-peripheral transfer) or done; the twin compressed the transfer and cannot say.
+  - **`EN` = 0:** the write passes.
+  - Nothing changes on ArduPilot's path: it never writes a protected field with `EN` set (§2.1). The stock's `EN` is a `stock-wrong` row (p665).
+- **Ask:** (a), (b) or (c)?
 
 **Q4. TCM (`predicted-fault`, p108, Table 7 p131).**
 - **The rule:** at the write that sets `EN` (0 → 1), refuse if any byte the stream would address lies in ITCM (`0x0000_0000`–`0x0000_FFFF`) or DTCM (`0x2000_0000`–`0x2001_FFFF`). The record names the stream, the address, the region and p108.
@@ -241,7 +244,7 @@ Nothing has been run in this work order.
 - **(c) A valid id that no model raises** (every id except 37, 39, 77, 83, 9 and 115 on the measured platforms). ArduPilot enables USART1 RX on id 41 at 3.1 ms.
   - Refusing it `unmodeled` refuses ArduPilot's boot.
   - **Recommendation:** a ledger row acknowledged by name (`RUL-17`): a peripheral-to-memory stream on a request no model raises moves no data in the twin, so a firmware that receives by DMA sees no reception.
-  - A memory-to-peripheral stream on a valid id moves at `EN`, unpaced. That is a second row (`stock-wrong`). ArduPilot's USART1 and SPI TX depend on it, and the consumer reads USART1 TX's bytes (§2.4).
+  - A memory-to-peripheral stream on a valid id moves at `EN`, unpaced. That is a second row (`stock-wrong`). ArduPilot's USART1 and SPI TX depend on it, and USART1 TX's bytes land in the consumer's `usart1` log (§2.4).
   - The USART RX request belongs to a USART guard (the `OQ-03` arming path).
   - **Ask:** acknowledge both, or refuse?
 - **(d) `unmodeled`** for ids 1–8 (DMAMUX1's request generators, all tags) and for a channel whose `SE`, `EGE`, `SOIE`, `SPOL`, `NBREQ` or `SYNC_ID` is non-zero.
@@ -272,7 +275,7 @@ Nothing has been run in this work order.
   - `FEIE`;
   - `DIR` = 11 and `PSIZE`/`MSIZE` = 11 (reserved).
 - **`unmodeled` for any byte or half-word access** to DMA1/DMA2 ("accessed by words", p659; `1302`'s `TVI-TIM-WIDTH` precedent).
-- **Served from copies on read:** every `CR` field, so ChibiOS's read-modify-write keeps `PL`, `TEIE`, `DMEIE` and `TRBUFF` as on silicon (§2.1), and `FCR`.
+- **Served from copies on read:** every `CR` field but `EN`, so ChibiOS's read-modify-write keeps `PL`, `TEIE`, `DMEIE` and `TRBUFF` as on silicon (§2.1), and `FCR` (reset `0x21`). Measured on ArduPilot with a scratch wrapper: no observer changes (§4).
 - **Neither firmware writes a field this list refuses,** so I predict 0 DMA `would-refuse` on ArduPilot's recorded boot.
 
 **Q7. The clock (WO (2)).**
@@ -294,6 +297,7 @@ Nothing has been run in this work order.
 - **(c) The class row.** "The class row naming its instances" is `tools/tviburi-release`'s reader and `pins.tsv`, with a manifest test. I read it as `class DMA.STM32DMA Tviburi.GuardedSTM32DMA dma1 dma2`, applied to this row only. Rewriting the timer and SPI rows is left alone, which keeps it inside the fence.
 
 **Rows, outside this WO:**
+- **No Sentinel-03 ArduPilot was attempted** (`4410` may now let its hwdef emit). It would be the first board with motors and an IMU, but an ArduPilot motor output is PWM until Aethelgard's defaults set `MOT_PWM_TYPE` (`1302`), so it would not raise timer DMA either.
 - **ArduPilot's USART RX has no request source.** No model raises `usart1_rx_dma`: a USART guard's, with `OQ-03`'s arming.
 - **The twin does not pace memory-to-peripheral transfers.** A transfer completes at `EN`, with no request needed (D2, D9). DShot's unwitnessability is one consequence.
 - **Hi-Z and errors.** No transfer error, FIFO error, direct-mode error or half-transfer is ever raised.
