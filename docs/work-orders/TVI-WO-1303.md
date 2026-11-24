@@ -32,7 +32,7 @@
 >     - a stream enabled with a memory address DMA1/DMA2 cannot reach (DTCM, ITCM), cited;
 >     - a configuration field written while its stream's `EN` = 1, where RM0433 says the write is ignored or forbidden, cited by page (the field takes silicon's behaviour);
 >     - a request routed through DMAMUX to a peripheral that does not exist, cited.
->   - **The clock:** an access while the DMA clock is off already refuses through `1300a`'s lock. Do not duplicate it; show the case is covered.
+>   - **The clock** (*corrected 2026-11-24 at the §1.1 ruling; the original sentence, "already refuses through `1300a`'s lock", was wrong*): an access with `DMA1EN`/`DMA2EN` = 0 is dropped with no record, which is silicon's ignored write (p373), not a refusal. Do not duplicate `1300a`'s lock; show the drop and the absence of any record in a test, and name it covered as silicon-faithful.
 >   - **`unmodeled`:** every other field outside the allow-list (`RUL-17`), double-buffer mode and FIFO thresholds included, unless a consumer needs them.
 > - **(3) The timer's DMA side:** with the DMA guard in place, decide from the measurement whether `TIMx_DIER.UDE`, `CCxDE` and `DCR`/`DMAR` can move from `1302`'s `unmodeled` to modeled.
 >   - If they can, build it.
