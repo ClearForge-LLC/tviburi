@@ -73,3 +73,129 @@ Nothing has been run in this work order.
 
 ### P9. Memory (`1201`'s budget, like for like)
 - A thin wrapper for the eight USART/UARTs (not `lpuart1`): +5 to +12 MiB at the median, eleven boots a side, as 1303's thin wrapper (+8.0).
+
+## 1. How it was measured (after §0 was committed at `dff6e77`)
+
+**Image:** `aethelgard-tools@sha256:1e0ab105…`, the digest Aethelgard `main` `fa12abf4` pins (`container/IMAGE`, fetched this session). Renode `1.17.0+20260907gitf1dd1b4af.aet1605`. One container at a time, under `~/bin/capped-run`, `nice -n 10`, `--network none`.
+**Evidence:** `~/.cache/tvi-1305/` (`m1/`, `probe/`, `budget/`, `arm-usart-writes.txt`, the scripts in `h/`), kept until the architect says.
+
+| Run | What | How |
+|---|---|---|
+| **M1** | the 14 generated boots, each replayed on `main`'s release (every guard recorded), the nine UARTs access-logged, each UART's `CR1` `CR2` `CR3` `BRR` `GTPR` `RTOR` `ISR` read after `RunFor` | `h/replay-u.sh` (the committed `tests/1301/replay-1301.sh` plus the logging; `diff` in the script's header) over 1303's captures at Aethelgard `1cb994c1`, which hold today's firmware and platforms (§0). Analysed by `h/ue-analyse.py` |
+| **AP** | ArduPilot: the committed fixture (`aet-1c32c8ea-ardupilot`, ELF `a799dfb6`, `sentinel-02-own`), 5 s | as M1 |
+| **ARM** | the armed run: Aethelgard `4400h`'s `s03-arm-s` (Sentinel-03, ELF `dbf598d8`, 13 s, armed at 9.0 s, `ReceiveDmaRequest -> dmamux1@41` added, `sysbus LogAllPeripheralsAccess` with reads dropped) | **not re-run:** its access log (`~/.cache/aet-4400h/run/s03-arm-s/console.txt.gz`, the 4400h builder's evidence, read-only) is the run the WO names. The ELF there hashes `dbf598d8…`, as `RESULTS.md` records |
+| **M2** | the stock `STM32F7_USART` by probe | monitor-driven on `main`'s Nucleo board, `usart1`, its receive request wired to `dmamux1@41`, the RCC and DMA1 guards recorded (`probe/probes.body`, U0–U16) |
+| **M3** | the form | the same body through a scratch wrapper (`probe/ProbeSTM32F7_USART.cs`: owns an unregistered `STM32F7_USART`; forwards every access, `IRQ`, `ReceiveDmaRequest`, the `IUART` surface and reset; a nested `Registers` enum; no rule), the eight USART/UARTs cancelled and restated (`probe/stm32h7-usart-restate.repl`) |
+| **B** | the one-file memory, by `1201`'s budget | `tests/1301/ci-memory.sh`, eleven boots a side, interleaved, main against a scratch tree carrying M3's wrapper as all eight instances, whose replay moves the consumer's untyped `usartN:`/`uartN:` blocks onto the wrappers |
+
+## 2. Results
+
+### 2.1 The field table, in order against `UE`, `TE` and `RE` (M1, AP, ARM)
+
+"Under `UE` = 1" means the last `CR1` written had `UE` = 1. A change is a protected field (P1's masks: `CR1` `0x33FF9E00`, `CR2` `0x000FFF30`, `CR3` `0x003EFB3E`, `BRR`/`GTPR` whole) whose value differs from the last word written. A write from a read-modify-write site is taken as a guard serving copies would see it: the word written plus the previous copy's bits the stock model drops (P4; `h/ue-analyse.py`).
+
+**The 14 generated boots** (100 ms). Ten write a USART; four write none (`motors-dshot600`, `motors-pwm`, `sentinel-02-bench`, `sentinel-02-bench-hse8`).
+
+| Board | Ports | Each port's writes, in order | Data |
+|---|---|---|---|
+| `d1-drv8876`, `driver-judges-nothing`, `sentinel-01`, `sentinel-01-ext-bmp581`, `sentinel-01-minimal` | `usart1` (`BRR` `0x22C`) | `BRR`; `CR2` = 0; `CR1` = `0x2000000C` (`FIFOEN`, `TE`, `RE`); `CR1` = `0x2000000D` (the same with `UE`) | 16–20 `TDR` writes; 8 `RDR` reads (the consumer's injected echo, one byte per 100 µs); 4,438–4,442 `ISR` reads |
+| `hse-crystal-16`, `hse-external-8`, `sentinel-02-shaped` | `usart2` (`0x457`), `usart3` (`0x98`) | the same, per port | the same per port; 8,331 and 4,438 `ISR` reads |
+| `sentinel-03` | `usart1` (`0x22C`), `usart2` (`0x98`), `usart3` (`0x457`) | the same | the same |
+| `serial-dshot-9600` | `usart1` (`0x1A0B`, 9600 baud) | the same | 20 `TDR`, 8 `RDR` (one per 1.1 ms), 43,331 `ISR` |
+
+- **No configuration field is written while `UE` = 1** on any port of any board, and no `CR3`, `GTPR`, `RTOR`, `RQR`, `ICR` or `PRESC` write. Every access is a word.
+- **`FIFOEN` = 1 on every configured port:** the generated firmware runs the USART in FIFO mode, and the stock model drops the bit (reserved, M2 U2).
+
+**ArduPilot, the fixture** (5 s, `usart1` only). ChibiOS's `usart_init` runs four times (3.1, 9.0, 93.9, 98.8 ms): `BRR` `0x271`, `CR2` `0x40` (`LBDIE`), `CR3` `0xC1` (`EIE`, `DMAR`, `DMAT`), `CR1` `0x2000013D` (`FIFOEN`, `PEIE`, `RXNEIE`, `IDLEIE`, `TE`, `RE`, `UE`), `ICR` all ones; then a read-modify-write of `CR1` that **reads `0x12D`** (the stock model drops `FIFOEN` and `IDLEIE`) and writes `0x10D`, clearing `RXNEIE`. On silicon the same code writes `0x2000011D`: `FIFOEN` and `IDLEIE` stay set. Then 547 `TDR` bytes, all moved by DMA1 (1303), and no `RDR` read.
+- **With copies served, no protected field changes under `UE` = 1.** The three later `usart_init` calls run on the enabled port and rewrite `BRR`, `CR2`, `CR3` and `CR1` with the values it already holds (same values pass, `RUL-18`).
+
+**The armed run, Sentinel-03** (13 s; `ARM`, 373 configuration writes; `TDR` 2,687 on `usart1`, 409 on `usart3`).
+- **`usart1` (console, MAVLink, the injected port)** and the first `usart3` init: as the fixture. No change under `UE` = 1.
+- **`usart2` (CRSF/RC input), every second from 0.2 s, ArduPilot's RC-protocol detection cycles the port:** `BRR` `0x271`, `0x2D0`, `0x168`, `0xAD`, `0x24` (115,200; 100,000; 200,000; 416,666; 2,000,000 baud at 72 MHz) and, for SBUS, 8E2 inverted (`CR1` `M0` + `PCE`, `CR2` `RXINV` + `STOP` = 10). Two code paths:
+  - **ChibiOS `sdStop` then `sdStart`** (`CR1`/`CR2`/`CR3` = 0 at `0x8105C12`, then `usart_init`), and **ArduPilot's `set_options`** (`CR1` `UE` cleared at `0x80FE514`, `CR2` `RXINV`, `CR3`, `UE` set again): both with `UE` = 0. Valid.
+  - **`usart_init` on a port already enabled** (`sdStart` without `sdStop`): `BRR`, `CR2`, `CR3`, `CR1` written with `UE` = 1. **16 protected changes on `usart2` in 13 s:** `BRR` 9 times (0.20, 2.21, 3.21, 4.21, 5.21, 6.21, 8.22, 9.22, 10.23 s), `CR1` `M0`/`PCE` cleared 4 times (2.21, 3.21, 8.22, 9.22 s), `CR2` `RXINV` cleared twice (4.21, 10.23 s), `CR1` `FIFOEN` set once (0.20 s). The first is at **0.2018 s: `BRR` 0 → `0x271` with `UE` = 1** (the port was started with `BRR` = 0 one write earlier).
+- **`usart3` (MAVLink2, `SERIAL2`):** `BRR` `0x4E2` → `0x271` at 0.611 s and back at 0.616 s, each by `usart_init` with `UE` = 1.
+- **ChibiOS's `sdStop` writes `CR1` = 0 from `UE` = 1** (26 times on `usart2`): one write clears `UE` and `FIFOEN` (and `M0`/`PCE` after an SBUS step) together. Whether such a write changes a protected field under `UE` = 1 is a reading (§5 Q2 (b)).
+- **On silicon, each change under `UE` = 1 is ignored** ("can only be written when the USART is disabled (UE = 0)": `BRR` p2082, `M0` p2069, `PCE` p2069, `RXINV` p2075, `FIFOEN` p2067), so the RC port keeps its previous baud and framing, and `usart3` keeps 57,600 baud through the 5 ms in between. The stock model takes each at once (M2 U3). **That silicon ignores them is the manual's statement, not a bench result** (§5 Q2 (c)).
+
+### 2.2 The stock model, by probe (M2)
+
+| # | Probe | Stock (measured) | Silicon (RM0433 Rev 9) |
+|---|---|---|---|
+| U0 | `CR1` written with `USART1EN` = 0 | dropped by the RCC guard's bus lock; reads 0; **no Tviburi record** | ignored (p373) |
+| U1 | reset reads | `ISR` `0x200000C0`; `GTPR` (0x10) and `PRESC` (0x2C) "Unhandled read" | `ISR` `0x0X80_00C0` / `0x0000_00C0` (FIFO on / off, p2085, p2091); `GTPR`, `PRESC` defined (pp. 2082, 2099) |
+| U2 | all ones written to each register with `UE` = 0 | `CR1` reads `0x040087EC`: stored `RE`, `TE`, `RXNEIE`, `TCIE`, `TXEIE`, `PEIE`, `PS`, `PCE`, `OVER8`, `RTOIE`; **dropped** `UESM`, `IDLEIE`, `WAKE`, `M0`, `MME`, `CMIE`, `DEDT`, `DEAT`, `M1`, `EOBIE`, and `FIFOEN`, `TXFEIE`, `RXFFIE` (reserved in the model). `CR2` reads `0x3000` (`STOP` only). `CR3` reads `0xC0` (`DMAR`, `DMAT` only). `BRR` 16 bits. `RTOR` 24 bits. `GTPR`, `PRESC` unhandled | every field stored (§48.8) |
+| U3 | `M1`, `OVER8`, `PCE`, `BRR`, `STOP` written with `UE` = 1 | **all taken** (`OVER8`, `PCE`, `BRR`, `STOP` read back; `M1` dropped as a tag); no record | ignored (pp. 2068–2069, 2076, 2082) |
+| U4 | a byte write to `CR1`, a half-word to `CR1`+2 | taken (the bus translates to the word) | "accessed by words (32 bits)" (p2067) |
+| U5 | a byte received with `RE` = 0 | dropped (DEBUG line) | not received |
+| U6 | three bytes received, `IDLEIE` = 1, then 1 ms, the bytes read, 1 ms | `RXNE` set; **`IDLE` never set** | `IDLE` one idle frame after the last byte (p2090, p2021) |
+| U7 | `ICR` all ones | clears `TC` only (`IDLECF`, `ORECF` and the rest tags) | clears each flag (p2096–2097) |
+| U8 | 20 bytes received, none read, `FIFOEN` = 1 | **all 20 kept and read back in order; `ORE` never set** | 16-deep RX FIFO (p2018), then `ORE` and the byte lost (p2090) |
+| U9 | `RTOEN` = 1, `RTO` = 10, `RTOIE` = 0, then `RTOIE` = 1 | `RTOF` not set with `RTOIE` = 0; set with `RTOIE` = 1 | set by `RTOEN` whatever `RTOIE` (p2088) |
+| U10 | receive by DMA: stream armed, then `DMAR`, then three bytes | **all three moved** (`NDTR` 8 → 5) | moved after each `RXFNE` (p2048) |
+| U11 | a byte arrives with the stream disabled; the stream is enabled; a second byte | **neither byte is ever moved** (`NDTR` stays 8; both stay readable in `RDR`): the request is raised only on the buffer's change from empty | the request stays asserted while `RXFNE` = 1, so both move once the stream runs (p2048; the level is from memory) |
+| U12 | a byte waits; then `DMAR` = 1 | **not moved** | moved (as U11) |
+| U13 | `UE` cleared with a byte waiting | `RXNE` stays set; a byte received then is dropped | "The DMA requests are also reset when UE = 0" (p2070) |
+| U14 | `TDR` with `TE` = 0; with `TE` = 1 | dropped with a WARNING; sent, `TC` set at once, `TEACK` = `TE` | — |
+| U15 | `RQR.RXFRQ` with two bytes waiting | both flushed | flushes (p2085) |
+| U16 | one byte, then 1 µs, then 100 µs (a frame is 31 µs at the board's 200 MHz / 625) | `IDLE` never set | set after one idle frame |
+
+### 2.3 The form (M3) and the form control
+
+- **`STM32F7_USART` is `sealed`,** so the guard is `RUL-07`'s wrapper. The probe loads cancelled and restated (`usartN: @none`; `tviburiUsartN: … as "usartN"`, registered on `tviburiRcc` with the stock alias, `frequency` and `IRQ -> exti@N`); `peripherals` lists `usart1 (ProbeSTM32F7_USART)`.
+- **M2 through the wrapper is identical to the stock run** (every value read and every access-log line, register names included), apart from two prices: the owned instance's own WARNING lines lose their source name (`[WARNING] Unhandled write …`), and its DEBUG lines (U5, U13) follow the owned instance's log level, not the wrapper's.
+- **The access log keeps its names** (`ControlRegister1`, `TransmitData`, …) through the wrapper's nested `Registers` enum: `RegisterMapper` reads the registered peripheral's type. 1303's wrapper logged `unknown`.
+- **`IUART` forwarded** (`WriteChar`, `CharReceived`, `BaudRate`, `StopBits`, `ParityBit`): the monitor's `sysbus.usart1 WriteChar` (the consumer's injection, `anchor.rs`:433–467) reaches the owned instance, and `CreateFileBackend` (the consumer's serial witness) binds to the wrapper.
+- **The form control:** the 14 generated boots and ArduPilot's fixture boot replayed on the wrapper tree against M1 (main). **Identical on all 15:** every USART access line (stamp, PC, register name, value; 587 to 43,363 lines a boot), the boot block (instruction count included) and the 63-value register dump.
+- **The consumer's untyped `usartN:`/`uartN:` blocks** must move onto the wrapper's variable (`RUL-09` (b)): every captured platform has one per instance (generated: all nine, `lpuart1` included; ArduPilot: eight). The replay moves them, as for the timers.
+
+### 2.4 Consumer observers each write reaches (Aethelgard `fa12abf4`)
+
+By board: the ten generated boards with a serial port (§2.1), ArduPilot's two (fixture: `usart1`; Sentinel-03: `usart1`–`usart3`); none on the four boards without one.
+
+| Observer | Reads | Changed by the wrapper's form | Changed by the guard's rules |
+|---|---|---|---|
+| `peripherals` listing (`renode.rs`:2834–2842; `foreign.rs`:1545–1553) | each solved USART's kind, exactly `STM32F7_USART` | **yes, every board with a port:** the class name. The class map's consumer step (`RUL-09`), as 1301's ports and 1302's timers | — |
+| serial access parser (`serial.rs`:347–391, `logged_by` :510; `renode.rs`:3830–3840) | every `[INFO] usartN:` line of a logged port must be one whole access | no (M3) | **yes, every generated board with a port:** the guard's witness and end records log at INFO under `usartN` (`RUL-11`), so the write reconstruction fails closed (`serial_tag_mismatch`). A consumer step, new to this guard: Aethelgard must take Tviburi's records out of the port's lines first (`RUL-11` names the record grammar) |
+| serial witness (a file backend per port, `renode.rs`:587–612) | the transmitted bytes | no (M3) | no: `TDR` is passed through |
+| `judge_writes` (`serial.rs`:731), `judge_options` (:971) | offset, width and value of each write | no | no: a guard never changes what the firmware writes |
+| boot block (`boot.rs`:931–1000) | `CR1` under the stored bits, `CR2` under `STOP`, `CR3` under `DMAR`/`DMAT`, `BRR` under `0xFFFF` | no (§2.3) | no: copies served for `FIFOEN`, `M0`, `M1`, `IDLEIE`, `RXINV` fall outside every mask |
+| injection (`anchor.rs`:433–467) | `WriteChar`, one byte per 100 µs | no | `IDLE` set one frame after each byte; the generated driver polls bits 7 and 5 only (`board.rs`:4803–4905) |
+| ledger rows (`ledger.rs`:1498–1593) | static text: `IDLEIE`, `FIFOEN`, the dropped `CR2` fields `ignored-by-model` | — | a modeled `IDLE` and served copies make that text stale (a consumer row, `OQ-04`) |
+| ArduPilot's console (`usart1` `TDR`, by DMA) | — | no (M3, AP) | no, unless a rule refuses |
+
+### 2.5 The clock (WO (2))
+
+- **`USARTxEN` = 0:** an access is dropped by the RCC guard's bus lock, a read returns 0, with no Tviburi record (U0): silicon's ignored write (p373). Covered as silicon's, as 1303 found for DMA.
+- **Every port of every run starts with its kernel clock running:** at each port's first `UE` its `*EN` is set and its selector's source runs (generated: the reset selectors, `rcc_pclk1`/`rcc_pclk2`; ArduPilot, both boards: `USART16SEL` = `USART234578SEL` = 001, `pll2_q_ck`, with `PLL2ON` and `DIVQ2EN` set at 3.1 ms). The RCC guard's `QueryKernelClock` answers "running" for each used port at the end of every run (`fc/*/…console.txt`, `Q-KERNEL`).
+- **The query covers `usart1`–`usart3` only.** `usart6`, `uart4/5/7/8` answer "not modeled"; the RCC guard already allows their `*EN` only at 0, so their start refuses at the RCC first.
+- **A kernel clock lost under a running USART** is not refused: the RCC guard's `TVI-RCC-CLOCK` watches its registered SPI guards only (§5 Q3).
+- **RM0433 says little on the USART's side:** the registers stay accessible "even when the usart_ker_ck clock is stopped" (p2019); no sentence says what reception or transmission do without it. The refusal rests on p371 ("no clock will be provided to the peripheral"), as SPI's did.
+
+## 3. Predictions, marked
+
+| Prediction | Verdict |
+|---|---|
+| P1 | held, read field by field (§0, `rm/usart-fields.md`). Not predicted: `M1`/`M0`/`OVER8`/`PCE`/`PS` exist identically in both `CR1` views; `RTOEN` carries no `UE` condition; the access width is "by words" (p2067); the p2040 sentence on `IDLE` at a start |
+| P2 form, tags, no `UE` rule, `IDLE` never set, no FIFO or overrun, request on a change only | held (U0–U16) |
+| P2 `RTOF` | held in kind (set only with `RTOIE`); the 8× timing is by source, not probed |
+| P2 reset `ISR` `0x200000C0` | held |
+| P3 | **held, one detail wrong:** each port writes `CR2` = 0 explicitly, and `RE` and `FIFOEN` are set; the firmware also receives (8 bytes a port, polled) |
+| P4 | **held:** the read-modify-write reads `0x12D` and writes `0x10D`; with copies, no protected change |
+| P5 USART1, USART3's first init | held |
+| P5 "each USART2 change goes through `UE` = 0" | **wrong:** 16 changes on `usart2` and 2 on `usart3` are made with `UE` = 1 by ChibiOS's `usart_init` on a running port (§2.1). This is §5 Q2 (c) |
+| P6 | not measured: it needs the guard (§5 Q5, Q6) |
+| P7 | held, with the access parser's whole-line rule added (§2.4) |
+| P8 | held (§2.5) |
+| P9 | **wrong in sign:** the thin wrapper measured −6.5 MiB (§4), inside the noise |
+
+## 4. The one-file memory, by `1201`'s budget (B)
+
+**A prototype figure, not the guard's:** M3's wrapper as the eight USART/UARTs in every branch boot, main `dff6e77` (main `1e9ce55` and this document) against the same tree plus the wrapper, its restatement, and a replay that moves the consumer's untyped blocks. ArduPilot's 5 s boot (ELF `a799dfb6`, rebuilt by the harness and checked), eleven boots a side, interleaved, on Furnace (load 3–9).
+
+| | Peaks (KiB), in boot order | Median |
+|---|---|---|
+| `main` | 1,022,448; 1,015,168; 1,015,856; 1,032,232; 1,013,100; 983,436; 1,012,148; 1,016,504; 1,004,732; 1,000,776; 1,021,612 | 1,015,168 |
+| `main` + the wrapper ×8 | 1,016,232; 1,024,660; 1,058,304; 1,006,212; 983,140; 1,007,408; 1,011,868; 1,000,368; 1,005,816; 1,008,524; 1,029,552 | 1,008,524 |
+
+`MEDIANS main 1015168 KiB, branch 1008524 KiB, difference -6644 KiB (-6.5 MiB)`, **PASS**; every branch boot under the 1,572,864 KiB ceiling; walls 10.5–12.3 s. The wrapper costs nothing this measurement can see: main already collects the overlay's compile garbage at its first start (1302). The built guard (rules, a field table, scheduled `IDLE`, records) will cost more; the build reports the budget again, in CI.
