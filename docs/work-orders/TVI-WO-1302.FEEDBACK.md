@@ -140,5 +140,10 @@ All on Furnace, in the pinned image (`aethelgard-tools@sha256:1e0ab105…`), one
 - **The mutation run, diff-sized** (TM01–TM31 and the amended G17), on the same tree: 32 of 32 killed, each by its named case.
   - One earlier run, on `3939ff4`, left TM28 alive: `timer-halfhigh` wrote 0 to an upper half, which cannot tell a merged word from a dropped shift. It now writes 1 to CCMR3's upper half and reads it back.
 - **The full `tests/spike.sh`** on `918f397`: 183 ok and 2 FAIL (§6). The affected cases were rerun after each fix.
-- **Memory:** `1201`'s budget runs in CI on this PR. The §1.1 prototype was +2.4 MiB on Furnace (measure.md §4).
+- **Memory, `1201`'s budget, on Furnace: it fails, and the WO stops here (§7).**
+  - `main`: 998,516; 998,636; 1,013,080; 974,432; 983,972 KiB (median 998,516).
+  - HEAD: 1,028,104; 1,035,524; 1,035,304; 1,010,864; 1,043,632 KiB (median 1,035,304).
+  - **+35.9 MiB, over the 32 MiB budget.** Every boot is under the 1,572,864 KiB ceiling.
+  - The §1.1 prototype, with one instance and no table, was +2.4 MiB (measure.md §4).
+  - Where the difference goes is not measured (compile against instances). Posted to the architect as a stop, 2026-11-24.
 - **CI:** see the PR. A green suite here is not live acceptance.
