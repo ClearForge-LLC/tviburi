@@ -74,3 +74,71 @@ There were two passes: mine through the build, and an independent one by a fresh
 **Also found and fixed:**
 - **By the tests:** in recorded mode, a DMAR write also recorded a false "no register" field refusal.
 - **By the review:** a refused LOCK change in recorded mode reached the copy. The frozen LOCK bits are now kept.
+
+## 5. The reduction pass
+
+**Reduction pass (diff): −3 net (model and tests; the generator's new TIM8 check adds back what was cut) · 3 duplicates removed · 3 dead paths removed · 0 protected kept · 4 findings below.** A fresh reviewer made the proposals over `9e61b81..HEAD`; I checked each in the code before acting.
+- **Duplicates removed:**
+  - LOCK's level was kept beside `BDTR`'s frozen LOCK bits; it is now derived from them;
+  - one "check passed" condition was written four ways in `tests/1302/timer.sh` (`passed`);
+  - the firmware path list was a second copy of `CASES` (`PATHS` is derived).
+- **Dead paths removed:**
+  - three observers no case reads;
+  - a `Row` constructor parameter it never stored;
+  - an unused generator argument and tuple element.
+- **Rejected:**
+  - "TM09 names a test that does not exist": it names `timer-locksame`, which exists;
+  - shortening the firmware's per-path documentation: the house style of `gpio.rs`;
+  - `gen-pwm` calling `start()`: the path replays the captured writes literally;
+  - dropping the explicit `INumberedGPIOOutput.Connections`: unmeasured, and TM07 guards the binding.
+- **Proof:** the timer suite and the mutation run on the reduced tree (§8). The generator's output is byte-identical (`timer-regen`), and it now asserts what its comment claimed, that TIM8's `AF1`/`AF2`/`TISEL` match TIM1's.
+- **Findings (outside this WO):**
+  - the guard-name list now lives in nine copies (the roadmap row);
+  - `t_timer` in `tests/spike.sh` copies `t_gpio`, and the ruling forbids touching `t_gpio`;
+  - "timerN → tviburiTimerN" is stated in the GPIO and timer generators and in the replay;
+  - "an untyped update binds to the cancelled entry" is explained in four places.
+
+## 6. The other guards' cases, unchanged apart from the names (ruled 06:52Z)
+
+- The full `tests/spike.sh` on `918f397`: 183 ok and 2 FAIL.
+  - `rcc-unheld` was this WO's RCC-restatement drop, reverted (§2).
+  - `gpio-packageinput` lost its end records to the teardown race.
+- Both pass on the reverted tree, as do the TIM1-dependent GPIO cases (`afodr`, `afenter`, `afenterhigh`, `afout`, `afentern`, `afswitch`, `registrations`), `rcc-reset` and `rcc-registrations` (the 58 restated registrations).
+- **The diff to the other guards' test files** (`git diff 9e61b81 -- tests/1300/rcc.sh tests/1301/gpio.sh scripts/tviburi-spike`, and the six lines in `tests/spike.sh`) appends only `timer1 timer8`.
+- `tests/mutants.tsv` row G17 now names the extended runner line, and still drops `gpioPortK` from it.
+- **Additive changes, inside this WO's `tests/` fence:**
+  - `tests/spike.sh` registers the `timer-*` cases, as it does the `gpio-*` ones;
+  - `tests/1301/replay-1301.sh` gains the timer restatement for a tree that has it (§1).
+
+## 7. Rows and findings
+
+**Ruled at 06:10Z to be written as rows:**
+- **Period and first edge (both repositories).** Tviburi keeps the stock model's period (`ARR` ticks) and first rise, one period after `CEN`, as `stock-wrong` rows citing p1558. Silicon counts `ARR` + 1, and `OCxREF` is high from `CEN`.
+  - **A fidelity finding for Aethelgard:** its motor witness encodes Renode's convention on purpose (`aethelgard-twin/src/timer.rs` L6–24), so a twin that models silicon would fail every motor witness.
+  - Changing it is one coordinated change in both repositories.
+- **The open-link case (both repositories).** `4300j` made the motor pull-down a switchable link. With the link open a disabled output floats, and Tviburi shows it low. Tviburi cannot see fitment today.
+- **A CHxN pin in AF mode with `CCxNE` = 0 still shows NOT CHx**, through the GPIO port's `invertedAFPins`, where silicon leaves it Hi-Z. This is a row for the GPIO guard. Separate complementary outputs are a later WO (Q5 (b)).
+- **TIM2–TIM5** under Table 342 (p1695): four committed boards drive TIM2.
+- **`tests/1301/replay-1301.sh` and Aethelgard's reaper.** Aethelgard ≥ `65c74788` launches Renode as `… -- /usr/local/bin/renode …`, which the harness does not strip. The committed fixture (`1c32c8ea`) is unaffected.
+- **`OQ-03`'s needs:**
+  - an Aethelgard board with motors and an IMU whose hwdef emits (Sentinel-03's refuses on `VBAT_SENSE`);
+  - a USART receive path over DMA (ArduPilot's `USART1_CR3.DMAR` = 1).
+- **AP-m runs 50 Hz PWM, not DShot600:** `MOT_PWM_TYPE` waits for Aethelgard's defaults.parm work.
+
+**New in the build:**
+- **The ledger cannot say "no value allowed".** DMAR (`0x4C`) has no field row; every access refuses by its own rule (`TVI-TIM-DMAR`). A consumer reading the ledger does not see DMAR listed. This is a row for the release program, whose table reader has no empty allowed set.
+- **`SR.UIF`/`CCxIF` are `stock-wrong`:** the stock model sets them only with their interrupt enabled (p1597). A polling firmware reads 0 with no record; neither committed firmware polls them.
+- **No test counts edges across a reset.** The fix for the zero-width reset pulse (§4, defect 3) is argued from the code alone.
+- **In recorded mode, the frozen LOCK bits are kept in the copy, but no case drives a refused LOCK change through recorded mode.** In enforcing mode the change refuses first.
+- **The teardown race** (roadmap row) hit `gpio-packageinput` once in the full suite and `timer-moe0` once in a rerun, 2 of about 225 container runs. TIM1 and TIM8 add two more end-record emitters. Whether that raises the rate is not measured.
+- **The S25 mint** needed the operator's out-of-band approval, which was not given while I worked (07:27Z). The branch is pushed only after it.
+
+## 8. Suites, mutants, memory and CI
+
+All on Furnace, in the pinned image (`aethelgard-tools@sha256:1e0ab105…`), one capped container at a time.
+- **The timer suite** on the reduced tree (`c6e49eb`): all 35 cases pass, 36 checks, 0 failed.
+- **The mutation run, diff-sized** (TM01–TM31 and the amended G17), on the same tree: 32 of 32 killed, each by its named case.
+  - One earlier run, on `3939ff4`, left TM28 alive: `timer-halfhigh` wrote 0 to an upper half, which cannot tell a merged word from a dropped shift. It now writes 1 to CCMR3's upper half and reads it back.
+- **The full `tests/spike.sh`** on `918f397`: 183 ok and 2 FAIL (§6). The affected cases were rerun after each fix.
+- **Memory:** `1201`'s budget runs in CI on this PR. The §1.1 prototype was +2.4 MiB on Furnace (measure.md §4).
+- **CI:** see the PR. A green suite here is not live acceptance.
