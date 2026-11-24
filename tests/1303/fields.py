@@ -74,7 +74,7 @@ def cr():
         (reg, off, sec, "DMEIE", 1, 1, A, ack("DMEIE is a stock tag: no direct-mode error is modeled, so its interrupt never fires; its value is kept by the guard and served on read"),
          "kept by the guard and served on read; no direct-mode error is modeled", 664),
         (reg, off, sec, "EN", 0, 0, A, "modeled by the guard",
-         "the stock model starts the stream; at its rise the guard checks the stream's addresses (TVI-DMA-TCM, TVI-DMA-ADDRESS, p108, Table 7 p131) and its DMAMUX1 request (TVI-DMA-ROUTE, TVI-DMA-SHARED, TVI-DMA-REQUEST, TVI-DMA-MUX); while it is set, a changed protected field refuses (TVI-DMA-EN running, TVI-DMA-DONE once the twin completed the transfer); the stock model never clears it at the end of a transfer (stock-wrong, p665)", 665),
+         "the stock model starts the stream; at its rise the guard checks its sizes (TVI-DMA-SIZE, p663), a stale offset (TVI-DMA-OFFSET, p666), its addresses (TVI-DMA-TCM, TVI-DMA-ADDRESS, p108, Table 7 p131), a reload (TVI-DMA-RELOAD, p665) and its DMAMUX1 request (TVI-DMA-ROUTE, TVI-DMA-SHARED, TVI-DMA-REQUEST, TVI-DMA-MUX); while it is set, a changed protected field refuses (TVI-DMA-EN running, TVI-DMA-DONE once the twin completed the transfer); the stock model never clears it at the end of a transfer (stock-wrong, p665)", 665),
     ]
 
 
@@ -96,7 +96,7 @@ def rows():
         ("DMA_SxFCR", 0x24, "§15.5.10", "Res6", 6, 6, Z, "reserved", "reserved: must be kept at reset value", 667),
         ("DMA_SxFCR", 0x24, "§15.5.10", "FS[2:0]", 5, 3, A, "read-only", "read-only: served by the guard as 100 (FIFO empty, the reset value; not relevant in direct mode); the stock model reads 000", 667),
         ("DMA_SxFCR", 0x24, "§15.5.10", "DMDIS", 2, 2, Z, "inherited, unaudited (acknowledged by name)", "0 only: direct mode; FIFO mode is not audited; protected under EN", 667),
-        ("DMA_SxFCR", 0x24, "§15.5.10", "FTH[1:0]", 1, 0, "Half", "stock, wrong (the stock model resets FCR to 0x00 where silicon resets it to 0x21 (p667); the guard serves FCR from its copy, reset 0x21)", "01 only, the reset value: FIFO thresholds are used only in FIFO mode, which is not audited", 667),
+        ("DMA_SxFCR", 0x24, "§15.5.10", "FTH[1:0]", 1, 0, A, "stock, wrong (the stock model resets FCR to 0x00 where silicon resets it to 0x21 (p667); the guard serves FCR from its copy, reset 0x21)", "kept by the guard and served on read; not used in direct mode (p667), the only mode allowed (DMDIS = 0); protected under EN", 667),
     ]
     return out
 

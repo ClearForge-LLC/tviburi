@@ -31,10 +31,10 @@
 //   TVI-DMA-READ      a read of an offset with no register (0xD0-0x3FC, Table 117 p668-671). unmodeled.
 //   TVI-DMA-EN        a write, while the stream is running, that changes a field RM0433 says can be written only with
 //                     EN = 0 (CR: MBURST, PBURST, CT, DBM, PL, PINCOS, MSIZE, PSIZE, MINC, PINC, DIR, PFCTRL, pp. 662-664;
-//                     NDTR p665; PAR p666; M0AR, M1AR p666; FCR.DMDIS p667): silicon ignores it, so the stream does not do
+//                     NDTR p665; PAR p666; M0AR, M1AR p666; FCR.DMDIS and FTH p667): silicon ignores it, so the stream does not do
 //                     what the firmware wrote. predicted-fault. The same value passes (RUL-18, amended). A write that also
 //                     clears EN is judged against the state before it. The other CR fields (TCIE, HTIE, TEIE, DMEIE, CIRC,
-//                     TRBUFF) and FCR's FTH and FEIE carry no such line and take the write (ruled Q2: p665's "forbidden to
+//                     TRBUFF) and FCR's FEIE carry no such line and take the write (ruled Q2: p665's "forbidden to
 //                     write these registers when the EN bit is read as 1" would refuse every disable, which RM0433 tells
 //                     software to make). In recorded mode the protected fields keep their old values, as on silicon.
 //   TVI-DMA-DONE      the same write once the twin has completed the transfer and EN is still set; and any CR write with
@@ -43,10 +43,18 @@
 //   TVI-DMA-FIELD     the allow-list (`Fields`): a field given a value the model does not implement, or a write to an
 //                     offset with no register. unmodeled.
 //   At the write that sets EN (0 -> 1), on the stream's configuration as the copies and the stock model then hold it, with
-//   NDT items of PSIZE bytes on each side that increments (one item on a side that does not; from memory: NDT counts
-//   peripheral-size items, and direct mode forces MSIZE to PSIZE, p663); NDT = 0 addresses nothing (p665):
+//   NDT items of PSIZE bytes on each side that increments (one item on a side that does not: "the number of bytes to be
+//   transferred is equal to 2 x NDT" for half-words, p648; direct mode forces MSIZE to PSIZE, p663); NDT = 0 addresses
+//   nothing (p665), and after a completed transfer silicon reloads the NDT last programmed (p665), so that is the span:
+//   TVI-DMA-SIZE      PSIZE and MSIZE differ: silicon forces MSIZE to PSIZE in direct mode (p663), and memory-to-memory
+//                     runs in FIFO mode only (§15.3.8 p645), while the stock model counts the transfer in MSIZE items and
+//                     corrupts its count or throws (STM32DMA.cs L251-255, measured in review). unmodeled.
+//   TVI-DMA-OFFSET    a stream enabled again after it was disabled part-way through a transfer with an incrementing
+//                     address: the stock model resumes from its old offset (STM32DMA.cs L160, L256, L262) where silicon
+//                     starts at the programmed base address (p666). unmodeled.
 //   TVI-DMA-RELOAD    NDT = 0 after a non-zero NDT was programmed: silicon reloads the programmed value when the stream is
-//                     enabled again (p665), and the stock model never reloads, so the twin would move nothing. unmodeled.
+//                     enabled again (p665), and the stock model never reloads, so the twin would move nothing. unmodeled;
+//                     the address rules below run first, on the reloaded span.
 //   TVI-DMA-ADDRESS   a span that wraps past 0xFFFF_FFFF. unmodeled.
 //   TVI-DMA-TCM       a span with a byte in ITCM (0x0000_0000-0x0000_FFFF) or DTCM (0x2000_0000-0x2001_FFFF): DMA1/DMA2's
 //                     memory and peripheral buses reach every internal memory "except ITCM and DTCM" (§2.1.6 p108; Table 7
@@ -262,14 +270,23 @@ namespace Antmicro.Renode.Peripherals.Tviburi
             if(r == CrOffset)
             {
                 cr[s] = word & CrBits;
+                // Disabled part-way through an incrementing transfer: the stock model keeps its offset (TVI-DMA-OFFSET).
+                if((word & EnBit) == 0 && Enabled(s) && Items(s) != 0 && Items(s) != started[s] && (word & (PincBit | MincBit)) != 0)
+                {
+                    stale[s] = true;
+                }
+                if((word & EnBit) != 0 && !Enabled(s))
+                {
+                    started[s] = Items(s);
+                }
             }
             else if(r == FcrOffset)
             {
                 fcr[s] = (word & FcrWritable) | FcrEmpty;   // FS is read-only: 100, FIFO empty (p667)
             }
-            else if(r == NdtrOffset)
+            else if(r == NdtrOffset && !Enabled(s))
             {
-                programmed[s] = word & 0xFFFF;
+                programmed[s] = word & 0xFFFF;   // written only while disabled (p665); a refused write keeps nothing
             }
             inner.WriteDoubleWord(offset, word);
         }
@@ -281,6 +298,8 @@ namespace Antmicro.Renode.Peripherals.Tviburi
                 cr[i] = 0;
                 fcr[i] = FcrReset;
                 programmed[i] = 0;
+                started[i] = 0;
+                stale[i] = false;
             }
         }
 
@@ -319,7 +338,7 @@ namespace Antmicro.Renode.Peripherals.Tviburi
             var mask = Protected(r);
             var old = Served(offset);
             var changed = (word ^ old) & mask;
-            var restart = state == Completed && r == CrOffset && (word & EnBit) != 0;
+            var restart = state == Completed && r == CrOffset && (word & EnBit) != 0 && programmed[s] != 0;
             if(changed == 0 && !restart)
             {
                 return false;
@@ -331,7 +350,7 @@ namespace Antmicro.Renode.Peripherals.Tviburi
                 running
                     ? reg + " written with a change to bits that can be written only while the stream is disabled: silicon ignores the write, so the stream does not do what the firmware wrote"
                     : changed == 0
-                        ? reg + " written with EN = 1 after the twin completed the transfer: silicon cleared EN at the end of the transfer, so this write starts a new transfer with NDT reloaded, which the twin does not make"
+                        ? reg + " written with EN = 1 after the twin completed the transfer: silicon cleared EN at the end of the transfer, so on silicon this write starts a new transfer with NDT reloaded, which the twin does not make (or, as a read-modify-write of the twin's EN, means something else): the twin cannot say"
                         : reg + " written with a change to bits that can be written only while the stream is disabled, after the twin completed the transfer and with EN still set: silicon may still be transferring (the twin completes a memory-to-peripheral transfer at once) or done and disabled, and the twin cannot say which",
                 "RM0433 Rev 9 " + Citation(r) + "; §15.5.5 p665 (EN)", State(s), offset, word, 32);
             word = (word & ~mask) | (old & mask);
@@ -344,7 +363,7 @@ namespace Antmicro.Renode.Peripherals.Tviburi
             {
             case CrOffset: return CrProtected;
             case NdtrOffset: case ParOffset: case M0arOffset: case M1arOffset: return 0xFFFFFFFF;
-            case FcrOffset: return DmdisBit;
+            case FcrOffset: return DmdisBit | FthBits;
             }
             return 0;
         }
@@ -386,14 +405,26 @@ namespace Antmicro.Renode.Peripherals.Tviburi
         {
             var b = StreamBase(s);
             var dir = (word >> 6) & 3;
-            var items = (ulong)Items(s);
+            var reload = Items(s) == 0 && programmed[s] != 0;
+            var items = (ulong)(reload ? programmed[s] : Items(s));
             var size = 1ul << (int)((word >> 11) & 3);
             var refused = false;
-            if(items == 0 && programmed[s] != 0)
+            if(((word >> 11) & 3) != ((word >> 13) & 3))
             {
-                refused = Refuse(offset, s, word, "TVI-DMA-RELOAD", Unmodeled, "DMA_S" + s + "NDTR.NDT = 0 (programmed " + programmed[s] + ")",
-                    "stream " + s + " enabled again with NDT = 0 after " + programmed[s] + " items were programmed: silicon reloads the programmed value when the stream is enabled again and transfers it, and the stock model never reloads, so the twin would move nothing",
-                    "RM0433 Rev 9 §15.5.6 p665 (NDT)");
+                refused = Refuse(offset, s, word, "TVI-DMA-SIZE", Unmodeled, "DMA_SxCR.PSIZE = " + ((word >> 11) & 3) + ", MSIZE = " + ((word >> 13) & 3),
+                    "stream " + s + " enabled with PSIZE and MSIZE different: silicon forces MSIZE to PSIZE in direct mode and runs memory-to-memory in FIFO mode only, while the stock model counts the transfer in MSIZE items, so the twin cannot say what moves",
+                    "RM0433 Rev 9 §15.5.5 p663 (MSIZE); §15.3.8 p645 (memory-to-memory: direct mode not allowed); p648 (NDT in PSIZE items)");
+                if(!records.Recorded)
+                {
+                    return true;
+                }
+            }
+            if(stale[s])
+            {
+                stale[s] = false;
+                refused |= Refuse(offset, s, word, "TVI-DMA-OFFSET", Unmodeled, "stream " + s + " re-enabled after a partial transfer",
+                    "stream " + s + " enabled again after it was disabled part-way through a transfer: silicon starts at the programmed base address, while the stock model resumes from the offset its earlier transfer reached, so the twin would move data to other addresses",
+                    "RM0433 Rev 9 §15.5.7-15.5.8 p666 (PAR, M0AR: base address)");
                 if(!records.Recorded)
                 {
                     return true;
@@ -408,6 +439,12 @@ namespace Antmicro.Renode.Peripherals.Tviburi
                 {
                     refused |= RefusedSpan(offset, s, word, "M0AR", m0, (word & MincBit) != 0 ? items * size : size);
                 }
+            }
+            if(reload && (!refused || records.Recorded))
+            {
+                refused |= Refuse(offset, s, word, "TVI-DMA-RELOAD", Unmodeled, "DMA_S" + s + "NDTR.NDT = 0 (programmed " + programmed[s] + ")",
+                    "stream " + s + " enabled again with NDT = 0 after " + programmed[s] + " items were programmed: silicon reloads the programmed value when the stream is enabled again and transfers it, and the stock model never reloads, so the twin would move nothing",
+                    "RM0433 Rev 9 §15.5.6 p665 (NDT)");
             }
             if(dir != MemoryToMemory && (!refused || records.Recorded))
             {
@@ -647,6 +684,9 @@ namespace Antmicro.Renode.Peripherals.Tviburi
         private readonly uint[] fcr = new uint[Streams];
         // The NDT software last wrote to each stream, which silicon reloads at a re-enable (p665).
         private readonly uint[] programmed = new uint[Streams];
+        // NDT at each stream's last EN rise, and whether it was then disabled part-way (TVI-DMA-OFFSET).
+        private readonly uint[] started = new uint[Streams];
+        private readonly bool[] stale = new bool[Streams];
         private string config;
 
         private const int Streams = 8;
@@ -665,6 +705,7 @@ namespace Antmicro.Renode.Peripherals.Tviburi
         private const uint PincBit = 1u << 9;
         private const uint MincBit = 1u << 10;
         private const uint DmdisBit = 1u << 2;
+        private const uint FthBits = 3;
         private const uint CrBits = 0x01FFFFFF;
         // MBURST, PBURST, CT, DBM, PL, PINCOS, MSIZE, PSIZE, MINC, PINC, DIR, PFCTRL (pp. 662-664).
         private const uint CrProtected = 0x01EFFEE0;
@@ -682,12 +723,14 @@ namespace Antmicro.Renode.Peripherals.Tviburi
         private const string Unmodeled = "unmodeled";
         private const string PredictedFault = "predicted-fault";
 
-        // The regions Table 7 maps (RM0433 Rev 9 p130-131), the TCMs included (TVI-DMA-TCM judges them first); 0x40000000-
+        // The regions Table 7 maps (RM0433 Rev 9 p130-131), the TCMs included (TVI-DMA-TCM judges them first). System memory
+        // bank 2 (0x1FF40000-0x1FF5FFFF) is left out: p131 prints it inside a Reserved row (0x1FF20000-0x1FFFFFFF), so the
+        // twin cannot say which holds, and a span there is unmodeled (a FEEDBACK row). 0x40000000-
         // 0x5FFFFFFF is the peripheral area as a whole (Table 8 p134 lists its holes, which this rule does not).
         private static readonly Tuple<ulong, ulong>[] Mapped =
         {
             Tuple.Create(0x00000000ul, 0x0000FFFFul), Tuple.Create(0x08000000ul, 0x081FFFFFul), Tuple.Create(0x1FF00000ul, 0x1FF1FFFFul),
-            Tuple.Create(0x1FF40000ul, 0x1FF5FFFFul), Tuple.Create(0x20000000ul, 0x2001FFFFul), Tuple.Create(0x24000000ul, 0x2407FFFFul),
+            Tuple.Create(0x20000000ul, 0x2001FFFFul), Tuple.Create(0x24000000ul, 0x2407FFFFul),
             Tuple.Create(0x30000000ul, 0x30047FFFul), Tuple.Create(0x38000000ul, 0x3800FFFFul), Tuple.Create(0x38800000ul, 0x38800FFFul),
             Tuple.Create(0x40000000ul, 0x5FFFFFFFul), Tuple.Create(0x60000000ul, 0x9FFFFFFFul), Tuple.Create(0xC0000000ul, 0xDFFFFFFFul),
         };
@@ -761,7 +804,6 @@ namespace Antmicro.Renode.Peripherals.Tviburi
         private static readonly uint[] Zero = { 0 };
         private static readonly uint[] Sizes = { 0, 1, 2 };
         private static readonly uint[] Directions = { 0, 1, 2 };
-        private static readonly uint[] Half = { 1 };
 
         private static Row R(string reg, long off, string sec, string name, int msb, int lsb, uint[] allowed, string cls, string behaves, int page)
         {
@@ -895,7 +937,7 @@ namespace Antmicro.Renode.Peripherals.Tviburi
             R("DMA_SxCR", 0x10, "§15.5.5", "HTIE", 3, 3, Zero, "tag", "0 only: a stock tag; the half-transfer flag never sets in the twin", 664),
             R("DMA_SxCR", 0x10, "§15.5.5", "TEIE", 2, 2, Any, "stock, wrong (TEIE is a stock tag: no transfer error is modeled, so its interrupt never fires; its value is kept by the guard and served on read; acknowledged by name, ruled 2026-11-24T14:10Z Q6; ArduPilot writes it)", "kept by the guard and served on read; no transfer error is modeled", 664),
             R("DMA_SxCR", 0x10, "§15.5.5", "DMEIE", 1, 1, Any, "stock, wrong (DMEIE is a stock tag: no direct-mode error is modeled, so its interrupt never fires; its value is kept by the guard and served on read; acknowledged by name, ruled 2026-11-24T14:10Z Q6; ArduPilot writes it)", "kept by the guard and served on read; no direct-mode error is modeled", 664),
-            R("DMA_SxCR", 0x10, "§15.5.5", "EN", 0, 0, Any, "modeled by the guard", "the stock model starts the stream; at its rise the guard checks the stream's addresses (TVI-DMA-TCM, TVI-DMA-ADDRESS, p108, Table 7 p131) and its DMAMUX1 request (TVI-DMA-ROUTE, TVI-DMA-SHARED, TVI-DMA-REQUEST, TVI-DMA-MUX); while it is set, a changed protected field refuses (TVI-DMA-EN running, TVI-DMA-DONE once the twin completed the transfer); the stock model never clears it at the end of a transfer (stock-wrong, p665)", 665),
+            R("DMA_SxCR", 0x10, "§15.5.5", "EN", 0, 0, Any, "modeled by the guard", "the stock model starts the stream; at its rise the guard checks its sizes (TVI-DMA-SIZE, p663), a stale offset (TVI-DMA-OFFSET, p666), its addresses (TVI-DMA-TCM, TVI-DMA-ADDRESS, p108, Table 7 p131), a reload (TVI-DMA-RELOAD, p665) and its DMAMUX1 request (TVI-DMA-ROUTE, TVI-DMA-SHARED, TVI-DMA-REQUEST, TVI-DMA-MUX); while it is set, a changed protected field refuses (TVI-DMA-EN running, TVI-DMA-DONE once the twin completed the transfer); the stock model never clears it at the end of a transfer (stock-wrong, p665)", 665),
             R("DMA_SxNDTR", 0x14, "§15.5.6", "Res31_16", 31, 16, Zero, "reserved", "reserved: must be kept at reset value", 665),
             R("DMA_SxNDTR", 0x14, "§15.5.6", "NDT[15:0]", 15, 0, Any, "inherited, unaudited (acknowledged by name)", "the stock model: the number of items, counted down by its transfers and never reloaded (probed, D2); protected under EN", 665),
             R("DMA_SxPAR", 0x18, "§15.5.7", "PAR[31:0]", 31, 0, Any, "modeled by the guard", "the stock model's peripheral address (probed, D2, D9); at EN the guard refuses a span in ITCM or DTCM (p108) and one in no mapped region (Table 7 p131); protected under EN", 666),
@@ -906,7 +948,7 @@ namespace Antmicro.Renode.Peripherals.Tviburi
             R("DMA_SxFCR", 0x24, "§15.5.10", "Res6", 6, 6, Zero, "reserved", "reserved: must be kept at reset value", 667),
             R("DMA_SxFCR", 0x24, "§15.5.10", "FS[2:0]", 5, 3, Any, "read-only", "read-only: served by the guard as 100 (FIFO empty, the reset value; not relevant in direct mode); the stock model reads 000", 667),
             R("DMA_SxFCR", 0x24, "§15.5.10", "DMDIS", 2, 2, Zero, "inherited, unaudited (acknowledged by name)", "0 only: direct mode; FIFO mode is not audited; protected under EN", 667),
-            R("DMA_SxFCR", 0x24, "§15.5.10", "FTH[1:0]", 1, 0, Half, "stock, wrong (the stock model resets FCR to 0x00 where silicon resets it to 0x21 (p667); the guard serves FCR from its copy, reset 0x21)", "01 only, the reset value: FIFO thresholds are used only in FIFO mode, which is not audited", 667),
+            R("DMA_SxFCR", 0x24, "§15.5.10", "FTH[1:0]", 1, 0, Any, "stock, wrong (the stock model resets FCR to 0x00 where silicon resets it to 0x21 (p667); the guard serves FCR from its copy, reset 0x21)", "kept by the guard and served on read; not used in direct mode (p667), the only mode allowed (DMDIS = 0); protected under EN", 667),
         };
     }
 }

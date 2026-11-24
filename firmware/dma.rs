@@ -35,6 +35,13 @@
 //!                     reloads NDT = 4 (p665), the stock model never does: TVI-DMA-RELOAD, unmodeled.
 //!   path="reassert" - M2P on 42 (completed at EN), then CR written again unchanged with EN = 1: silicon cleared EN at the
 //!                     end (p665), so this starts a new transfer the twin does not make: TVI-DMA-DONE, unmodeled.
+//!   path="sizes"    - M2P on 42 with PSIZE = word and MSIZE = byte: direct mode forces MSIZE to PSIZE on silicon (p663),
+//!                     and the stock model counts in MSIZE items: TVI-DMA-SIZE, unmodeled.
+//!   path="fth"      - P2M on 41 running, then FCR.FTH changed (0x21 to 0x20): TVI-DMA-EN, predicted-fault (p667).
+//!   path="fthzero"  - FCR = 0x20 (FTH = 00, direct mode), then P2M on 41 enabled: passes; FTH is not used in direct mode
+//!                     (p667). MARK_READ = S0FCR (0x20).
+//!   path="reloadtcm" - M2M AXI to AXI, 4 words (completed), disabled, M0AR moved into DTCM, enabled again without NDTR: the
+//!                     reloaded span (p665) is in DTCM: TVI-DMA-TCM, predicted-fault (p108).
 #![no_std]
 #![no_main]
 #![allow(dead_code)]
@@ -247,6 +254,36 @@ pub unsafe extern "C" fn reset() -> ! {
         cfg(DMA1, 0, 0, None, AXI, AXI + 0x1000, 4, M2M);
         en(DMA1, 0);
         w(s(DMA1, 0, CR), M2M);
+        en(DMA1, 0);
+    }
+    #[cfg(path = "sizes")]
+    {
+        cfg(DMA1, 0, 0, Some(42), USART1_TDR, SRAM4, 4, 0x1440);
+        en(DMA1, 0);
+    }
+    #[cfg(path = "fth")]
+    {
+        cfg(DMA1, 0, 0, Some(41), USART1_RDR, SRAM4, 4, P2M);
+        en(DMA1, 0);
+        w(s(DMA1, 0, FCR), 0x20);
+    }
+    #[cfg(path = "fthzero")]
+    {
+        w(s(DMA1, 0, FCR), 0x20);
+        w(DMAMUX1, 41);
+        w(s(DMA1, 0, PAR), USART1_RDR as u32);
+        w(s(DMA1, 0, M0AR), SRAM4 as u32);
+        w(s(DMA1, 0, NDTR), 4);
+        w(s(DMA1, 0, CR), P2M);
+        en(DMA1, 0);
+        write_volatile(MARK_READ, r(s(DMA1, 0, FCR)));
+    }
+    #[cfg(path = "reloadtcm")]
+    {
+        cfg(DMA1, 0, 0, None, AXI, AXI + 0x1000, 4, M2M);
+        en(DMA1, 0);
+        w(s(DMA1, 0, CR), M2M);
+        w(s(DMA1, 0, M0AR), DTCM as u32);
         en(DMA1, 0);
     }
     #[cfg(path = "reassert")]

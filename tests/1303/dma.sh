@@ -10,9 +10,9 @@ set -euo pipefail
 
 here=$(cd "$(dirname "$0")/../.." && pwd)
 IMAGE=$(sed -n 's/^IMAGE=//p' "$here/tests/spike.sh")
-CASES="axi tcm itcm partcm below wrap unmapped ndt0 reload reassert en enoff done same disable width read field msize16 route0 route54 mux shared sharedx request txother fields ledger registrations irq config recorded reset clock regen restate"
+CASES="axi tcm itcm partcm below wrap unmapped ndt0 reload reassert sizes fth fthzero reloadtcm en enoff done same disable width read field msize16 route0 route54 mux shared sharedx request txother fields ledger registrations irq config recorded reset clock offset regen restate"
 GUARDS="spi1 rcc gpioPortA gpioPortB gpioPortC gpioPortD gpioPortE gpioPortF gpioPortG gpioPortH gpioPortI gpioPortJ gpioPortK timer1 timer8 dma1 dma2"
-MONITOR="fields ledger registrations irq config recorded reset clock regen restate"
+MONITOR="fields ledger registrations irq config recorded reset clock offset regen restate"
 # The planted firmware's paths: every case but the monitor-driven ones.
 PATHS=$(for c in $CASES; do case " $MONITOR " in *" $c "*) ;; *) printf '"%s",' "$c" ;; esac; done | sed 's/,$//')
 scratch=${TVIBURI_SCRATCH:-$HOME/.cache/tviburi}
@@ -110,6 +110,14 @@ for t in ${TVIBURI_TESTS:-$CASES}; do
     "refuses reload TVI-DMA-RELOAD unmodeled 'r[\"bit\"] == \"DMA_S0NDTR.NDT = 0 (programmed 4)\" and \"p665\" in r[\"citation\"]'" ;;
   reassert) check "reassert: CR written unchanged with EN = 1 after the twin completed the transfer refuses TVI-DMA-DONE, unmodeled (silicon starts a new transfer, p665)" \
     "refuses reassert TVI-DMA-DONE unmodeled '\"starts a new transfer\" in r[\"condition\"]'" ;;
+  sizes) check "sizes: a stream enabled with PSIZE = word and MSIZE = byte refuses TVI-DMA-SIZE, unmodeled (p663: direct mode forces MSIZE to PSIZE)" \
+    "refuses sizes TVI-DMA-SIZE unmodeled 'r[\"bit\"] == \"DMA_SxCR.PSIZE = 2, MSIZE = 0\" and \"p663\" in r[\"citation\"]'" ;;
+  fth) check "fth: FCR.FTH changed while a stream runs refuses TVI-DMA-EN, predicted-fault (p667: protected under EN)" \
+    "refuses fth TVI-DMA-EN predicted-fault 'r[\"register\"] == \"DMA_SxFCR\" and r[\"bit\"].startswith(\"DMA_SxFCR bits 0x00000001 of stream 0\") and \"p667\" in r[\"citation\"]'" ;;
+  fthzero) check "fthzero: FTH = 00 in direct mode passes (p667: not used in direct mode); FCR reads 0x20" \
+    "passes fthzero && [ \"\$(readout fthzero READ)\" = 0x00000020 ]" ;;
+  reloadtcm) check "reloadtcm: a stream enabled again without NDTR, its M0AR moved into DTCM, refuses TVI-DMA-TCM on the reloaded span (p665, p108), not RELOAD" \
+    "refuses reloadtcm TVI-DMA-TCM predicted-fault 'r[\"bit\"].startswith(\"DMA_S0M0AR = 0x20000400 (DTCM\")'" ;;
   en) check "en: PAR rewritten while a stream runs refuses TVI-DMA-EN, predicted-fault (p666)" \
     "refuses en TVI-DMA-EN predicted-fault 'r[\"register\"] == \"DMA_SxPAR\" and \"running\" in r[\"bit\"] and \"p666\" in r[\"citation\"]'" ;;
   enoff) check "enoff: one CR write clearing EN and changing DIR on a running stream refuses TVI-DMA-EN (judged against the state before it)" \
@@ -157,10 +165,10 @@ for l in open(sys.argv[1]):
     if l.startswith('# CASE '):
         kind, name, off, val = l.split()[2:6]
         o, v = int(off, 16), int(val, 16)
-        # The generator knows one offset per register; streams 1-7's registers (0x28-0xCC) are stream 0's rows, so a 0
-        # written there refuses only at FCR, whose FTH resets to 01 (p667), and passes elsewhere.
+        # The generator knows one offset per register; streams 1-7's registers (0x28-0xCC) are stream 0's rows, which
+        # allow 0 in every field, so a 0 written there passes.
         if name == 'none' and 0x28 <= o < 0xD0:
-            kind, name = ('refuse', 'DMA_SxFCR.FTH[1:0]') if (o - 0x10) % 0x18 == 0x14 else ('pass', 'stream')
+            kind, name = 'pass', 'stream'
         cases[(o, v)] = (kind, name)
 recs = [json.loads(l[8:]) for l in open(sys.argv[2]) if l.startswith('REFUSAL ')]
 seen, bad = {}, []
@@ -195,7 +203,7 @@ ok = len(f) == 135 and len({r[\"register\"] for r in f}) == 10
 d = by[(\"DMA_SxCR\", \"DIR[1:0]\")]
 ok = ok and d[\"state\"] == \"stock-wrong\" and all(x in d[\"detail\"] for x in (\"41 usart1_rx_dma\", \"38 spi1_tx_dma\", \"40 spi2_tx_dma\", \"42 usart1_tx_dma\"))
 ok = ok and d[\"allowed\"] == [0, 1, 2] and by[(\"DMA_SxCR\", \"CIRC\")][\"allowed\"] == [0] and \"p665\" in by[(\"DMA_SxCR\", \"EN\")][\"behaves_as\"]
-ok = ok and by[(\"DMA_SxCR\", \"PL[1:0]\")][\"state\"] == \"stock-wrong\" and by[(\"DMA_SxFCR\", \"FTH[1:0]\")][\"allowed\"] == [1]
+ok = ok and by[(\"DMA_SxCR\", \"PL[1:0]\")][\"state\"] == \"stock-wrong\" and by[(\"DMA_SxFCR\", \"FTH[1:0]\")][\"allowed\"] == \"any\"
 bench = sorted((r[\"field\"], r[\"rule\"], r[\"bit\"]) for r in rows if r.get(\"peripheral\") == \"Tviburi.GuardedSTM32DMA\" and r[\"row\"] == \"bench\")
 ok = ok and bench == [(\"D1\", \"TVI-DMA-TCM\", \"DMA_S0M0AR = 0x20000400 (DTCM (0x20000000-0x2001FFFF))\")]
 sys.exit(0 if ok else 1)
@@ -238,6 +246,16 @@ tviburiDma2:\
     run_case clock - 'sysbus WriteDoubleWord 0x40020014 0x5' "$clk" 'echo "R-NDTR"' 'sysbus ReadDoubleWord 0x40020014'
     check "clock: NDTR written with DMA1EN = 0 is dropped by the bus lock with no record (p373; ruled Q7): it reads 0 once clocked, and the run passes" \
       "passed clock && grep -q 'Tried to write a locked peripheral: machine-0.dma1. Address 0x40020014' '$work/clock/renode.out' && [ \"\$(readout clock NDTR)\" = 0x00000000 ]" ;;
+  offset)
+    # The stock model keeps its transfer offset when a stream is disabled part-way (STM32DMA.cs L160, L256, L262): three
+    # requests raised by hand on an 8-item P2M stream, a disable, a new M0AR and NDTR, then the enable.
+    run_case offset - "$clk" 'sysbus WriteDoubleWord 0x40020800 0x29' 'sysbus WriteDoubleWord 0x40020018 0x40011024' \
+      'sysbus WriteDoubleWord 0x4002001C 0x38001900' 'sysbus WriteDoubleWord 0x40020014 0x8' 'sysbus WriteDoubleWord 0x40020010 0x401' \
+      'sysbus.dmamux1 OnGPIO 41 true' 'sysbus.dmamux1 OnGPIO 41 false' 'sysbus.dmamux1 OnGPIO 41 true' 'sysbus.dmamux1 OnGPIO 41 false' \
+      'sysbus.dmamux1 OnGPIO 41 true' 'sysbus.dmamux1 OnGPIO 41 false' 'sysbus WriteDoubleWord 0x40020010 0x400' \
+      'sysbus WriteDoubleWord 0x4002001C 0x38001A00' 'sysbus WriteDoubleWord 0x40020014 0x8' 'sysbus WriteDoubleWord 0x40020010 0x401'
+    check "offset: a stream disabled after 3 of 8 items and enabled again refuses TVI-DMA-OFFSET, unmodeled: the stock model would resume at its old offset where silicon starts at M0AR (p666)" \
+      "[ \$rc = 3 ] && first offset 'r[\"rule\"] == \"TVI-DMA-OFFSET\" and r[\"kind\"] == \"unmodeled\" and \"p666\" in r[\"citation\"]'" ;;
   regen)
     rc=0; python3 -I "$src/tests/1303/fields.py" > "$work/fields.cs" || rc=$?
     check "regen: the guard's Fields table regenerates from tests/1303/fields.py, byte for byte (RUL-16)" \

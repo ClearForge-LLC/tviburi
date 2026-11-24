@@ -272,5 +272,10 @@ DM32-clockReg	model/stm32h7-dma-restate.repl	        tviburiRcc RegistrationPeri
 DM33-regen	tests/1303/fields.py	"00 only: a stock tag; burst transfers are not modeled", 662),\n        (reg, off, sec, "PBURST	"00 only: a stock tag; bursts are not modeled", 662),\n        (reg, off, sec, "PBURST	dma-regen
 DM34-restateGen	model/stm32h7-dma-restate.awk	    print "    dmamux: dmamux1"	    print "    dmamux:  dmamux1"	dma-restate
 DM35-instances	tools/tviburi-release/src/main.rs	Ok(all.into_iter().filter(|(i, _)| names.iter().any(|n| n == i)).collect())	Ok(all)	unit
-DM36-reload	model/GuardedSTM32DMA.cs	if(items == 0 && programmed[s] != 0)	if(false)	dma-reload
-DM37-restart	model/GuardedSTM32DMA.cs	var restart = state == Completed && r == CrOffset && (word & EnBit) != 0;	var restart = false;	dma-reassert
+DM36-reload	model/GuardedSTM32DMA.cs	var reload = Items(s) == 0 && programmed[s] != 0;	var reload = false;	dma-reload
+DM37-restart	model/GuardedSTM32DMA.cs	var restart = state == Completed && r == CrOffset && (word & EnBit) != 0 && programmed[s] != 0;	var restart = false;	dma-reassert
+DM38-size	model/GuardedSTM32DMA.cs	if(((word >> 11) & 3) != ((word >> 13) & 3))	if(false)	dma-sizes
+DM39-fthProtected	model/GuardedSTM32DMA.cs	case FcrOffset: return DmdisBit | FthBits;	case FcrOffset: return DmdisBit;	dma-fth
+DM40-fthAny	tests/1303/fields.py	"FTH[1:0]", 1, 0, A,	"FTH[1:0]", 1, 0, Z,	dma-regen
+DM41-offset	model/GuardedSTM32DMA.cs	            if(stale[s])	            if(false)	dma-offset
+DM42-reloadSpan	model/GuardedSTM32DMA.cs	var items = (ulong)(reload ? programmed[s] : Items(s));	var items = (ulong)Items(s);	dma-reloadtcm
