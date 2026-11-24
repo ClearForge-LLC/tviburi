@@ -50,7 +50,7 @@
   - The flash access log is identical to `main`'s, every value included. So `OPTSR_CUR` reads the declared word: the consumer's, carried by the replay's translation.
   - Observers, boot blocks and bank 2 are identical, with 0 flash would-refuse.
   - Planted, enforcing: `flash-gen` (hse-crystal-16's PWR, RCC and `ACR` writes, then its `OPTSR_CUR` read) passes.
-- **The budget:** __BUDGET__.
+- **The budget:** +3.4 MiB at the median over `main`, 11 ArduPilot boots a side on Furnace, PASS (§8). CI's run is in §8.
 - **CI:** __CI__.
 
 ## 4. The adversarial pass (WO §5)
@@ -67,10 +67,10 @@ A fresh Opus reviewer read the code, the rulings and RM0433, with no container. 
 | A6 | An RCC-triggered record's `access.offset` is the RCC register's absolute address | Kept, pinned by `flash-clockfirst`; **for the architect** (§6) |
 | A7 | `Judge` ran from the RCC path for a guard that failed to load or could not model its platform | It returns at once |
 | A8 | Recorded mode: the latch hid a worse mismatch. Recorded state can also diverge from the stock model's | The latch now holds the mismatch's description, so a changed mismatch is recorded again (`flash-worse`). The divergence is stated in the header |
-| A9 | Mutants likely to survive: programming while `PG` set, the band edge, VOS2, `D1CPRE`, `keyLost`, the common-register exemption | Cases `wrhrcc`, `edge`, `vos2`, `d1cpre`, `recorded` (keys after a wrong sequence), `keymid` (an `ACR` write between keys); mutants FL35–FL41 |
+| A9 | Mutants likely to survive: programming while `PG` set, the band edge, VOS2, `D1CPRE`, `keyLost`, the common-register exemption | Cases `wrhrcc`, `edge`, `vos2`, `d1cpre`, `recorded` (keys after a wrong sequence), `keymid` (an `ACR` write between bank 1's keys); mutants FL35–FL41 |
 | A10 | RCC writes from the monitor before the machine starts are not judged | A row: `ACR`'s reset `0x37` covers every clock ≤ 225 MHz at every scale |
 | A11 | Above 225 MHz at a known VOS2/VOS3 was recorded as "only at VOS0" | The record names the scale in force |
-| A12 | The key rule counted common registers as bank 1 (recorded mode) | `Common` (Table 20 p172) is exempt |
+| A12 | The key rule counted common registers as bank 1 (recorded mode) | The registers with a bank 2 alias, which are the common ones (Table 20 p172), are exempt |
 | A13 | Invalid PLL configurations (`DIVN1` < 3, the reference or VCO out of range) are computed as clocks | A row for the RCC guard, where `DIVN1` is `Any` |
 | A14 | The `FRACN` path is dead: the RCC guard serves `PLL1FRACEN` from a tag | Kept, harmless; a row |
 | A15 | The replay's translation is strict about the block's shape | It fails closed (no image: `OPTSR_CUR` refuses); a row |
@@ -88,7 +88,19 @@ A fresh Opus reviewer read the code, the rulings and RM0433, with no container. 
 
 ## 5. The reduction pass
 
-__REDUCTION__
+A fresh subagent read the diff and proposed cuts; I made the ones inside the diff and proved them (the 37 cases and the 41 mutants re-run on the reduced code, §8).
+
+- **The rule list was written twice** in `Write`: once as recorded mode's statements, once as enforcing's `||` chain. It is now one ordered list, which stops at the first refusal unless recorded.
+- **The `Access` class** carried (offset, value, width) into `Judge` and `Program`, and every other rule passes them as plain arguments: removed.
+- **`Common`, the registers outside the key rule's bank, was `Aliases` minus `0x100`:** the same fact twice. The key rule now reads `Aliases`.
+- **The flash restatement generator's header comment** repeated the header it prints: cut to a pointer.
+- **Found by the proof, not by reading:** FL41 survived the first run. `keymid` put its key sequence on bank 2, where a common register never counts, because it maps to bank 1's offsets. The case now uses bank 1, and FL41 is killed.
+
+Reduction pass (diff): −21 net · 2 duplicates removed · 1 mechanism removed · 0 dead paths removed · 0 protected kept · 2 findings below.
+
+**Findings (outside the diff, not done):**
+1. `tests/spike.sh` holds four copies of one 11-line wrapper (`t_rcc`, `t_gpio`, `t_timer`, now `t_flash`), and four copies of its case-list setup. One `t_guardcase <prefix> <script> <case>` would serve all, about −30 lines. 1303 adds a fifth beside this one, so it is a change for after both merge.
+2. The guard-name list has 11 copies: 6 in `tests/spike.sh`, plus `scripts/tviburi-spike`, `rcc.sh`, `gpio.sh`, `timer.sh` and `flash.sh`. This WO appended to each. The roadmap's existing row ("one list, after `1300a`") still stands, now with 11 copies.
 
 ## 6. Questions for the architect
 
@@ -118,4 +130,12 @@ __REDUCTION__
 
 ## 8. Suites, mutants, memory and CI
 
-__GATES__
+**On Furnace** (one capped container at a time, `nice -n 10`):
+- **The full acceptance suite** (224 cases), at `61eddd9`: every case passed but one. `flash-lockedsame` lost every guard's end record at quit (the teardown race, §7) and passed on its rerun.
+- **The 37 flash cases**, at `b1315a1`, the reduced code: 37 passed.
+- **The diff-sized mutants**, at `b1315a1`: FL01, FL03–FL41 and G17 (its text gained `flashController`), **41 of 41 killed**. FL02 was replaced by FL35 when the latch changed (A8). FL41 had survived the first run until `keymid` moved to bank 1 (§5).
+- **The route inventory** passes (`tests/ci/route.sh`): 304 tracked files, ten citation rows appended. The `unit` case passes.
+- **The acceptance replays** (§3): 16 boots, against `main`'s release, at `cb6b7ea`/`7cb5bcd` (the guard's rules as built, before the adversarial fixes, which touch no path either firmware takes).
+- **The memory budget** (`tests/1301/ci-memory.sh`, 11 boots a side, at `7cb5bcd` plus the citations): `MEDIANS main 987900 KiB, branch 991364 KiB, difference 3464 KiB (+3.4 MiB)`, PASS. Every branch boot was under 1,572,864 KiB. The §1.1 prototype measured −0.1 MiB.
+
+**CI:** __CI__.
