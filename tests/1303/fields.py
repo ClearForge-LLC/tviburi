@@ -1,0 +1,121 @@
+#!/usr/bin/env python3
+# tests/1303/fields.py — the DMA guard's allow-list (RUL-16, RUL-17): model/GuardedSTM32DMA.cs's `Fields` rows, every bit
+# 31:0 of every DMA1/DMA2 register, from RM0433 Rev 9 §15.5 (pp. 659-667) with the classes ruled 2026-11-24T14:10Z (Q2,
+# Q5 (c), Q6). Stream registers are named DMA_SxNNN at stream 0's offset; the guard applies a row to all eight streams.
+# Prints the rows; tests/1303/dma.sh `regen` checks the guard's table against this output byte for byte.
+import sys
+
+RULING = "ruled 2026-11-24T14:10Z"
+Z, A = "Zero", "Any"
+
+
+def stream_flags(reg, off, sec, page, streams, cls):
+    """LISR/HISR (flags) or LIFCR/HIFCR (clears): each stream's group of six bits starts at 0, 6, 16 or 22 (p659-661)."""
+    names = {}
+    for g, s in zip([0, 6, 16, 22], streams):
+        for k, n in enumerate(["FEIF", None, "DMEIF", "TEIF", "HTIF", "TCIF"]):
+            if n:
+                names[g + k] = n + str(s)
+    clear = reg.endswith("IFCR")
+    out = []
+    for bit in range(31, -1, -1):
+        if bit in names:
+            n, a, c, b = cls(("C" if clear else "") + names[bit])
+            out.append((reg, off, sec, n, bit, bit, a, c, b, page))
+        elif out and out[-1][3].startswith("Res") and out[-1][5] == bit + 1:
+            m = out[-1][4]
+            out[-1] = (reg, off, sec, "Res%d_%d" % (m, bit), m, bit, Z, "reserved", "reserved: must be kept at reset value", page)
+        else:
+            out.append((reg, off, sec, "Res%d" % bit, bit, bit, Z, "reserved", "reserved: must be kept at reset value", page))
+    return out
+
+
+def flag(name):
+    if name.startswith("TCIF"):
+        return (name, A, "read-only", "read-only (silicon ignores a write; so does the guard's stock model): set when the stock model completes a transfer (probed, TVI-WO-1303.measure.md D2)")
+    return (name, A, "read-only", "read-only (silicon ignores a write): the stock model never sets it; silicon sets HTIF at half transfer and TEIF, DMEIF, FEIF on errors, none modeled")
+
+
+def clearbit(name):
+    if name.startswith("CTCIF"):
+        return (name, A, "inherited, unaudited (acknowledged by name)", "the stock model: writing 1 clears TCIFx and its interrupt (probed, TVI-WO-1303.measure.md D2; ArduPilot writes it)")
+    return (name, A, "stock, wrong (the stock model never sets HTIF, TEIF, DMEIF or FEIF, so clearing one changes nothing, where silicon sets HTIF at half transfer and the others on errors; acknowledged by name, " + RULING + " Q6; ArduPilot writes them)",
+            "a stock tag: dropped; the flag it clears never sets in the twin")
+
+
+def cr():
+    reg, off, sec = "DMA_SxCR", 0x10, "§15.5.5"
+    ack = lambda what: "stock, wrong (" + what + "; acknowledged by name, " + RULING + " Q6; ArduPilot writes it)"
+    return [
+        (reg, off, sec, "Res31_25", 31, 25, Z, "reserved", "reserved: must be kept at reset value", 662),
+        (reg, off, sec, "MBURST[1:0]", 24, 23, Z, "tag", "00 only: a stock tag; burst transfers are not modeled", 662),
+        (reg, off, sec, "PBURST[1:0]", 22, 21, Z, "tag", "00 only: a stock tag; burst transfers are not modeled", 662),
+        (reg, off, sec, "TRBUFF", 20, 20, A, ack("TRBUFF is a stock tag: bufferable transfers are not modeled, and its value is kept by the guard and served on read"),
+         "kept by the guard and served on read; no effect modeled", 662),
+        (reg, off, sec, "CT", 19, 19, Z, "tag", "0 only: a stock tag; double-buffer mode is not modeled", 662),
+        (reg, off, sec, "DBM", 18, 18, Z, "tag", "0 only: a stock tag; double-buffer mode is not modeled", 663),
+        (reg, off, sec, "PL[1:0]", 17, 16, A, ack("PL is a stock tag: no priority between streams is modeled, and its value is kept by the guard and served on read"),
+         "kept by the guard and served on read; no effect modeled; protected under EN (TVI-DMA-EN)", 663),
+        (reg, off, sec, "PINCOS", 15, 15, Z, "tag", "0 only: a stock tag; the fixed 4-byte peripheral increment is not modeled", 663),
+        (reg, off, sec, "MSIZE[1:0]", 14, 13, "Sizes", "inherited, unaudited (acknowledged by name)", "the stock model: the memory data size, byte, half-word or word (probed: word D2, half-word msize16, byte ArduPilot); 11 is reserved; protected under EN", 663),
+        (reg, off, sec, "PSIZE[1:0]", 12, 11, "Sizes", "inherited, unaudited (acknowledged by name)", "the stock model: the peripheral data size, byte, half-word or word (probed: word D2, half-word msize16, byte ArduPilot); 11 is reserved; protected under EN", 663),
+        (reg, off, sec, "MINC", 10, 10, A, "inherited, unaudited (acknowledged by name)", "the stock model: memory address increment (probed, D2); protected under EN", 663),
+        (reg, off, sec, "PINC", 9, 9, A, "inherited, unaudited (acknowledged by name)", "the stock model: peripheral address increment (probed, D2); protected under EN", 663),
+        (reg, off, sec, "CIRC", 8, 8, Z, "tag", "0 only: a stock tag; circular mode is not modeled", 664),
+        (reg, off, sec, "DIR[1:0]", 7, 6, "Directions",
+         "stock, wrong (a memory-to-peripheral transfer completes at the EN write, unpaced by any request, where silicon moves one item per request: acknowledged for requests 38 spi1_tx_dma, 40 spi2_tx_dma and 42 usart1_tx_dma, as ArduPilot's recorded boot uses them; a peripheral-to-memory stream on request 41 usart1_rx_dma moves no data, because no model raises it: acknowledged by name; any other request no model raises refuses TVI-DMA-REQUEST; "
+         + RULING + " Q5 (c))",
+         "the stock model: 00 peripheral-to-memory, 01 memory-to-peripheral, 10 memory-to-memory (probed, D2, D9, D11); 11 is reserved; protected under EN", 664),
+        (reg, off, sec, "PFCTRL", 5, 5, Z, "tag", "0 only: a stock tag; the peripheral as flow controller is not modeled", 664),
+        (reg, off, sec, "TCIE", 4, 4, A, "inherited, unaudited (acknowledged by name)", "the stock model: the transfer-complete interrupt (probed, D2; ArduPilot's streams take it)", 664),
+        (reg, off, sec, "HTIE", 3, 3, Z, "tag", "0 only: a stock tag; the half-transfer flag never sets in the twin", 664),
+        (reg, off, sec, "TEIE", 2, 2, A, ack("TEIE is a stock tag: no transfer error is modeled, so its interrupt never fires; its value is kept by the guard and served on read"),
+         "kept by the guard and served on read; no transfer error is modeled", 664),
+        (reg, off, sec, "DMEIE", 1, 1, A, ack("DMEIE is a stock tag: no direct-mode error is modeled, so its interrupt never fires; its value is kept by the guard and served on read"),
+         "kept by the guard and served on read; no direct-mode error is modeled", 664),
+        (reg, off, sec, "EN", 0, 0, A, "modeled by the guard",
+         "the stock model starts the stream; at its rise the guard checks the stream's addresses (TVI-DMA-TCM, TVI-DMA-ADDRESS, p108, Table 7 p131) and its DMAMUX1 request (TVI-DMA-ROUTE, TVI-DMA-SHARED, TVI-DMA-REQUEST, TVI-DMA-MUX); while it is set, a changed protected field refuses (TVI-DMA-EN running, TVI-DMA-DONE once the twin completed the transfer); the stock model never clears it at the end of a transfer (stock-wrong, p665)", 665),
+    ]
+
+
+def rows():
+    out = []
+    out += stream_flags("DMA_LISR", 0x00, "§15.5.1", 659, [0, 1, 2, 3], flag)
+    out += stream_flags("DMA_HISR", 0x04, "§15.5.2", 660, [4, 5, 6, 7], flag)
+    out += stream_flags("DMA_LIFCR", 0x08, "§15.5.3", 660, [0, 1, 2, 3], clearbit)
+    out += stream_flags("DMA_HIFCR", 0x0C, "§15.5.4", 661, [4, 5, 6, 7], clearbit)
+    out += cr()
+    out += [
+        ("DMA_SxNDTR", 0x14, "§15.5.6", "Res31_16", 31, 16, Z, "reserved", "reserved: must be kept at reset value", 665),
+        ("DMA_SxNDTR", 0x14, "§15.5.6", "NDT[15:0]", 15, 0, A, "inherited, unaudited (acknowledged by name)", "the stock model: the number of items, counted down by its transfers and never reloaded (probed, D2); protected under EN", 665),
+        ("DMA_SxPAR", 0x18, "§15.5.7", "PAR[31:0]", 31, 0, A, "modeled by the guard", "the stock model's peripheral address (probed, D2, D9); at EN the guard refuses a span in ITCM or DTCM (p108) and one in no mapped region (Table 7 p131); protected under EN", 666),
+        ("DMA_SxM0AR", 0x1C, "§15.5.8", "M0A[31:0]", 31, 0, A, "modeled by the guard", "the stock model's memory address (probed, D2); at EN the guard refuses a span in ITCM or DTCM (p108) and one in no mapped region (Table 7 p131); protected under EN", 666),
+        ("DMA_SxM1AR", 0x20, "§15.5.9", "M1A[31:0]", 31, 0, Z, "tag", "0 only: a stock tag that reads 0; double-buffer mode is not modeled", 666),
+        ("DMA_SxFCR", 0x24, "§15.5.10", "Res31_8", 31, 8, Z, "reserved", "reserved: must be kept at reset value", 667),
+        ("DMA_SxFCR", 0x24, "§15.5.10", "FEIE", 7, 7, Z, "tag", "0 only: a stock tag; FIFO errors are not modeled", 667),
+        ("DMA_SxFCR", 0x24, "§15.5.10", "Res6", 6, 6, Z, "reserved", "reserved: must be kept at reset value", 667),
+        ("DMA_SxFCR", 0x24, "§15.5.10", "FS[2:0]", 5, 3, A, "read-only", "read-only: served by the guard as 100 (FIFO empty, the reset value; not relevant in direct mode); the stock model reads 000", 667),
+        ("DMA_SxFCR", 0x24, "§15.5.10", "DMDIS", 2, 2, Z, "inherited, unaudited (acknowledged by name)", "0 only: direct mode; FIFO mode is not audited; protected under EN", 667),
+        ("DMA_SxFCR", 0x24, "§15.5.10", "FTH[1:0]", 1, 0, "Half", "stock, wrong (the stock model resets FCR to 0x00 where silicon resets it to 0x21 (p667); the guard serves FCR from its copy, reset 0x21)", "01 only, the reset value: FIFO thresholds are used only in FIFO mode, which is not audited", 667),
+    ]
+    return out
+
+
+def lit(v):
+    if isinstance(v, int):
+        return "0x%02X" % v if v < 0x100 else "0x%X" % v
+    return v
+
+
+def q(s):
+    return '"' + s.replace("\\", "\\\\").replace('"', '\\"') + '"'
+
+
+def main():
+    for r in rows():
+        reg, off, sec, name, msb, lsb, allowed, cls, behaves, page = r
+        print("            R(%s, %s, %s, %s, %d, %d, %s, %s, %s, %d)," % (q(reg), lit(off), q(sec), q(name), msb, lsb, allowed, q(cls), q(behaves), page))
+
+
+if __name__ == "__main__":
+    main()
