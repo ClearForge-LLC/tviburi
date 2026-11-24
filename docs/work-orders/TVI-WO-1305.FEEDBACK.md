@@ -6,7 +6,7 @@
 - §1.1 was measured and stopped (`TVI-WO-1305.measure.md` §0–§5, predictions committed at `dff6e77` before any run).
 - Ruled on the bus: the rulings headed 18:55Z (a hand-typed stamp, corrected at 19:13Z: it went out before 18:42Z), and the confirmations at 19:13Z.
 - The guard is built to the rulings. No §7 stop is open.
-- One question is open (§6 Q1, the ledger's model row). It is outside the fence and does not block.
+- The ledger's model row was split for a partly guarded type (granted outside the fence at 19:57Z): a **ledger-format change**, schema 1 → 2 (§2a).
 - Untouched: `model/Refusal.cs`, the record grammar, the RCC guard (its query is only called), the SPI/GPIO/timer/flash guards, the steering documents and Aethelgard.
 - The DMA guard has exactly the three ruled items and the narrowed `TVI-DMA-OFFSET` (§2).
 - One PR, left unmerged.
@@ -36,6 +36,16 @@
 - **Requests 43, 45 (`usart2_rx_dma`, `usart3_rx_dma`) and 46 (`usart3_tx_dma`)** are acknowledged by name, as 41 was (`dma-usart23`). 41's acknowledgement stays: it now moves data where the platform wires the USART guard's request, and nothing where it does not.
 - **`TVI-DMA-OFFSET` stays, narrowed** (the ruling's "check that it stays right"). It now fires only for a re-enable after a software suspension with no `NDTR` write since. p654 has software rewrite `NDTR`; p665 says NDT reloads after a completed transfer, which `TCIF` declared this one. So whether silicon runs the remaining or the programmed count is not stated: `unmodeled` (`dma-offsetndt`, DM49). ArduPilot always rewrites `NDTR`.
 
+## 2a. The ledger's model row (granted 19:57Z, outside the fence; a ledger-format change)
+
+- **Before:** `tools/tviburi-release` wrote one model row per stock type, listing every instance the pinned chain declares, with `guarded_by` whenever the type had a class row. For `UART.STM32F7_USART` that named `lpuart1`, left stock (ruled Q1), as guarded.
+- **Now:** a type whose class row names only some of its instances gets two rows, each true read alone:
+  - `field` `"guarded"`: the restated instances, with `guarded_by`;
+  - `field` `"unguarded"`: the rest, with no `guarded_by`.
+  Every other type keeps its one row with `field` `""`. Keys stay unique on (peripheral, register, field).
+- **The ledger's schema is 2.** Aethelgard's `main` reads neither `guarded_by` nor model-row `instances` (the architect's check).
+- **Checked at build:** every instance a `guarded_by` row lists must be one the manifest restates for that type, or the release refuses by name. A unit test plants an overclaiming row (`unit`; mutant US37). `usart-ledger` asserts the split rows and schema 2 (mutant US36).
+
 ## 3. Acceptance (WO §2)
 
 - **A planted firmware that changes `M` or `OVER8` with `UE` = 1** refuses `TVI-USART-UE`, **`unmodeled`**, naming the port, the field and the page (`usart-m1ue`, `-over8ue`). **The WO's "`predicted-fault`" is superseded by the ruling** (19:13Z: the manual does not say what silicon does). "The same change made with `UE` = 0 passes" holds for every allowed field (`usart-psoff`); a non-zero `M1` or `OVER8` is outside the allow-list at any `UE` (`TVI-USART-FIELD`).
@@ -47,7 +57,7 @@
   - the armed run (14 s): none;
   - other guards' records in the armed run are rows (§7).
 - **The 14 generated boots:** each board's observers are unchanged (measure §6). Every write, every `RDR` value and every `ISR` poll count is identical to main. The boot block differs only in copy-served bits outside Aethelgard's masks (`boot.rs`:960–990 read). Two consumer steps change from the form, not the rules: the `peripherals` kind and the access parser reading the guard's INFO records (§7).
-- **The budget:** judged in CI (§8).
+- **The budget:** within `1201`'s 32 MiB, judged in CI on the first push (run 45475257047): `MEDIANS main 902872 KiB, branch 908924 KiB, difference 6052 KiB (+5.9 MiB)`, PASS, every branch boot under the 1,572,864 KiB ceiling.
 - **CI:** §8.
 
 ### 3.1 The armed run (Furnace; CI has only the fixture ELF, ruled Q9)
@@ -108,7 +118,7 @@ Reduction pass (diff): −17 net · 5 duplicates removed · 3 dead paths removed
 
 ## 6. Questions for the architect
 
-1. **The ledger's model row** (posted at 19:27Z). `tools/tviburi-release` lists every stock instance of `UART.STM32F7_USART` under `guarded_by`, `lpuart1` included. The manifest's `restate` lines are right. The fix is about ten lines in the release program, a ledger-format change outside my fence. Grant it, or make it a row? `usart-ledger` asserts the manifest meanwhile.
+1. ~~The ledger's model row~~ (posted 19:27Z): **granted at 19:57Z and done** (§2a).
 2. **`BRR` below 16** (adversarial G4). "USARTDIV must be greater than or equal to 16" (p2035), and the allow-list takes any `BRR`. ArduPilot's armed run starts `usart2` with `BRR` = 0 for one write (0.2017 s), so refusing it would refuse the armed run. `unmodeled`, acknowledge by name, or leave it?
 3. **Overrun with `FIFOEN` = 0** (G1). Silicon loses the second unread byte (p2030), and the twin's queue is unbounded. Q8 acknowledged that for FIFO mode, which both firmwares run. Does the acknowledgement extend to `FIFOEN` = 0, or should that be `unmodeled`? With instantaneous injection, a firmware on silicon would lose bytes the consumer never paces.
 4. **`IDLE`'s frame time uses the stock `frequency` property** (200 MHz or 125 MHz), not the RCC's selected kernel source (G3). Baud accuracy is ruled Aethelgard's. But `IDLE` timing is now the guard's own, and it is off by the same ratio whenever the two differ. Compute it from the RCC source, or a row?
@@ -160,12 +170,12 @@ Reduction pass (diff): −17 net · 5 duplicates removed · 3 dead paths removed
 - **The whole suite** (286 cases, at `01eb773`): 326 checks ok, 6 failed:
   - three teardown-race losses (§7);
   - `usart-reinitstop` (the adversarial B1 bug, then fixed);
-  - `usart-fields` (a case-count floor I guessed at 400; the generator makes 394, and no record was wrong or missing);
+  - `usart-fields` (a case-count floor I guessed at 400; the generator makes 394, and no record was wrong or missing). Now pinned to exactly 394, the generator's `# CASE` lines for this table, counted in that run (ruled 19:57Z);
   - `usart-ledger` (§6 Q1).
 - **The final tree, `8e1d2d1`:**
   - `tests/1305/usart.sh` 30/30;
   - `tests/1303/dma.sh` 44/44;
-  - **all 43 of this WO's mutants killed** (US01–US35, DM25 retargeted, DM43–DM49), each on the case named for it;
+  - **all 43 of this WO's mutants killed** (US01–US35, DM25 retargeted, DM43–DM49), each on the case named for it; then, with the ledger split, US36 and US37 killed, and `unit` plus all six guards' `ledger` cases and `usart-fields` pass (45 mutants in all);
   - the first mutant run left US02 and US05 alive, because their cases touched only acknowledged fields; both cases now carry an unacknowledged one.
 - **The acceptance replays on `8e1d2d1`** (the 14 generated boots and the fixture; the armed run): as measure §6 and §3.1.
 - **Memory:** a prototype measured −6.5 MiB (measure §4). **The built guard's budget is judged in CI** (ruled; Furnace is shared).
