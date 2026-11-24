@@ -16,9 +16,9 @@
 | The allow-list: 225 rows over the 25 registers of TIM1/TIM8 (every bit 31:0), generated from RM0433 Rev 9 §38.4 with the classes ruled at Q7 | the same, `Fields` |
 | The restatement (variant B, ruled Q3): the GPIO generator's one change and its regenerated output (only the `timer1`/`timer8` renames, §2), a generator for the timer restatement, and the board's include and modes. **The RCC restatement is untouched** (§2) | `model/stm32h7-{gpio,timer}-restate.{awk,repl}`, `model/tviburi-nucleo-h753zi.repl` |
 | The class row | `tools/tviburi-release/pins.tsv` |
-| 35 cases, each `timer-<case>` in `tests/spike.sh`'s acceptance group (registered there, additively); 28 planted firmware paths | `tests/1302/timer.sh`, `firmware/timer.rs` |
+| 36 cases, each `timer-<case>` in `tests/spike.sh`'s acceptance group (registered there, additively); 28 planted firmware paths | `tests/1302/timer.sh`, `firmware/timer.rs` |
 | The table's generator and its input: RM0433 Rev 9 §38.4's fields, extracted and checked to cover each register once; `timer-regen` checks the table byte for byte | `tests/1302/fields.py`, `tests/1302/data/rm0433-rev9-tim18-fields.tsv` |
-| Mutants TM01–TM31, one per guard added or changed, two for the restatement, one for the table's regeneration | `tests/mutants.tsv` |
+| Mutants TM01–TM33, one per guard added or changed, two for the restatement, one for the table's regeneration, two for the load-time collection | `tests/mutants.tsv` |
 | The replay instantiates the timer guards on a tree that has them, moving the consumer's `timer1:`/`timer8:` frequency onto them (the measured trap) | `tests/1301/replay-1301.sh` |
 | `timer1 timer8` appended to each guard-name list (granted 06:52Z) | `tests/1301/gpio.sh`, `tests/1300/rcc.sh`, `tests/spike.sh` (6), `tests/mutants.tsv` (G17), `scripts/tviburi-spike` |
 
@@ -130,8 +130,14 @@ There were two passes: mine through the build, and an independent one by a fresh
 - **`SR.UIF`/`CCxIF` are `stock-wrong`:** the stock model sets them only with their interrupt enabled (p1597). A polling firmware reads 0 with no record; neither committed firmware polls them.
 - **No test counts edges across a reset.** The fix for the zero-width reset pulse (§4, defect 3) is argued from the code alone.
 - **In recorded mode, the frozen LOCK bits are kept in the copy, but no case drives a refused LOCK change through recorded mode.** In enforcing mode the change refuses first.
-- **The teardown race** (roadmap row) hit `gpio-packageinput` once in the full suite and `timer-moe0` once in a rerun, 2 of about 225 container runs. TIM1 and TIM8 add two more end-record emitters. Whether that raises the rate is not measured.
-- **The S25 mint** needed the operator's out-of-band approval, which was not given while I worked (07:27Z). The branch is pushed only after it.
+- **The teardown race** (roadmap row) hit `gpio-packageinput` once in the full suite, and `timer-moe0` and `timer-cce0` once each in reruns: 3 of about 330 container runs. Each passed on rerun. TIM1 and TIM8 add two more end-record emitters. Whether that raises the rate is not measured.
+- **The S25 mint** needed the operator's out-of-band approval at 07:27Z and 07:39Z, before the window opened. Both requests expired unused.
+- **The class map is broader than the guard** (agreed 09:25Z; a Phase 2 consumer row for the release program). `class Timers.STM32_Timer Tviburi.GuardedSTM32_Timer` makes the MANIFEST restate all 14 stock timers, while the guard models TIM1 and TIM8 and refuses `TVI-TIM-CONFIG` elsewhere. The SPI row is as broad (`restate … spi4`). The fix is "a class row names its instances". `tools/` is left as it is.
+- **Compile garbage and the one-file overlay (ruled 10:30Z):**
+  - Aethelgard (Phase 2) may collect after its `include` itself.
+  - The release program should know that the overlay's compile leaves garbage (~24 MiB of the 36 here, at main's size plus this guard) that grows with the file.
+  - Each later guard's budget compares against a `main` that already collects.
+- **The load-time collection's memory effect has no functional test:** CI's budget step is its check. That it happens exactly once per instance is `timer-gconce`'s.
 
 ## 8. Suites, mutants, memory and CI
 
@@ -140,10 +146,30 @@ All on Furnace, in the pinned image (`aethelgard-tools@sha256:1e0ab105…`), one
 - **The mutation run, diff-sized** (TM01–TM31 and the amended G17), on the same tree: 32 of 32 killed, each by its named case.
   - One earlier run, on `3939ff4`, left TM28 alive: `timer-halfhigh` wrote 0 to an upper half, which cannot tell a merged word from a dropped shift. It now writes 1 to CCMR3's upper half and reads it back.
 - **The full `tests/spike.sh`** on `918f397`: 183 ok and 2 FAIL (§6). **On `ef48255`: 192 ok, 0 FAIL. `tests/adversarial.sh` on HEAD: 33 ok, ALL PASS.**
-- **Memory, `1201`'s budget, on Furnace: it fails, and the WO stops here (§7).**
-  - `main`: 998,516; 998,636; 1,013,080; 974,432; 983,972 KiB (median 998,516).
-  - HEAD: 1,028,104; 1,035,524; 1,035,304; 1,010,864; 1,043,632 KiB (median 1,035,304).
-  - **+35.9 MiB, over the 32 MiB budget.** Every boot is under the 1,572,864 KiB ceiling.
-  - The §1.1 prototype, with one instance and no table, was +2.4 MiB (measure.md §4).
-  - Where the difference goes is not measured (compile against instances). Posted to the architect as a stop, 2026-11-24.
+- **Memory, `1201`'s budget, on Furnace.** Every run is eleven boots a side unless marked; main against an identical copy of itself gave +0.6 MiB.
+  - **First measured: +35.6 MiB** (+35.9 at five boots), over the 32 MiB budget: a stop (§7). Ruled 09:25Z: measure, then reduce.
+  - **Where it went:**
+
+    | Variant (against `main`) | Median difference |
+    |---|---|
+    | HEAD as built | +35.6 MiB |
+    | the class compiled in, no instance | +35.9 MiB |
+    | no table and no `Row` type | +35.1 MiB |
+    | table strings cut to one character (5 boots) | +36.3 MiB |
+    | table cut to one row (5 boots) | +39.8 MiB |
+    | without the 16- and 8-bit interfaces (not shipped, RUL-07) | +24.8 MiB |
+    | the §1.1 probe class | +3.9 MiB |
+
+  - **So neither the instances nor the data cost anything; the compiled class does.**
+    - Compiling alone costs +4–10 MiB at its own peak.
+    - After `include` and `mach create`, the managed heap holds +22 MB more than main's (230.9 against 208.3 MB, the same 4 gen2 collections; JIT +151 methods). After a forced full GC the difference is +0.4 MB.
+    - **That garbage stays in gen2 through ArduPilot's boot and counts in the peak.**
+  - **The guard's own cost, like for like:** one forced full GC after the platform load on *both* sides gives **+11.6 MiB** (main 987,620, branch 999,484 KiB). main itself drops about 12 MiB.
+  - **Ruled 10:30Z (A), placed 10:55Z:** the guard subscribes to the machine's `StateChanged` in its constructor. At the first `Started` it unsubscribes and forces one full, blocking, compacting GC.
+    - It is per-instance state with no static, so TIM1 and TIM8 collect twice, tens of ms at the start.
+    - It is a deliberate load-time side effect, with no effect on virtual time, accesses or records.
+    - **In the constructor, as first ruled, it measured +27.7 MiB:** the constructor runs during the platform's load, so the collection there misses part of the garbage.
+    - `timer-gconce` reads each instance's collection count: 0 before the start, then 1 after it, after a pause and resume, and after a `machine Reset` and a start. TM32 (no unsubscribe) and TM33 (no subscription) are killed by it.
+  - **The budget's own figure then compares a collecting branch with a non-collecting main:** `MEDIANS main 1003476 KiB, branch 1004332 KiB, difference 856 KiB (+0.8 MiB)`, PASS, eleven boots a side on `24d4155`. With the collection at the first start against a non-collecting main, an earlier run measured −51.2 MiB. **The guard's cost is the like-for-like +11.6 MiB;** the budget's figure also hides main's own ~12 MiB of garbage, once.
+  - **A slip:** during the diagnosis, one `podman run` (checking that the image has `python3`) ran outside `~/bin/capped-run`, against the house rule. It was a single `command -v` in a throwaway container.
 - **CI:** see the PR. A green suite here is not live acceptance.
