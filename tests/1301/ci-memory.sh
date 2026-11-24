@@ -140,8 +140,7 @@ for r in $(seq 1 "$runs"); do
     parts=$(awk '/^(RssAnon|RssFile|RssShmem|AnonHugePages|Threads):/ {v[$1] = $2} /^pid / {v["n"] = $4; v["s"] = $7}
       END {printf "%s\t%s\t%s\t%s\t%s\t%s\t%s", v["RssAnon:"], v["RssFile:"], v["RssShmem:"], v["AnonHugePages:"], v["Threads:"], v["n"], v["s"]}' \
       "$out/2-accept.peak-proc.txt" 2>/dev/null || true)
-    printf '%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n' $s $r "${peak:-0}" "${wall:-none}" "$status" "$mine" "$avail" \
-      "$(cut -d' ' -f1-3 /proc/loadavg)" "$parts" >> "$work/runs.tsv"
+    printf '%s\t%s\t%s\t%s\t%s\t%s\t%s\n' $s $r "${peak:-0}" "${wall:-none}" "$status" "$mine" "$parts" >> "$work/runs.tsv"
     echo "$s boot $r: peak ${peak:-none} KiB, wall ${wall:-none} s, witnesses of its release $mine, host MemAvailable" \
       "before $avail kB; at the peak RssAnon/RssFile/RssShmem/AnonHugePages/Threads/processes/snapshot-sum $(tr '\t' / <<<"$parts"): $status"
   done
@@ -160,7 +159,7 @@ if [ -n "${GITHUB_STEP_SUMMARY:-}" ]; then
     echo
     echo "| side | boot | peak (KiB) | wall (s) | counts? | witnesses | RssAnon | RssFile | RssShmem | AnonHugePages | threads | processes | snapshot's sum |"
     echo "|---|---|---|---|---|---|---|---|---|---|---|---|---|"
-    awk -F'\t' '{printf "| %s | %s | %s | %s | %s | %s | %s | %s | %s | %s | %s | %s | %s |\n", $1, $2, $3, $4, $5, $6, $9, $10, $11, $12, $13, $14, $15}' \
+    awk -F'\t' '{printf "| %s | %s | %s | %s | %s | %s | %s | %s | %s | %s | %s | %s | %s |\n", $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13}' \
       "$work/runs.tsv"
     echo
     echo '```'; cat "$work/runner.txt"; echo '```'
