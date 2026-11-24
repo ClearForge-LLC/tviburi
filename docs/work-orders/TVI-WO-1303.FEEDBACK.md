@@ -52,8 +52,8 @@
 | A planted firmware pointing a DMA1 stream at DTCM refuses `predicted-fault` at enable, naming the stream, the address, the region and the page; the same firmware with an AXI SRAM address passes | `dma-tcm`, `dma-axi` | as stated: `DMA_S0M0AR = 0x20000400 (DTCM (0x20000000-0x2001FFFF))`, p108, stream 0, at the `CR` store |
 | ArduPilot's recorded boot shows no DMA `would-refuse` outside the acknowledged table | the committed fixture (ELF `a799dfb6`) and AP-m, every guard recorded, `main` against this branch | 0 `would-refuse` from `dma1`/`dma2`; both guards witness; the console bytes and the boot block are identical to `main`'s (§8) |
 | The 14 generated boots: each board's observers unchanged, or each difference cited | the 14 boots recaptured at Aethelgard `1cb994c1`, the same way | observer edges with their stamps, the boot block and USART1's lines identical on all 14; 0 DMA `would-refuse` (§8) |
-| The budget, within `1201`'s 32 MiB, under the ceiling | §8 | §8 |
-| CI green | the PR | §8 |
+| The budget, within `1201`'s 32 MiB, under the ceiling | CI's budget (ruled the decider, 15:50Z) | +9.6 MiB at the median, every branch boot under the ceiling: PASS (§8) |
+| CI green | PR #37 | green (§8) |
 
 ## 4. The adversarial pass (WO §5)
 
@@ -166,4 +166,9 @@ All on Furnace, in the pinned image (`aethelgard-tools@sha256:1e0ab105…`), one
   - A §7 stop, ruled at 15:50Z: host contention (the roadmap's wall-time row), with CI's budget the decider. CI's result is below.
 - **Acceptance** on `609a2c9` (§3): all 16 boots identical to main, 0 DMA `would-refuse`, both DMA guards witnessing.
 - **`tviburi-route inventory`:** passes.
-- **CI:** see the PR. A green CI is not live acceptance.
+- **CI on PR #37, run 45429587308, on `f6f3fa1`:** all green.
+  - The route passed, with the inventory. The first run, on `32114c3`, failed it: the guard's comment names its FEEDBACK, which became a tracked document only with that commit. The row was added in `f6f3fa1`.
+  - Shards 1–5 passed, and the aggregate proved every case and mutant ran exactly once.
+  - The budget's tests passed.
+  - **The budget, the decider (ruled 15:50Z):** `MEDIANS main 899580 KiB, branch 909372 KiB, difference 9792 KiB (+9.6 MiB)`, PASS. Every boot ran under 0.93 GB with a wall of 14.7–15.9 s.
+  - A green CI is not live acceptance.
