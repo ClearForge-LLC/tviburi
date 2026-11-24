@@ -172,7 +172,7 @@ G13-portFromAddress	model/GuardedSTM32_GPIOPort.cs	port = (char)('A' + (int)((st
 G14-tableData	model/GuardedSTM32_GPIOPort.cs	PA5:89:	PA5:90:	afcheck
 G15-restatedRoute	model/stm32h7-gpio-restate.repl	tviburiTimer1:\n    0 -> tviburiGpioA#07@01 | tviburiGpioA#08@01 |	tviburiTimer1:\n    0 -> tviburiGpioA#07@01 |	gpio-registrations
 G16-boardPackage	model/tviburi-nucleo-h753zi.repl	tviburiGpioH:\n    mode: "enforcing"\n    package: "LQFP144"	tviburiGpioH:\n    mode: "enforcing"	gpio-package
-G17-namesLine	scripts/tviburi-spike	gpioPortJ gpioPortK timer1 timer8 dma1 dma2 >	gpioPortJ timer1 timer8 dma1 dma2 >	modeled
+G17-namesLine	scripts/tviburi-spike	gpioPortJ gpioPortK timer1 timer8 dma1 dma2 flashController >	gpioPortJ timer1 timer8 dma1 dma2 flashController >	modeled
 G18-unlistedPinAf	model/GuardedSTM32_GPIOPort.cs	if(cell == null || cell.Text == "-")	if(cell != null && cell.Text == "-")	gpio-pk8af
 G19-unlistedPinPackage	model/GuardedSTM32_GPIOPort.cs	(!bonding.TryGetValue("P" + port + pin, out var b) || b.Pin == null)	(bonding.TryGetValue("P" + port + pin, out var b) && b.Pin == null)	gpio-pk8out
 G20-staleRefresh	model/GuardedSTM32_GPIOPort.cs	base.ReadDoubleWord(b);\n            }\n            var before = Selection();	}\n            var before = Selection();	gpio-resetwrite
@@ -279,3 +279,43 @@ DM39-fthProtected	model/GuardedSTM32DMA.cs	case FcrOffset: return DmdisBit | Fth
 DM40-fthAny	tests/1303/fields.py	"FTH[1:0]", 1, 0, A,	"FTH[1:0]", 1, 0, Z,	dma-regen
 DM41-offset	model/GuardedSTM32DMA.cs	            if(stale[s])	            if(false)	dma-offset
 DM42-reloadSpan	model/GuardedSTM32DMA.cs	var items = (ulong)(reload ? programmed[s] : Items(s));	var items = (ulong)Items(s);	dma-reloadtcm
+FL01-waitShort	model/GuardedSTM32H7_Flash.cs	                if(latency < need)	                if(false)	flash-clockfirst
+FL03-vosUnknownAtVos1	model/GuardedSTM32H7_Flash.cs	var row = table[c.Vos == 0 ? 1 : c.Vos];	var row = table[c.Vos == 0 ? 3 : c.Vos];	flash-vosunknown
+FL04-over225	model/GuardedSTM32H7_Flash.cs	            if(clock.Hz == null || clock.Hz > MaxAclk)\n            {\n                kind = Unmodeled;\n                why = clock.Hz == null ? "the AXI clock cannot be computed (" + clock.Note + ")"\n                    :	            if(clock.Hz == null)\n            {\n                kind = Unmodeled;\n                why = clock.Hz == null ? "the AXI clock cannot be computed (" + clock.Note + ")"\n                    :	flash-over225
+FL05-divider	model/GuardedSTM32H7_Flash.cs	(v & 7) < 4 ? 2ul << (int)(v & 7)	(v & 7) < 4 ? 1ul << (int)(v & 7)	flash-clockfirst flash-prescaler
+FL06-divp	model/GuardedSTM32H7_Flash.cs	/ ((divr >> 9 & 0x7F) + 1);	/ ((divr >> 9 & 0x7F) + 2);	flash-vos3
+FL07-sysPll	model/GuardedSTM32H7_Flash.cs	case 3: sys = Pll1(rcc, hsi); break;	case 3: sys = hsi; break;	flash-clockfirst
+FL08-rccEvent	model/GuardedSTM32H7_RCC.cs	            Written?.Invoke(b, value);\n	(empty)	flash-clockfirst
+FL09-subscribe	model/GuardedSTM32H7_Flash.cs	                    rcc.Written += OnRccWritten;\n	(empty)	flash-clockfirst
+FL10-alias	model/GuardedSTM32H7_Flash.cs	return Aliases.Contains(b) ? b - 0x100 : b;	return b;	flash-alias flash-optsr
+FL11-vosRead	model/GuardedSTM32H7_Flash.cs	return scale == 0 ? 0 : 4 - scale;	return 0;	flash-vos3
+FL12-lock	model/GuardedSTM32H7_Flash.cs	            if((!locked && !locking) || changed == 0)\n	            if(!locking || changed == 0)\n	flash-lockedcr
+FL13-lockSame	model/GuardedSTM32H7_Flash.cs	var changed = (word ^ Served(b)) & ~LockBit;	var changed = word & ~LockBit;	flash-lockedsame
+FL14-keyWrong	model/GuardedSTM32H7_Flash.cs	else if(key[k] == 0 && word != Key1)	else if(false)	flash-badkey
+FL15-keyUnlocked	model/GuardedSTM32H7_Flash.cs	else if(!LockedCr(k))	else if(false)	flash-keytwice
+FL16-keyMid	model/GuardedSTM32H7_Flash.cs	else if(key[k] == 1 && !Aliases.Contains(b + 0x100))	else if(false)	flash-keymid
+FL17-keyWidth	model/GuardedSTM32H7_Flash.cs	                if(width != 32)\n	                if(false)\n	flash-keyhalf
+FL18-keyAdvance	model/GuardedSTM32H7_Flash.cs	key[k] = key[k] == 0 ? 1 : 0;	key[k] = 0;	flash-ap
+FL19-psize	model/GuardedSTM32H7_Flash.cs	return (base.ReadDoubleWord(b) & ~PsizeMask) | (psize[Bank(b)] << 4);	return base.ReadDoubleWord(b);	flash-ap flash-reset
+FL20-srReadOnly	model/GuardedSTM32H7_Flash.cs	            case Sr1:\n            case Sr2:\n            case OptsrCur:\n                return;	            case Sr1:\n            case OptsrCur:\n                return;	flash-ap
+FL21-optsrImage	model/GuardedSTM32H7_Flash.cs	return (uint)optionBytes;	return base.ReadDoubleWord(b);	flash-optsr
+FL22-optsrUndeclared	model/GuardedSTM32H7_Flash.cs	if(b == OptsrCur && optionBytes < 0)	if(false)	flash-optsrnone
+FL23-register	model/GuardedSTM32H7_Flash.cs	if(Modeled(b))	if(true)	flash-optwrite
+FL24-field	model/GuardedSTM32H7_Flash.cs	if(f.Allowed != null && !f.Allowed.Contains(v))	if(false)	flash-bank1
+FL25-read	model/GuardedSTM32H7_Flash.cs	if(!Readable(b))	if(false)	flash-readreg
+FL26-progStart	model/GuardedSTM32H7_Flash.cs	return starts && Program(	return false && Program(	flash-wrhlow
+FL27-progPg	model/GuardedSTM32H7_Flash.cs	var starts = ((word & PgBit) != 0 && (before & PgBit) == 0) ||	var starts =	flash-wrhpg
+FL28-wrhOneSided	model/GuardedSTM32H7_Flash.cs	if(wrh < need)	if(wrh != need)	flash-ap
+FL29-config	model/GuardedSTM32H7_Flash.cs	if(optionBytes < -1 || optionBytes > 0xFFFFFFFFL)	if(false)	flash-config
+FL30-ledgerLatency	model/GuardedSTM32H7_Flash.cs	"LATENCY", 3, 0, Latencies,	"LATENCY", 3, 0, Any,	flash-ledger flash-regen
+FL31-bank	model/GuardedSTM32H7_Flash.cs	return b >= 0x100 ? 1 : 0;	return 0;	flash-keytwice
+FL32-restate	model/stm32h7-flash-restate.repl	    -> nvic@4\n	(empty)	flash-regen
+FL33-clockRegisters	model/GuardedSTM32H7_Flash.cs	{ 0x00, 0x10, 0x18, 0x28, 0x2C, 0x30, 0x34 }	{ 0x00, 0x10, 0x28, 0x2C, 0x30, 0x34 }	flash-prescaler
+FL34-locking	model/GuardedSTM32H7_Flash.cs	var locking = !locked && (word & LockBit) != 0;	var locking = false;	flash-locking
+FL35-latchWhy	model/GuardedSTM32H7_Flash.cs	if(why != null && why != waitWhy)	if(why != null && waitWhy == null)	flash-worse
+FL36-keyLost	model/GuardedSTM32H7_Flash.cs	                else if(keyLost[k])\n	                else if(false)\n	flash-recorded
+FL37-bandEdge	model/GuardedSTM32H7_Flash.cs	if(c.Hz <= (ulong)row[i] * 1000000)	if(c.Hz < (ulong)row[i] * 1000000)	flash-edge
+FL38-table17vos2	model/GuardedSTM32H7_Flash.cs	new[] { 55, 110, 165, 225 }	new[] { 55, 140, 165, 225 }	flash-vos2
+FL39-d1cpre	model/GuardedSTM32H7_Flash.cs	c.Hz = sys / Div(d1 >> 8 & 0xF) / Div(d1 & 0xF);	c.Hz = sys / Div(d1 & 0xF);	flash-d1cpre
+FL40-progWhileProgramming	model/GuardedSTM32H7_Flash.cs	            if(programming)\n	            if(false)\n	flash-wrhrcc
+FL41-commonRegisters	model/GuardedSTM32H7_Flash.cs	else if(key[k] == 1 && !Aliases.Contains(b + 0x100))	else if(key[k] == 1)	flash-keymid

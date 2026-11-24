@@ -150,6 +150,11 @@ namespace Antmicro.Renode.Peripherals.Tviburi
             return true;
         }
 
+        // TVI-WO-1304: raised after every write this guard passes, with its offset and value, so that the flash guard judges
+        // the AXI clock the write leaves against FLASH_ACR (RM0433 Rev 9 Table 17 p160). Its one call into the flash guard
+        // (ruled 2026-11-24T15:50Z Q6); the flash guard reads the clock back from this guard's registers.
+        public event Action<long, uint> Written;
+
         // ---- the query -----------------------------------------------------------------------------------------
 
         // "Is peripheral P's kernel clock running now", by the guard's tracked state. Peripheral names are the
@@ -394,6 +399,7 @@ namespace Antmicro.Renode.Peripherals.Tviburi
                 UnlockGuarded();
             }
             Settle();
+            Written?.Invoke(b, value);
         }
 
         // ---- enables at reset (TVI-WO-1300a (1)) ---------------------------------------------------------------

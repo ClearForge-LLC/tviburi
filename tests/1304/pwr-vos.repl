@@ -1,0 +1,33 @@
+// TVI-WO-1304 (ruled 2026-11-24T15:50Z Q7): a VOS-storing pwr for the flash guard's tests' platform only; the board
+// file keeps the stock stub, as consumers' foreign platforms do. The consumer's own script, verbatim: the generated
+// platform of Aethelgard 1cb994c1 (hse-crystal-16, aethelgard-twin platform.rs pwr_override; AET-WO-4240v D-3 (a)).
+// The PWR (AET-WO-4240v D-3 (a)): the stock stub's script replaced, from RM0433 Rev 9
+// §6.8: PWR_CR3 reads revision V's power-on 0x00000046 until its first write, stores that
+// write (USB33RDY 0) and ignores later ones; PWR_D3CR stores VOS (Scale 3 from reset) with
+// VOSRDY 1; PWR_CSR1 reads ACTVOS as the stored VOS with ACTVOSRDY 1; any other offset as stock.
+pwr:
+    initable: true
+    script: '''
+if request.IsInit:
+    cr3 = 0x00000046
+    cr3_written = False
+    vos = 0x00004000
+elif request.Offset == 0x00:
+    request.Value = 0xF000C100
+elif request.Offset == 0x04:
+    request.Value = vos | 0x00002000
+elif request.Offset == 0x0C:
+    if request.IsWrite:
+        if not cr3_written:
+            cr3 = request.Value & 0xFBFFFFFF
+            cr3_written = True
+    else:
+        request.Value = cr3
+elif request.Offset == 0x18:
+    if request.IsWrite:
+        vos = request.Value & 0x0000C000
+    else:
+        request.Value = vos | 0x00002000
+else:
+    self.WarningLog("Unhandled access to offset 0x{0:X}", request.Offset)
+'''

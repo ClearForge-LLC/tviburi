@@ -32,6 +32,9 @@ ACCEPTANCE="$ACCEPTANCE $(for c in $TIMER_CASES; do printf 'timer-%s ' "$c"; don
 # TVI-WO-1303: the DMA guard's cases live in tests/1303/dma.sh; each is a test here, dma-<case>, in the acceptance group.
 DMA_CASES=$(sed -n 's/^CASES="\(.*\)"$/\1/p' "$(dirname "$0")/1303/dma.sh")
 ACCEPTANCE="$ACCEPTANCE $(for c in $DMA_CASES; do printf 'dma-%s ' "$c"; done)"
+# TVI-WO-1304: the flash guard's cases live in tests/1304/flash.sh; each is a test here, flash-<case>, in the acceptance group.
+FLASH_CASES=$(sed -n 's/^CASES="\(.*\)"$/\1/p' "$(dirname "$0")/1304/flash.sh")
+ACCEPTANCE="$ACCEPTANCE $(for c in $FLASH_CASES; do printf 'flash-%s ' "$c"; done)"
 ALL="$ACCEPTANCE $ADVERSARIAL"
 if [ "${TVIBURI_TESTS:-}" = list ]; then printf '%s\n' $ALL; exit 0; fi
 here=$(cd "$(dirname "$0")/.." && pwd)
@@ -77,7 +80,7 @@ renode_in() { # renode_in <name> <tree> <resc> [podman args...]: the release, Re
   local name=$1 tree=$2 resc=$3; shift 3
   pod "$name" "$tree" -v "$work/check-build:/check:ro,Z" "$@" -- sh -c "v=\$(/repo/scripts/build-release) || exit 9; \
     timeout 120 renode --disable-gui --console --plain $resc </dev/null >/out/renode.out 2>&1; \
-    echo renode-exit=\$?; /check/debug/tviburi-check \$v /out/renode-log.txt spi1 rcc gpioPortA gpioPortB gpioPortC gpioPortD gpioPortE gpioPortF gpioPortG gpioPortH gpioPortI gpioPortJ gpioPortK timer1 timer8 dma1 dma2"
+    echo renode-exit=\$?; /check/debug/tviburi-check \$v /out/renode-log.txt spi1 rcc gpioPortA gpioPortB gpioPortC gpioPortD gpioPortE gpioPortF gpioPortG gpioPortH gpioPortI gpioPortJ gpioPortK timer1 timer8 dma1 dma2 flashController"
 }
 
 version_of() { # version_of <name>: the release hash of the release a run built, sha256:<hex>
@@ -379,9 +382,11 @@ t_crash() {
     v=$(/repo/scripts/build-release) || exit 9
     printf "include @/repo/scripts/prelude.resc\nemulation RunFor \"100\"\nquit\n" >/out/long.resc
     renode --disable-gui --console --plain /out/long.resc </dev/null >/out/renode.out 2>&1 & pid=$!
-    for i in $(seq 600); do grep -q "spi1: {\"tviburi\":\"witness\"" /out/renode-log.txt 2>/dev/null && break; sleep 0.1; done
+    # the whole witness line, its closing brace included: the log is flushed in blocks, and a kill inside the line leaves it
+    # malformed (TVI-WO-1304: after the DMA and flash witnesses, spi1'"'"'s line straddled a block on every run)
+    for i in $(seq 600); do grep -q "spi1: {\"tviburi\":\"witness\".*}\$" /out/renode-log.txt 2>/dev/null && break; sleep 0.1; done
     kill -9 $pid; wait $pid; echo renode-exit=$?
-    /check/debug/tviburi-check $v /out/renode-log.txt spi1 rcc gpioPortA gpioPortB gpioPortC gpioPortD gpioPortE gpioPortF gpioPortG gpioPortH gpioPortI gpioPortJ gpioPortK timer1 timer8 dma1 dma2'
+    /check/debug/tviburi-check $v /out/renode-log.txt spi1 rcc gpioPortA gpioPortB gpioPortC gpioPortD gpioPortE gpioPortF gpioPortG gpioPortH gpioPortI gpioPortJ gpioPortK timer1 timer8 dma1 dma2 flashController'
   check "a simulator killed after its witness does not PASS (1, no end record, the witness seen)" \
     "grep -qx 'renode-exit=137' '$work/crash.stdout' && grep -qx 'CHECK FAIL' '$work/crash.stdout' \
      && grep -q '^PROBLEM spi1: no end record' '$work/crash.stdout' && ! grep -q '^PROBLEM spi1: no load witness' '$work/crash.stdout'"
@@ -399,7 +404,7 @@ t_identity() {
   pod id-empty "$src" -v "$work/check-build:/check:ro,Z" -- sh -c 'v=$(/repo/scripts/build-release) || exit 9
     printf "include @/repo/scripts/prelude.resc\nquit\n" >/out/empty.resc; cd /out
     env -i /opt/renode/renode --disable-gui --console --plain /out/empty.resc </dev/null >/out/renode.out 2>&1
-    /check/debug/tviburi-check $v /out/renode-log.txt spi1 rcc gpioPortA gpioPortB gpioPortC gpioPortD gpioPortE gpioPortF gpioPortG gpioPortH gpioPortI gpioPortJ gpioPortK timer1 timer8 dma1 dma2'
+    /check/debug/tviburi-check $v /out/renode-log.txt spi1 rcc gpioPortA gpioPortB gpioPortC gpioPortD gpioPortE gpioPortF gpioPortG gpioPortH gpioPortI gpioPortJ gpioPortK timer1 timer8 dma1 dma2 flashController'
   check "the witness's version is the same with TVIBURI_MODEL_DIR at another directory (and the run PASSes), and with an empty environment" \
     "grep -qx 'VERDICT PASS' '$work/id-otherdir.stdout' && [ \$(version_of id-otherdir) = $v ] && spi1_records id-otherdir 'recs[0][\"model_version\"] == \"$v\"' \
      && [ \$(version_of id-empty) = $v ] && spi1_records id-empty 'recs[0][\"tviburi\"] == \"witness\" and recs[0][\"model_version\"] == \"$v\"'"
@@ -544,9 +549,9 @@ t_adv-version() {
   need_check
   pod adv-version "$src" -v "$work/check-build:/check:ro,Z" -v "$work/modeled:/run:ro,Z" -- sh -c '
     v=sha256:$(sha256sum </run/release/MANIFEST | cut -c1-64); w=sha256:$(printf %064d 0)
-    /check/debug/tviburi-check "$v" /run/renode-log.txt spi1 rcc gpioPortA gpioPortB gpioPortC gpioPortD gpioPortE gpioPortF gpioPortG gpioPortH gpioPortI gpioPortJ gpioPortK timer1 timer8 dma1 dma2 >/dev/null; echo right=$?
-    /check/debug/tviburi-check "$w" /run/renode-log.txt spi1 rcc gpioPortA gpioPortB gpioPortC gpioPortD gpioPortE gpioPortF gpioPortG gpioPortH gpioPortI gpioPortJ gpioPortK timer1 timer8 dma1 dma2 >/dev/null; echo wrong=$?
-    /check/debug/tviburi-check /run/renode-log.txt spi1 rcc gpioPortA gpioPortB gpioPortC gpioPortD gpioPortE gpioPortF gpioPortG gpioPortH gpioPortI gpioPortJ gpioPortK timer1 timer8 dma1 dma2 >/dev/null; echo none=$?
+    /check/debug/tviburi-check "$v" /run/renode-log.txt spi1 rcc gpioPortA gpioPortB gpioPortC gpioPortD gpioPortE gpioPortF gpioPortG gpioPortH gpioPortI gpioPortJ gpioPortK timer1 timer8 dma1 dma2 flashController >/dev/null; echo right=$?
+    /check/debug/tviburi-check "$w" /run/renode-log.txt spi1 rcc gpioPortA gpioPortB gpioPortC gpioPortD gpioPortE gpioPortF gpioPortG gpioPortH gpioPortI gpioPortJ gpioPortK timer1 timer8 dma1 dma2 flashController >/dev/null; echo wrong=$?
+    /check/debug/tviburi-check /run/renode-log.txt spi1 rcc gpioPortA gpioPortB gpioPortC gpioPortD gpioPortE gpioPortF gpioPortG gpioPortH gpioPortI gpioPortJ gpioPortK timer1 timer8 dma1 dma2 flashController >/dev/null; echo none=$?
     /check/debug/tviburi-check "$v" /run/renode-log.txt spi2 >/run-unnamed.txt; echo unnamed=$?; grep -c "not named" /run-unnamed.txt'
   check "the check passes the modeled run only with its expected version: wrong (1) and none (1) fail (gate clause 7)" \
     "grep -qx right=0 '$work/adv-version.stdout' && grep -qx wrong=1 '$work/adv-version.stdout' && grep -qx none=1 '$work/adv-version.stdout'"
@@ -689,6 +694,17 @@ t_dma() { # t_dma <case>: one case of tests/1303/dma.sh on this source, its ok/F
   fails=$((fails + f))
 }
 for c in $DMA_CASES; do eval "t_dma-$c() { t_dma $c; }"; done
+t_flash() { # t_flash <case>: one case of tests/1304/flash.sh on this source, its ok/FAIL lines counted here (TVI-WO-1304)
+  local out trc=0
+  out=$(TVIBURI_TESTS="$1" TVIBURI_SCRATCH="$work" "$src/tests/1304/flash.sh" "$src" 2>&1) || trc=$?
+  grep -E '^(ok|FAIL) ' <<<"$out" || true
+  local f; f=$(grep -c '^FAIL ' <<<"$out" || true)
+  if [ "$trc" -ne 0 ] && [ "$f" -eq 0 ]; then
+    echo "FAIL flash-$1: tests/1304/flash.sh exited $trc with no verdict"; f=1
+  fi
+  fails=$((fails + f))
+}
+for c in $FLASH_CASES; do eval "t_flash-$c() { t_flash $c; }"; done
 
 for t in ${TVIBURI_TESTS:-acceptance}; do
   case "$t" in
