@@ -29,7 +29,7 @@
 //!   path="analogout"   - the same, then MODER PB0 = output: GreenLED lights with the latched ODR; MARK_READ = IDR_B.
 //!   path="odrfirst"    - ODR = 1 on port B, then PB0 output ("set ODR, then output"): GreenLED lit.
 //!   path="moderfirst"  - PB0 output, then ODR = 1: GreenLED lit.
-//!   path="analoghold"  - PB0 output with ODR0 = 1, then analog: the pin holds (nothing drives it); IDR0 reads 0.
+//!   path="analoghold"  - PB0 output with ODR0 = 1, then analog: nothing drives it, so it is low (p539); IDR0 reads 0.
 //!   path="afodr"       - PA8 AF1 (TIM1_CH1, DS12117 Table 9 p89), TIM1 PWM held low (CCR1 = 0), then ODR = 0x100: the
 //!                        pin follows TIM1, not ODR (p538); MARK_READ = ODR_A << 16 | IDR_A.
 //!   path="afenter"     - PA8 output high, then AF1 with TIM1 low: the pin takes TIM1's level at the switch; MARK_READ = IDR_A.
@@ -43,12 +43,13 @@
 //!   path="inputidr"    - port D: PD0 output high, then input (floating: reads 0); PD1 input, then pulled up; PD2 output
 //!                        high, input (held), then pulled down (PUPDR, p542: the pin follows each pull); PD3 output high;
 //!                        PD4 analog with ODR4 = 1 and a pull-up written (no pull in analog, p539: IDR 0, the pin low);
-//!                        PD5 input, declared up by the test's platform; PD6 input with ODR6 = 1 (floating: 0).
-//!                        MARK_READ = IDR_D, MARK_READ2 = ODR_D.
+//!                        PD5 input, declared up by the test's platform; PD6 input with ODR6 = 1 (floating: 0); PD7
+//!                        analog, declared up (the pin high, IDR7 0, p539). MARK_READ = IDR_D, MARK_READ2 = ODR_D.
 //!   path="afswitch"    - PA0 on AF1 (TIM2_CH1, p89) with TIM2 low, then AFSEL = 2 (TIM5_CH1) with TIM5 high, in AF mode:
 //!                        the pin follows the newly selected AF. MARK_READ = IDR0 before << 1 | IDR0 after.
 //!   path="afnosrc"     - PA5 output high, then AF5 (SPI1_SCK, p89; no Renode model drives a pin), then BSRR resets ODR5:
-//!                        the pin holds high (ruled 2026-11-23T23:52Z) and IDR5 reads it. MARK_READ = IDR_A.
+//!                        the pin holds high (ruled 2026-11-23T23:52Z (3)) and IDR5 reads it (MARK_READ = IDR_A); then a
+//!                        pull-down written (p542) takes it low.
 //! Bits: RM0433 Rev 9 §11.4 p541-546.
 #![no_std]
 #![no_main]
@@ -1299,6 +1300,7 @@ pub unsafe extern "C" fn reset() -> ! {
         mode(GPIOA, 5, 2);
         w(GPIOA, BSRR, 1 << 21);
         write_volatile(MARK_READ, r(GPIOA, IDR));
+        w(GPIOA, PUPDR, r(GPIOA, PUPDR) | 2 << 10);
     }
     #[cfg(path = "odrhalf")]
     {
@@ -1319,7 +1321,7 @@ pub unsafe extern "C" fn reset() -> ! {
         w(GPIOD, BSRR, (1 << 3) | (1 << 4) | (1 << 6));
         mode(GPIOD, 5, 0);
         mode(GPIOD, 6, 0);
-        write_volatile(MARK_READ, r(GPIOD, IDR) & 0x7F);
+        write_volatile(MARK_READ, r(GPIOD, IDR) & 0xFF);
         write_volatile(MARK_READ2, r(GPIOD, ODR));
     }
     #[cfg(path = "ardupilot")]

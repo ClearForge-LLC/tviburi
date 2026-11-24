@@ -186,14 +186,14 @@ H02-switchDrives	model/GuardedSTM32_GPIOPort.cs	            Drive(changed);	    
 H03-afEntry	model/GuardedSTM32_GPIOPort.cs	return sources.Any(g => g.IsSet) ^ inverted.Contains(pin * 16 + af);	return null;	gpio-afenter
 H04-afInverted	model/GuardedSTM32_GPIOPort.cs	return sources.Any(g => g.IsSet) ^ inverted.Contains(pin * 16 + af);	return sources.Any(g => g.IsSet);	gpio-afentern
 H05-odrLatched	model/GuardedSTM32_GPIOPort.cs	: b == OdrOffset ? odr :	: b == OdrOffset ? Idr() :	gpio-afodr
-H06-idrAnalog	model/GuardedSTM32_GPIOPort.cs	m == 0 && (Outside(pin, m) ?? false)	m == 0 ? (Outside(pin, m) ?? false) : Connections[pin].IsSet	gpio-analoghold
-H07-floatingZero	model/GuardedSTM32_GPIOPort.cs	m == 0 && (Outside(pin, m) ?? false)	m == 0 && (Outside(pin, m) ?? Connections[pin].IsSet)	gpio-inputidr
+H06-idrAnalog	model/GuardedSTM32_GPIOPort.cs	m != 3 && Connections[pin].IsSet	Connections[pin].IsSet	gpio-inputidr
+H07-undrivenLow	model/GuardedSTM32_GPIOPort.cs	Outside(pin, m) ?? false;	Outside(pin, m);	gpio-analoghold
 H08-pull	model/GuardedSTM32_GPIOPort.cs	return pull == 1 ? true : pull == 2 ? (bool?)false : null;	return null;	gpio-inputidr
 H09-declared	model/GuardedSTM32_GPIOPort.cs	if((declaredMask >> pin & 1) == 1)	if(false)	gpio-inputidr
 H10-externalCheck	model/GuardedSTM32_GPIOPort.cs	                if(!ok)	                if(false)	gpio-externalbad
 H11-senderOutput	model/GuardedSTM32_GPIOPort.cs	                Drive(1u << number);	                SetPin(number, value);	gpio-button
 H12-resetOdr	model/GuardedSTM32_GPIOPort.cs	            odr = 0;   // a sender's level is outside the port, so a reset keeps it\n	(empty)	gpio-resetodr
-H13-pullDown	model/GuardedSTM32_GPIOPort.cs	return pull == 1 ? true : pull == 2 ? (bool?)false : null;	return pull == 1 ? true : (bool?)null;	gpio-inputidr
+H13-pullDown	model/GuardedSTM32_GPIOPort.cs	return pull == 1 ? true : pull == 2 ? (bool?)false : null;	return pull == 1 ? true : (bool?)null;	gpio-afnosrc
 H14-selectionAf	model/GuardedSTM32_GPIOPort.cs	 | (uint)Af(afrl, afrh, pin) << 2	(empty)	gpio-afswitch
 H15-selectionPull	model/GuardedSTM32_GPIOPort.cs	 | (pupdr >> (2 * pin) & 3) << 6;	;	gpio-inputidr
 H16-analogNoPull	model/GuardedSTM32_GPIOPort.cs	var pull = mode == 3 ? 0 :	var pull = mode == 9 ? 0 :	gpio-inputidr

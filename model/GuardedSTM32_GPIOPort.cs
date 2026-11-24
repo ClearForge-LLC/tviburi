@@ -24,10 +24,10 @@
 //     and read back as written (p537), and a pin carries: in output mode, ODR (p537); in AF mode, the peripheral
 //     output the platform routes to its AFSEL (only the timers have routes), taken at the switch and followed through
 //     the stock port's AF receiver (p538); in input and analog mode, nothing from the port (the output buffer is
-//     disabled, p537, p539). A pin nothing drives takes the level from outside the port: an external sender's, else
-//     the board's declared level (`external`), else PUPDR's pull (not in analog mode, p539); with none, it holds its
-//     level. IDR reads by mode (Idr). Ruled 2026-11-23T23:52Z: hold; a floating input reads 0 (the ledger's IDR row);
-//     the consumer declares its board's levels.
+//     disabled, p537, p539). A pin the port does not drive takes the level from outside the port: an external
+//     sender's, else the board's declared level (`external`), else PUPDR's pull (not in analog mode, p539); with none,
+//     an input or analog pin is low, not driven (ruled 2026-11-24T01:05Z), and an AF pin no Renode model drives holds
+//     its level (ruled 2026-11-23T23:52Z (3)). IDR reads by mode (Idr). The consumer declares its board's levels.
 //
 // Rules, in the order they are evaluated. A refused access is not passed to the stock port.
 //   TVI-LOAD          (Records) the model version could not be computed: every access refuses.
@@ -292,10 +292,9 @@ namespace Antmicro.Renode.Peripherals.Tviburi
         }
 
         // IDR, pin by pin (RM0433 Rev 9 §11.3.9-11.3.13 p537-539): output, the pin as ODR drives it (push-pull; no
-        // open-drain behaviour, TVI-WO-1301 A1); AF, the pin's level (the peripheral's signal, or the level held where no
-        // Renode model drives the pin); input, the level from outside the port (a sender, a declared level, PUPDR's
-        // pull), and 0 where there is none: a floating pin, whose level silicon does not define (ruled 2026-11-23T23:52Z,
-        // the ledger's IDR row); analog, 0 (p539).
+        // open-drain behaviour, TVI-WO-1301 A1); AF and input, the pin's level (Drive keeps it: the peripheral's signal,
+        // the level from outside the port, or for input 0 where there is none, a floating pin whose level silicon does
+        // not define: the ledger's IDR row); analog, 0 (p539).
         private uint Idr()
         {
             var moder = base.ReadDoubleWord(ModerOffset);
@@ -303,7 +302,7 @@ namespace Antmicro.Renode.Peripherals.Tviburi
             for(var pin = 0; pin < 16; pin++)
             {
                 var m = (moder >> (2 * pin)) & 3;
-                var level = m == 1 ? ((odr >> pin) & 1) == 1 : m == 2 ? Connections[pin].IsSet : m == 0 && (Outside(pin, m) ?? false);
+                var level = m == 1 ? ((odr >> pin) & 1) == 1 : m != 3 && Connections[pin].IsSet;
                 v |= level ? 1u << pin : 0;
             }
             return v;
@@ -371,8 +370,8 @@ namespace Antmicro.Renode.Peripherals.Tviburi
             return s;
         }
 
-        // Each pin in `pins` set to what drives it, where something does; a pin nothing drives holds its level
-        // (ruled 2026-11-23T23:52Z).
+        // Each pin in `pins` set to what drives it. An input or analog pin with no level from outside goes low (not
+        // driven, p537, p539; ruled 2026-11-24T01:05Z); an AF pin with no Renode source and none from outside holds.
         private void Drive(uint pins)
         {
             if(pins == 0)
@@ -389,7 +388,7 @@ namespace Antmicro.Renode.Peripherals.Tviburi
                 var m = (moder >> (2 * pin)) & 3;
                 var level = m == 1 ? ((odr >> pin) & 1) == 1                       // output: ODR (p537)
                     : m == 2 ? Peripheral(pin) ?? Outside(pin, m)                     // AF: the peripheral's signal (p538)
-                    : Outside(pin, m);                                                 // input, analog: output buffer off (p537, p539)
+                    : Outside(pin, m) ?? false;                                        // input, analog: output buffer off (p537, p539)
                 if(level.HasValue)
                 {
                     SetPin(pin, level.Value);
@@ -404,7 +403,7 @@ namespace Antmicro.Renode.Peripherals.Tviburi
         }
 
         // The level from outside the port on a pin the port does not drive: a sender's, else the board's declared level,
-        // else PUPDR's pull (none in analog mode: "disabled by hardware", p539); null: none, the pin floats.
+        // else PUPDR's pull (none in analog mode: "disabled by hardware", p539); null: none.
         private bool? Outside(int pin, uint mode)
         {
             if((senderKnown >> pin & 1) == 1)
@@ -850,7 +849,7 @@ namespace Antmicro.Renode.Peripherals.Tviburi
 
         private static readonly Row[] Fields =
         {
-            R("GPIOx_MODER", 0x00, "§11.4.1", "MODER[15:0]", 31, 0, Any, "modeled by the guard", "stored by the stock port; the guard drives each pin by it (§11.3.9-11.3.13 p537-539): output from ODR, AF from the peripheral routed to the pin's AFSEL (a timer, through the platform's routes; its level taken at the switch), input and analog from nothing (the pin holds its level, or takes a sender's, the board's declared level or PUPDR's pull); 10 is checked against DS12117 Table 9 and the declared package; 11 has nothing analog behind it (TVI-WO-1301 A4)", 541),
+            R("GPIOx_MODER", 0x00, "§11.4.1", "MODER[15:0]", 31, 0, Any, "modeled by the guard", "stored by the stock port; the guard drives each pin by it (§11.3.9-11.3.13 p537-539): output from ODR, AF from the peripheral routed to the pin's AFSEL (a timer, through the platform's routes; its level taken at the switch), input and analog from nothing (the pin takes a sender's level, the board's declared level or PUPDR's pull, else it is low; an AF pin no Renode model drives holds); 10 is checked against DS12117 Table 9 and the declared package; 11 has nothing analog behind it (TVI-WO-1301 A4)", 541),
             R("GPIOx_OTYPER", 0x04, "§11.4.2", "OT[15:0]", 15, 0, Any, "modeled by the guard", "kept by the guard and served on read (the stock port drops it, a tag); no open-drain electrical behaviour (TVI-WO-1301 A1)", 541),
             R("GPIOx_OTYPER", 0x04, "§11.4.2", "Res31_16", 31, 16, Zero, "reserved", "reserved: dropped, reads 0", 541),
             R("GPIOx_OSPEEDR", 0x08, "§11.4.3", "OSPEEDR[15:0]", 31, 0, Any, "inherited, unaudited (acknowledged by name)", "the stock port: stored, with no effect on timing (TVI-WO-1301 A2)", 542),

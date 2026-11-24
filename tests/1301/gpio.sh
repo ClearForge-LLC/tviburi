@@ -263,8 +263,8 @@ tviburiGpioA: @ {\
     [ $t != analogout ] || check "analogout: IDR0 reads the driven pin, 1 (p537)" "[ \$(bit \$(readmark analogout) 0) = 1 ]" ;;
   analoghold)
     run_case analoghold analoghold "$run" "${marks[@]}" 'echo "R-GreenLED"' 'sysbus.gpioPortB.GreenLED State'
-    check "analoghold: PB0 driven high, then analog: nothing drives it, so it holds (GreenLED lit, ruled 23:52Z); IDR0 reads 0 (p539)" \
-      "passes analoghold && [ \"\$(readout analoghold GreenLED)\" = True ] && [ \$(bit \$(readmark analoghold) 0) = 0 ]" ;;
+    check "analoghold: PB0 driven high, then analog: nothing drives it, so it is low (GreenLED dark, p539; ruled 2026-11-24T01:05Z); IDR0 reads 0 (p539)" \
+      "passes analoghold && [ \"\$(readout analoghold GreenLED)\" = False ] && [ \$(bit \$(readmark analoghold) 0) = 0 ]" ;;
   afodr|afenter|afenterhigh|afout|afentern|afswitch|afnosrc)
     PLATFORM_SED=$pa8obs run_case "$t" "$t" "$run" "${marks[@]}" 'echo "R-pa8obs"' 'sysbus.gpioPortA.pa8obs State' "$(pin A 7)" "$(pin A 0)" "$(pin A 5)" "$(pin A 15)"
     m=$(readmark "$t"); obs=$(readout "$t" pa8obs)
@@ -273,8 +273,8 @@ tviburiGpioA: @ {\
       "passes afodr && [ $obs = False ] && [ \$(bit $m 24) = 1 ] && [ \$(bit $m 8) = 0 ] && [ \"\$(readout afodr PINA15)\" = True ]" ;;
     afswitch) check "afswitch: PA0 in AF mode moved from AF1 (TIM2_CH1, low) to AF2 (TIM5_CH1, high): the pin follows the newly selected AF (p538)" \
       "passes afswitch && [ $m = 0x00000001 ] && [ \"\$(readout afswitch PINA0)\" = True ]" ;;
-    afnosrc) check "afnosrc: PA5 high, then AF5 (SPI1_SCK, which no Renode model drives): the pin holds high through an ODR reset (ruled 23:52Z), and IDR5 reads the held level" \
-      "passes afnosrc && [ \$(bit $m 5) = 1 ] && [ \"\$(readout afnosrc PINA5)\" = True ]" ;;
+    afnosrc) check "afnosrc: PA5 high, then AF5 (SPI1_SCK, which no Renode model drives): the pin holds high through an ODR reset (ruled 23:52Z (3)), IDR5 reads the held level, and a pull-down then takes it low (p542)" \
+      "passes afnosrc && [ \$(bit $m 5) = 1 ] && [ \"\$(readout afnosrc PINA5)\" = False ]" ;;
     afenter) check "afenter: PA8 an output, high, then AF1 with TIM1 low: the pin takes TIM1's level at the switch (p538)" \
       "passes afenter && [ $obs = False ] && [ \$(bit $m 8) = 0 ]" ;;
     afenterhigh) check "afenterhigh: PA8 an output, low, then AF1 with TIM1 high (CCR1 > ARR): the pin goes high at the switch (p538)" \
@@ -287,9 +287,9 @@ tviburiGpioA: @ {\
   inputidr)
     PLATFORM_SED='$a\
 tviburiGpioD:\
-    external: "PD5:up"' run_case inputidr inputidr "$run" "${marks[@]}" "${marks2[@]}" "$(pin D 1)" "$(pin D 2)" "$(pin D 4)"
-    check "inputidr: IDR by mode on port D: a floating input reads 0 (ruled 23:52Z), PUPDR's pulls read as pulled (p537), an output reads ODR, analog 0 (p539), a declared level as declared; ODR reads as written (0x2A, ODR 0x5D); a pull written on an input pin moves the pin (PD1 up, PD2 down from a held 1), and none in analog (PD4 low)" \
-      "passes inputidr && [ \"\$(readmark inputidr)\" = 0x0000002A ] && [ \$(( \$(readmark2 inputidr) & 0x7F )) = \$((0x5D)) ] && [ \"\$(readout inputidr PIND1)\" = True ] && [ \"\$(readout inputidr PIND2)\" = False ] && [ \"\$(readout inputidr PIND4)\" = False ]" ;;
+    external: "PD5:up PD7:up"' run_case inputidr inputidr "$run" "${marks[@]}" "${marks2[@]}" "$(pin D 1)" "$(pin D 2)" "$(pin D 4)" "$(pin D 7)"
+    check "inputidr: IDR by mode on port D: a floating input reads 0 (ruled 23:52Z), PUPDR's pulls read as pulled (p537), an output reads ODR, analog 0 (p539), a declared level as declared; ODR reads as written (0x2A, ODR 0x5D); a pull written on an input pin moves the pin (PD1 up, PD2 down), none applies in analog (PD4 low), and an analog pin declared up is high while IDR7 reads 0 (p539)" \
+      "passes inputidr && [ \"\$(readmark inputidr)\" = 0x0000002A ] && [ \$(( \$(readmark2 inputidr) & 0x7F )) = \$((0x5D)) ] && [ \"\$(readout inputidr PIND1)\" = True ] && [ \"\$(readout inputidr PIND2)\" = False ] && [ \"\$(readout inputidr PIND4)\" = False ] && [ \"\$(readout inputidr PIND7)\" = True ]" ;;
   button)
     run_case button idle "$run" 'sysbus.gpioPortC.UserButton1 Press' 'emulation RunFor "0.00001"' "$(pin C 13 PRE)" 'sysbus.gpioPortC.UserButton1 Release' 'emulation RunFor "0.00001"' \
       'sysbus WriteDoubleWord 0x58020800 0xF3FFFFFF' 'sysbus.gpioPortC.UserButton1 Press' 'emulation RunFor "0.00001"' 'echo "R-IN"' 'sysbus ReadDoubleWord 0x58020810' "$(pin C 13)" \
