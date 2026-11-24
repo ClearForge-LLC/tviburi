@@ -69,3 +69,15 @@ tests/1301/replay-1301.sh	TVI-WO-1304.measure.md
 tests/1304/fields.py	TVI-WO-1304.measure.md
 tests/1304/flash.sh	TVI-WO-1304.measure.md
 tests/1304/flash.sh	docs/
+firmware/dma.rs	TVI-WO-1305.measure.md
+firmware/usart.rs	TVI-WO-1305.measure.md
+model/GuardedSTM32DMA.cs	TVI-WO-1305.measure.md
+model/GuardedSTM32F7_USART.cs	TVI-WO-1305.measure.md
+model/GuardedSTM32F7_USART.cs	docs/
+model/bench-checks.tsv	TVI-WO-1305.measure.md
+model/stm32h7-usart-restate.awk	TVI-WO-1305.measure.md
+tests/1301/replay-1301.sh	TVI-WO-1305.measure.md
+tests/1305/extract.py	TVI-WO-1305.measure.md
+tests/1305/fields.py	TVI-WO-1305.measure.md
+tests/1305/usart.sh	TVI-WO-1305.measure.md
+tests/1305/usart.sh	docs/
