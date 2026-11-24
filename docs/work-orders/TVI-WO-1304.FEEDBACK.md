@@ -51,7 +51,7 @@
   - Observers, boot blocks and bank 2 are identical, with 0 flash would-refuse.
   - Planted, enforcing: `flash-gen` (hse-crystal-16's PWR, RCC and `ACR` writes, then its `OPTSR_CUR` read) passes.
 - **The budget:** +3.4 MiB at the median over `main`, 11 ArduPilot boots a side on Furnace, PASS (§8). CI's run is in §8.
-- **CI:** green on `2a075b3`, run 45439662770 (PR #38): route, budget, budget-tests, five shards and the aggregate, 18.0 min end to end (the longest shard 16 min) (§8).
+- **CI:** green on `2d8b029`, run 45450156621, with TVI-WO-1303 merged: 570 of 570 cases and mutants ran, 0 failures; the budget +2.2 MiB (§8). Before the merge: green on `2a075b3`, run 45439662770 (PR #38): route, budget, budget-tests, five shards and the aggregate, 18.0 min end to end (the longest shard 16 min) (§8).
 
 ## 4. The adversarial pass (WO §5)
 
@@ -150,7 +150,9 @@ Reduction pass (diff): −21 net · 2 duplicates removed · 1 mechanism removed 
 - **The acceptance replays** (§3): 16 boots, against `main`'s release, at `cb6b7ea`/`7cb5bcd` (the guard's rules as built, before the adversarial fixes, which touch no path either firmware takes).
 - **The memory budget** (`tests/1301/ci-memory.sh`, 11 boots a side, at `7cb5bcd` plus the citations): `MEDIANS main 987900 KiB, branch 991364 KiB, difference 3464 KiB (+3.4 MiB)`, PASS. Every branch boot was under 1,572,864 KiB. The §1.1 prototype measured −0.1 MiB.
 
-**CI:** green on `2a075b3`, run 45439662770 (PR #38), 18.0 min end to end:
+**CI, final:** green on `2d8b029`, run 45450156621, after `main` `0a86577` (TVI-WO-1303) was merged, in 14.7 min end to end. "aggregate: 570 expected (258 cases, 312 mutants), 570 ran across 5 shards, 0 failures". The budget against the merged main: `MEDIANS main 908096 KiB, branch 910324 KiB, difference 2228 KiB (+2.2 MiB)`, PASS. That run included `timer-moe0`, which had failed once in the run before it (§7a).
+
+**CI, before the merge:** green on `2a075b3`, run 45439662770 (PR #38), 18.0 min end to end:
 - **The aggregate:** "487 expected (217 cases, 270 mutants), 487 ran across 5 shards, 0 failures". Every flash case and FL mutant ran in a shard.
 - **The shards:** 41/55, 41/56, 48/51, 42/55 and 45/53 cases and mutants; the longest ran 16 min.
 - **The budget, in CI:** `MEDIANS main 900628 KiB, branch 899896 KiB, difference -732 KiB (-0.7 MiB)`, PASS.
