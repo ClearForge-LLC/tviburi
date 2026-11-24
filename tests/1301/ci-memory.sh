@@ -107,7 +107,10 @@ for r in $(seq 1 "$runs"); do
     out=$work/out-$s-$r
     mkdir -p "$out"
     avail=$(awk '/^MemAvailable:/ {print $2}' /proc/meminfo)
-    container -e ACCEPT_MODE=recorded -v "$work/cap:/cap:ro" -v "${tree[$s]}:/repo:ro" -v "$here/tests/1301:/h:ro" \
+    # Sentinel-02's I2C1 lines are "open-drain, pulled up off-chip" (fixtures/…/boards/sentinel-02.hwdef.dat L24-25),
+    # which the consumer's platform does not yet declare: declared here (TVI-WO-1301a, ruled 2026-11-23T23:52Z). The
+    # harness gives it only to a tree whose guard takes it, so main before 1301a boots as it always has.
+    container -e ACCEPT_MODE=recorded -e ACCEPT_EXTERNAL="PB6:up PB7:up" -v "$work/cap:/cap:ro" -v "${tree[$s]}:/repo:ro" -v "$here/tests/1301:/h:ro" \
       -v "$work/rel-$s/release:/tmp/release:ro" -v "$out:/out" "$IMAGE" bash /h/replay-1301.sh 2 accept >"$out/replay.txt" 2>&1 || true
     con=$out/2-accept.console.txt cost=$(cat "$out/2-accept.cost.txt" 2>/dev/null || true)
     peak=$(sed -n 's/.*peak_tree_vmrss_kib=\([0-9]*\).*/\1/p' <<<"$cost")

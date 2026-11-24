@@ -16,9 +16,18 @@
 //     others; §11.4.3-11.4.4 p542 OSPEEDR and PUPDR). They reach the stock port as its constructor arguments, from
 //     the restatement, and this guard checks them against its port at the first access (TVI-WO-1301 A5);
 //   - OTYPER, which the stock port drops (a tag): kept here and served on read (RUL-17; TVI-WO-1301 A1);
-//   - BSRR's priority: "If both BSx and BRx are set, BSx has priority" (§11.4.7 p544). The stock port applies BR
-//     last, so a both-set pin is passed with its BR bit cleared;
-//   - the query "which signal does pin P carry now", from MODER, AFSEL and DS12117 Rev 10 Table 9 (WhichSignal).
+//   - BSRR's priority: "If both BSx and BRx are set, BSx has priority" (§11.4.7 p544), in the guard's ODR copy (the
+//     stock port applies BR last);
+//   - the query "which signal does pin P carry now", from MODER, AFSEL and DS12117 Rev 10 Table 9 (WhichSignal);
+//   - what drives a pin (TVI-WO-1301a; RM0433 Rev 9 §11.3.9-11.3.13 p537-539). The stock port drives every pin's
+//     connections (LEDs, EXTI, timer inputs, devices) and IDR from ODR in every mode. Here ODR is latched by the guard
+//     and read back as written (p537), and a pin carries: in output mode, ODR (p537); in AF mode, the peripheral
+//     output the platform routes to its AFSEL (only the timers have routes), taken at the switch and followed through
+//     the stock port's AF receiver (p538); in input and analog mode, nothing from the port (the output buffer is
+//     disabled, p537, p539). A pin the port does not drive takes the level from outside the port: an external
+//     sender's, else the board's declared level (`external`), else PUPDR's pull (not in analog mode, p539); with none,
+//     an input or analog pin is low, not driven (ruled 2026-11-24T01:05Z), and an AF pin no Renode model drives holds
+//     its level (ruled 2026-11-23T23:52Z (3)). IDR reads by mode (Idr). The consumer declares its board's levels.
 //
 // Rules, in the order they are evaluated. A refused access is not passed to the stock port.
 //   TVI-LOAD          (Records) the model version could not be computed: every access refuses.
@@ -58,22 +67,36 @@ namespace Antmicro.Renode.Peripherals.Tviburi
 {
     public class GuardedSTM32_GPIOPort : STM32_GPIOPort, IDoubleWordPeripheral, IWordPeripheral, IBytePeripheral, IDisposable
     {
-        // The stock entry's constructor arguments, passed through; `mode` (RUL-19) and `package` are this guard's.
-        // `package` names the package the platform's part is in ("LQFP144"); null: none declared, the package rule off.
+        // The stock entry's constructor arguments, passed through; `mode` (RUL-19), `package` and `external` are this
+        // guard's. `package` names the package the platform's part is in ("LQFP144"); null: none declared, the package
+        // rule off. `external` declares the board's levels on this port's pins, which the twin cannot know: "PB6:up
+        // PB7:up" (up or down, a pull or a driven level alike); null: none (TVI-WO-1301a, ruled 2026-11-23T23:52Z).
         public GuardedSTM32_GPIOPort(IMachine machine, uint modeResetValue = 0, uint outputSpeedResetValue = 0,
             uint pullUpPullDownResetValue = 0, uint numberOfAFs = 16, List<List<int>> invertedAFPins = null,
-            string mode = Records.Enforcing, string package = null)
+            string mode = Records.Enforcing, string package = null, string external = null)
             : base(machine, modeResetValue, outputSpeedResetValue, pullUpPullDownResetValue, numberOfAFs, invertedAFPins)
         {
             this.machine = machine;
             resets = new[] { modeResetValue, outputSpeedResetValue, pullUpPullDownResetValue };
             afs = numberOfAFs;
             Package = package;
-            records = new Records(machine, this, nameof(GuardedSTM32_GPIOPort), mode,
-                new[] { new KeyValuePair<string, string>("package", package ?? "none") });
+            External = external;
+            foreach(var l in invertedAFPins ?? new List<List<int>>())
+            {
+                foreach(var af in l.Skip(1))
+                {
+                    inverted.Add(l[0] * 16 + af);
+                }
+            }
+            records = new Records(machine, this, nameof(GuardedSTM32_GPIOPort), mode, new[]
+            {
+                new KeyValuePair<string, string>("external", external ?? "none"),
+                new KeyValuePair<string, string>("package", package ?? "none"),
+            });
         }
 
         public string Package { get; }
+        public string External { get; }
 
         public override void Reset()
         {
@@ -81,6 +104,32 @@ namespace Antmicro.Renode.Peripherals.Tviburi
             otyper = 0;
             afFaulted = 0;
             packageFaulted = 0;
+            odr = 0;   // a sender's level is outside the port, so a reset keeps it
+            if(config == "")
+            {
+                Drive(0xFFFF);   // the declared levels and the reset pulls, on the pins nobody drives (silicon's reset: analog)
+            }
+        }
+
+        // An external sender into the port (a button, a device's output: `-> gpioPortX@pin`) sets the pin's level from
+        // outside. The pin follows it unless the port drives the pin itself (output, or AF with a peripheral behind it).
+        public override void OnGPIO(int number, bool value)
+        {
+            if(number < 0 || number > 15)
+            {
+                base.OnGPIO(number, value);   // the stock port's own error
+                return;
+            }
+            senderKnown |= 1u << number;
+            sender = value ? sender | 1u << number : sender & ~(1u << number);
+            if(config == "")
+            {
+                Drive(1u << number);
+            }
+            else
+            {
+                SetPin(number, value);   // before the first access, or with a configuration it refuses, the port drives no pin
+            }
         }
 
         public void Dispose()
@@ -235,17 +284,42 @@ namespace Antmicro.Renode.Peripherals.Tviburi
             return true;
         }
 
-        // What a read returns: OTYPER from the guard's copy (the stock port drops it), the rest from the stock port.
+        // What a read returns: OTYPER and ODR from the guard's copies (the stock port drops OTYPER, and reads ODR back
+        // from the pins), IDR by mode, the rest from the stock port.
         private uint Served(long b)
         {
-            return b == OtyperOffset ? otyper : base.ReadDoubleWord(b);
+            return b == OtyperOffset ? otyper : b == OdrOffset ? odr : b == IdrOffset ? Idr() : base.ReadDoubleWord(b);
+        }
+
+        // IDR, pin by pin (RM0433 Rev 9 §11.3.9-11.3.13 p537-539): output, the pin as ODR drives it (push-pull; no
+        // open-drain behaviour, TVI-WO-1301 A1); AF and input, the pin's level (Drive keeps it: the peripheral's signal,
+        // the level from outside the port, or for input 0 where there is none, a floating pin whose level silicon does
+        // not define: the ledger's IDR row); analog, 0 (p539).
+        private uint Idr()
+        {
+            var moder = base.ReadDoubleWord(ModerOffset);
+            uint v = 0;
+            for(var pin = 0; pin < 16; pin++)
+            {
+                var m = (moder >> (2 * pin)) & 3;
+                var level = m == 1 ? ((odr >> pin) & 1) == 1 : m != 3 && Connections[pin].IsSet;
+                v |= level ? 1u << pin : 0;
+            }
+            return v;
         }
 
         private void Pass(long b, uint value)
         {
-            if(b == BsrrOffset)
+            if(b == OdrOffset || b == BsrrOffset || b == BrrOffset)
             {
-                value &= ~((value & 0xFFFFu) << 16);   // BSx has priority over BRx (p544)
+                // ODR is the guard's: the stock port would drive every pin from it, in every mode (TVI-WO-1301 F1).
+                // BRR (0x28) reaches here only in recorded mode, where it does what the stock port does with it.
+                var old = odr;
+                odr = b == OdrOffset ? value & 0xFFFFu
+                    : b == BrrOffset ? odr & ~value & 0xFFFFu
+                    : (odr & ~(value >> 16) | value) & 0xFFFFu;   // BSRR: BSx has priority over BRx (p544)
+                Drive(old ^ odr);
+                return;
             }
             if(b == OtyperOffset)
             {
@@ -259,11 +333,129 @@ namespace Antmicro.Renode.Peripherals.Tviburi
                 // refreshes the cache from the port's state (Renode's PeripheralRegister.WriteInner, ReadInner).
                 base.ReadDoubleWord(b);
             }
+            var before = Selection();
             base.WriteDoubleWord(b, value);
+            var after = Selection();
             // A pin leaves a fault's latch when it leaves the faulting state; only a recorded pin enters it.
             var moder = base.ReadDoubleWord(ModerOffset);
             afFaulted &= AfFaults(moder, base.ReadDoubleWord(AfrlOffset), base.ReadDoubleWord(AfrhOffset));
             packageFaulted &= PackageFaults(moder);
+            // A pin whose mode, AF or pull changed is driven again: switching to output drives the latched ODR, entering
+            // AF the peripheral's level now, leaving both the level from outside the port or the one held.
+            uint changed = 0;
+            for(var pin = 0; pin < 16; pin++)
+            {
+                if(before[pin] != after[pin])
+                {
+                    changed |= 1u << pin;
+                }
+            }
+            Drive(changed);
+        }
+
+        // ---- the pins: what drives each one (RM0433 Rev 9 §11.3.9-11.3.13 p537-539) ----------------------------------
+
+        // Per pin, what decides its level: its mode, its AF in AF mode, its pull.
+        private uint[] Selection()
+        {
+            var moder = base.ReadDoubleWord(ModerOffset);
+            var afrl = base.ReadDoubleWord(AfrlOffset);
+            var afrh = base.ReadDoubleWord(AfrhOffset);
+            var pupdr = base.ReadDoubleWord(PupdrOffset);
+            var s = new uint[16];
+            for(var pin = 0; pin < 16; pin++)
+            {
+                s[pin] = (moder >> (2 * pin) & 3) | (uint)Af(afrl, afrh, pin) << 2 | (pupdr >> (2 * pin) & 3) << 6;
+            }
+            return s;
+        }
+
+        // Each pin in `pins` set to what drives it. An input or analog pin with no level from outside goes low (not
+        // driven, p537, p539; ruled 2026-11-24T01:05Z); an AF pin with no Renode source and none from outside holds.
+        private void Drive(uint pins)
+        {
+            if(pins == 0)
+            {
+                return;
+            }
+            var moder = base.ReadDoubleWord(ModerOffset);
+            for(var pin = 0; pin < 16; pin++)
+            {
+                if((pins >> pin & 1) == 0)
+                {
+                    continue;
+                }
+                var m = (moder >> (2 * pin)) & 3;
+                var level = m == 1 ? ((odr >> pin) & 1) == 1                       // output: ODR (p537)
+                    : m == 2 ? Peripheral(pin) ?? Outside(pin, m)                     // AF: the peripheral's signal (p538)
+                    : Outside(pin, m) ?? false;                                        // input, analog: output buffer off (p537, p539)
+                if(level.HasValue)
+                {
+                    SetPin(pin, level.Value);
+                }
+            }
+        }
+
+        private void SetPin(int pin, bool level)
+        {
+            base.State[pin] = level;
+            Connections[pin].Set(level);
+        }
+
+        // The level from outside the port on a pin the port does not drive: a sender's, else the board's declared level,
+        // else PUPDR's pull (none in analog mode: "disabled by hardware", p539); null: none.
+        private bool? Outside(int pin, uint mode)
+        {
+            if((senderKnown >> pin & 1) == 1)
+            {
+                return (sender >> pin & 1) == 1;
+            }
+            if((declaredMask >> pin & 1) == 1)
+            {
+                return (declaredHigh >> pin & 1) == 1;
+            }
+            var pull = mode == 3 ? 0 : base.ReadDoubleWord(PupdrOffset) >> (2 * pin) & 3;
+            return pull == 1 ? true : pull == 2 ? (bool?)false : null;
+        }
+
+        // In AF mode, the level of the peripheral output routed to the pin's selected AF now (the stock port's AF
+        // receiver carries its later edges); null: no Renode model drives that AF (only the timers do, through the
+        // platform's routes).
+        private bool? Peripheral(int pin)
+        {
+            var af = Af(base.ReadDoubleWord(AfrlOffset), base.ReadDoubleWord(AfrhOffset), pin);
+            var sources = Sources()[pin * 16 + af];
+            if(sources == null)
+            {
+                return null;
+            }
+            return sources.Any(g => g.IsSet) ^ inverted.Contains(pin * 16 + af);
+        }
+
+        // Every peripheral output wired to one of this port's AF receivers (`timer1: 0 -> gpioPortA#08@01`), by pin and
+        // AF, found once in the loaded machine.
+        private List<IGPIO>[] Sources()
+        {
+            if(sources == null)
+            {
+                var receivers = Enumerable.Range(0, 16).Select(GetLocalReceiver).ToArray();
+                sources = new List<IGPIO>[256];
+                foreach(var p in machine.GetPeripheralsOfType<INumberedGPIOOutput>())
+                {
+                    foreach(var g in p.Connections.Values)
+                    {
+                        foreach(var e in g.Endpoints)
+                        {
+                            var pin = Array.IndexOf(receivers, e.Receiver);
+                            if(pin >= 0 && e.Number >= 0 && e.Number < 16)
+                            {
+                                (sources[pin * 16 + e.Number] = sources[pin * 16 + e.Number] ?? new List<IGPIO>()).Add(g);
+                            }
+                        }
+                    }
+                }
+            }
+            return sources;
         }
 
         // ---- rules ---------------------------------------------------------------------------------------------
@@ -426,6 +618,10 @@ namespace Antmicro.Renode.Peripherals.Tviburi
             if(config == null)
             {
                 config = Check();
+                if(config.Length == 0)
+                {
+                    Drive(0xFFFF);   // the declared levels and the pulls, on the pins nobody drives
+                }
             }
             return config.Length == 0 ? null : config;
         }
@@ -467,6 +663,19 @@ namespace Antmicro.Renode.Peripherals.Tviburi
             if(Package != null && Bonding(Package) == null)
             {
                 return "package \"" + Package + "\", for which the guard holds no bonding (it holds LQFP144's, DS12117 Rev 10 Table 8)";
+            }
+            foreach(var d in (External ?? "").Split(new[] { ' ' }, StringSplitOptions.RemoveEmptyEntries))
+            {
+                var f = d.Split(':');
+                var pin = -1;
+                var ok = f.Length == 2 && f[0].Length >= 3 && f[0][0] == 'P' && f[0][1] == port && int.TryParse(f[0].Substring(2), out pin)
+                    && pin >= 0 && pin <= 15 && f[0].Substring(2) == pin.ToString() && (declaredMask >> pin & 1) == 0 && (f[1] == "up" || f[1] == "down");
+                if(!ok)
+                {
+                    return "external = \"" + External + "\": \"" + d + "\" is not P" + port + "<pin>:up or :down, once per pin of port " + port;
+                }
+                declaredMask |= 1u << pin;
+                declaredHigh |= f[1] == "up" ? 1u << pin : 0;
             }
             return "";
         }
@@ -555,7 +764,10 @@ namespace Antmicro.Renode.Peripherals.Tviburi
         private const long OtyperOffset = 0x04;
         private const long OspeedrOffset = 0x08;
         private const long PupdrOffset = 0x0C;
+        private const long IdrOffset = 0x10;
+        private const long OdrOffset = 0x14;
         private const long BsrrOffset = 0x18;
+        private const long BrrOffset = 0x28;
         private const long AfrlOffset = 0x20;
         private const long AfrhOffset = 0x24;
         private const ulong PortsBase = 0x58020000;
@@ -571,6 +783,11 @@ namespace Antmicro.Renode.Peripherals.Tviburi
         private uint otyper;
         private int afFaulted;
         private int packageFaulted;
+        private uint odr;                       // ODR as written (p543), latched by the guard
+        private uint sender, senderKnown;       // the last level an external sender put on each pin, and which pins have one
+        private uint declaredHigh, declaredMask; // the board's declared levels (`external`)
+        private List<IGPIO>[] sources;          // per pin * 16 + AF, the peripheral outputs routed to it (Sources)
+        private readonly HashSet<int> inverted = new HashSet<int>();   // pin * 16 + AF, from invertedAFPins
 
         // ---- the tables (generated: tools/tviburi-afcheck csharp; its unit tests check them against the files) --
         // DS12117 Rev 10 Table 9 (model/ds12117-rev10-table9.tsv): per pin PIN:PAGE:AF0,...,AF15.
@@ -632,32 +849,32 @@ namespace Antmicro.Renode.Peripherals.Tviburi
 
         private static readonly Row[] Fields =
         {
-            R("GPIOx_MODER", 0x00, "§11.4.1", "MODER[15:0]", 31, 0, Any, "inherited, unaudited (acknowledged by name)", "the stock port: stored; 10 connects the pin's AF receiver, which the guard checks against DS12117 Table 9 and the declared package; 11 (analog, the reset state) stored with nothing analog behind it (TVI-WO-1301 A4)", 541),
+            R("GPIOx_MODER", 0x00, "§11.4.1", "MODER[15:0]", 31, 0, Any, "modeled by the guard", "stored by the stock port; the guard drives each pin by it (§11.3.9-11.3.13 p537-539): output from ODR, AF from the peripheral routed to the pin's AFSEL (a timer, through the platform's routes; its level taken at the switch), input and analog from nothing (the pin takes a sender's level, the board's declared level or PUPDR's pull, else it is low; an AF pin no Renode model drives holds); 10 is checked against DS12117 Table 9 and the declared package; 11 has nothing analog behind it (TVI-WO-1301 A4)", 541),
             R("GPIOx_OTYPER", 0x04, "§11.4.2", "OT[15:0]", 15, 0, Any, "modeled by the guard", "kept by the guard and served on read (the stock port drops it, a tag); no open-drain electrical behaviour (TVI-WO-1301 A1)", 541),
             R("GPIOx_OTYPER", 0x04, "§11.4.2", "Res31_16", 31, 16, Zero, "reserved", "reserved: dropped, reads 0", 541),
             R("GPIOx_OSPEEDR", 0x08, "§11.4.3", "OSPEEDR[15:0]", 31, 0, Any, "inherited, unaudited (acknowledged by name)", "the stock port: stored, with no effect on timing (TVI-WO-1301 A2)", 542),
-            R("GPIOx_PUPDR", 0x0C, "§11.4.4", "PUPDR15", 31, 30, NotReserved, "inherited, unaudited (acknowledged by name)", "the stock port: stored, with no effect on IDR; 11 is reserved (TVI-WO-1301 A3)", 542),
-            R("GPIOx_PUPDR", 0x0C, "§11.4.4", "PUPDR14", 29, 28, NotReserved, "inherited, unaudited (acknowledged by name)", "the stock port: stored, with no effect on IDR; 11 is reserved (TVI-WO-1301 A3)", 542),
-            R("GPIOx_PUPDR", 0x0C, "§11.4.4", "PUPDR13", 27, 26, NotReserved, "inherited, unaudited (acknowledged by name)", "the stock port: stored, with no effect on IDR; 11 is reserved (TVI-WO-1301 A3)", 542),
-            R("GPIOx_PUPDR", 0x0C, "§11.4.4", "PUPDR12", 25, 24, NotReserved, "inherited, unaudited (acknowledged by name)", "the stock port: stored, with no effect on IDR; 11 is reserved (TVI-WO-1301 A3)", 542),
-            R("GPIOx_PUPDR", 0x0C, "§11.4.4", "PUPDR11", 23, 22, NotReserved, "inherited, unaudited (acknowledged by name)", "the stock port: stored, with no effect on IDR; 11 is reserved (TVI-WO-1301 A3)", 542),
-            R("GPIOx_PUPDR", 0x0C, "§11.4.4", "PUPDR10", 21, 20, NotReserved, "inherited, unaudited (acknowledged by name)", "the stock port: stored, with no effect on IDR; 11 is reserved (TVI-WO-1301 A3)", 542),
-            R("GPIOx_PUPDR", 0x0C, "§11.4.4", "PUPDR9", 19, 18, NotReserved, "inherited, unaudited (acknowledged by name)", "the stock port: stored, with no effect on IDR; 11 is reserved (TVI-WO-1301 A3)", 542),
-            R("GPIOx_PUPDR", 0x0C, "§11.4.4", "PUPDR8", 17, 16, NotReserved, "inherited, unaudited (acknowledged by name)", "the stock port: stored, with no effect on IDR; 11 is reserved (TVI-WO-1301 A3)", 542),
-            R("GPIOx_PUPDR", 0x0C, "§11.4.4", "PUPDR7", 15, 14, NotReserved, "inherited, unaudited (acknowledged by name)", "the stock port: stored, with no effect on IDR; 11 is reserved (TVI-WO-1301 A3)", 542),
-            R("GPIOx_PUPDR", 0x0C, "§11.4.4", "PUPDR6", 13, 12, NotReserved, "inherited, unaudited (acknowledged by name)", "the stock port: stored, with no effect on IDR; 11 is reserved (TVI-WO-1301 A3)", 542),
-            R("GPIOx_PUPDR", 0x0C, "§11.4.4", "PUPDR5", 11, 10, NotReserved, "inherited, unaudited (acknowledged by name)", "the stock port: stored, with no effect on IDR; 11 is reserved (TVI-WO-1301 A3)", 542),
-            R("GPIOx_PUPDR", 0x0C, "§11.4.4", "PUPDR4", 9, 8, NotReserved, "inherited, unaudited (acknowledged by name)", "the stock port: stored, with no effect on IDR; 11 is reserved (TVI-WO-1301 A3)", 542),
-            R("GPIOx_PUPDR", 0x0C, "§11.4.4", "PUPDR3", 7, 6, NotReserved, "inherited, unaudited (acknowledged by name)", "the stock port: stored, with no effect on IDR; 11 is reserved (TVI-WO-1301 A3)", 542),
-            R("GPIOx_PUPDR", 0x0C, "§11.4.4", "PUPDR2", 5, 4, NotReserved, "inherited, unaudited (acknowledged by name)", "the stock port: stored, with no effect on IDR; 11 is reserved (TVI-WO-1301 A3)", 542),
-            R("GPIOx_PUPDR", 0x0C, "§11.4.4", "PUPDR1", 3, 2, NotReserved, "inherited, unaudited (acknowledged by name)", "the stock port: stored, with no effect on IDR; 11 is reserved (TVI-WO-1301 A3)", 542),
-            R("GPIOx_PUPDR", 0x0C, "§11.4.4", "PUPDR0", 1, 0, NotReserved, "inherited, unaudited (acknowledged by name)", "the stock port: stored, with no effect on IDR; 11 is reserved (TVI-WO-1301 A3)", 542),
-            R("GPIOx_IDR", 0x10, "§11.4.5", "IDR[15:0]", 15, 0, Any, "read-only", "ignored (read-only); reads the port's output state, not its inputs (TVI-WO-1301 A6)", 543),
+            R("GPIOx_PUPDR", 0x0C, "§11.4.4", "PUPDR15", 31, 30, NotReserved, "modeled by the guard", "stored by the stock port; on an input or AF pin the port does not drive, its pull sets the pin and IDR, unless a sender or the board's declared level does (p537-538); none in analog mode (p539); 11 is reserved (TVI-WO-1301 A3)", 542),
+            R("GPIOx_PUPDR", 0x0C, "§11.4.4", "PUPDR14", 29, 28, NotReserved, "modeled by the guard", "stored by the stock port; on an input or AF pin the port does not drive, its pull sets the pin and IDR, unless a sender or the board's declared level does (p537-538); none in analog mode (p539); 11 is reserved (TVI-WO-1301 A3)", 542),
+            R("GPIOx_PUPDR", 0x0C, "§11.4.4", "PUPDR13", 27, 26, NotReserved, "modeled by the guard", "stored by the stock port; on an input or AF pin the port does not drive, its pull sets the pin and IDR, unless a sender or the board's declared level does (p537-538); none in analog mode (p539); 11 is reserved (TVI-WO-1301 A3)", 542),
+            R("GPIOx_PUPDR", 0x0C, "§11.4.4", "PUPDR12", 25, 24, NotReserved, "modeled by the guard", "stored by the stock port; on an input or AF pin the port does not drive, its pull sets the pin and IDR, unless a sender or the board's declared level does (p537-538); none in analog mode (p539); 11 is reserved (TVI-WO-1301 A3)", 542),
+            R("GPIOx_PUPDR", 0x0C, "§11.4.4", "PUPDR11", 23, 22, NotReserved, "modeled by the guard", "stored by the stock port; on an input or AF pin the port does not drive, its pull sets the pin and IDR, unless a sender or the board's declared level does (p537-538); none in analog mode (p539); 11 is reserved (TVI-WO-1301 A3)", 542),
+            R("GPIOx_PUPDR", 0x0C, "§11.4.4", "PUPDR10", 21, 20, NotReserved, "modeled by the guard", "stored by the stock port; on an input or AF pin the port does not drive, its pull sets the pin and IDR, unless a sender or the board's declared level does (p537-538); none in analog mode (p539); 11 is reserved (TVI-WO-1301 A3)", 542),
+            R("GPIOx_PUPDR", 0x0C, "§11.4.4", "PUPDR9", 19, 18, NotReserved, "modeled by the guard", "stored by the stock port; on an input or AF pin the port does not drive, its pull sets the pin and IDR, unless a sender or the board's declared level does (p537-538); none in analog mode (p539); 11 is reserved (TVI-WO-1301 A3)", 542),
+            R("GPIOx_PUPDR", 0x0C, "§11.4.4", "PUPDR8", 17, 16, NotReserved, "modeled by the guard", "stored by the stock port; on an input or AF pin the port does not drive, its pull sets the pin and IDR, unless a sender or the board's declared level does (p537-538); none in analog mode (p539); 11 is reserved (TVI-WO-1301 A3)", 542),
+            R("GPIOx_PUPDR", 0x0C, "§11.4.4", "PUPDR7", 15, 14, NotReserved, "modeled by the guard", "stored by the stock port; on an input or AF pin the port does not drive, its pull sets the pin and IDR, unless a sender or the board's declared level does (p537-538); none in analog mode (p539); 11 is reserved (TVI-WO-1301 A3)", 542),
+            R("GPIOx_PUPDR", 0x0C, "§11.4.4", "PUPDR6", 13, 12, NotReserved, "modeled by the guard", "stored by the stock port; on an input or AF pin the port does not drive, its pull sets the pin and IDR, unless a sender or the board's declared level does (p537-538); none in analog mode (p539); 11 is reserved (TVI-WO-1301 A3)", 542),
+            R("GPIOx_PUPDR", 0x0C, "§11.4.4", "PUPDR5", 11, 10, NotReserved, "modeled by the guard", "stored by the stock port; on an input or AF pin the port does not drive, its pull sets the pin and IDR, unless a sender or the board's declared level does (p537-538); none in analog mode (p539); 11 is reserved (TVI-WO-1301 A3)", 542),
+            R("GPIOx_PUPDR", 0x0C, "§11.4.4", "PUPDR4", 9, 8, NotReserved, "modeled by the guard", "stored by the stock port; on an input or AF pin the port does not drive, its pull sets the pin and IDR, unless a sender or the board's declared level does (p537-538); none in analog mode (p539); 11 is reserved (TVI-WO-1301 A3)", 542),
+            R("GPIOx_PUPDR", 0x0C, "§11.4.4", "PUPDR3", 7, 6, NotReserved, "modeled by the guard", "stored by the stock port; on an input or AF pin the port does not drive, its pull sets the pin and IDR, unless a sender or the board's declared level does (p537-538); none in analog mode (p539); 11 is reserved (TVI-WO-1301 A3)", 542),
+            R("GPIOx_PUPDR", 0x0C, "§11.4.4", "PUPDR2", 5, 4, NotReserved, "modeled by the guard", "stored by the stock port; on an input or AF pin the port does not drive, its pull sets the pin and IDR, unless a sender or the board's declared level does (p537-538); none in analog mode (p539); 11 is reserved (TVI-WO-1301 A3)", 542),
+            R("GPIOx_PUPDR", 0x0C, "§11.4.4", "PUPDR1", 3, 2, NotReserved, "modeled by the guard", "stored by the stock port; on an input or AF pin the port does not drive, its pull sets the pin and IDR, unless a sender or the board's declared level does (p537-538); none in analog mode (p539); 11 is reserved (TVI-WO-1301 A3)", 542),
+            R("GPIOx_PUPDR", 0x0C, "§11.4.4", "PUPDR0", 1, 0, NotReserved, "modeled by the guard", "stored by the stock port; on an input or AF pin the port does not drive, its pull sets the pin and IDR, unless a sender or the board's declared level does (p537-538); none in analog mode (p539); 11 is reserved (TVI-WO-1301 A3)", 542),
+            R("GPIOx_IDR", 0x10, "§11.4.5", "IDR[15:0]", 15, 0, Any, "read-only", "ignored (read-only); served by the guard by mode (p537-539): output, ODR; AF, the pin's level; analog, 0 (p539); input, a sender's level, else the board's declared level (`external`), else PUPDR's pull, else 0. That 0 is an assumption: silicon gives a floating pin no defined level, so a firmware that needs 0 from a floating pin passes in the twin and may not on silicon (ruled 2026-11-23T23:52Z)", 543),
             R("GPIOx_IDR", 0x10, "§11.4.5", "Res31_16", 31, 16, Zero, "reserved", "reserved: dropped, reads 0", 543),
-            R("GPIOx_ODR", 0x14, "§11.4.6", "ODR[15:0]", 15, 0, Any, "stock, wrong (the stock port drives each pin's connections, its LEDs, EXTI and timer inputs, from ODR in every mode; silicon drives a pin from ODR only in output mode: p537-539)", "the stock port: the output state, stored", 543),
+            R("GPIOx_ODR", 0x14, "§11.4.6", "ODR[15:0]", 15, 0, Any, "modeled by the guard", "latched by the guard and read back as written (p537); drives a pin only in output mode, at the write or when the pin switches to output (p537-539)", 543),
             R("GPIOx_ODR", 0x14, "§11.4.6", "Res31_16", 31, 16, Zero, "reserved", "reserved: dropped, reads 0", 543),
-            R("GPIOx_BSRR", 0x18, "§11.4.7", "BR[15:0]", 31, 16, Any, "modeled by the guard", "resets ODR bits, except where the BS bit is set too: BS has priority (p544), which the stock port gets wrong (TVI-WO-1301 A7); the stock port drives ODR onto the pin's connections in every mode (p537-539)", 544),
-            R("GPIOx_BSRR", 0x18, "§11.4.7", "BS[15:0]", 15, 0, Any, "stock, wrong (it sets ODR bits, which the stock port drives onto the pin's connections in every mode; silicon only in output mode: p537-539)", "the stock port: sets ODR bits", 544),
+            R("GPIOx_BSRR", 0x18, "§11.4.7", "BR[15:0]", 31, 16, Any, "modeled by the guard", "resets ODR bits, except where the BS bit is set too: BS has priority (p544; TVI-WO-1301 A7); ODR drives a pin only in output mode (p537-539)", 544),
+            R("GPIOx_BSRR", 0x18, "§11.4.7", "BS[15:0]", 15, 0, Any, "modeled by the guard", "sets ODR bits (the guard's copy); ODR drives a pin only in output mode (p537-539)", 544),
             R("GPIOx_LCKR", 0x1C, "§11.4.8", "Res31_17", 31, 17, Zero, "reserved", "reserved: dropped, reads 0", 545),
             R("GPIOx_LCKR", 0x1C, "§11.4.8", "LCKK", 16, 16, Zero, "stock, wrong (the lock key sequence and the lock are not modeled; the stock port reads back the locked pins, not the LCK bits; TVI-WO-1301 A8)", "no lock: LCKK written 0, which starts no sequence", 545),
             R("GPIOx_LCKR", 0x1C, "§11.4.8", "LCK[15:0]", 15, 0, Zero, "stock, wrong (the lock key sequence and the lock are not modeled; the stock port reads back the locked pins, not the LCK bits; TVI-WO-1301 A8)", "no lock: LCK written 0", 545),
