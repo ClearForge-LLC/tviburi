@@ -154,6 +154,16 @@ usart1: @ {
         tviburiRcc RegistrationPeripheralAlias.USART1
     }
 
+timer8: @ {
+        sysbus 0x40010400;
+        tviburiRcc RegistrationPeripheralAlias.TIM8
+    }
+
+timer1: @ {
+        sysbus 0x40010000;
+        tviburiRcc RegistrationPeripheralAlias.TIM1
+    }
+
 uart8: @ {
         sysbus 0x40007C00;
         tviburiRcc RegistrationPeripheralAlias.UART8
@@ -291,4 +301,4 @@ qspi: @ {
         tviburiRcc RegistrationPeripheralAlias.QSPI
     }
 
-// 56 registrations restated.
+// 58 registrations restated.

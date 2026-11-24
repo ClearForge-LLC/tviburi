@@ -13,13 +13,14 @@
 //
 // What a channel output carries (CH1-CH4; RM0433 Rev 9 Table 337 p1608):
 //   OCxREF is the stock model's channel line (PWM mode 1: high from the update event until the compare, p1558, with
-//   the stock model's conventions for the period and the first edge, kept by ruling Q1), except that with CCRx = 0 in
-//   PWM mode 1 OCxREF is 0 (p1558), and CCRx reads 0 at reset (p1610), both from the guard's copy (ruling Q2).
+//   the stock model's conventions for the period and the first edge, kept by ruling Q1). The guard keeps that line
+//   OCxREF (ruling Q2): CCRx is 0 at reset (p1610) in the stock model too, a CCRx of 0 in PWM mode 1 lowers it
+//   (p1558), and the stock model sees every CCxE set, so it never clears OCxREF for an output being disabled.
 //   MOE = 1, CCxE = 1: OCx = OCxREF xor CCxP (polarity applied here, once: the stock model never applies it).
 //   MOE = 1, CCxE = 0: not driven by the timer (Hi-Z).
 //   MOE = 0, OSSI = 0, or CCxE = CCxNE = 0: not driven (Hi-Z).
-//   MOE = 0, OSSI = 1, CCxE = 1: the idle level OISx (p1615 OSSI: "forced to their idle level after the deadtime";
-//   no dead time is modeled, DTG = 0).
+//   MOE = 0, OSSI = 1, CCxE = 1: the idle level OISx (OIS1 p1591, MOE p1614, OSSI p1615: "forced to their idle level
+//   after the deadtime"; no dead time is modeled, DTG = 0).
 //   A Renode connection has two levels, so "not driven" is driven LOW: a stated assumption, which is silicon's level
 //   on every committed motor pin, each with a fitted 442 kOhm pull-down (Aethelgard 65c74788, 4300j; ruling Q4). A
 //   pin whose board leaves it floating, or pulls it up, is not modeled (the twin cannot see fitment).
@@ -71,13 +72,19 @@ namespace Antmicro.Renode.Peripherals.Tviburi
         public new IReadOnlyDictionary<int, IGPIO> Connections => connections;
         IReadOnlyDictionary<int, IGPIO> INumberedGPIOOutput.Connections => connections;
 
+        // The copies first, so the stock lines' own reset edges are judged by silicon's reset state (no pulse); then
+        // CCRx = 0, silicon's reset (p1610), into the stock model, whose reset is its initialLimit (0xFFFF), so that it
+        // never raises an unwritten channel in PWM mode 1 (CCRx above ARR would hold OCxREF at 1, p1558).
         public override void Reset()
         {
-            base.Reset();
             cr2 = ccmr1 = ccmr2 = ccer = bdtr = ccmr3 = 0;
-            Array.Clear(ccr, 0, ccr.Length);
             lockLevel = 0;
             bdtrWritten = false;
+            base.Reset();
+            for(var i = 0; i < Channels; i++)
+            {
+                base.WriteDoubleWord(Ccr1Offset + 4 * i, 0);
+            }
             DriveAll();
         }
 
@@ -216,10 +223,6 @@ namespace Antmicro.Renode.Peripherals.Tviburi
             case Ccmr3Offset: return ccmr3;
             case Af1Offset: case Af2Offset: return 1;   // BKINE, BK2INE reset 1 (p1619, p1621)
             }
-            if(b >= Ccr1Offset && b <= Ccr4Offset)
-            {
-                return ccr[(b - Ccr1Offset) / 4];
-            }
             return b <= BdtrOffset ? base.ReadDoubleWord(b) : 0;
         }
 
@@ -232,7 +235,11 @@ namespace Antmicro.Renode.Peripherals.Tviburi
             case Ccmr2Offset: ccmr2 = word; break;
             case CcerOffset: ccer = word; break;
             case BdtrOffset:
-                if(!bdtrWritten)
+                if(bdtrWritten)
+                {
+                    word = (word & ~LockBits) | (bdtr & LockBits);   // frozen (p1615): kept even when recorded mode passes a change
+                }
+                else
                 {
                     lockLevel = (int)((word >> 8) & 3);   // frozen by the first write after reset (p1615)
                     bdtrWritten = true;
@@ -241,49 +248,45 @@ namespace Antmicro.Renode.Peripherals.Tviburi
                 break;
             case Ccmr3Offset: ccmr3 = word; break;
             }
-            if(b >= Ccr1Offset && b <= Ccr4Offset)
-            {
-                ccr[(b - Ccr1Offset) / 4] = word & 0xFFFF;
-            }
             if(b <= BdtrOffset)
             {
-                base.WriteDoubleWord(b, word);   // the registers past BDTR are the guard's alone (the stock model has none)
+                // The registers past BDTR are the guard's alone (the stock model has none). The stock model sees every
+                // CCxE set, so its line stays OCxREF whatever CCxE says (silicon computes OCxREF regardless, p1607; the
+                // stock model would clear its line at CCxE = 0, STM32_Timer.cs L695-704): the guard alone gates.
+                base.WriteDoubleWord(b, b == CcerOffset ? word | AllOutputs : word);
             }
             DriveAll();
         }
 
         // ---- the outputs ---------------------------------------------------------------------------------------
 
+        // In PWM mode 1, a CCRx of 0 holds OCxREF at 0 (p1558); the stock model leaves its line where it was when CCRx
+        // becomes 0 (STM32_Timer.cs L398-402), so the guard lowers it, and the stock model then never raises it.
         private void DriveAll()
         {
             for(var i = 0; i < Channels; i++)
             {
+                var ccmr = i < 2 ? ccmr1 : ccmr2;
+                if((ccmr >> (8 * (i % 2) + 4) & 7) == PwmMode1 && base.ReadDoubleWord(Ccr1Offset + 4 * i) == 0 && base.Connections[i].IsSet)
+                {
+                    base.Connections[i].Unset();
+                }
                 outs[i]?.Set(Level(i));
             }
         }
 
-        // Silicon's level at channel i's output (Table 337 p1608), "not driven" as low (ruling Q4).
+        // Silicon's level at channel i's output (Table 337 p1608), "not driven" as low (ruling Q4). OCxREF is the stock
+        // model's line (its period and first edge, ruling Q1). The idle level with MOE = 0 and OSSI = 1 is OISx (OIS1
+        // p1591, MOE p1614, OSSI p1615: Table 337 p1608 states it only after a break).
         private bool Level(int i)
         {
             var e = (ccer >> (4 * i) & 1) == 1;
             var p = (ccer >> (4 * i + 1) & 1) == 1;
             if((bdtr & MoeBit) != 0)
             {
-                return e && (Ref(i) ^ p);
+                return e && (base.Connections[i].IsSet ^ p);
             }
             return e && (bdtr & OssiBit) != 0 && (cr2 >> (8 + 2 * i) & 1) == 1;
-        }
-
-        // OCxREF: the stock model's line, except in PWM mode 1 with CCRx = 0, which holds it at 0 (p1558).
-        private bool Ref(int i)
-        {
-            var ccmr = i < 2 ? ccmr1 : ccmr2;
-            var ocm = ccmr >> (8 * (i % 2) + 4) & 7;
-            if(ocm == PwmMode1 && ccr[i] == 0)
-            {
-                return false;
-            }
-            return base.Connections[i].IsSet;
         }
 
         private sealed class Tap : IGPIOReceiver
@@ -325,7 +328,9 @@ namespace Antmicro.Renode.Peripherals.Tviburi
         // (BDTR) and OIS1-OIS4, OIS1N-OIS3N (CR2); level 2 also OSSR, OSSI (BDTR) and CCxP, CCxNP (CCER, every channel
         // an output: CCxS = 00 is the allow-list's); level 3 also OCxM and OCxPE (CCMR1, CCMR2), and the LOCK bits
         // themselves once frozen. BKF, BK2F, BK2E and BK2P are left to the allow-list (refused unless 0): their own
-        // pages lock them at level 1 and p1615's list does not, so the manual does not say which (measure.md §5).
+        // pages lock them at level 1 and p1615's list does not, so the manual does not say which (measure.md §5). CCMR3
+        // is not locked: p1615's level 3 names "TIMx_CCMRx" and CCMR3's own page (p1617) has no LOCK note; OC5/OC6
+        // drive nothing modeled, so its copy only reads back.
         private uint Locked(long b)
         {
             switch(b)
@@ -440,7 +445,6 @@ namespace Antmicro.Renode.Peripherals.Tviburi
         private readonly uint limit;
         private readonly GPIO[] outs = new GPIO[Channels];
         private readonly Dictionary<int, IGPIO> connections;
-        private readonly uint[] ccr = new uint[Channels];
         private uint cr2, ccmr1, ccmr2, ccer, bdtr, ccmr3;
         private int lockLevel;
         private bool bdtrWritten;
@@ -450,6 +454,8 @@ namespace Antmicro.Renode.Peripherals.Tviburi
         private const uint PwmMode1 = 6;
         private const uint MoeBit = 1u << 15;
         private const uint OssiBit = 1u << 10;
+        private const uint LockBits = 3u << 8;
+        private const uint AllOutputs = 0x1111;
         private const ulong Tim1Base = 0x40010000;
         private const ulong Tim8Base = 0x40010400;
         private const long Cr2Offset = 0x04;
@@ -457,7 +463,6 @@ namespace Antmicro.Renode.Peripherals.Tviburi
         private const long Ccmr2Offset = 0x1C;
         private const long CcerOffset = 0x20;
         private const long Ccr1Offset = 0x34;
-        private const long Ccr4Offset = 0x40;
         private const long BdtrOffset = 0x44;
         private const long DmarOffset = 0x4C;
         private const long Ccmr3Offset = 0x54;
@@ -540,13 +545,13 @@ namespace Antmicro.Renode.Peripherals.Tviburi
             R("TIMx_CR2", 0x04, "§38.4.2", "Res17_17", 17, 17, Zero, "reserved", "reserved: dropped, reads 0", 1589),
             R("TIMx_CR2", 0x04, "§38.4.2", "OIS5", 16, 16, Zero, "undefined in the stock model", "0 only: the stock model reserves the bits; OC5/OC6 reach no pin and no trigger output is modeled", 1589),
             R("TIMx_CR2", 0x04, "§38.4.2", "Res15_15", 15, 15, Zero, "reserved", "reserved: dropped, reads 0", 1589),
-            R("TIMx_CR2", 0x04, "§38.4.2", "OIS4", 14, 14, Any, "modeled by the guard", "kept by the guard and served on read (a stock tag): the idle level of the output while MOE = 0 with OSSI = 1 (Table 337 p1608, OSSI p1615); locked from LOCK level 1 (p1615)", 1589),
-            R("TIMx_CR2", 0x04, "§38.4.2", "OIS3N", 13, 13, Any, "modeled by the guard", "kept by the guard and served on read (a stock tag): the idle level of the output while MOE = 0 with OSSI = 1 (Table 337 p1608, OSSI p1615); locked from LOCK level 1 (p1615)", 1589),
-            R("TIMx_CR2", 0x04, "§38.4.2", "OIS3", 12, 12, Any, "modeled by the guard", "kept by the guard and served on read (a stock tag): the idle level of the output while MOE = 0 with OSSI = 1 (Table 337 p1608, OSSI p1615); locked from LOCK level 1 (p1615)", 1589),
-            R("TIMx_CR2", 0x04, "§38.4.2", "OIS2N", 11, 11, Any, "modeled by the guard", "kept by the guard and served on read (a stock tag): the idle level of the output while MOE = 0 with OSSI = 1 (Table 337 p1608, OSSI p1615); locked from LOCK level 1 (p1615)", 1589),
-            R("TIMx_CR2", 0x04, "§38.4.2", "OIS2", 10, 10, Any, "modeled by the guard", "kept by the guard and served on read (a stock tag): the idle level of the output while MOE = 0 with OSSI = 1 (Table 337 p1608, OSSI p1615); locked from LOCK level 1 (p1615)", 1589),
-            R("TIMx_CR2", 0x04, "§38.4.2", "OIS1N", 9, 9, Any, "modeled by the guard", "kept by the guard and served on read (a stock tag): the idle level of the output while MOE = 0 with OSSI = 1 (Table 337 p1608, OSSI p1615); locked from LOCK level 1 (p1615)", 1589),
-            R("TIMx_CR2", 0x04, "§38.4.2", "OIS1", 8, 8, Any, "modeled by the guard", "kept by the guard and served on read (a stock tag): the idle level of the output while MOE = 0 with OSSI = 1 (Table 337 p1608, OSSI p1615); locked from LOCK level 1 (p1615)", 1589),
+            R("TIMx_CR2", 0x04, "§38.4.2", "OIS4", 14, 14, Any, "modeled by the guard", "kept by the guard and served on read (a stock tag): the idle level of the output while MOE = 0 with OSSI = 1 (OIS1 p1591, OSSI p1615); locked from LOCK level 1 (p1615)", 1589),
+            R("TIMx_CR2", 0x04, "§38.4.2", "OIS3N", 13, 13, Any, "modeled by the guard", "kept by the guard and served on read (a stock tag); drives nothing: no complementary output is modeled (ruled 2026-11-24T06:10Z Q5 (a)); locked from LOCK level 1 (p1615)", 1589),
+            R("TIMx_CR2", 0x04, "§38.4.2", "OIS3", 12, 12, Any, "modeled by the guard", "kept by the guard and served on read (a stock tag): the idle level of the output while MOE = 0 with OSSI = 1 (OIS1 p1591, OSSI p1615); locked from LOCK level 1 (p1615)", 1589),
+            R("TIMx_CR2", 0x04, "§38.4.2", "OIS2N", 11, 11, Any, "modeled by the guard", "kept by the guard and served on read (a stock tag); drives nothing: no complementary output is modeled (ruled 2026-11-24T06:10Z Q5 (a)); locked from LOCK level 1 (p1615)", 1589),
+            R("TIMx_CR2", 0x04, "§38.4.2", "OIS2", 10, 10, Any, "modeled by the guard", "kept by the guard and served on read (a stock tag): the idle level of the output while MOE = 0 with OSSI = 1 (OIS1 p1591, OSSI p1615); locked from LOCK level 1 (p1615)", 1589),
+            R("TIMx_CR2", 0x04, "§38.4.2", "OIS1N", 9, 9, Any, "modeled by the guard", "kept by the guard and served on read (a stock tag); drives nothing: no complementary output is modeled (ruled 2026-11-24T06:10Z Q5 (a)); locked from LOCK level 1 (p1615)", 1589),
+            R("TIMx_CR2", 0x04, "§38.4.2", "OIS1", 8, 8, Any, "modeled by the guard", "kept by the guard and served on read (a stock tag): the idle level of the output while MOE = 0 with OSSI = 1 (OIS1 p1591, OSSI p1615); locked from LOCK level 1 (p1615)", 1589),
             R("TIMx_CR2", 0x04, "§38.4.2", "TI1S", 7, 7, Zero, "inherited, unaudited (acknowledged by name)", "0 only: the input XOR is not audited", 1589),
             R("TIMx_CR2", 0x04, "§38.4.2", "MMS[2:0]", 6, 4, Zero, "tag", "0 only: a stock tag (MMS); preloaded control, DMA selection and the trigger output are not modeled", 1589),
             R("TIMx_CR2", 0x04, "§38.4.2", "CCDS", 3, 3, Zero, "tag", "0 only: a stock tag (CCDS); preloaded control, DMA selection and the trigger output are not modeled", 1589),
@@ -595,11 +600,11 @@ namespace Antmicro.Renode.Peripherals.Tviburi
             R("TIMx_SR", 0x10, "§38.4.5", "BIF", 7, 7, Any, "tag", "reads 0 and is never set (COM, break, system break and channels 5-6 are refused or unrouted); a write of 0 or 1 changes nothing (rc_w0)", 1596),
             R("TIMx_SR", 0x10, "§38.4.5", "TIF", 6, 6, Any, "inherited, unaudited (acknowledged by name)", "the stock model: flags cleared by writing 0, a 1 changes nothing (rc_w0)", 1596),
             R("TIMx_SR", 0x10, "§38.4.5", "COMIF", 5, 5, Any, "tag", "reads 0 and is never set (COM, break, system break and channels 5-6 are refused or unrouted); a write of 0 or 1 changes nothing (rc_w0)", 1596),
-            R("TIMx_SR", 0x10, "§38.4.5", "CC4IF", 4, 4, Any, "inherited, unaudited (acknowledged by name)", "the stock model: flags cleared by writing 0, a 1 changes nothing (rc_w0)", 1596),
-            R("TIMx_SR", 0x10, "§38.4.5", "CC3IF", 3, 3, Any, "inherited, unaudited (acknowledged by name)", "the stock model: flags cleared by writing 0, a 1 changes nothing (rc_w0)", 1596),
-            R("TIMx_SR", 0x10, "§38.4.5", "CC2IF", 2, 2, Any, "inherited, unaudited (acknowledged by name)", "the stock model: flags cleared by writing 0, a 1 changes nothing (rc_w0)", 1596),
-            R("TIMx_SR", 0x10, "§38.4.5", "CC1IF", 1, 1, Any, "inherited, unaudited (acknowledged by name)", "the stock model: flags cleared by writing 0, a 1 changes nothing (rc_w0)", 1596),
-            R("TIMx_SR", 0x10, "§38.4.5", "UIF", 0, 0, Any, "inherited, unaudited (acknowledged by name)", "the stock model: flags cleared by writing 0, a 1 changes nothing (rc_w0)", 1596),
+            R("TIMx_SR", 0x10, "§38.4.5", "CC4IF", 4, 4, Any, "stock, wrong (the stock model sets UIF at UG only with UIE = 1, and CCxIF at a compare only with CCxIE = 1 (STM32_Timer.cs L283, L132-134); silicon sets them regardless (p1597), so a firmware that polls them reads 0 in the twin)", "the stock model: cleared by writing 0, a 1 changes nothing (rc_w0)", 1596),
+            R("TIMx_SR", 0x10, "§38.4.5", "CC3IF", 3, 3, Any, "stock, wrong (the stock model sets UIF at UG only with UIE = 1, and CCxIF at a compare only with CCxIE = 1 (STM32_Timer.cs L283, L132-134); silicon sets them regardless (p1597), so a firmware that polls them reads 0 in the twin)", "the stock model: cleared by writing 0, a 1 changes nothing (rc_w0)", 1596),
+            R("TIMx_SR", 0x10, "§38.4.5", "CC2IF", 2, 2, Any, "stock, wrong (the stock model sets UIF at UG only with UIE = 1, and CCxIF at a compare only with CCxIE = 1 (STM32_Timer.cs L283, L132-134); silicon sets them regardless (p1597), so a firmware that polls them reads 0 in the twin)", "the stock model: cleared by writing 0, a 1 changes nothing (rc_w0)", 1596),
+            R("TIMx_SR", 0x10, "§38.4.5", "CC1IF", 1, 1, Any, "stock, wrong (the stock model sets UIF at UG only with UIE = 1, and CCxIF at a compare only with CCxIE = 1 (STM32_Timer.cs L283, L132-134); silicon sets them regardless (p1597), so a firmware that polls them reads 0 in the twin)", "the stock model: cleared by writing 0, a 1 changes nothing (rc_w0)", 1596),
+            R("TIMx_SR", 0x10, "§38.4.5", "UIF", 0, 0, Any, "stock, wrong (the stock model sets UIF at UG only with UIE = 1, and CCxIF at a compare only with CCxIE = 1 (STM32_Timer.cs L283, L132-134); silicon sets them regardless (p1597), so a firmware that polls them reads 0 in the twin)", "the stock model: cleared by writing 0, a 1 changes nothing (rc_w0)", 1596),
             R("TIMx_EGR", 0x14, "§38.4.6", "Res31_16", 31, 16, Zero, "reserved", "reserved: dropped, reads 0", 1598),
             R("TIMx_EGR", 0x14, "§38.4.6", "Res15_9", 15, 9, Zero, "reserved", "reserved: dropped, reads 0", 1598),
             R("TIMx_EGR", 0x14, "§38.4.6", "B2G", 8, 8, Zero, "undefined in the stock model", "0 only: a capture, COM, trigger or break event is not modeled", 1598),
@@ -616,12 +621,12 @@ namespace Antmicro.Renode.Peripherals.Tviburi
             R("TIMx_CCMR1", 0x18, "§38.4.8", "Res23_17", 23, 17, Zero, "reserved", "reserved: dropped, reads 0", 1601),
             R("TIMx_CCMR1", 0x18, "§38.4.8", "OC1M[3]", 16, 16, Zero, "undefined in the stock model", "0 only: the stock model reserves bits 16 and 24, so the modes 1000-1111 are not modeled", 1601),
             R("TIMx_CCMR1", 0x18, "§38.4.8", "OC2CE", 15, 15, Zero, "tag", "0 only: a stock tag (OC2CE); fast enable and OCxREF clear are not modeled", 1601),
-            R("TIMx_CCMR1", 0x18, "§38.4.8", "OC2M[2:0]", 14, 12, new uint[] { 0, 4, 5, 6 }, "modeled by the guard", "the stock model's compare modes frozen, force inactive, force active and PWM mode 1; in PWM mode 1 a CCRx of 0 holds OCxREF at 0 (p1558), from the guard's copy; locked at LOCK level 3 (p1602)", 1601),
+            R("TIMx_CCMR1", 0x18, "§38.4.8", "OC2M[2:0]", 14, 12, new uint[] { 0, 4, 5, 6 }, "modeled by the guard", "the stock model's compare modes frozen, force inactive, force active and PWM mode 1; in PWM mode 1 a CCRx of 0 holds OCxREF at 0 (p1558), the guard lowering the stock line; locked at LOCK level 3 (p1602)", 1601),
             R("TIMx_CCMR1", 0x18, "§38.4.8", "OC2PE", 11, 11, Any, "stock, wrong (OCxPE is a stock tag: no preload, so a CCRx write takes effect at once where silicon waits for the update event (p1603); acknowledged by name, ruled 2026-11-24T06:10Z Q7; Aethelgard lists it unobservable)", "kept by the guard and served on read; locked at LOCK level 3 (p1603)", 1601),
             R("TIMx_CCMR1", 0x18, "§38.4.8", "OC2FE", 10, 10, Zero, "tag", "0 only: a stock tag (OC2FE); fast enable and OCxREF clear are not modeled", 1601),
             R("TIMx_CCMR1", 0x18, "§38.4.8", "CC2S[1:0]", 9, 8, Zero, "inherited, unaudited (acknowledged by name)", "00 only: the channel is an output; input capture is not audited", 1601),
             R("TIMx_CCMR1", 0x18, "§38.4.8", "OC1CE", 7, 7, Zero, "tag", "0 only: a stock tag (OC1CE); fast enable and OCxREF clear are not modeled", 1601),
-            R("TIMx_CCMR1", 0x18, "§38.4.8", "OC1M[2:0]", 6, 4, new uint[] { 0, 4, 5, 6 }, "modeled by the guard", "the stock model's compare modes frozen, force inactive, force active and PWM mode 1; in PWM mode 1 a CCRx of 0 holds OCxREF at 0 (p1558), from the guard's copy; locked at LOCK level 3 (p1602)", 1601),
+            R("TIMx_CCMR1", 0x18, "§38.4.8", "OC1M[2:0]", 6, 4, new uint[] { 0, 4, 5, 6 }, "modeled by the guard", "the stock model's compare modes frozen, force inactive, force active and PWM mode 1; in PWM mode 1 a CCRx of 0 holds OCxREF at 0 (p1558), the guard lowering the stock line; locked at LOCK level 3 (p1602)", 1601),
             R("TIMx_CCMR1", 0x18, "§38.4.8", "OC1PE", 3, 3, Any, "stock, wrong (OCxPE is a stock tag: no preload, so a CCRx write takes effect at once where silicon waits for the update event (p1603); acknowledged by name, ruled 2026-11-24T06:10Z Q7; Aethelgard lists it unobservable)", "kept by the guard and served on read; locked at LOCK level 3 (p1603)", 1601),
             R("TIMx_CCMR1", 0x18, "§38.4.8", "OC1FE", 2, 2, Zero, "tag", "0 only: a stock tag (OC1FE); fast enable and OCxREF clear are not modeled", 1601),
             R("TIMx_CCMR1", 0x18, "§38.4.8", "CC1S[1:0]", 1, 0, Zero, "inherited, unaudited (acknowledged by name)", "00 only: the channel is an output; input capture is not audited", 1601),
@@ -630,12 +635,12 @@ namespace Antmicro.Renode.Peripherals.Tviburi
             R("TIMx_CCMR2", 0x1C, "§38.4.10", "Res23_17", 23, 17, Zero, "reserved", "reserved: dropped, reads 0", 1604),
             R("TIMx_CCMR2", 0x1C, "§38.4.10", "OC3M[3]", 16, 16, Zero, "undefined in the stock model", "0 only: the stock model reserves bits 16 and 24, so the modes 1000-1111 are not modeled", 1604),
             R("TIMx_CCMR2", 0x1C, "§38.4.10", "OC4CE", 15, 15, Zero, "tag", "0 only: a stock tag (OC4CE); fast enable and OCxREF clear are not modeled", 1604),
-            R("TIMx_CCMR2", 0x1C, "§38.4.10", "OC4M[2:0]", 14, 12, new uint[] { 0, 4, 5, 6 }, "modeled by the guard", "the stock model's compare modes frozen, force inactive, force active and PWM mode 1; in PWM mode 1 a CCRx of 0 holds OCxREF at 0 (p1558), from the guard's copy; locked at LOCK level 3 (p1602)", 1604),
+            R("TIMx_CCMR2", 0x1C, "§38.4.10", "OC4M[2:0]", 14, 12, new uint[] { 0, 4, 5, 6 }, "modeled by the guard", "the stock model's compare modes frozen, force inactive, force active and PWM mode 1; in PWM mode 1 a CCRx of 0 holds OCxREF at 0 (p1558), the guard lowering the stock line; locked at LOCK level 3 (p1602)", 1604),
             R("TIMx_CCMR2", 0x1C, "§38.4.10", "OC4PE", 11, 11, Any, "stock, wrong (OCxPE is a stock tag: no preload, so a CCRx write takes effect at once where silicon waits for the update event (p1603); acknowledged by name, ruled 2026-11-24T06:10Z Q7; Aethelgard lists it unobservable)", "kept by the guard and served on read; locked at LOCK level 3 (p1603)", 1604),
             R("TIMx_CCMR2", 0x1C, "§38.4.10", "OC4FE", 10, 10, Zero, "tag", "0 only: a stock tag (OC4FE); fast enable and OCxREF clear are not modeled", 1604),
             R("TIMx_CCMR2", 0x1C, "§38.4.10", "CC4S[1:0]", 9, 8, Zero, "inherited, unaudited (acknowledged by name)", "00 only: the channel is an output; input capture is not audited", 1604),
             R("TIMx_CCMR2", 0x1C, "§38.4.10", "OC3CE", 7, 7, Zero, "tag", "0 only: a stock tag (OC3CE); fast enable and OCxREF clear are not modeled", 1604),
-            R("TIMx_CCMR2", 0x1C, "§38.4.10", "OC3M[2:0]", 6, 4, new uint[] { 0, 4, 5, 6 }, "modeled by the guard", "the stock model's compare modes frozen, force inactive, force active and PWM mode 1; in PWM mode 1 a CCRx of 0 holds OCxREF at 0 (p1558), from the guard's copy; locked at LOCK level 3 (p1602)", 1604),
+            R("TIMx_CCMR2", 0x1C, "§38.4.10", "OC3M[2:0]", 6, 4, new uint[] { 0, 4, 5, 6 }, "modeled by the guard", "the stock model's compare modes frozen, force inactive, force active and PWM mode 1; in PWM mode 1 a CCRx of 0 holds OCxREF at 0 (p1558), the guard lowering the stock line; locked at LOCK level 3 (p1602)", 1604),
             R("TIMx_CCMR2", 0x1C, "§38.4.10", "OC3PE", 3, 3, Any, "stock, wrong (OCxPE is a stock tag: no preload, so a CCRx write takes effect at once where silicon waits for the update event (p1603); acknowledged by name, ruled 2026-11-24T06:10Z Q7; Aethelgard lists it unobservable)", "kept by the guard and served on read; locked at LOCK level 3 (p1603)", 1604),
             R("TIMx_CCMR2", 0x1C, "§38.4.10", "OC3FE", 2, 2, Zero, "tag", "0 only: a stock tag (OC3FE); fast enable and OCxREF clear are not modeled", 1604),
             R("TIMx_CCMR2", 0x1C, "§38.4.10", "CC3S[1:0]", 1, 0, Zero, "inherited, unaudited (acknowledged by name)", "00 only: the channel is an output; input capture is not audited", 1604),
@@ -648,19 +653,19 @@ namespace Antmicro.Renode.Peripherals.Tviburi
             R("TIMx_CCER", 0x20, "§38.4.11", "CC4NP", 15, 15, Zero, "stock, wrong (a CHxN pin in AF mode shows NOT CHx through the GPIO port's invertedAFPins, whatever CCxNE says, where silicon leaves it Hi-Z with CCxNE = 0 (Table 337 p1608): a GPIO-guard row, ruled 2026-11-24T06:10Z Q5 (a))", "0 only: the guard has no complementary output to gate", 1605),
             R("TIMx_CCER", 0x20, "§38.4.11", "Res14_14", 14, 14, Zero, "reserved", "reserved: dropped, reads 0", 1605),
             R("TIMx_CCER", 0x20, "§38.4.11", "CC4P", 13, 13, Any, "modeled by the guard", "kept by the guard and applied once to the driven level, OCx = OCxREF xor CCxP (Table 337 p1608); the stock model never applies it to an output; locked at LOCK level 2 (p1607)", 1605),
-            R("TIMx_CCER", 0x20, "§38.4.11", "CC4E", 12, 12, Any, "modeled by the guard", "gates the channel output with MOE (Table 337 p1608): disabled, the pin is not driven by the timer (Hi-Z) and the guard drives it low. a channel output silicon does not drive (Hi-Z, Table 337 p1608) is driven low: every committed motor pin has a fitted 442 kOhm pull-down (Aethelgard 65c74788, 4300j), so low is silicon's level there; an open link would float, which the twin cannot see (ruled 2026-11-24T06:10Z Q4)", 1605),
+            R("TIMx_CCER", 0x20, "§38.4.11", "CC4E", 12, 12, Any, "modeled by the guard", "gates the channel output with MOE (Table 337 p1608), in the guard alone (the stock model sees every CCxE set, so its line stays OCxREF): disabled, the pin is not driven by the timer (Hi-Z) and the guard drives it low. a channel output silicon does not drive (Hi-Z, Table 337 p1608) is driven low: every committed motor pin has a fitted 442 kOhm pull-down (Aethelgard 65c74788, 4300j), so low is silicon's level there; an open link would float, which the twin cannot see (ruled 2026-11-24T06:10Z Q4)", 1605),
             R("TIMx_CCER", 0x20, "§38.4.11", "CC3NP", 11, 11, Zero, "stock, wrong (a CHxN pin in AF mode shows NOT CHx through the GPIO port's invertedAFPins, whatever CCxNE says, where silicon leaves it Hi-Z with CCxNE = 0 (Table 337 p1608): a GPIO-guard row, ruled 2026-11-24T06:10Z Q5 (a))", "0 only: the guard has no complementary output to gate", 1605),
             R("TIMx_CCER", 0x20, "§38.4.11", "CC3NE", 10, 10, Zero, "stock, wrong (a CHxN pin in AF mode shows NOT CHx through the GPIO port's invertedAFPins, whatever CCxNE says, where silicon leaves it Hi-Z with CCxNE = 0 (Table 337 p1608): a GPIO-guard row, ruled 2026-11-24T06:10Z Q5 (a))", "0 only: the guard has no complementary output to gate", 1605),
             R("TIMx_CCER", 0x20, "§38.4.11", "CC3P", 9, 9, Any, "modeled by the guard", "kept by the guard and applied once to the driven level, OCx = OCxREF xor CCxP (Table 337 p1608); the stock model never applies it to an output; locked at LOCK level 2 (p1607)", 1605),
-            R("TIMx_CCER", 0x20, "§38.4.11", "CC3E", 8, 8, Any, "modeled by the guard", "gates the channel output with MOE (Table 337 p1608): disabled, the pin is not driven by the timer (Hi-Z) and the guard drives it low. a channel output silicon does not drive (Hi-Z, Table 337 p1608) is driven low: every committed motor pin has a fitted 442 kOhm pull-down (Aethelgard 65c74788, 4300j), so low is silicon's level there; an open link would float, which the twin cannot see (ruled 2026-11-24T06:10Z Q4)", 1605),
+            R("TIMx_CCER", 0x20, "§38.4.11", "CC3E", 8, 8, Any, "modeled by the guard", "gates the channel output with MOE (Table 337 p1608), in the guard alone (the stock model sees every CCxE set, so its line stays OCxREF): disabled, the pin is not driven by the timer (Hi-Z) and the guard drives it low. a channel output silicon does not drive (Hi-Z, Table 337 p1608) is driven low: every committed motor pin has a fitted 442 kOhm pull-down (Aethelgard 65c74788, 4300j), so low is silicon's level there; an open link would float, which the twin cannot see (ruled 2026-11-24T06:10Z Q4)", 1605),
             R("TIMx_CCER", 0x20, "§38.4.11", "CC2NP", 7, 7, Zero, "stock, wrong (a CHxN pin in AF mode shows NOT CHx through the GPIO port's invertedAFPins, whatever CCxNE says, where silicon leaves it Hi-Z with CCxNE = 0 (Table 337 p1608): a GPIO-guard row, ruled 2026-11-24T06:10Z Q5 (a))", "0 only: the guard has no complementary output to gate", 1605),
             R("TIMx_CCER", 0x20, "§38.4.11", "CC2NE", 6, 6, Zero, "stock, wrong (a CHxN pin in AF mode shows NOT CHx through the GPIO port's invertedAFPins, whatever CCxNE says, where silicon leaves it Hi-Z with CCxNE = 0 (Table 337 p1608): a GPIO-guard row, ruled 2026-11-24T06:10Z Q5 (a))", "0 only: the guard has no complementary output to gate", 1605),
             R("TIMx_CCER", 0x20, "§38.4.11", "CC2P", 5, 5, Any, "modeled by the guard", "kept by the guard and applied once to the driven level, OCx = OCxREF xor CCxP (Table 337 p1608); the stock model never applies it to an output; locked at LOCK level 2 (p1607)", 1605),
-            R("TIMx_CCER", 0x20, "§38.4.11", "CC2E", 4, 4, Any, "modeled by the guard", "gates the channel output with MOE (Table 337 p1608): disabled, the pin is not driven by the timer (Hi-Z) and the guard drives it low. a channel output silicon does not drive (Hi-Z, Table 337 p1608) is driven low: every committed motor pin has a fitted 442 kOhm pull-down (Aethelgard 65c74788, 4300j), so low is silicon's level there; an open link would float, which the twin cannot see (ruled 2026-11-24T06:10Z Q4)", 1605),
+            R("TIMx_CCER", 0x20, "§38.4.11", "CC2E", 4, 4, Any, "modeled by the guard", "gates the channel output with MOE (Table 337 p1608), in the guard alone (the stock model sees every CCxE set, so its line stays OCxREF): disabled, the pin is not driven by the timer (Hi-Z) and the guard drives it low. a channel output silicon does not drive (Hi-Z, Table 337 p1608) is driven low: every committed motor pin has a fitted 442 kOhm pull-down (Aethelgard 65c74788, 4300j), so low is silicon's level there; an open link would float, which the twin cannot see (ruled 2026-11-24T06:10Z Q4)", 1605),
             R("TIMx_CCER", 0x20, "§38.4.11", "CC1NP", 3, 3, Zero, "stock, wrong (a CHxN pin in AF mode shows NOT CHx through the GPIO port's invertedAFPins, whatever CCxNE says, where silicon leaves it Hi-Z with CCxNE = 0 (Table 337 p1608): a GPIO-guard row, ruled 2026-11-24T06:10Z Q5 (a))", "0 only: the guard has no complementary output to gate", 1605),
             R("TIMx_CCER", 0x20, "§38.4.11", "CC1NE", 2, 2, Zero, "stock, wrong (a CHxN pin in AF mode shows NOT CHx through the GPIO port's invertedAFPins, whatever CCxNE says, where silicon leaves it Hi-Z with CCxNE = 0 (Table 337 p1608): a GPIO-guard row, ruled 2026-11-24T06:10Z Q5 (a))", "0 only: the guard has no complementary output to gate", 1605),
             R("TIMx_CCER", 0x20, "§38.4.11", "CC1P", 1, 1, Any, "modeled by the guard", "kept by the guard and applied once to the driven level, OCx = OCxREF xor CCxP (Table 337 p1608); the stock model never applies it to an output; locked at LOCK level 2 (p1607)", 1605),
-            R("TIMx_CCER", 0x20, "§38.4.11", "CC1E", 0, 0, Any, "modeled by the guard", "gates the channel output with MOE (Table 337 p1608): disabled, the pin is not driven by the timer (Hi-Z) and the guard drives it low. a channel output silicon does not drive (Hi-Z, Table 337 p1608) is driven low: every committed motor pin has a fitted 442 kOhm pull-down (Aethelgard 65c74788, 4300j), so low is silicon's level there; an open link would float, which the twin cannot see (ruled 2026-11-24T06:10Z Q4)", 1605),
+            R("TIMx_CCER", 0x20, "§38.4.11", "CC1E", 0, 0, Any, "modeled by the guard", "gates the channel output with MOE (Table 337 p1608), in the guard alone (the stock model sees every CCxE set, so its line stays OCxREF): disabled, the pin is not driven by the timer (Hi-Z) and the guard drives it low. a channel output silicon does not drive (Hi-Z, Table 337 p1608) is driven low: every committed motor pin has a fitted 442 kOhm pull-down (Aethelgard 65c74788, 4300j), so low is silicon's level there; an open link would float, which the twin cannot see (ruled 2026-11-24T06:10Z Q4)", 1605),
             R("TIMx_CNT", 0x24, "§38.4.12", "UIFCPY", 31, 31, Zero, "read-only", "ignored (read-only); reads 0 (UIFREMAP = 0)", 1609),
             R("TIMx_CNT", 0x24, "§38.4.12", "Res30_16", 30, 16, Zero, "reserved", "reserved: dropped, reads 0", 1609),
             R("TIMx_CNT", 0x24, "§38.4.12", "CNT[15:0]", 15, 0, Any, "inherited, unaudited (acknowledged by name)", "the stock model: the counter value; not written by either firmware", 1609),
@@ -671,13 +676,13 @@ namespace Antmicro.Renode.Peripherals.Tviburi
             R("TIMx_RCR", 0x30, "§38.4.15", "Res31_16", 31, 16, Zero, "reserved", "reserved: dropped, reads 0", 1610),
             R("TIMx_RCR", 0x30, "§38.4.15", "REP[15:0]", 15, 0, Zero, "inherited, unaudited (acknowledged by name)", "0 only: the repetition counter is not audited", 1610),
             R("TIMx_CCR1", 0x34, "§38.4.16", "Res31_16", 31, 16, Zero, "reserved", "reserved: dropped, reads 0", 1610),
-            R("TIMx_CCR1", 0x34, "§38.4.16", "CCR1[15:0]", 15, 0, Any, "modeled by the guard", "kept by the guard, read 0 at reset (p1610; the stock model reads 0xFFFF, its initialLimit) and served on read; in PWM mode 1 a value of 0 holds OCxREF at 0 (p1558), where the stock model leaves the line at its last level; a value above ARR holds it at 1 (p1558), as the stock model does", 1610),
+            R("TIMx_CCR1", 0x34, "§38.4.16", "CCR1[15:0]", 15, 0, Any, "modeled by the guard", "the stock model, set to 0 at reset by the guard (p1610; the stock reset is its initialLimit, 0xFFFF); in PWM mode 1 a value of 0 holds OCxREF at 0 (p1558): the guard lowers the stock line, which the stock model leaves at its last level; a value above ARR holds it at 1 (p1558), as the stock model does", 1610),
             R("TIMx_CCR2", 0x38, "§38.4.17", "Res31_16", 31, 16, Zero, "reserved", "reserved: dropped, reads 0", 1611),
-            R("TIMx_CCR2", 0x38, "§38.4.17", "CCR2[15:0]", 15, 0, Any, "modeled by the guard", "kept by the guard, read 0 at reset (p1610; the stock model reads 0xFFFF, its initialLimit) and served on read; in PWM mode 1 a value of 0 holds OCxREF at 0 (p1558), where the stock model leaves the line at its last level; a value above ARR holds it at 1 (p1558), as the stock model does", 1611),
+            R("TIMx_CCR2", 0x38, "§38.4.17", "CCR2[15:0]", 15, 0, Any, "modeled by the guard", "the stock model, set to 0 at reset by the guard (p1610; the stock reset is its initialLimit, 0xFFFF); in PWM mode 1 a value of 0 holds OCxREF at 0 (p1558): the guard lowers the stock line, which the stock model leaves at its last level; a value above ARR holds it at 1 (p1558), as the stock model does", 1611),
             R("TIMx_CCR3", 0x3C, "§38.4.18", "Res31_16", 31, 16, Zero, "reserved", "reserved: dropped, reads 0", 1611),
-            R("TIMx_CCR3", 0x3C, "§38.4.18", "CCR3[15:0]", 15, 0, Any, "modeled by the guard", "kept by the guard, read 0 at reset (p1610; the stock model reads 0xFFFF, its initialLimit) and served on read; in PWM mode 1 a value of 0 holds OCxREF at 0 (p1558), where the stock model leaves the line at its last level; a value above ARR holds it at 1 (p1558), as the stock model does", 1611),
+            R("TIMx_CCR3", 0x3C, "§38.4.18", "CCR3[15:0]", 15, 0, Any, "modeled by the guard", "the stock model, set to 0 at reset by the guard (p1610; the stock reset is its initialLimit, 0xFFFF); in PWM mode 1 a value of 0 holds OCxREF at 0 (p1558): the guard lowers the stock line, which the stock model leaves at its last level; a value above ARR holds it at 1 (p1558), as the stock model does", 1611),
             R("TIMx_CCR4", 0x40, "§38.4.19", "Res31_16", 31, 16, Zero, "reserved", "reserved: dropped, reads 0", 1612),
-            R("TIMx_CCR4", 0x40, "§38.4.19", "CCR4[15:0]", 15, 0, Any, "modeled by the guard", "kept by the guard, read 0 at reset (p1610; the stock model reads 0xFFFF, its initialLimit) and served on read; in PWM mode 1 a value of 0 holds OCxREF at 0 (p1558), where the stock model leaves the line at its last level; a value above ARR holds it at 1 (p1558), as the stock model does", 1612),
+            R("TIMx_CCR4", 0x40, "§38.4.19", "CCR4[15:0]", 15, 0, Any, "modeled by the guard", "the stock model, set to 0 at reset by the guard (p1610; the stock reset is its initialLimit, 0xFFFF); in PWM mode 1 a value of 0 holds OCxREF at 0 (p1558): the guard lowers the stock line, which the stock model leaves at its last level; a value above ARR holds it at 1 (p1558), as the stock model does", 1612),
             R("TIMx_BDTR", 0x44, "§38.4.20", "Res31_26", 31, 26, Zero, "reserved", "reserved: dropped, reads 0", 1612),
             R("TIMx_BDTR", 0x44, "§38.4.20", "BK2P", 25, 25, Zero, "undefined in the stock model", "0 only: the break inputs and their filters are not modeled (the stock model reserves bits 16-31)", 1612),
             R("TIMx_BDTR", 0x44, "§38.4.20", "BK2E", 24, 24, Zero, "undefined in the stock model", "0 only: the break inputs and their filters are not modeled (the stock model reserves bits 16-31)", 1612),

@@ -28,6 +28,13 @@
 //!   path="aoe"        - BDTR = MOE | AOE: TVI-TIM-FIELD, unmodeled.
 //!   path="read"       - a read at 0x50 (no register, Table 338 p1628): TVI-TIM-READ, unmodeled.
 //!   path="tim8"       - TIM8 PWM on PC6 with MOE never set: PC6 low; TIM8 is guarded too.
+//!   path="tim8on"     - the same with MOE = 1: PC6 toggles (TIM8's routes land on the guard's outputs).
+//!   path="reenable"   - MOE = 1, OC1M = force active, CC1E = 1 (PA8 high), CC1E = 0 (low), CC1E = 1 again: high, since
+//!                       OCxREF does not depend on CCxE (p1607; Table 337 p1608).
+//!   path="lockbelow"  - LOCK 1, then a CC1P change, an OSSI change and an OC1M change, each above level 1: pass (p1615).
+//!   path="lockbelow2" - LOCK 2, then an OC1M change, above level 2: passes (p1615).
+//!   path="halfhigh"   - TIM1 PWM with MOE = 1, then a 16-bit store of 0 to BDTR's upper half (0x46): merged, MOE kept,
+//!                       PA8 toggles (p1588).
 //!   path="gen-pwm"    - motors-pwm's TIM1 writes at Aethelgard 65c74788 (TVI-WO-1302.measure.md §2.1), PA8-PA11 on AF1:
 //!                       passes, enforcing; PA8 toggles.
 //!   path="ap-m"       - unmodified ArduPilot's TIM1 writes when built with motor outputs (measure.md §2.1, AP-m),
@@ -214,6 +221,41 @@ pub unsafe extern "C" fn reset() -> ! {
     {
         pwm(TIM8, Some(50), 1);
         start(TIM8);
+    }
+    #[cfg(path = "tim8on")]
+    {
+        pwm(TIM8, Some(50), 1);
+        w(TIM8, BDTR, MOE);
+        start(TIM8);
+    }
+    #[cfg(path = "reenable")]
+    {
+        pwm(TIM1, Some(50), 1);
+        w(TIM1, CCMR1, 0x58);
+        w(TIM1, BDTR, MOE);
+        w(TIM1, CCER, 0);
+        w(TIM1, CCER, 1);
+    }
+    #[cfg(path = "lockbelow")]
+    {
+        pwm(TIM1, Some(50), 1);
+        w(TIM1, BDTR, MOE | 1 << 8);
+        w(TIM1, CCER, 0x3);
+        w(TIM1, BDTR, MOE | 1 << 8 | 1 << 10);
+        w(TIM1, CCMR1, 0x58);
+    }
+    #[cfg(path = "lockbelow2")]
+    {
+        pwm(TIM1, Some(50), 1);
+        w(TIM1, BDTR, MOE | 2 << 8);
+        w(TIM1, CCMR1, 0x58);
+    }
+    #[cfg(path = "halfhigh")]
+    {
+        pwm(TIM1, Some(50), 1);
+        w(TIM1, BDTR, MOE);
+        start(TIM1);
+        write_volatile((TIM1 + BDTR + 2) as *mut u16, 0);
     }
     #[cfg(path = "gen-pwm")]
     {
