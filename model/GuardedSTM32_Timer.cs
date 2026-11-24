@@ -78,7 +78,6 @@ namespace Antmicro.Renode.Peripherals.Tviburi
         public override void Reset()
         {
             cr2 = ccmr1 = ccmr2 = ccer = bdtr = ccmr3 = 0;
-            lockLevel = 0;
             bdtrWritten = false;
             base.Reset();
             for(var i = 0; i < Channels; i++)
@@ -239,11 +238,7 @@ namespace Antmicro.Renode.Peripherals.Tviburi
                 {
                     word = (word & ~LockBits) | (bdtr & LockBits);   // frozen (p1615): kept even when recorded mode passes a change
                 }
-                else
-                {
-                    lockLevel = (int)((word >> 8) & 3);   // frozen by the first write after reset (p1615)
-                    bdtrWritten = true;
-                }
+                bdtrWritten = true;   // the first write after reset freezes LOCK (p1615)
                 bdtr = word;
                 break;
             case Ccmr3Offset: ccmr3 = word; break;
@@ -446,7 +441,7 @@ namespace Antmicro.Renode.Peripherals.Tviburi
         private readonly GPIO[] outs = new GPIO[Channels];
         private readonly Dictionary<int, IGPIO> connections;
         private uint cr2, ccmr1, ccmr2, ccer, bdtr, ccmr3;
-        private int lockLevel;
+        private int lockLevel => (int)(bdtr >> 8 & 3);
         private bool bdtrWritten;
         private string config;
 
@@ -477,7 +472,7 @@ namespace Antmicro.Renode.Peripherals.Tviburi
         private sealed class Row
         {
             public Row(string register, long offset, string section, string name, int msb, int lsb, uint[] allowed,
-                string cls, string behavesAs, int page)
+                string behavesAs, int page)
             {
                 Register = register;
                 Offset = offset;
@@ -519,7 +514,7 @@ namespace Antmicro.Renode.Peripherals.Tviburi
 
         private static Row R(string reg, long off, string sec, string name, int msb, int lsb, uint[] allowed, string cls, string behaves, int page)
         {
-            return new Row(reg, off, sec, name, msb, lsb, allowed, cls, behaves, page);
+            return new Row(reg, off, sec, name, msb, lsb, allowed, behaves, page);
         }
 
         // Generated from RM0433 Rev 9 §38.4 (TIM1/TIM8 registers) with the classes ruled 2026-11-24T06:10Z; DMAR (0x4C)

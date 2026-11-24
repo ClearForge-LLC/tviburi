@@ -12,7 +12,8 @@ here=$(cd "$(dirname "$0")/../.." && pwd)
 IMAGE=$(sed -n 's/^IMAGE=//p' "$here/tests/spike.sh")
 CASES="pwm moe0 cce0 force polarity ccrreset ccr0 ossi ccne ccnp lock1 lock2 lock3 lockfrozen locksame dmar half byte aoe read tim8 tim8on reenable lockbelow lockbelow2 halfhigh gen-pwm ap-m fields ledger registrations config recorded reset rccreset regen"
 GUARDS="spi1 rcc gpioPortA gpioPortB gpioPortC gpioPortD gpioPortE gpioPortF gpioPortG gpioPortH gpioPortI gpioPortJ gpioPortK timer1 timer8"
-PATHS='"pwm","moe0","cce0","force","polarity","ccrreset","ccr0","ossi","ccne","ccnp","lock1","lock2","lock3","lockfrozen","locksame","dmar","half","byte","aoe","read","tim8","tim8on","reenable","lockbelow","lockbelow2","halfhigh","gen-pwm","ap-m"'
+# The planted firmware's paths: every case but the monitor-driven ones.
+PATHS=$(for c in $CASES; do case $c in fields|ledger|registrations|config|recorded|reset|rccreset|regen) ;; *) printf '"%s",' "$c" ;; esac; done | sed 's/,$//')
 scratch=${TVIBURI_SCRATCH:-$HOME/.cache/tviburi}
 mkdir -p "$scratch"
 work=$(mktemp -d "$scratch/timer.XXXXXX")
@@ -79,21 +80,16 @@ console() { "$src/scripts/monitor-output" "$work/$1/renode.out"; }
 after() { console "$1" | grep -A1 -x 'TVIBURI-MARK-AFTER' | tail -n1 | grep -qx '0xAF7E0002'; }
 readout() { console "$1" | grep -A1 -x "R-$2" | tail -n1; }
 rises() { grep -c "${2:-pa8obs}: LED state changed to True" "$work/$1/renode.out" || true; }
-passes() { [ "$rc" = 0 ] && grep -qx 'CHECK PASS' "$work/$1.stdout" && after "$1"; }
+passed() { [ "$rc" = 0 ] && grep -qx 'CHECK PASS' "$work/$1.stdout"; }
+passes() { passed "$1" && after "$1"; }
 refuses() { [ "$rc" = 3 ] && first "$1" "r[\"rule\"] == \"$2\" and r[\"kind\"] == \"$3\" and r[\"access\"][\"pc\"] != \"none\" and $4"; }
 # The motor pins observed as the consumer's generated boards observe them (TVI-WO-1302.measure.md §2.4): an LED beside
 # each pin's timer input; PC6 (TIM8_CH1, AF3) too.
 observers='$a\
 pa8obs: Miscellaneous.LED @ tviburiGpioA 8\
-pa9obs: Miscellaneous.LED @ tviburiGpioA 9\
-pa10obs: Miscellaneous.LED @ tviburiGpioA 10\
-pa11obs: Miscellaneous.LED @ tviburiGpioA 11\
 pc6obs: Miscellaneous.LED @ tviburiGpioC 6\
 tviburiGpioA:\
     8 -> tviburiTimer1@00 | pa8obs@0\
-    9 -> tviburiTimer1@01 | pa9obs@0\
-    10 -> tviburiTimer1@02 | pa10obs@0\
-    11 -> tviburiTimer1@03 | pa11obs@0\
 tviburiGpioC:\
     6 -> timer3@00 | tviburiTimer8@00 | pc6obs@0'
 marks=('echo "TVIBURI-MARK-AFTER"' 'sysbus ReadDoubleWord 0x20000104' 'echo "TVIBURI-MARK-READ"' 'sysbus ReadDoubleWord 0x20000108')
@@ -107,7 +103,8 @@ for t in ${TVIBURI_TESTS:-$CASES}; do
   case $t in
   pwm|moe0|cce0|force|polarity|ccrreset|ccr0|ossi|locksame|half|tim8|tim8on|reenable|lockbelow|lockbelow2|halfhigh|gen-pwm|ap-m)
     span='"0.001"'; [ "$t" = gen-pwm ] && span='"0.003"'; [ "$t" = ap-m ] && span='"0.04"'
-    run_case "$t" "$t" "emulation RunFor $span" "${marks[@]}" "${pins[@]}" "$stock"
+    extra=(); [ "$t" = polarity ] && extra=("$stock")
+    run_case "$t" "$t" "emulation RunFor $span" "${marks[@]}" "${pins[@]}" "${extra[@]}"
     pa8=$(readout "$t" PA8); n=$(rises "$t")
     case $t in
     pwm) check "pwm: TIM1 CH1 PWM mode 1 with MOE = 1 drives PA8 as today (Table 337 p1608: OCx = OCxREF); CCMR1 reads 0x68 (OC1PE kept, p1602)" \
@@ -140,8 +137,8 @@ for t in ${TVIBURI_TESTS:-$CASES}; do
       "passes lockbelow" ;;
     lockbelow2) check "lockbelow2: under LOCK 2, an OC1M change passes: OCxM is locked only at level 3 (p1615)" \
       "passes lockbelow2" ;;
-    halfhigh) check "halfhigh: a 16-bit store of 0 to BDTR's upper half is merged into the word (p1588): MOE kept, PA8 toggles" \
-      "passes halfhigh && [ $n -gt 10 ]" ;;
+    halfhigh) check "halfhigh: a 16-bit store of 1 to CCMR3's upper half (0x56) is merged into bit 16 (p1588, p1617): CCMR3 reads 0x00010000, PA8 toggles" \
+      "passes halfhigh && [ $n -gt 10 ] && [ \"\$(readmark halfhigh)\" = 0x00010000 ]" ;;
     gen-pwm) check "gen-pwm: motors-pwm's TIM1 writes (Aethelgard 65c74788) pass, enforcing, and PA8 pulses" \
       "passes gen-pwm && [ $n -ge 1 ]" ;;
     ap-m) check "ap-m: unmodified ArduPilot's TIM1 writes with motor outputs (CCMR3 included, no CCRx) pass, enforcing; PA8 stays low for 40 ms, silicon's level (p1610, p1558; ruled Q2), where the stock model holds it high from one period on" \
@@ -214,7 +211,7 @@ sys.exit(0 if ok else 1)
   registrations)
     run_case registrations - "$clk" 'peripherals' 'python "g = self.Machine[\"sysbus.timer1\"]; print(\"OUT0 \" + str(g.Connections[0].Endpoints.Count) + \" STOCK0 \" + str(g.GetType().BaseType.GetProperty(\"Connections\").GetValue(g)[0].Endpoints.Count))"'
     check "registrations: peripherals lists timer1 and timer8 as the guard; TIM1 CH1's 7 routes (stm32h7.repl L584) and the observer's are on the guard's output, and the stock line feeds only the guard's tap" \
-      "passes_monitor() { [ \$rc = 0 ] && grep -qx 'CHECK PASS' '$work/registrations.stdout'; }; passes_monitor && grep -q 'timer1 (GuardedSTM32_Timer)' '$work/registrations/renode.out' && grep -q 'timer8 (GuardedSTM32_Timer)' '$work/registrations/renode.out' && tr -d '\\r' < '$work/registrations/renode.out' | grep -qx 'OUT0 7 STOCK0 1'" ;;
+      "passed registrations && grep -q 'timer1 (GuardedSTM32_Timer)' '$work/registrations/renode.out' && grep -q 'timer8 (GuardedSTM32_Timer)' '$work/registrations/renode.out' && tr -d '\\r' < '$work/registrations/renode.out' | grep -qx 'OUT0 7 STOCK0 1'" ;;
   config)
     PLATFORM_SED='$a\
 tviburiTimer8:\
@@ -229,14 +226,14 @@ tviburiTimer8:\
   reset)
     run_case reset - "$clk" 'sysbus WriteDoubleWord 0x40010044 0x8300' 'machine Reset' "$clk" 'sysbus WriteDoubleWord 0x40010018 0x58' 'sysbus WriteDoubleWord 0x40010044 0x8100' 'echo "R-BDTR"' 'sysbus ReadDoubleWord 0x40010044' 'echo "R-CCR1"' 'sysbus ReadDoubleWord 0x40010034'
     check "reset: LOCK 3, then machine Reset: LOCK clears (p1615: frozen until the next reset), so a CCMR1 change and a new LOCK pass; CCR1 reads 0 (p1610)" \
-      "[ \$rc = 0 ] && grep -qx 'CHECK PASS' '$work/reset.stdout' && [ \"\$(readout reset BDTR)\" = 0x00008100 ] && [ \"\$(readout reset CCR1)\" = 0x00000000 ]" ;;
+      "passed reset && [ \"\$(readout reset BDTR)\" = 0x00008100 ] && [ \"\$(readout reset CCR1)\" = 0x00000000 ]" ;;
   rccreset)
     # TIM1RST (RCC_APB2RSTR bit 0, RM0433 Rev 9 §8.7.35 p442), set then cleared through the RCC guard, as rcc-reset does.
     run_case rccreset - "$clk" 'sysbus WriteDoubleWord 0x40010020 0x1' 'sysbus WriteDoubleWord 0x40010044 0x8300' \
       'sysbus WriteDoubleWord 0x58024498 0x1' 'sysbus WriteDoubleWord 0x58024498 0x0' 'echo "R-CCER"' 'sysbus ReadDoubleWord 0x40010020' \
       'echo "R-BDTR"' 'sysbus ReadDoubleWord 0x40010044' 'sysbus WriteDoubleWord 0x40010044 0x8100' 'sysbus WriteDoubleWord 0x40010020 0x3'
     check "rccreset: TIM1RST through the RCC resets the guard: CCER and BDTR read 0, LOCK clears, so a new LOCK and a CC1P change pass (p1615: frozen until the next reset)" \
-      "[ \$rc = 0 ] && grep -qx 'CHECK PASS' '$work/rccreset.stdout' && [ \"\$(readout rccreset CCER)\" = 0x00000000 ] && [ \"\$(readout rccreset BDTR)\" = 0x00000000 ]" ;;
+      "passed rccreset && [ \"\$(readout rccreset CCER)\" = 0x00000000 ] && [ \"\$(readout rccreset BDTR)\" = 0x00000000 ]" ;;
   regen)
     rc=0; python3 -I "$src/tests/1302/fields.py" "$src/tests/1302/data/rm0433-rev9-tim18-fields.tsv" > "$work/fields.cs" || rc=$?
     check "regen: the guard's Fields table regenerates from tests/1302/data by tests/1302/fields.py, byte for byte (RUL-16)" \

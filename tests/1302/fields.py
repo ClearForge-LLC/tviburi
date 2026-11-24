@@ -7,13 +7,13 @@ Usage: python3 -I tests/1302/fields.py tests/1302/data/rm0433-rev9-tim18-fields.
 import re, sys
 
 tsv = sys.argv[1]
-SEC = {0x00: ('§38.4.1', None), 0x04: ('§38.4.2', None), 0x08: ('§38.4.3', None), 0x0C: ('§38.4.4', None),
-       0x10: ('§38.4.5', None), 0x14: ('§38.4.6', None), 0x18: ('§38.4.8', None), 0x1C: ('§38.4.10', None),
-       0x20: ('§38.4.11', None), 0x24: ('§38.4.12', None), 0x28: ('§38.4.13', None), 0x2C: ('§38.4.14', None),
-       0x30: ('§38.4.15', None), 0x34: ('§38.4.16', None), 0x38: ('§38.4.17', None), 0x3C: ('§38.4.18', None),
-       0x40: ('§38.4.19', None), 0x44: ('§38.4.20', None), 0x48: ('§38.4.21', None), 0x54: ('§38.4.23', None),
-       0x58: ('§38.4.24', None), 0x5C: ('§38.4.25', None), 0x60: ('§38.4.26, §38.4.28', None),
-       0x64: ('§38.4.27, §38.4.29', None), 0x68: ('§38.4.30, §38.4.31', None)}
+SEC = {0x00: '§38.4.1', 0x04: '§38.4.2', 0x08: '§38.4.3', 0x0C: '§38.4.4',
+       0x10: '§38.4.5', 0x14: '§38.4.6', 0x18: '§38.4.8', 0x1C: '§38.4.10',
+       0x20: '§38.4.11', 0x24: '§38.4.12', 0x28: '§38.4.13', 0x2C: '§38.4.14',
+       0x30: '§38.4.15', 0x34: '§38.4.16', 0x38: '§38.4.17', 0x3C: '§38.4.18',
+       0x40: '§38.4.19', 0x44: '§38.4.20', 0x48: '§38.4.21', 0x54: '§38.4.23',
+       0x58: '§38.4.24', 0x5C: '§38.4.25', 0x60: '§38.4.26, §38.4.28',
+       0x64: '§38.4.27, §38.4.29', 0x68: '§38.4.30, §38.4.31'}
 
 G, T, RES, RO, U, I = ('modeled by the guard', 'tag', 'reserved', 'read-only', 'undefined in the stock model',
                        'inherited, unaudited (acknowledged by name)')
@@ -27,7 +27,7 @@ def sw(detail):
     return 'stock, wrong (' + detail + ')'
 
 
-def cls(reg, f, msb, lsb, acc, reset):
+def cls(reg, f, msb, lsb, reset):
     """(allowed symbol or literal, class, behaves) for one field."""
     base = re.sub(r'\[.*', '', f)
     n = re.search(r'(\d)', base)
@@ -131,20 +131,25 @@ def cls(reg, f, msb, lsb, acc, reset):
     raise SystemExit(f'no class for {reg}.{f}')
 
 
-rows = []
+rows, tim8, tim1 = [], [], []
 for line in open(tsv):
     c = line.rstrip('\n').split('\t')
     if c[0] == 'register' or 'input-mode' in (c[8] if len(c) > 8 else '') or 'UIFREMAP=1' in (c[8] if len(c) > 8 else ''):
         continue
     reg, off, f, msb, lsb, acc, reset, page = c[0], int(c[1], 16), c[2], int(c[3]), int(c[4]), c[5], c[6], int(c[7])
     if reg.startswith('TIM8_'):
-        continue   # TIM8's AF1, AF2 and TISEL have TIM1's layout and resets (checked below); one table serves both
+        tim8.append((off, f, msb, lsb, reset))
+        continue   # TIM8's AF1, AF2 and TISEL must have TIM1's layout and resets (asserted below): one table serves both
+    if reg.startswith('TIM1_'):
+        tim1.append((off, f, msb, lsb, reset))
     reg = re.sub(r'^TIM1_', 'TIMx_', reg)
     if off == 0x4C:
         continue   # DMAR: every access refuses (TVI-TIM-DMAR); the table cannot say "no value"
     rv = int(reset.replace(' ', ''), 16)
     fv = (rv >> lsb) & ((1 << (msb - lsb + 1)) - 1)
     rows.append((reg, off, f, msb, lsb, acc, fv, page))
+
+assert sorted((o, m, l, r) for o, f, m, l, r in tim8) == sorted((o, m, l, r) for o, f, m, l, r in tim1), 'TIM8 AF1/AF2/TISEL differ from TIM1\'s'
 
 # 16-bit registers: bits 31:16 reserved
 by = {}
@@ -165,10 +170,10 @@ for (reg, off), rs in sorted({(r[0], r[1]): 0 for r in rows}.items(), key=lambda
 
 out = []
 for reg, off, f, msb, lsb, acc, fv, page in rows:
-    allowed, k, behaves = cls(reg, f, msb, lsb, acc, fv)
+    allowed, k, behaves = cls(reg, f, msb, lsb, fv)
     if allowed.startswith('{'):
         allowed = 'new uint[] ' + allowed.replace('{', '{ ').replace('}', ' }')
     name = f if f != 'Reserved' else f'Res{msb}_{lsb}'
     esc = lambda s: s.replace('\\', '\\\\').replace('"', '\\"')
-    out.append(f'            R("{reg}", 0x{off:02X}, "{SEC[off][0]}", "{name}", {msb}, {lsb}, {allowed}, "{esc(k)}", "{esc(behaves)}", {page}),')
+    out.append(f'            R("{reg}", 0x{off:02X}, "{SEC[off]}", "{name}", {msb}, {lsb}, {allowed}, "{esc(k)}", "{esc(behaves)}", {page}),')
 print('\n'.join(out))

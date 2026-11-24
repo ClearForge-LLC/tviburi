@@ -212,13 +212,13 @@ TM06-ccrResetZero	model/GuardedSTM32_Timer.cs	                base.WriteDoubleWo
 TM07-ownOutputs	model/GuardedSTM32_Timer.cs	ToDictionary(i => i, i => (IGPIO)outs[i]);	ToDictionary(i => i, i => base.Connections[i]);	timer-moe0 timer-registrations
 TM08-tapDrives	model/GuardedSTM32_Timer.cs	                parent.outs[channel]?.Set(parent.Level(channel));	                ;	timer-pwm
 TM09-passDrives	model/GuardedSTM32_Timer.cs	base.WriteDoubleWord(b, b == CcerOffset ? word | AllOutputs : word);\n            }\n            DriveAll();	base.WriteDoubleWord(b, b == CcerOffset ? word | AllOutputs : word);\n            }	timer-ccr0 timer-locksame
-TM10-lockFreeze	model/GuardedSTM32_Timer.cs	lockLevel = (int)((word >> 8) & 3);	lockLevel = 0;	timer-lock2
+TM10-lockLevel	model/GuardedSTM32_Timer.cs	private int lockLevel => (int)(bdtr >> 8 & 3);	private int lockLevel => 0;	timer-lock2
 TM11-lockFrozenBits	model/GuardedSTM32_Timer.cs	(bdtrWritten ? 0x300u : 0)	0u	timer-lockfrozen
 TM12-lock2Ccer	model/GuardedSTM32_Timer.cs	return lockLevel >= 2 ? 0xAAAAu : 0;	return 0;	timer-lock2
 TM13-lock1Cr2	model/GuardedSTM32_Timer.cs	return lockLevel >= 1 ? 0x7F00u : 0;	return 0;	timer-lock1
 TM14-lock3Ccmr	model/GuardedSTM32_Timer.cs	return lockLevel >= 3 ? 0x01017878u : 0;	return 0;	timer-lock3
 TM15-lockSamePasses	model/GuardedSTM32_Timer.cs	var changed = (word ^ Served(b)) & Locked(b);	var changed = Locked(b);	timer-locksame
-TM16-resetUnlocks	model/GuardedSTM32_Timer.cs	            lockLevel = 0;\n            bdtrWritten = false;	            lockLevel = 0;	timer-reset
+TM16-resetUnlocks	model/GuardedSTM32_Timer.cs	ccmr3 = 0;\n            bdtrWritten = false;	ccmr3 = 0;	timer-reset
 TM17-dmar	model/GuardedSTM32_Timer.cs	if(b != DmarOffset)	if(true)	timer-dmar
 TM18-width	model/GuardedSTM32_Timer.cs	if(width != 8 && (offset & (width / 8 - 1)) == 0)	if((offset & (width / 8 - 1)) == 0)	timer-byte
 TM19-field	model/GuardedSTM32_Timer.cs	if(f.Allowed != null && !f.Allowed.Contains(v))	if(false)	timer-ccne timer-aoe

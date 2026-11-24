@@ -33,8 +33,8 @@
 //!                       OCxREF does not depend on CCxE (p1607; Table 337 p1608).
 //!   path="lockbelow"  - LOCK 1, then a CC1P change, an OSSI change and an OC1M change, each above level 1: pass (p1615).
 //!   path="lockbelow2" - LOCK 2, then an OC1M change, above level 2: passes (p1615).
-//!   path="halfhigh"   - TIM1 PWM with MOE = 1, then a 16-bit store of 0 to BDTR's upper half (0x46): merged, MOE kept,
-//!                       PA8 toggles (p1588).
+//!   path="halfhigh"   - TIM1 PWM with MOE = 1, then a 16-bit store of 1 to CCMR3's upper half (0x56, OC5M[3], p1617):
+//!                       merged into bit 16; MARK_READ = CCMR3 (0x00010000); PA8 toggles (p1588).
 //!   path="gen-pwm"    - motors-pwm's TIM1 writes at Aethelgard 65c74788 (TVI-WO-1302.measure.md §2.1), PA8-PA11 on AF1:
 //!                       passes, enforcing; PA8 toggles.
 //!   path="ap-m"       - unmodified ArduPilot's TIM1 writes when built with motor outputs (measure.md §2.1, AP-m),
@@ -255,7 +255,8 @@ pub unsafe extern "C" fn reset() -> ! {
         pwm(TIM1, Some(50), 1);
         w(TIM1, BDTR, MOE);
         start(TIM1);
-        write_volatile((TIM1 + BDTR + 2) as *mut u16, 0);
+        write_volatile((TIM1 + CCMR3 + 2) as *mut u16, 1);
+        write_volatile(MARK_READ, r(TIM1, CCMR3));
     }
     #[cfg(path = "gen-pwm")]
     {
