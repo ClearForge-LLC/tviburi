@@ -13,7 +13,7 @@
 //   write the RCC guard passes (its one event, `Written`: ruled Q6). The clock is read from the RCC guard's own object
 //   (CR, CFGR, D1CFGR, PLLCKSELR, PLLCFGR, PLL1DIVR, PLL1FRACR, its HSE and CSI frequencies), which logs nothing; the
 //   voltage scale from the pwr peripheral's PWR_D3CR.VOS (p310), read from the object at 0x58024818, which logs
-//   nothing (measure.md §2.3). A D3CR that reads VOS 00 (the stock stub drops every write) is "VOS unknown": decided at
+//   nothing (TVI-WO-1304.measure.md §2.3). A D3CR that reads VOS 00 (the stock stub drops every write) is "VOS unknown": decided at
 //   VOS1, the most permissive scale that can be known, so a mismatch only at VOS2/VOS3 passes, acknowledged in the
 //   ledger (ruled Q1). VOS0's SYSCFG_PWRCR.ODEN cannot be read, so an AXI clock above 225 MHz is unmodeled.
 //   The programming delay (p164, Table 17): WRHIGHFREQ below Table 17's value at a program or erase start. One-sided:
@@ -462,7 +462,7 @@ namespace Antmicro.Renode.Peripherals.Tviburi
         {
             var c = new ClockNow();
             c.Vos = Vos();
-            c.Scale = c.Vos == 0 ? "VOS unknown on this platform (PWR_D3CR reads VOS 00), decided at VOS1" : "VOS" + (4 - c.Vos);
+            c.Scale = c.Vos == 0 ? "VOS unknown on this platform (PWR_D3CR reads VOS 00), decided at VOS1" : "VOS" + c.Vos;
             var rcc = Rcc();
             if(rcc == null)
             {
@@ -523,7 +523,8 @@ namespace Antmicro.Renode.Peripherals.Tviburi
             return (v & 8) == 0 ? 1 : (v & 7) < 4 ? 2ul << (int)(v & 7) : 64ul << (int)((v & 7) - 4);
         }
 
-        // PWR_D3CR.VOS (p310): 1 Scale 3, 2 Scale 2, 3 Scale 1; 0 is "unknown" (the stock stub reads 00 whatever was written).
+        // PWR_D3CR.VOS (p310), as the scale's number: 11 Scale 1 is 1, 10 Scale 2 is 2, 01 Scale 3 is 3; 00 is 0, "unknown"
+        // (the stock stub reads 00 whatever was written).
         private int Vos()
         {
             var at = machine.SystemBus.WhatIsAt(PwrD3cr);
@@ -551,7 +552,7 @@ namespace Antmicro.Renode.Peripherals.Tviburi
         private sealed class ClockNow
         {
             public ulong? Hz;
-            public int Vos;   // 0 unknown, else 1-3 for VOS3-VOS1
+            public int Vos;   // the scale, VOS1-VOS3 as 1-3; 0 unknown
             public string Scale;
             public string Note;
         }

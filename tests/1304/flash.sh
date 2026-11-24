@@ -216,7 +216,7 @@ sys.exit(0 if ok else 1)
 ' '$work/ledger/release/LEDGER.jsonl'" ;;
   registrations)
     run_case registrations - 'sysbus LogPeripheralAccess sysbus.flashController true' 'sysbus ReadDoubleWord 0x52002000' 'sysbus ReadDoubleWord 0x5200201C' 'peripherals'
-    check "registrations: peripherals lists flashController as the guard, and the access log names its registers as the stock model's (AccessControl, OptionStatusCurrent; measure.md §2.4)" \
+    check "registrations: peripherals lists flashController as the guard, and the access log names its registers as the stock model's (AccessControl, OptionStatusCurrent; TVI-WO-1304.measure.md §2.4)" \
       "passed registrations && grep -q 'flashController (GuardedSTM32H7_Flash)' '$work/registrations/renode.out' && grep -q 'flashController: .*ReadUInt32 from 0x0 (AccessControl), returned 0x37' '$work/registrations/renode-log.txt' && grep -q 'flashController: .*ReadUInt32 from 0x1C (OptionStatusCurrent), returned 0x1BC6AAF0' '$work/registrations/renode-log.txt'" ;;
   recorded)
     PLATFORM_SED='/^tviburiFlash:$/{n;s/enforcing/recorded/}' run_case recorded - 'sysbus WriteDoubleWord 0x52002104 0x12345678' 'sysbus WriteDoubleWord 0x52002008 0x08192A3B' 'echo "R-CR2"' 'sysbus ReadDoubleWord 0x5200210C'
