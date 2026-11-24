@@ -1,0 +1,48 @@
+# One shard of ci.yml's suite (TVI-WO-1202): its share of the cases and the mutants, as tools/tviburi-route plan
+# packs them by measured time, one case at a time. Its record (`case <id>`, `mutant <id>` for each it ran) is its
+# output, for ci.yml's aggregate. Called only by ci.yml.
+name: shard
+on:
+  workflow_call:
+    inputs:
+      shard:
+        type: number
+        required: true
+      of:
+        # The number of shards: ci.yml calls shard-1 .. shard-5 (ruled 2026-11-24T10:30Z, Q1).
+        type: number
+        default: 5
+    outputs:
+      ran:
+        value: ${{ jobs.shard.outputs.ran }}
+permissions:
+  contents: read
+# `shell: bash` is bash -eo pipefail: a failing stage of a pipe fails the step.
+defaults:
+  run:
+    shell: bash
+jobs:
+  shard:
+    name: shard ${{ inputs.shard }} of ${{ inputs.of }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    env:
+      TVIBURI_CI: "1"
+    outputs:
+      ran: ${{ steps.record.outputs.ran }}
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+      - name: Pull the pinned tools image, by digest
+        run: podman pull "$(sed -n 's/^IMAGE=//p' tests/spike.sh)"
+      - name: Cases, then mutants (each mutant must be killed)
+        env:
+          K: ${{ inputs.shard }}
+          N: ${{ inputs.of }}
+        run: TVIBURI_SCRATCH="$RUNNER_TEMP/tviburi" TVIBURI_RAN="$RUNNER_TEMP/ran.txt" tests/ci/shard.sh "$K" "$N"
+      - name: Record what ran, whatever it gave
+        id: record
+        if: always()
+        run: |
+          { echo 'ran<<END_OF_RAN'; cat "$RUNNER_TEMP/ran.txt" 2>/dev/null || true; echo 'END_OF_RAN'; } >>"$GITHUB_OUTPUT"
