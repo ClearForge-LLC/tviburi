@@ -296,9 +296,6 @@ machine Reset
 # FIELD RCC_BDCR.BDRST (bit 16)
 sysbus WriteDoubleWord 0x58024470 0x00010000
 machine Reset
-# FIELD RCC_BDCR.RTCEN (bit 15)
-sysbus WriteDoubleWord 0x58024470 0x00008000
-machine Reset
 # FIELD RCC_BDCR.Res14_10 (14:10)
 sysbus WriteDoubleWord 0x58024470 0x00000400
 machine Reset
@@ -464,9 +461,6 @@ machine Reset
 # FIELD RCC_AHB1ENR.Res14_6 (14:6)
 sysbus WriteDoubleWord 0x580244D8 0x00000040
 machine Reset
-# FIELD RCC_AHB1ENR.ADC12EN (bit 5)
-sysbus WriteDoubleWord 0x580244D8 0x00000020
-machine Reset
 # FIELD RCC_AHB1ENR.Res4_2 (4:2)
 sysbus WriteDoubleWord 0x580244D8 0x00000004
 machine Reset
@@ -487,9 +481,6 @@ sysbus WriteDoubleWord 0x580244E0 0x20000000
 machine Reset
 # FIELD RCC_AHB4ENR.Res27_26 (27:26)
 sysbus WriteDoubleWord 0x580244E0 0x04000000
-machine Reset
-# FIELD RCC_AHB4ENR.ADC3EN (bit 24)
-sysbus WriteDoubleWord 0x580244E0 0x01000000
 machine Reset
 # FIELD RCC_AHB4ENR.Res23_22 (23:22)
 sysbus WriteDoubleWord 0x580244E0 0x00400000
@@ -743,9 +734,6 @@ machine Reset
 # FIELD RCC_AHB1LPENR.Res14_6 (14:6)
 sysbus WriteDoubleWord 0x58024500 0x1E038023
 machine Reset
-# FIELD RCC_AHB1LPENR.ADC12LPEN (bit 5)
-sysbus WriteDoubleWord 0x58024500 0x1E03C003
-machine Reset
 # FIELD RCC_AHB1LPENR.Res4_2 (4:2)
 sysbus WriteDoubleWord 0x58024500 0x1E03C027
 machine Reset
@@ -793,9 +781,6 @@ sysbus WriteDoubleWord 0x58024508 0x212807FF
 machine Reset
 # FIELD RCC_AHB4LPENR.Res27_25 (27:25)
 sysbus WriteDoubleWord 0x58024508 0x332807FF
-machine Reset
-# FIELD RCC_AHB4LPENR.ADC3LPEN (bit 24)
-sysbus WriteDoubleWord 0x58024508 0x302807FF
 machine Reset
 # FIELD RCC_AHB4LPENR.Res23_22 (23:22)
 sysbus WriteDoubleWord 0x58024508 0x316807FF
@@ -895,9 +880,6 @@ sysbus WriteDoubleWord 0x58024510 0xE8F7CBFF
 machine Reset
 # FIELD RCC_APB1LLPENR.USART3LPEN (bit 18)
 sysbus WriteDoubleWord 0x58024510 0xE8FBCBFF
-machine Reset
-# FIELD RCC_APB1LLPENR.USART2LPEN (bit 17)
-sysbus WriteDoubleWord 0x58024510 0xE8FDCBFF
 machine Reset
 # FIELD RCC_APB1LLPENR.SPDIFRXLPEN (bit 16)
 sysbus WriteDoubleWord 0x58024510 0xE8FECBFF
@@ -1024,9 +1006,6 @@ sysbus WriteDoubleWord 0x58024518 0x31D73037
 machine Reset
 # FIELD RCC_APB2LPENR.TIM8LPEN (bit 1)
 sysbus WriteDoubleWord 0x58024518 0x31D73031
-machine Reset
-# FIELD RCC_APB2LPENR.TIM1LPEN (bit 0)
-sysbus WriteDoubleWord 0x58024518 0x31D73032
 machine Reset
 # FIELD RCC_APB4LPENR.Res31_26 (31:26)
 sysbus WriteDoubleWord 0x5802451C 0x0021DEAA

@@ -1,0 +1,13 @@
+// TVI-WO-1300b (2) (ruled 2026-11-25T03:03Z Q2; TVI-WO-1305 adversarial G6): a USART guard declared on the bus but not registered
+// on the RCC guard. Unwatched, its kernel clock could be lost with no record: every access refuses, unmodeled.
+using "platforms/boards/nucleo_h753zi.repl"
+using "/repo/model/stm32h7-rcc-restate.repl"
+
+tviburiRcc:
+    hseFrequency: 8000000
+    mode: "enforcing"
+
+usart1: @none
+
+tviburiUsart1: Tviburi.GuardedSTM32F7_USART @ sysbus 0x40011000 as "usart1"
+    frequency: 200000000

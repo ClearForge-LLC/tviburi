@@ -14,8 +14,7 @@
 #       recorded mode, the consumer's platform with the RCC restated) into <dir>/<board>/replay, with its peak memory.
 #   check <dir>
 #       Compare every board of boots.tsv with its replay: each guard's witness (recorded) and end, and exactly the
-#       would-refuse records boots.tsv expects (peripheral, rule, kind, bit), each TVI-SPI-KERNEL citing p414 and p371-372, and
-#       each refusal of an ADC enable naming ADCx_CCR.CKMODE and p920.
+#       would-refuse records boots.tsv expects (peripheral, rule, kind, bit), each TVI-SPI-KERNEL citing p414 and p371-372.
 #       A board with no replay fails; it is never skipped. Exit 0 only if every board matches.
 # ArduPilot's boot is captured by `aethelgard simulate --foreign`, not verify: its capture is 1300's (see boots.tsv); replay
 # and check take it like any other.
@@ -98,8 +97,6 @@ for line in open(table):
     for s, r in wr:
         if r['rule'] == 'TVI-SPI-KERNEL' and not ('p414' in r['citation'] and 'p371-372' in r['citation']):
             problems.append('%s TVI-SPI-KERNEL without p414 and p371-372' % s)
-        if 'ADC' in r['bit'] and not ('CKMODE' in r['condition'] and 'p920' in r['condition']):
-            problems.append('%s %s without CKMODE and p920 (ruled 17:52Z)' % (s, r['bit']))
     print(('ok   %s: %d would-refuse' % (board, len(wr))) if not problems else ('FAIL %s: %s' % (board, '; '.join(problems))))
     fails += bool(problems)
 print('%d failed' % fails)

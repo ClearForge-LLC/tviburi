@@ -43,6 +43,22 @@
 //!   path="cfg2same"  - then CFG2 written with the value it holds, SPE = 1: nothing changes (TVI-WO-1300a (4), p2221); passes.
 //!   path="sel5"      - SPI123SEL written 101 (reserved, "the kernel clock is disabled", p414): TVI-RCC-FIELD, unmodeled.
 //!   path="divr"      - PLL1 started, then RCC_PLL1DIVR changed (DIVQ1 3 -> 4): silicon ignores it (p404); TVI-RCC-PLL.
+//! TVI-WO-1300b (ruled 2026-11-25T03:03Z). These end at their own access, with no SPI start.
+//!   path="usart-lost"  - USART1 started on rcc_pclk2 (USART16SEL 000: USART1EN, BRR, CR1 = UE|TE), then USART16SEL written
+//!                        100 (csi_ker_ck, CSI off): the mux waits, so the running USART1 loses its kernel clock: TVI-RCC-CLOCK,
+//!                        predicted-fault (p417, p371, p2019).
+//!   path="usart-stopped" - the same with CR1 written 0 (UE = 0) before the selector: nothing runs, a valid order; passes.
+//!   path="usart-lost-en" - USART3 started (USART234578SEL 000: rcc_pclk1), then USART3EN cleared: TVI-RCC-CLOCK (p376).
+//!   path="usart-othersel" - USART1 started, then USART234578SEL (the other mux: USART2/3/UART4/5/7/8) written 100: USART1's
+//!                        source is unchanged and nothing on that mux runs; passes (WO §5: the wrong source).
+//!   path="hse-on"      - HSEON set and HSERDY polled: on a platform with no hseFrequency, TVI-RCC-HSE, unmodeled (p384);
+//!                        with one declared, it passes.
+//!   path="adc"         - the armed Sentinel-03 run's RCC writes that 1300 refused, in its order and values: ADC12EN and
+//!                        ADC3EN set (p455, p458), then ADC12LPEN, ADC3LPEN, USART2LPEN and TIM1LPEN cleared (p477, p480,
+//!                        p485, p492); passes.
+//!   path="rtcen"       - RCC_BDCR read (0 at construction, p427), then ArduPilot's set_rtc_backup: BDCR written 0 (its
+//!                        `|= STM32_RTCSEL`), an RTC backup register written and read back (rtc unlocked: RTCAPBEN = 1,
+//!                        p471), BDCR written 0x8000 (RTCEN), BDCR read; the reads go to DTCM 0x20000108-0x20000110; passes.
 //! Bits: RM0433 Rev 9 §8.7 (RCC_CR p383-386, PLLCFGR p400-401, PLL1DIVR p403-404, D2CCIP1R p414, APB2ENR p469).
 #![no_std]
 #![no_main]
@@ -64,6 +80,14 @@ const RCC_PLLCKSELR: *mut u32 = (RCC + 0x028) as *mut u32;
 const RCC_D2CCIP2R: *mut u32 = (RCC + 0x054) as *mut u32;
 const RCC_APB1LENR: *mut u32 = (RCC + 0x0E8) as *mut u32;
 const USART2_CR1: *mut u32 = 0x4000_4400 as *mut u32;
+const USART1: usize = 0x4001_1000;
+const USART3: usize = 0x4000_4800;
+const RCC_BDCR: *mut u32 = (RCC + 0x070) as *mut u32;
+const RTC_BKP1R: *mut u32 = 0x5800_4054 as *mut u32;
+/// TVI-WO-1300b's read-backs, read by the test.
+const READ0: *mut u32 = 0x2000_0108 as *mut u32;
+const READ1: *mut u32 = 0x2000_010C as *mut u32;
+const READ2: *mut u32 = 0x2000_0110 as *mut u32;
 const SPI1_CR1: *mut u32 = 0x4001_3000 as *mut u32;
 const SPI1_CFG2: *mut u32 = 0x4001_300C as *mut u32;
 /// Marker in DTCM, read back by the test: the firmware got past its last guarded write.
@@ -107,6 +131,15 @@ unsafe fn spi1_start() {
     write_volatile(SPI1_CR1, read_volatile(SPI1_CR1) | 1); // SPE: the start
 }
 
+
+// A USART started on its reset kernel source (USARTxSEL 000: rcc_pclk2 for USART1, rcc_pclk1 for USART3; p417): its bus
+// enable, BRR at or above 16 (p2035), then CR1 = UE | TE, the start (TVI-USART-KERNEL asks the query; it runs).
+unsafe fn usart_start(base: usize, enr: *mut u32, bit: u32) {
+    write_volatile(enr, read_volatile(enr) | (1 << bit));
+    let _ = read_volatile(enr);
+    write_volatile((base + 0x0C) as *mut u32, 0x22C); // BRR
+    write_volatile(base as *mut u32, 0b1001); // CR1: TE | UE
+}
 
 // RCC write sequences measured in TVI-WO-1300 §1.1, replayed by the paths of the same name. (offset, value).
 #[cfg(path = "ardupilot")]
@@ -183,6 +216,36 @@ pub unsafe extern "C" fn reset() -> ! {
         let _ = read_volatile(RCC_APB1LENR);
         write_volatile(USART2_CR1, 1); // UE: the start
     }
+    #[cfg(any(path = "usart-lost", path = "usart-stopped", path = "usart-othersel"))]
+    usart_start(USART1, RCC_APB2ENR, 4);
+    #[cfg(path = "usart-stopped")]
+    write_volatile(USART1 as *mut u32, 0); // UE = 0 first
+    #[cfg(any(path = "usart-lost", path = "usart-stopped"))]
+    write_volatile(RCC_D2CCIP2R, (read_volatile(RCC_D2CCIP2R) & !(0b111 << 3)) | (0b100 << 3)); // USART16SEL = csi_ker_ck
+    #[cfg(path = "usart-othersel")]
+    write_volatile(RCC_D2CCIP2R, (read_volatile(RCC_D2CCIP2R) & !0b111) | 0b100); // USART234578SEL = csi_ker_ck
+    #[cfg(path = "usart-lost-en")]
+    {
+        usart_start(USART3, RCC_APB1LENR, 18);
+        write_volatile(RCC_APB1LENR, read_volatile(RCC_APB1LENR) & !(1 << 18)); // USART3EN = 0 under UE = 1
+    }
+    #[cfg(path = "hse-on")]
+    hse_on();
+    #[cfg(path = "adc")]
+    for &(off, v) in [(0x0D8u32, 0x23u32), (0x0E0, 0x0120_07FF), (0x100, 0x1E03_C003), (0x108, 0x3028_07FF), (0x110, 0xE8FD_CBFF),
+        (0x118, 0x31D7_3032)].iter()
+    {
+        write_volatile((RCC + off as usize) as *mut u32, v);
+    }
+    #[cfg(path = "rtcen")]
+    {
+        write_volatile(READ0, read_volatile(RCC_BDCR));
+        write_volatile(RCC_BDCR, read_volatile(RCC_BDCR)); // set_rtc_backup's `RCC->BDCR |= STM32_RTCSEL` (NOCLK: 0)
+        write_volatile(RTC_BKP1R, 0xA5A5_0001);
+        write_volatile(READ1, read_volatile(RTC_BKP1R));
+        write_volatile(RCC_BDCR, read_volatile(RCC_BDCR) | (1 << 15)); // RTCEN
+        write_volatile(READ2, read_volatile(RCC_BDCR));
+    }
     #[cfg(path = "divq")]
     write_volatile(RCC_PLLCFGR, read_volatile(RCC_PLLCFGR) & !(1 << 17));
     #[cfg(any(path = "clocked", path = "field", path = "pll", path = "switched", path = "alias", path = "divq"))]
@@ -214,7 +277,8 @@ pub unsafe extern "C" fn reset() -> ! {
     spi1_start(); // SPI1EN never set: the first SPI1 access refuses
     // Every path but those that end at their own access enables SPI1 and starts it.
     #[cfg(not(any(path = "ardupilot", path = "pllref", path = "divm0", path = "sw", path = "width", path = "read", path = "usart2",
-        path = "unenabled", path = "sel5", path = "divr")))]
+        path = "unenabled", path = "sel5", path = "divr", path = "usart-lost", path = "usart-stopped", path = "usart-lost-en",
+        path = "usart-othersel", path = "hse-on", path = "adc", path = "rtcen")))]
     {
         #[cfg(not(path = "alias"))]
         write_volatile(RCC_APB2ENR, read_volatile(RCC_APB2ENR) | SPI1EN);

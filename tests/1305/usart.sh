@@ -155,11 +155,13 @@ for t in ${TVIBURI_TESTS:-$CASES}; do
        && bit \"\$(readout idle AGAIN)\" 4 0 && bit \"\$(readout idle OFF)\" 4 0 && bit \"\$(readout idle OFF)\" 5 0 && [ \"\$(readout idle IRQ3)\" = 'GPIO: set' ]" ;;
   rxoff)
     # Adversarial B3: a byte arriving while the port's bus clock is off is not received (p470 USART1EN; p2019; p371): no
-    # RXFNE, no IDLE, no request. The guard asks the RCC guard's query; the stock model would take the byte.
-    run_case rxoff - 'cpu IsHalted true' "$clk" 'sysbus WriteDoubleWord 0x4001100C 0x271' 'sysbus WriteDoubleWord 0x40011000 0x2000001D' \
+    # RXFNE, no IDLE, no request. The guard asks the RCC guard's query; the stock model would take the byte. TVI-WO-1300b (2):
+    # clearing USART1EN under UE = 1 is now the RCC guard's TVI-RCC-CLOCK, so the RCC runs recorded here (the write passes on,
+    # as a would-refuse) and the reception rule behind it is still shown.
+    PLATFORM_SED='/^tviburiRcc:$/,/mode:/s/enforcing/recorded/' run_case rxoff - 'cpu IsHalted true' "$clk" 'sysbus WriteDoubleWord 0x4001100C 0x271' 'sysbus WriteDoubleWord 0x40011000 0x2000001D' \
       'sysbus WriteDoubleWord 0x580244F0 0x0' 'sysbus.usart1 WriteChar 0x41' 'emulation RunFor "0.0001"' "$clk" 'echo "R-ISR"' 'sysbus ReadDoubleWord 0x4001101C'
-    check "rxoff: a byte arriving with USART1EN cleared under a running port is not received: no RXFNE and no IDLE once the clock is back (adversarial B3)" \
-      "passed rxoff && bit \"\$(readout rxoff ISR)\" 5 0 && bit \"\$(readout rxoff ISR)\" 4 0" ;;
+    check "rxoff: a byte arriving with USART1EN cleared under a running port is not received: no RXFNE and no IDLE once the clock is back (adversarial B3); the clear itself is the RCC's TVI-RCC-CLOCK (TVI-WO-1300b (2)), its only record" \
+      "[ \$rc = 1 ] && [ \"\$(grep -o '\"tviburi\":\"would-refuse\",\"seq\":[0-9]*,\"rule\":\"[A-Z-]*\"' '$work/rxoff/renode-log.txt' | sed 's/.*rule\":\"//; s/\"//')\" = TVI-RCC-CLOCK ] && bit \"\$(readout rxoff ISR)\" 5 0 && bit \"\$(readout rxoff ISR)\" 4 0" ;;
   idleframe)
     # Adversarial T2: the idle frame by M and STOP (p2068-2069, p2076): M0 = PCE = 1 (9 bits with parity) and STOP = 10 (2):
     # 1 + 9 + 2 = 12 bits at 320,000 baud, 37.5 us, where 8N1 would be 31.25 and either term alone 34.375.
@@ -353,7 +355,8 @@ sys.exit(0 if ok else 1)
     "refuses idlenorule TVI-USART-IDLE unmodeled 'r[\"access\"][\"value\"] == \"0x2000000D\" and \"USART16SEL = 100 (csi_ker_ck): no rule\" in r[\"bit\"] and \"p2034\" in r[\"citation\"]'" ;;
   idlenone)
     # Recorded: the other ways to no rule, each from reset: (1) a byte arriving after the source moved to csi_ker_ck under the
-    # running port (the RCC guard does not refuse it for a USART); (2) rcc_pclk2 with sys_ck on the CSI; then (6) and (7), before
+    # running port (the RCC guard's TVI-RCC-CLOCK does not fire: the CSI is on, so the mux switches with a clock on both
+    # inputs, p371); (2) rcc_pclk2 with sys_ck on the CSI; then (6) and (7), before
     # any PLL2 scenario leaves usart1's mux on pll2_q_ck (the RCC guard keeps it across machine Reset: a row); (3) pll2_q_ck from a
     # CSI reference; (4) pll2_q_ck after PLL2DIVR was written with DIVN2 = 359, which the stock model keeps as 103 (p407 has 9
     # bits), and a USART1RST pulse, which must not forget it; (5) pll2_q_ck with DIVN2 = 2 (x3): a 6 MHz VCO, outside p407's
@@ -388,9 +391,8 @@ sys.exit(0 if ok else 1)
     # (3), ruled 2026-11-25T01:12Z: rcc_pclk2 from sys_ck = PLL1's P output on the HSE, as hse-crystal-16's generated firmware
     # sets it up (HSEON, HSECSSON, PLLCKSELR 0x52: PLLSRC HSE, DIVM1 5; PLLCFGR 0x30004; PLL1DIVR 0x0103064F: x80, /4; PLL1ON;
     # SW = PLL1), BRR 0xC8. D: the board declares hseFrequency 16 MHz (the generated board's): 3.2 MHz * 80 / 4 = 64 MHz, 320,000
-    # baud, IDLE 31.25 us after a byte. N: the board declares no crystal, so the HSE is the RCC guard's own default, 8 MHz (a row
-    # for the RCC guard). With this board's PLL settings that is a 1.6 MHz reference and a 128 MHz VCO, outside p404's 192-960:
-    # TVI-USART-IDLE, unmodeled, at the start, and the record shows the 8 MHz it took.
+    # baud, IDLE 31.25 us after a byte. N: the board declares no crystal: the first record is the RCC guard's TVI-RCC-HSE,
+    # unmodeled, at the write that starts the HSE, and no frequency is taken (TVI-WO-1300b (4)).
     hse=('cpu IsHalted true' "$clk" 'sysbus WriteDoubleWord 0x58024400 0x00010001' 'sysbus WriteDoubleWord 0x58024400 0x00090001'
       'sysbus WriteDoubleWord 0x58024428 0x52' 'sysbus WriteDoubleWord 0x5802442C 0x30004' 'sysbus WriteDoubleWord 0x58024430 0x0103064F'
       'sysbus WriteDoubleWord 0x58024400 0x01090001' 'sysbus WriteDoubleWord 0x58024410 0x3' 'sysbus WriteDoubleWord 0x4001100C 0xC8'
@@ -399,10 +401,10 @@ sys.exit(0 if ok else 1)
       'emulation RunFor "0.00002"' 'echo "R-D20"' 'sysbus ReadDoubleWord 0x4001101C' 'emulation RunFor "0.00002"' 'echo "R-D40"' 'sysbus ReadDoubleWord 0x4001101C'
     d=$rc; mv "$work/idlehse" "$work/idlehse-d"; mv "$work/idlehse.stdout" "$work/idlehse-d.stdout"
     PLATFORM_SED='/^    hseFrequency: 8000000$/d' run_case idlehse - "${hse[@]}"
-    check "idlehse: rcc_pclk2 from PLL1's P output on the HSE (the generated hse-crystal-16 sequence): with hseFrequency 16 MHz declared, 64 MHz (IDLE clear at 20 us, set at 40); with none declared, the RCC guard's default 8 MHz, under which this PLL's VCO is 128 MHz, outside its range: TVI-USART-IDLE, unmodeled, at the start" \
+    check "idlehse: rcc_pclk2 from PLL1's P output on the HSE (the generated hse-crystal-16 sequence): with hseFrequency 16 MHz declared, 64 MHz (IDLE clear at 20 us, set at 40); with none declared, no HSE frequency: the HSE's start refuses at the RCC guard, TVI-RCC-HSE, unmodeled (TVI-WO-1300b (4); no 8 MHz default)" \
       "[ \$d = 0 ] && grep -qx 'CHECK PASS' '$work/idlehse-d.stdout' && grep -qx '    hseFrequency: 16000000' '$work/idlehse-d/platform.repl' && ! grep -q '^    hseFrequency' '$work/idlehse/platform.repl' \
        && bit \"\$(readout idlehse-d D20)\" 4 0 && bit \"\$(readout idlehse-d D40)\" 4 1 \
-       && [ \$rc = 3 ] && first idlehse 'r[\"rule\"] == \"TVI-USART-IDLE\" and r[\"access\"][\"offset\"] == \"0x0\" and \"with PLL1 outside its ranges (reference 1600000 Hz, VCO 128000000 Hz)\" in r[\"bit\"]'" ;;
+       && [ \$rc = 3 ] && first idlehse 'r[\"rule\"] == \"TVI-RCC-HSE\" and r[\"kind\"] == \"unmodeled\" and r[\"peripheral\"] == \"sysbus.rcc\" and r[\"bit\"] == \"RCC_CR.HSEON (bit 16) = 1\"'" ;;
   *) echo "unknown case: $t" >&2; exit 2 ;;
   esac
 done

@@ -513,7 +513,7 @@ namespace Antmicro.Renode.Peripherals.Tviburi
             var cfg = rcc.ReadDoubleWord(0x2C);
             var divr = rcc.ReadDoubleWord(0x30);
             var frac = rcc.ReadDoubleWord(0x34);
-            ulong reference;
+            ulong? reference;   // null when the platform declares no HSE: the result is null (TVI-WO-1300b (4), granted Q3)
             switch(ck & 3)
             {
             case 0: reference = hsi; break;
