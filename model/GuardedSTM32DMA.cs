@@ -16,8 +16,8 @@
 // dropped there (a read returns 0) with no record, which is silicon's ignored write (p373). It is covered, not refused.
 //
 // A stream's state, for the rules on writes while it is enabled (ruled Q2, Q3 (c)):
-//   off        EN = 0 (as the stock model holds it, which is as software wrote it: the stock model never clears EN at the
-//              end of a transfer, stock-wrong, p665).
+//   off        EN = 0 (as the stock model holds it: as software wrote it, or cleared by the guard at the end of a
+//              non-circular peripheral-to-memory transfer, below; the stock model never clears EN itself, stock-wrong, p665).
 //   running    EN = 1 and the twin's transfer has items left (NDT > 0).
 //   completed  EN = 1 and the twin's transfer has none left. The stock model completes a memory-to-peripheral or
 //              memory-to-memory transfer inside the EN write itself (measure.md D2, D9), where silicon takes as long as its
@@ -76,11 +76,13 @@
 //                     direct modes are not allowed", §15.3.8 p645). unmodeled.
 //   TVI-DMA-HALF      a circular stream with an odd NDT: HTIF is set "once half the data have been transferred" (p657),
 //                     and RM0433 states no count for an odd NDT; or HTIE = 1 on a non-circular stream, where the twin
-//                     models no HTIF (ruled Q3). unmodeled.
+//                     models no HTIF (ruled Q3). unmodeled. Also judged on a write that sets HTIE while a non-circular
+//                     stream is enabled (below).
 //   And on any write while the stream is enabled (running or completed), before TVI-DMA-EN:
 //   TVI-DMA-CIRC      CIRC changed: p664 states no rule for a CIRC write under EN, and p665's "It is forbidden to write
 //                     these registers when the EN bit is read as 1" says nothing of what silicon does (ruled Q2).
 //                     unmodeled; in recorded mode CIRC keeps its old value.
+//   TVI-DMA-HALF      HTIE set on a non-circular stream: no HTIF is modeled there (ruled Q3). unmodeled.
 // Enforcing: the first rule that fires refuses the access. Recorded mode (RUL-19): every rule is evaluated and records what
 // it finds, and the access goes on as if none had fired (model/Refusal.cs), with protected fields kept as silicon keeps them.
 //
@@ -100,14 +102,17 @@
 //             items to be transferred is automatically reloaded ... and the DMA requests continue to be served" (§15.3.10
 //             p647; NDT p665). EN stays 1 and TCIF is set at each wrap: both inferred from p654 against p665 (§15.3.15
 //             p654 clears EN at the end of a transfer only "in non-circular mode"); RM0433 states neither. At the request
-//             that has moved half the programmed NDT (even only, TVI-DMA-HALF), the guard sets HTIF (p657).
+//             that has moved half the programmed NDT (even only, TVI-DMA-HALF), the guard sets HTIF (p657); that it does so
+//             in every cycle is inferred from p647 ("the DMA requests continue to be served") with p657.
 //   EN clear  with CIRC = 0, at the request that takes NDT to 0, the guard clears EN in the stock stream: "the DMA is
 //             stopped (EN bit ... is cleared by Hardware)" (§15.3.15 p654; EN p665; ruled Q4). Memory-to-peripheral and
 //             memory-to-memory transfers, which the stock model completes at the EN write, keep EN set (the completed
 //             state above, ruled 1303 Q3 (c)).
-//   HTIF      the guard's own flag, served in LISR/HISR, cleared by CHTIFx in LIFCR/HIFCR (p659-661). The stock
-//             interrupt line is TCIE && TCIF only (STM32DMA.cs L128-137), so the guard drives each stream's line itself:
-//             the stock line, or HTIE && HTIF (Table 116 p658).
+//   HTIF      the guard's own flag, served in LISR/HISR, cleared by CHTIFx in LIFCR/HIFCR (p659-661).
+//   lines     the guard drives each stream's interrupt line itself: TCIE (the copy) && TCIF (the stock model's), or
+//             HTIE && HTIF (Table 116 p658). The stock model recomputes its own line only when TCIF changes
+//             (STM32DMA.cs L119-137, L259-264), so a TCIE write did not move it; a tap on the stock line catches TCIF
+//             changes made inside a request.
 //   The request's source is not judged here: on the armed Sentinel-03 run it is the unguarded stock ADC1, which converts
 //   at its externalEventFrequency (1 kHz) with 0 mV samples, where silicon converts at its sample time and kernel clock
 //   (the ADC guard's row, TVI-WO-1303a.measure.md §5 Q1).
@@ -403,7 +408,9 @@ namespace Antmicro.Renode.Peripherals.Tviburi
 
         private void UpdateLine(int s)
         {
-            lines[s].Set(inner.Connections[s].IsSet || (htif[s] && (cr[s] & HtieBit) != 0));
+            var isr = inner.ReadDoubleWord(s < 4 ? LisrOffset : HisrOffset);
+            var tcif = (isr >> (FlagShift[s % 4] + TcifBit) & 1) != 0;
+            lines[s].Set(((cr[s] & TcieBit) != 0 && tcif) || (htif[s] && (cr[s] & HtieBit) != 0));
         }
 
         // Software cleared EN while stream s ran (NDT > 0): silicon sets TCIF "to indicate the end of transfer due to the
@@ -478,11 +485,22 @@ namespace Antmicro.Renode.Peripherals.Tviburi
                     return true;
                 }
             }
+            var half = r == CrOffset && (word & HtieBit) != 0 && (old & HtieBit) == 0 && (old & CircBit) == 0;
+            if(half)
+            {
+                records.Refuse("TVI-DMA-HALF", Unmodeled, reg, "DMA_SxCR.HTIE of stream " + s + " set (EN = 1, " + (running ? "running" : "completed in the twin") + ", CIRC = 0)",
+                    "DMA_SxCR.HTIE set while a non-circular stream is enabled: the twin models HTIF on circular streams only, so this stream's half-transfer interrupt would never fire",
+                    "RM0433 Rev 9 §15.3.19 p657 (HTIF); Table 116 p658; TVI-WO-1303a ruled 2026-11-25T18:49Z Q3", State(s), offset, word, 32);
+                if(!records.Recorded)
+                {
+                    return true;
+                }
+            }
             var changed = (word ^ old) & mask;
             var restart = state == Completed && r == CrOffset && (word & EnBit) != 0 && programmed[s] != 0;
             if(changed == 0 && !restart)
             {
-                return circ;
+                return circ || half;
             }
             records.Refuse(running ? "TVI-DMA-EN" : "TVI-DMA-DONE", running ? PredictedFault : Unmodeled, reg,
                 reg + " bits 0x" + changed.ToString("X8") + " of stream " + s + " (EN = 1, " + (running ? "running" : "completed in the twin") + ")",
@@ -875,6 +893,7 @@ namespace Antmicro.Renode.Peripherals.Tviburi
         private const long FcrOffset = 0x24;
         private const uint EnBit = 1;
         private const uint HtieBit = 1u << 3;
+        private const uint TcieBit = 1u << 4;
         private const uint CircBit = 1u << 8;
         private const long LisrOffset = 0x00;
         private const long HisrOffset = 0x04;
@@ -883,6 +902,7 @@ namespace Antmicro.Renode.Peripherals.Tviburi
         // Each stream's group of flags in LISR/HISR and LIFCR/HIFCR starts at bit 0, 6, 16 or 22; HTIF is bit 4 of it (p659-661).
         private static readonly int[] FlagShift = { 0, 6, 16, 22 };
         private const int HtifBit = 4;
+        private const int TcifBit = 5;
         private const uint PincBit = 1u << 9;
         private const uint MincBit = 1u << 10;
         private const uint DmdisBit = 1u << 2;
@@ -949,7 +969,7 @@ namespace Antmicro.Renode.Peripherals.Tviburi
             "TIM16_CH1", "TIM16_UP", "TIM17_CH1", "TIM17_UP", "sai3_a_dma", "sai3_b_dma", "adc3_dma",
         };
 
-        // Recomputes stream `stream`'s line when the stock model's line for it changes.
+        // Recomputes stream `stream`'s line when the stock model's line for it changes (TCIF set or cleared).
         private sealed class Tap : IGPIOReceiver
         {
             public Tap(GuardedSTM32DMA parent, int stream)
@@ -960,7 +980,10 @@ namespace Antmicro.Renode.Peripherals.Tviburi
 
             public void OnGPIO(int number, bool value)
             {
-                parent.lines[stream]?.Set(value || (parent.htif[stream] && (parent.cr[stream] & HtieBit) != 0));
+                if(parent.lines[stream] != null)
+                {
+                    parent.UpdateLine(stream);
+                }
             }
 
             public void Reset()
@@ -1030,52 +1053,52 @@ namespace Antmicro.Renode.Peripherals.Tviburi
         {
             R("DMA_LISR", 0x00, "§15.5.1", "Res31_28", 31, 28, Zero, "reserved", "reserved: must be kept at reset value", 659),
             R("DMA_LISR", 0x00, "§15.5.1", "TCIF3", 27, 27, Any, "read-only", "read-only (silicon ignores a write; so does the guard's stock model): set when the stock model completes a transfer (probed, TVI-WO-1303.measure.md D2), at each wrap of a circular stream (p657; each wrap is inferred from p654 against p665), and by the guard when software clears EN while the stream runs (p654; TVI-WO-1305, ruled 2026-11-24T18:55Z Q6)", 659),
-            R("DMA_LISR", 0x00, "§15.5.1", "HTIF3", 26, 26, Any, "read-only", "read-only (silicon ignores a write): set by the guard once half of a circular stream's NDT has been transferred in each cycle (p657), served on read and cleared by CHTIFx; never set on a non-circular stream, where HTIE = 1 refuses (TVI-DMA-HALF; ruled 2026-11-25T18:49Z Q3); the stock model never sets it", 659),
+            R("DMA_LISR", 0x00, "§15.5.1", "HTIF3", 26, 26, Any, "read-only", "read-only (silicon ignores a write): set by the guard once half of a circular stream's NDT has been transferred (p657), in each cycle (inferred from p647's 'the DMA requests continue to be served' with p657), served on read and cleared by CHTIFx; never set on a non-circular stream, where HTIE = 1 refuses (TVI-DMA-HALF; ruled 2026-11-25T18:49Z Q3); the stock model never sets it", 659),
             R("DMA_LISR", 0x00, "§15.5.1", "TEIF3", 25, 25, Any, "read-only", "read-only (silicon ignores a write): the stock model never sets it; silicon sets TEIF, DMEIF and FEIF on errors, none modeled", 659),
             R("DMA_LISR", 0x00, "§15.5.1", "DMEIF3", 24, 24, Any, "read-only", "read-only (silicon ignores a write): the stock model never sets it; silicon sets TEIF, DMEIF and FEIF on errors, none modeled", 659),
             R("DMA_LISR", 0x00, "§15.5.1", "Res23", 23, 23, Zero, "reserved", "reserved: must be kept at reset value", 659),
             R("DMA_LISR", 0x00, "§15.5.1", "FEIF3", 22, 22, Any, "read-only", "read-only (silicon ignores a write): the stock model never sets it; silicon sets TEIF, DMEIF and FEIF on errors, none modeled", 659),
             R("DMA_LISR", 0x00, "§15.5.1", "TCIF2", 21, 21, Any, "read-only", "read-only (silicon ignores a write; so does the guard's stock model): set when the stock model completes a transfer (probed, TVI-WO-1303.measure.md D2), at each wrap of a circular stream (p657; each wrap is inferred from p654 against p665), and by the guard when software clears EN while the stream runs (p654; TVI-WO-1305, ruled 2026-11-24T18:55Z Q6)", 659),
-            R("DMA_LISR", 0x00, "§15.5.1", "HTIF2", 20, 20, Any, "read-only", "read-only (silicon ignores a write): set by the guard once half of a circular stream's NDT has been transferred in each cycle (p657), served on read and cleared by CHTIFx; never set on a non-circular stream, where HTIE = 1 refuses (TVI-DMA-HALF; ruled 2026-11-25T18:49Z Q3); the stock model never sets it", 659),
+            R("DMA_LISR", 0x00, "§15.5.1", "HTIF2", 20, 20, Any, "read-only", "read-only (silicon ignores a write): set by the guard once half of a circular stream's NDT has been transferred (p657), in each cycle (inferred from p647's 'the DMA requests continue to be served' with p657), served on read and cleared by CHTIFx; never set on a non-circular stream, where HTIE = 1 refuses (TVI-DMA-HALF; ruled 2026-11-25T18:49Z Q3); the stock model never sets it", 659),
             R("DMA_LISR", 0x00, "§15.5.1", "TEIF2", 19, 19, Any, "read-only", "read-only (silicon ignores a write): the stock model never sets it; silicon sets TEIF, DMEIF and FEIF on errors, none modeled", 659),
             R("DMA_LISR", 0x00, "§15.5.1", "DMEIF2", 18, 18, Any, "read-only", "read-only (silicon ignores a write): the stock model never sets it; silicon sets TEIF, DMEIF and FEIF on errors, none modeled", 659),
             R("DMA_LISR", 0x00, "§15.5.1", "Res17", 17, 17, Zero, "reserved", "reserved: must be kept at reset value", 659),
             R("DMA_LISR", 0x00, "§15.5.1", "FEIF2", 16, 16, Any, "read-only", "read-only (silicon ignores a write): the stock model never sets it; silicon sets TEIF, DMEIF and FEIF on errors, none modeled", 659),
             R("DMA_LISR", 0x00, "§15.5.1", "Res15_12", 15, 12, Zero, "reserved", "reserved: must be kept at reset value", 659),
             R("DMA_LISR", 0x00, "§15.5.1", "TCIF1", 11, 11, Any, "read-only", "read-only (silicon ignores a write; so does the guard's stock model): set when the stock model completes a transfer (probed, TVI-WO-1303.measure.md D2), at each wrap of a circular stream (p657; each wrap is inferred from p654 against p665), and by the guard when software clears EN while the stream runs (p654; TVI-WO-1305, ruled 2026-11-24T18:55Z Q6)", 659),
-            R("DMA_LISR", 0x00, "§15.5.1", "HTIF1", 10, 10, Any, "read-only", "read-only (silicon ignores a write): set by the guard once half of a circular stream's NDT has been transferred in each cycle (p657), served on read and cleared by CHTIFx; never set on a non-circular stream, where HTIE = 1 refuses (TVI-DMA-HALF; ruled 2026-11-25T18:49Z Q3); the stock model never sets it", 659),
+            R("DMA_LISR", 0x00, "§15.5.1", "HTIF1", 10, 10, Any, "read-only", "read-only (silicon ignores a write): set by the guard once half of a circular stream's NDT has been transferred (p657), in each cycle (inferred from p647's 'the DMA requests continue to be served' with p657), served on read and cleared by CHTIFx; never set on a non-circular stream, where HTIE = 1 refuses (TVI-DMA-HALF; ruled 2026-11-25T18:49Z Q3); the stock model never sets it", 659),
             R("DMA_LISR", 0x00, "§15.5.1", "TEIF1", 9, 9, Any, "read-only", "read-only (silicon ignores a write): the stock model never sets it; silicon sets TEIF, DMEIF and FEIF on errors, none modeled", 659),
             R("DMA_LISR", 0x00, "§15.5.1", "DMEIF1", 8, 8, Any, "read-only", "read-only (silicon ignores a write): the stock model never sets it; silicon sets TEIF, DMEIF and FEIF on errors, none modeled", 659),
             R("DMA_LISR", 0x00, "§15.5.1", "Res7", 7, 7, Zero, "reserved", "reserved: must be kept at reset value", 659),
             R("DMA_LISR", 0x00, "§15.5.1", "FEIF1", 6, 6, Any, "read-only", "read-only (silicon ignores a write): the stock model never sets it; silicon sets TEIF, DMEIF and FEIF on errors, none modeled", 659),
             R("DMA_LISR", 0x00, "§15.5.1", "TCIF0", 5, 5, Any, "read-only", "read-only (silicon ignores a write; so does the guard's stock model): set when the stock model completes a transfer (probed, TVI-WO-1303.measure.md D2), at each wrap of a circular stream (p657; each wrap is inferred from p654 against p665), and by the guard when software clears EN while the stream runs (p654; TVI-WO-1305, ruled 2026-11-24T18:55Z Q6)", 659),
-            R("DMA_LISR", 0x00, "§15.5.1", "HTIF0", 4, 4, Any, "read-only", "read-only (silicon ignores a write): set by the guard once half of a circular stream's NDT has been transferred in each cycle (p657), served on read and cleared by CHTIFx; never set on a non-circular stream, where HTIE = 1 refuses (TVI-DMA-HALF; ruled 2026-11-25T18:49Z Q3); the stock model never sets it", 659),
+            R("DMA_LISR", 0x00, "§15.5.1", "HTIF0", 4, 4, Any, "read-only", "read-only (silicon ignores a write): set by the guard once half of a circular stream's NDT has been transferred (p657), in each cycle (inferred from p647's 'the DMA requests continue to be served' with p657), served on read and cleared by CHTIFx; never set on a non-circular stream, where HTIE = 1 refuses (TVI-DMA-HALF; ruled 2026-11-25T18:49Z Q3); the stock model never sets it", 659),
             R("DMA_LISR", 0x00, "§15.5.1", "TEIF0", 3, 3, Any, "read-only", "read-only (silicon ignores a write): the stock model never sets it; silicon sets TEIF, DMEIF and FEIF on errors, none modeled", 659),
             R("DMA_LISR", 0x00, "§15.5.1", "DMEIF0", 2, 2, Any, "read-only", "read-only (silicon ignores a write): the stock model never sets it; silicon sets TEIF, DMEIF and FEIF on errors, none modeled", 659),
             R("DMA_LISR", 0x00, "§15.5.1", "Res1", 1, 1, Zero, "reserved", "reserved: must be kept at reset value", 659),
             R("DMA_LISR", 0x00, "§15.5.1", "FEIF0", 0, 0, Any, "read-only", "read-only (silicon ignores a write): the stock model never sets it; silicon sets TEIF, DMEIF and FEIF on errors, none modeled", 659),
             R("DMA_HISR", 0x04, "§15.5.2", "Res31_28", 31, 28, Zero, "reserved", "reserved: must be kept at reset value", 660),
             R("DMA_HISR", 0x04, "§15.5.2", "TCIF7", 27, 27, Any, "read-only", "read-only (silicon ignores a write; so does the guard's stock model): set when the stock model completes a transfer (probed, TVI-WO-1303.measure.md D2), at each wrap of a circular stream (p657; each wrap is inferred from p654 against p665), and by the guard when software clears EN while the stream runs (p654; TVI-WO-1305, ruled 2026-11-24T18:55Z Q6)", 660),
-            R("DMA_HISR", 0x04, "§15.5.2", "HTIF7", 26, 26, Any, "read-only", "read-only (silicon ignores a write): set by the guard once half of a circular stream's NDT has been transferred in each cycle (p657), served on read and cleared by CHTIFx; never set on a non-circular stream, where HTIE = 1 refuses (TVI-DMA-HALF; ruled 2026-11-25T18:49Z Q3); the stock model never sets it", 660),
+            R("DMA_HISR", 0x04, "§15.5.2", "HTIF7", 26, 26, Any, "read-only", "read-only (silicon ignores a write): set by the guard once half of a circular stream's NDT has been transferred (p657), in each cycle (inferred from p647's 'the DMA requests continue to be served' with p657), served on read and cleared by CHTIFx; never set on a non-circular stream, where HTIE = 1 refuses (TVI-DMA-HALF; ruled 2026-11-25T18:49Z Q3); the stock model never sets it", 660),
             R("DMA_HISR", 0x04, "§15.5.2", "TEIF7", 25, 25, Any, "read-only", "read-only (silicon ignores a write): the stock model never sets it; silicon sets TEIF, DMEIF and FEIF on errors, none modeled", 660),
             R("DMA_HISR", 0x04, "§15.5.2", "DMEIF7", 24, 24, Any, "read-only", "read-only (silicon ignores a write): the stock model never sets it; silicon sets TEIF, DMEIF and FEIF on errors, none modeled", 660),
             R("DMA_HISR", 0x04, "§15.5.2", "Res23", 23, 23, Zero, "reserved", "reserved: must be kept at reset value", 660),
             R("DMA_HISR", 0x04, "§15.5.2", "FEIF7", 22, 22, Any, "read-only", "read-only (silicon ignores a write): the stock model never sets it; silicon sets TEIF, DMEIF and FEIF on errors, none modeled", 660),
             R("DMA_HISR", 0x04, "§15.5.2", "TCIF6", 21, 21, Any, "read-only", "read-only (silicon ignores a write; so does the guard's stock model): set when the stock model completes a transfer (probed, TVI-WO-1303.measure.md D2), at each wrap of a circular stream (p657; each wrap is inferred from p654 against p665), and by the guard when software clears EN while the stream runs (p654; TVI-WO-1305, ruled 2026-11-24T18:55Z Q6)", 660),
-            R("DMA_HISR", 0x04, "§15.5.2", "HTIF6", 20, 20, Any, "read-only", "read-only (silicon ignores a write): set by the guard once half of a circular stream's NDT has been transferred in each cycle (p657), served on read and cleared by CHTIFx; never set on a non-circular stream, where HTIE = 1 refuses (TVI-DMA-HALF; ruled 2026-11-25T18:49Z Q3); the stock model never sets it", 660),
+            R("DMA_HISR", 0x04, "§15.5.2", "HTIF6", 20, 20, Any, "read-only", "read-only (silicon ignores a write): set by the guard once half of a circular stream's NDT has been transferred (p657), in each cycle (inferred from p647's 'the DMA requests continue to be served' with p657), served on read and cleared by CHTIFx; never set on a non-circular stream, where HTIE = 1 refuses (TVI-DMA-HALF; ruled 2026-11-25T18:49Z Q3); the stock model never sets it", 660),
             R("DMA_HISR", 0x04, "§15.5.2", "TEIF6", 19, 19, Any, "read-only", "read-only (silicon ignores a write): the stock model never sets it; silicon sets TEIF, DMEIF and FEIF on errors, none modeled", 660),
             R("DMA_HISR", 0x04, "§15.5.2", "DMEIF6", 18, 18, Any, "read-only", "read-only (silicon ignores a write): the stock model never sets it; silicon sets TEIF, DMEIF and FEIF on errors, none modeled", 660),
             R("DMA_HISR", 0x04, "§15.5.2", "Res17", 17, 17, Zero, "reserved", "reserved: must be kept at reset value", 660),
             R("DMA_HISR", 0x04, "§15.5.2", "FEIF6", 16, 16, Any, "read-only", "read-only (silicon ignores a write): the stock model never sets it; silicon sets TEIF, DMEIF and FEIF on errors, none modeled", 660),
             R("DMA_HISR", 0x04, "§15.5.2", "Res15_12", 15, 12, Zero, "reserved", "reserved: must be kept at reset value", 660),
             R("DMA_HISR", 0x04, "§15.5.2", "TCIF5", 11, 11, Any, "read-only", "read-only (silicon ignores a write; so does the guard's stock model): set when the stock model completes a transfer (probed, TVI-WO-1303.measure.md D2), at each wrap of a circular stream (p657; each wrap is inferred from p654 against p665), and by the guard when software clears EN while the stream runs (p654; TVI-WO-1305, ruled 2026-11-24T18:55Z Q6)", 660),
-            R("DMA_HISR", 0x04, "§15.5.2", "HTIF5", 10, 10, Any, "read-only", "read-only (silicon ignores a write): set by the guard once half of a circular stream's NDT has been transferred in each cycle (p657), served on read and cleared by CHTIFx; never set on a non-circular stream, where HTIE = 1 refuses (TVI-DMA-HALF; ruled 2026-11-25T18:49Z Q3); the stock model never sets it", 660),
+            R("DMA_HISR", 0x04, "§15.5.2", "HTIF5", 10, 10, Any, "read-only", "read-only (silicon ignores a write): set by the guard once half of a circular stream's NDT has been transferred (p657), in each cycle (inferred from p647's 'the DMA requests continue to be served' with p657), served on read and cleared by CHTIFx; never set on a non-circular stream, where HTIE = 1 refuses (TVI-DMA-HALF; ruled 2026-11-25T18:49Z Q3); the stock model never sets it", 660),
             R("DMA_HISR", 0x04, "§15.5.2", "TEIF5", 9, 9, Any, "read-only", "read-only (silicon ignores a write): the stock model never sets it; silicon sets TEIF, DMEIF and FEIF on errors, none modeled", 660),
             R("DMA_HISR", 0x04, "§15.5.2", "DMEIF5", 8, 8, Any, "read-only", "read-only (silicon ignores a write): the stock model never sets it; silicon sets TEIF, DMEIF and FEIF on errors, none modeled", 660),
             R("DMA_HISR", 0x04, "§15.5.2", "Res7", 7, 7, Zero, "reserved", "reserved: must be kept at reset value", 660),
             R("DMA_HISR", 0x04, "§15.5.2", "FEIF5", 6, 6, Any, "read-only", "read-only (silicon ignores a write): the stock model never sets it; silicon sets TEIF, DMEIF and FEIF on errors, none modeled", 660),
             R("DMA_HISR", 0x04, "§15.5.2", "TCIF4", 5, 5, Any, "read-only", "read-only (silicon ignores a write; so does the guard's stock model): set when the stock model completes a transfer (probed, TVI-WO-1303.measure.md D2), at each wrap of a circular stream (p657; each wrap is inferred from p654 against p665), and by the guard when software clears EN while the stream runs (p654; TVI-WO-1305, ruled 2026-11-24T18:55Z Q6)", 660),
-            R("DMA_HISR", 0x04, "§15.5.2", "HTIF4", 4, 4, Any, "read-only", "read-only (silicon ignores a write): set by the guard once half of a circular stream's NDT has been transferred in each cycle (p657), served on read and cleared by CHTIFx; never set on a non-circular stream, where HTIE = 1 refuses (TVI-DMA-HALF; ruled 2026-11-25T18:49Z Q3); the stock model never sets it", 660),
+            R("DMA_HISR", 0x04, "§15.5.2", "HTIF4", 4, 4, Any, "read-only", "read-only (silicon ignores a write): set by the guard once half of a circular stream's NDT has been transferred (p657), in each cycle (inferred from p647's 'the DMA requests continue to be served' with p657), served on read and cleared by CHTIFx; never set on a non-circular stream, where HTIE = 1 refuses (TVI-DMA-HALF; ruled 2026-11-25T18:49Z Q3); the stock model never sets it", 660),
             R("DMA_HISR", 0x04, "§15.5.2", "TEIF4", 3, 3, Any, "read-only", "read-only (silicon ignores a write): the stock model never sets it; silicon sets TEIF, DMEIF and FEIF on errors, none modeled", 660),
             R("DMA_HISR", 0x04, "§15.5.2", "DMEIF4", 2, 2, Any, "read-only", "read-only (silicon ignores a write): the stock model never sets it; silicon sets TEIF, DMEIF and FEIF on errors, none modeled", 660),
             R("DMA_HISR", 0x04, "§15.5.2", "Res1", 1, 1, Zero, "reserved", "reserved: must be kept at reset value", 660),
@@ -1147,13 +1170,13 @@ namespace Antmicro.Renode.Peripherals.Tviburi
             R("DMA_SxCR", 0x10, "§15.5.5", "CIRC", 8, 8, Any, "modeled by the guard", "the guard (the stock model drops it): on a peripheral-to-memory stream, at the request that leaves NDT = 0, the programmed NDT is reloaded and requests go on being served (§15.3.10 p647; NDT p665); EN stays 1 and TCIF is set at each wrap (both inferred from p654 against p665: RM0433 states neither), HTIF at half (p657); at EN, refused on memory-to-peripheral (the twin moves it unpaced) and memory-to-memory (p645) (TVI-DMA-CIRC) and with an odd NDT (TVI-DMA-HALF); changed while the stream is enabled, TVI-DMA-CIRC (p664 states no rule; p665); ruled 2026-11-25T18:49Z Q1-Q5", 664),
             R("DMA_SxCR", 0x10, "§15.5.5", "DIR[1:0]", 7, 6, Directions, "stock, wrong (a memory-to-peripheral transfer completes at the EN write, unpaced by any request, where silicon moves one item per request: acknowledged for requests 38 spi1_tx_dma, 40 spi2_tx_dma, 42 usart1_tx_dma and 46 usart3_tx_dma, as ArduPilot's recorded boot and armed run use them; a peripheral-to-memory stream on request 41 usart1_rx_dma, 43 usart2_rx_dma or 45 usart3_rx_dma moves the bytes the USART guard's ReceiveDmaRequest raises where the platform wires it, and nothing where it does not: acknowledged by name; any other request no model raises refuses TVI-DMA-REQUEST; ruled 2026-11-24T14:10Z Q5 (c); 43, 45, 46 ruled 2026-11-24T18:55Z Q6)", "the stock model: 00 peripheral-to-memory, 01 memory-to-peripheral, 10 memory-to-memory (probed, D2, D9, D11); 11 is reserved; protected under EN", 664),
             R("DMA_SxCR", 0x10, "§15.5.5", "PFCTRL", 5, 5, Zero, "tag", "0 only: a stock tag; the peripheral as flow controller is not modeled", 664),
-            R("DMA_SxCR", 0x10, "§15.5.5", "TCIE", 4, 4, Any, "inherited, unaudited (acknowledged by name)", "the stock model: the transfer-complete interrupt (probed, D2; ArduPilot's streams take it)", 664),
-            R("DMA_SxCR", 0x10, "§15.5.5", "HTIE", 3, 3, Any, "modeled by the guard", "the guard (the stock model drops it): the half-transfer interrupt of a circular stream, on the stream's line with the stock model's TCIE and TCIF (p657; Table 116 p658); 1 on a non-circular stream refuses at EN (TVI-DMA-HALF): HTIF is modeled on circular streams only (ruled 2026-11-25T18:49Z Q3)", 664),
+            R("DMA_SxCR", 0x10, "§15.5.5", "TCIE", 4, 4, Any, "modeled by the guard", "the transfer-complete interrupt: the guard drives the stream's line from its copy of TCIE and the stock model's TCIF, so a TCIE write moves the line (Table 116 p658), where the stock model recomputes its own line only when TCIF changes (STM32DMA.cs L119-137); ArduPilot's streams take it", 664),
+            R("DMA_SxCR", 0x10, "§15.5.5", "HTIE", 3, 3, Any, "modeled by the guard", "the guard (the stock model drops it): the half-transfer interrupt of a circular stream, on the stream's line, which the guard drives (p657; Table 116 p658); 1 on a non-circular stream refuses at EN, and set while one is enabled (TVI-DMA-HALF): HTIF is modeled on circular streams only (ruled 2026-11-25T18:49Z Q3)", 664),
             R("DMA_SxCR", 0x10, "§15.5.5", "TEIE", 2, 2, Any, "stock, wrong (TEIE is a stock tag: no transfer error is modeled, so its interrupt never fires; its value is kept by the guard and served on read; acknowledged by name, ruled 2026-11-24T14:10Z Q6; ArduPilot writes it)", "kept by the guard and served on read; no transfer error is modeled", 664),
             R("DMA_SxCR", 0x10, "§15.5.5", "DMEIE", 1, 1, Any, "stock, wrong (DMEIE is a stock tag: no direct-mode error is modeled, so its interrupt never fires; its value is kept by the guard and served on read; acknowledged by name, ruled 2026-11-24T14:10Z Q6; ArduPilot writes it)", "kept by the guard and served on read; no direct-mode error is modeled", 664),
             R("DMA_SxCR", 0x10, "§15.5.5", "EN", 0, 0, Any, "modeled by the guard", "the stock model starts the stream; at its rise the guard checks its sizes (TVI-DMA-SIZE, p663), its addresses (TVI-DMA-TCM, TVI-DMA-ADDRESS, p108, Table 7 p131), a reload (TVI-DMA-RELOAD, p665), its circular mode and half-transfer flag (TVI-DMA-CIRC, TVI-DMA-HALF) and its DMAMUX1 request (TVI-DMA-ROUTE, TVI-DMA-SHARED, TVI-DMA-REQUEST, TVI-DMA-MUX); while it is set, a changed protected field refuses (TVI-DMA-EN running, TVI-DMA-DONE once the twin completed the transfer); the guard clears it at the end of a non-circular peripheral-to-memory transfer, which requests pace (p654, p665; ruled 2026-11-25T18:49Z Q4), and it stays 1 at a circular wrap (inferred from p654 against p665); the stock model never clears it at the end of a memory-to-peripheral or memory-to-memory transfer, which it completes at the EN write (stock-wrong, p665); cleared by software while the stream runs, the guard sets TCIF and restarts the stream's next transfer at its programmed addresses, as silicon's suspension does (p654, p666; TVI-WO-1305, ruled 2026-11-24T18:55Z Q6)", 665),
             R("DMA_SxNDTR", 0x14, "§15.5.6", "Res31_16", 31, 16, Zero, "reserved", "reserved: must be kept at reset value", 665),
-            R("DMA_SxNDTR", 0x14, "§15.5.6", "NDT[15:0]", 15, 0, Any, "inherited, unaudited (acknowledged by name)", "the stock model: the number of items, counted down by its transfers (probed, D2); reloaded with the programmed value by the guard at each wrap of a circular stream (p647, p665), otherwise never reloaded; protected under EN", 665),
+            R("DMA_SxNDTR", 0x14, "§15.5.6", "NDT[15:0]", 15, 0, Any, "modeled by the guard", "the stock model: the number of items, counted down by its transfers (probed, D2); reloaded with the programmed value by the guard at each wrap of a circular stream (p647, p665), otherwise never reloaded; protected under EN", 665),
             R("DMA_SxPAR", 0x18, "§15.5.7", "PAR[31:0]", 31, 0, Any, "modeled by the guard", "the stock model's peripheral address (probed, D2, D9); at EN the guard refuses a span in ITCM or DTCM (p108) and one in no mapped region (Table 7 p131); protected under EN", 666),
             R("DMA_SxM0AR", 0x1C, "§15.5.8", "M0A[31:0]", 31, 0, Any, "modeled by the guard", "the stock model's memory address (probed, D2); at EN the guard refuses a span in ITCM or DTCM (p108) and one in no mapped region (Table 7 p131); protected under EN", 666),
             R("DMA_SxM1AR", 0x20, "§15.5.9", "M1A[31:0]", 31, 0, Zero, "tag", "0 only: a stock tag that reads 0; double-buffer mode is not modeled", 666),

@@ -49,6 +49,7 @@
 //!                     (p664 states no rule; p665).
 //!   path="circodd"  - P2M on 41, CIRC = 1, NDT = 5: TVI-DMA-HALF, unmodeled (p657 states no count for an odd NDT).
 //!   path="htie"     - P2M on 41, CIRC = 0, HTIE = 1: TVI-DMA-HALF, unmodeled (HTIF is modeled on circular streams only).
+//!   path="htien"    - P2M on 41, CIRC = 0, enabled; then CR with HTIE set and EN still set: TVI-DMA-HALF, unmodeled.
 //!   path="circm2p"  - M2P on 42 with CIRC = 1: TVI-DMA-CIRC, unmodeled (the twin moves it at EN, unpaced).
 //!   path="circm2m"  - M2M with CIRC = 1: TVI-DMA-CIRC, unmodeled (p645: not allowed).
 //!   path="adc"      - ArduPilot's ADC pattern (Sentinel-03's armed run, measure.md §2.1): ADC1 (ADVREGEN, ADEN, CFGR =
@@ -273,6 +274,12 @@ pub unsafe extern "C" fn reset() -> ! {
     {
         cfg(DMA1, 0, 0, Some(41), USART1_RDR, SRAM4, 4, P2M | 0x8);
         en(DMA1, 0);
+    }
+    #[cfg(path = "htien")]
+    {
+        cfg(DMA1, 0, 0, Some(41), USART1_RDR, SRAM4, 4, P2M);
+        en(DMA1, 0);
+        w(s(DMA1, 0, CR), r(s(DMA1, 0, CR)) | 0x8);
     }
     #[cfg(path = "circm2p")]
     {

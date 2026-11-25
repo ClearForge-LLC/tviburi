@@ -35,7 +35,7 @@ def flag(name):
     if name.startswith("TCIF"):
         return (name, A, "read-only", "read-only (silicon ignores a write; so does the guard's stock model): set when the stock model completes a transfer (probed, TVI-WO-1303.measure.md D2), at each wrap of a circular stream (p657; each wrap is inferred from p654 against p665), and by the guard when software clears EN while the stream runs (p654; TVI-WO-1305, ruled 2026-11-24T18:55Z Q6)")
     if name.startswith("HTIF"):
-        return (name, A, "read-only", "read-only (silicon ignores a write): set by the guard once half of a circular stream's NDT has been transferred in each cycle (p657), served on read and cleared by CHTIFx; never set on a non-circular stream, where HTIE = 1 refuses (TVI-DMA-HALF; " + CIRCULAR + " Q3); the stock model never sets it")
+        return (name, A, "read-only", "read-only (silicon ignores a write): set by the guard once half of a circular stream's NDT has been transferred (p657), in each cycle (inferred from p647's 'the DMA requests continue to be served' with p657), served on read and cleared by CHTIFx; never set on a non-circular stream, where HTIE = 1 refuses (TVI-DMA-HALF; " + CIRCULAR + " Q3); the stock model never sets it")
     return (name, A, "read-only", "read-only (silicon ignores a write): the stock model never sets it; silicon sets TEIF, DMEIF and FEIF on errors, none modeled")
 
 
@@ -74,9 +74,9 @@ def cr():
          + RULING + " Q5 (c); 43, 45, 46 ruled 2026-11-24T18:55Z Q6)",
          "the stock model: 00 peripheral-to-memory, 01 memory-to-peripheral, 10 memory-to-memory (probed, D2, D9, D11); 11 is reserved; protected under EN", 664),
         (reg, off, sec, "PFCTRL", 5, 5, Z, "tag", "0 only: a stock tag; the peripheral as flow controller is not modeled", 664),
-        (reg, off, sec, "TCIE", 4, 4, A, "inherited, unaudited (acknowledged by name)", "the stock model: the transfer-complete interrupt (probed, D2; ArduPilot's streams take it)", 664),
+        (reg, off, sec, "TCIE", 4, 4, A, "modeled by the guard", "the transfer-complete interrupt: the guard drives the stream's line from its copy of TCIE and the stock model's TCIF, so a TCIE write moves the line (Table 116 p658), where the stock model recomputes its own line only when TCIF changes (STM32DMA.cs L119-137); ArduPilot's streams take it", 664),
         (reg, off, sec, "HTIE", 3, 3, A, "modeled by the guard",
-         "the guard (the stock model drops it): the half-transfer interrupt of a circular stream, on the stream's line with the stock model's TCIE and TCIF (p657; Table 116 p658); 1 on a non-circular stream refuses at EN (TVI-DMA-HALF): HTIF is modeled on circular streams only (" + CIRCULAR + " Q3)", 664),
+         "the guard (the stock model drops it): the half-transfer interrupt of a circular stream, on the stream's line, which the guard drives (p657; Table 116 p658); 1 on a non-circular stream refuses at EN, and set while one is enabled (TVI-DMA-HALF): HTIF is modeled on circular streams only (" + CIRCULAR + " Q3)", 664),
         (reg, off, sec, "TEIE", 2, 2, A, ack("TEIE is a stock tag: no transfer error is modeled, so its interrupt never fires; its value is kept by the guard and served on read"),
          "kept by the guard and served on read; no transfer error is modeled", 664),
         (reg, off, sec, "DMEIE", 1, 1, A, ack("DMEIE is a stock tag: no direct-mode error is modeled, so its interrupt never fires; its value is kept by the guard and served on read"),
@@ -95,7 +95,7 @@ def rows():
     out += cr()
     out += [
         ("DMA_SxNDTR", 0x14, "§15.5.6", "Res31_16", 31, 16, Z, "reserved", "reserved: must be kept at reset value", 665),
-        ("DMA_SxNDTR", 0x14, "§15.5.6", "NDT[15:0]", 15, 0, A, "inherited, unaudited (acknowledged by name)", "the stock model: the number of items, counted down by its transfers (probed, D2); reloaded with the programmed value by the guard at each wrap of a circular stream (p647, p665), otherwise never reloaded; protected under EN", 665),
+        ("DMA_SxNDTR", 0x14, "§15.5.6", "NDT[15:0]", 15, 0, A, "modeled by the guard", "the stock model: the number of items, counted down by its transfers (probed, D2); reloaded with the programmed value by the guard at each wrap of a circular stream (p647, p665), otherwise never reloaded; protected under EN", 665),
         ("DMA_SxPAR", 0x18, "§15.5.7", "PAR[31:0]", 31, 0, A, "modeled by the guard", "the stock model's peripheral address (probed, D2, D9); at EN the guard refuses a span in ITCM or DTCM (p108) and one in no mapped region (Table 7 p131); protected under EN", 666),
         ("DMA_SxM0AR", 0x1C, "§15.5.8", "M0A[31:0]", 31, 0, A, "modeled by the guard", "the stock model's memory address (probed, D2); at EN the guard refuses a span in ITCM or DTCM (p108) and one in no mapped region (Table 7 p131); protected under EN", 666),
         ("DMA_SxM1AR", 0x20, "§15.5.9", "M1A[31:0]", 31, 0, Z, "tag", "0 only: a stock tag that reads 0; double-buffer mode is not modeled", 666),

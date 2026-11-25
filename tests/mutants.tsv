@@ -462,12 +462,19 @@ DM52-circNoClear	model/GuardedSTM32DMA.cs	            if((cr[s] & CircBit) == 0)
 DM53-htifSet	model/GuardedSTM32DMA.cs	                htif[s] = true;   // half	                // half	dma-circ dma-adc
 DM54-htifServed	model/GuardedSTM32DMA.cs	v |= htif[b + i] ? 1u << (FlagShift[i] + HtifBit) : 0;	v |= 0;	dma-circ
 DM55-chtifClear	model/GuardedSTM32DMA.cs	htif[b + i] &= (word >> (FlagShift[i] + HtifBit) & 1) == 0;	htif[b + i] &= true;	dma-circ
-DM56-htLine	model/GuardedSTM32DMA.cs	lines[s].Set(inner.Connections[s].IsSet || (htif[s] && (cr[s] & HtieBit) != 0));	lines[s].Set(inner.Connections[s].IsSet);	dma-circ
-DM57-tapLine	model/GuardedSTM32DMA.cs	parent.lines[stream]?.Set(value || (parent.htif[stream]	parent.lines[stream]?.Set(false || (parent.htif[stream]	dma-circoff
+DM56-htLine	model/GuardedSTM32DMA.cs	lines[s].Set(((cr[s] & TcieBit) != 0 && tcif) || (htif[s] && (cr[s] & HtieBit) != 0));	lines[s].Set(((cr[s] & TcieBit) != 0 && tcif));	dma-circ
+DM57-tapLine	model/GuardedSTM32DMA.cs	                    parent.UpdateLine(stream);\n	(empty)	dma-circoff
 DM58-resetHtif	model/GuardedSTM32DMA.cs	                htif[i] = false;\n	(empty)	dma-circ
 DM59-circChanged	model/GuardedSTM32DMA.cs	            if(circ)\n	            if(false)\n	dma-circen
 DM60-circDir	model/GuardedSTM32DMA.cs	if((word & CircBit) != 0 && dir != PeripheralToMemory)	if(false)	dma-circm2p dma-circm2m
 DM61-halfOdd	model/GuardedSTM32DMA.cs	if((word & CircBit) != 0 ? items % 2 == 1 : (word & HtieBit) != 0)	if((word & CircBit) == 0 && (word & HtieBit) != 0)	dma-circodd
 DM62-halfHtie	model/GuardedSTM32DMA.cs	if((word & CircBit) != 0 ? items % 2 == 1 : (word & HtieBit) != 0)	if((word & CircBit) != 0 && items % 2 == 1)	dma-htie
-DM63-servedDir	model/GuardedSTM32DMA.cs	var served = value && number >= 0 && number < Streams && Enabled(number)	var served = false && number >= 0 && number < Streams && Enabled(number)	dma-circ dma-circoff
+DM63-servedGate	model/GuardedSTM32DMA.cs	var served = value && number >= 0 && number < Streams && Enabled(number)	var served = false && number >= 0 && number < Streams && Enabled(number)	dma-circ dma-circoff
 DM64-circRow	tests/1303/fields.py	(reg, off, sec, "CIRC", 8, 8, A,	(reg, off, sec, "CIRC", 8, 8, Z,	dma-regen
+DM65-halfCount	model/GuardedSTM32DMA.cs	else if(n % 2 == 0 && n - left == n / 2)	else if(n % 2 == 0)	dma-circ
+DM66-htieUnderEn	model/GuardedSTM32DMA.cs	var half = r == CrOffset && (word & HtieBit) != 0 && (old & HtieBit) == 0 && (old & CircBit) == 0;	var half = false;	dma-htien
+DM67-tcieLine	model/GuardedSTM32DMA.cs	lines[s].Set(((cr[s] & TcieBit) != 0 && tcif) || (htif[s] && (cr[s] & HtieBit) != 0));	lines[s].Set(tcif || (htif[s] && (cr[s] & HtieBit) != 0));	dma-tcie
+DM68-flagShift	model/GuardedSTM32DMA.cs	private static readonly int[] FlagShift = { 0, 6, 16, 22 };	private static readonly int[] FlagShift = { 0, 6, 16, 20 };	dma-circhi
+DM69-hifcrClear	model/GuardedSTM32DMA.cs	                var b = r == LifcrOffset ? 0 : 4;\n                for(var i = 0; i < 4; i++)\n                {\n                    htif[b + i]	                var b = 0;\n                for(var i = 0; i < 4; i++)\n                {\n                    htif[b + i]	dma-circhi
+DM70-clearLine	model/GuardedSTM32DMA.cs	                    UpdateLine((r == LifcrOffset ? 0 : 4) + i);\n	(empty)	dma-circ
+DM71-circRecorded	model/GuardedSTM32DMA.cs	                word = (word & ~CircBit) | (old & CircBit);\n	(empty)	dma-circrec
