@@ -400,7 +400,7 @@ sys.exit(0 if ok else 1)
     d=$rc; mv "$work/idlehse" "$work/idlehse-d"; mv "$work/idlehse.stdout" "$work/idlehse-d.stdout"
     PLATFORM_SED='/^    hseFrequency: 8000000$/d' run_case idlehse - "${hse[@]}"
     check "idlehse: rcc_pclk2 from PLL1's P output on the HSE (the generated hse-crystal-16 sequence): with hseFrequency 16 MHz declared, 64 MHz (IDLE clear at 20 us, set at 40); with none declared, the RCC guard's default 8 MHz, under which this PLL's VCO is 128 MHz, outside its range: TVI-USART-IDLE, unmodeled, at the start" \
-      "[ \$d = 0 ] && grep -qx 'CHECK PASS' '$work/idlehse-d.stdout' && grep -q 'hseFrequency: 16000000' '$work/idlehse-d/platform.repl' && ! grep -q 'hseFrequency' '$work/idlehse/platform.repl' \
+      "[ \$d = 0 ] && grep -qx 'CHECK PASS' '$work/idlehse-d.stdout' && grep -qx '    hseFrequency: 16000000' '$work/idlehse-d/platform.repl' && ! grep -q '^    hseFrequency' '$work/idlehse/platform.repl' \
        && bit \"\$(readout idlehse-d D20)\" 4 0 && bit \"\$(readout idlehse-d D40)\" 4 1 \
        && [ \$rc = 3 ] && first idlehse 'r[\"rule\"] == \"TVI-USART-IDLE\" and r[\"access\"][\"offset\"] == \"0x0\" and \"with PLL1 outside its ranges (reference 1600000 Hz, VCO 128000000 Hz)\" in r[\"bit\"]'" ;;
   *) echo "unknown case: $t" >&2; exit 2 ;;
