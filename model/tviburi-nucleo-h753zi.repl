@@ -11,6 +11,7 @@ using "./stm32h7-timer-restate.repl"
 using "./stm32h7-dma-restate.repl"
 using "./stm32h7-flash-restate.repl"
 using "./stm32h7-usart-restate.repl"
+using "./stm32h7-i2c-restate.repl"
 
 // The guard's mode (RUL-19), and the stock board's `rcc: hseFrequency: 8_000_000` restated on the guard: that update
 // lands on the cancelled stock entry (TVI-WO-1300.rm0433.md §6.4).
@@ -125,4 +126,12 @@ tviburiUsart6:
 tviburiUart7:
     mode: "enforcing"
 tviburiUart8:
+    mode: "enforcing"
+// TVI-WO-1306: I2C1, I2C2 and I2C3 are guarded (stm32h7-i2c-restate.repl cancels each stock port and declares the guard as
+// "i2cN"; i2c4 stays stock). Each port's mode (RUL-19). The stock board declares no I2C device.
+tviburiI2c1:
+    mode: "enforcing"
+tviburiI2c2:
+    mode: "enforcing"
+tviburiI2c3:
     mode: "enforcing"

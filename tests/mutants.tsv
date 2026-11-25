@@ -172,7 +172,7 @@ G13-portFromAddress	model/GuardedSTM32_GPIOPort.cs	port = (char)('A' + (int)((st
 G14-tableData	model/GuardedSTM32_GPIOPort.cs	PA5:89:	PA5:90:	afcheck
 G15-restatedRoute	model/stm32h7-gpio-restate.repl	tviburiTimer1:\n    0 -> tviburiGpioA#07@01 | tviburiGpioA#08@01 |	tviburiTimer1:\n    0 -> tviburiGpioA#07@01 |	gpio-registrations
 G16-boardPackage	model/tviburi-nucleo-h753zi.repl	tviburiGpioH:\n    mode: "enforcing"\n    package: "LQFP144"	tviburiGpioH:\n    mode: "enforcing"	gpio-package
-G17-namesLine	scripts/tviburi-spike	gpioPortJ gpioPortK timer1 timer8 dma1 dma2 flashController usart1 usart2 usart3 uart4 uart5 usart6 uart7 uart8 >	gpioPortJ timer1 timer8 dma1 dma2 flashController usart1 usart2 usart3 uart4 uart5 usart6 uart7 uart8 >	modeled
+G17-namesLine	scripts/tviburi-spike	gpioPortJ gpioPortK timer1 timer8 dma1 dma2 flashController usart1 usart2 usart3 uart4 uart5 usart6 uart7 uart8 i2c1 i2c2 i2c3 >	gpioPortJ timer1 timer8 dma1 dma2 flashController usart1 usart2 usart3 uart4 uart5 usart6 uart7 uart8 i2c1 i2c2 i2c3 >	modeled
 G18-unlistedPinAf	model/GuardedSTM32_GPIOPort.cs	if(cell == null || cell.Text == "-")	if(cell != null && cell.Text == "-")	gpio-pk8af
 G19-unlistedPinPackage	model/GuardedSTM32_GPIOPort.cs	(!bonding.TryGetValue("P" + port + pin, out var b) || b.Pin == null)	(bonding.TryGetValue("P" + port + pin, out var b) && b.Pin == null)	gpio-pk8out
 G20-staleRefresh	model/GuardedSTM32_GPIOPort.cs	base.ReadDoubleWord(b);\n            }\n            var before = Selection();	}\n            var before = Selection();	gpio-resetwrite
@@ -394,8 +394,8 @@ US65-hseRef	model/GuardedSTM32F7_USART.cs	(ck & 3) == 2 ? rcc.HseFrequency :	(ck
 US66-sysPll1	model/GuardedSTM32F7_USART.cs	var sys = sws == 0 ? hsi : sws == 3 ?	var sys = sws == 0 ? hsi : sws == 4 ?	usart-idlehse
 US67-vcoselPassed	model/GuardedSTM32F7_USART.cs	var wide = (pllcfgr >> (n == 1 ? 1 : 5) & 1) == 0;	var wide = (rcc.ReadDoubleWord(0x2C) >> (n == 1 ? 1 : 5) & 1) == 0;	usart-idlenone
 US68-divp1	model/GuardedSTM32F7_USART.cs	Vco(rcc, 1, hsi, ref why) / ((R(0x30) >> 9 & 0x7F) + 1) : null;	Vco(rcc, 1, hsi, ref why) / 2 : null;	usart-idlehse
-RB01-usartWatched	model/GuardedSTM32H7_RCC.cs	.Concat(watched.Where(w => w.Value.UeSet).Select(w => w.Key))	.Concat(new string[0])	rcc-usart-lost
-RB02-ueRunning	model/GuardedSTM32H7_RCC.cs	watched.Where(w => w.Value.UeSet)	watched.Where(w => true)	rcc-usart-stopped
+RB01-usartWatched	model/GuardedSTM32H7_RCC.cs	.Concat(watched.Where(w => w.Value.IsRunning).Select(w => w.Key))	.Concat(new string[0])	rcc-usart-lost
+RB02-ueRunning	model/GuardedSTM32H7_RCC.cs	watched.Where(w => w.Value.IsRunning)	watched.Where(w => true)	rcc-usart-stopped
 RB03-usartHeld	model/GuardedSTM32F7_USART.cs	&& rcc.Holds(name, this)))	))	rcc-usart-unheld
 RB04-hseRule	model/GuardedSTM32H7_RCC.cs	|| HseFrequency != null ||	|| true ||	rcc-hse-none
 RB05-hseDefault	model/GuardedSTM32H7_RCC.cs	ulong? hseFrequency = null,	ulong? hseFrequency = 8000000,	rcc-hse-none
@@ -406,7 +406,7 @@ RB09-rtcenKeptOnReset	model/GuardedSTM32H7_RCC.cs	            ResetCopies();\n  
 RB10-adc12Enable	model/GuardedSTM32H7_RCC.cs	"ADC12EN", 5, 5, Any,	"ADC12EN", 5, 5, Zero,	rcc-adc
 RB11-adc3Enable	model/GuardedSTM32H7_RCC.cs	"ADC3EN", 24, 24, Any,	"ADC3EN", 24, 24, Zero,	rcc-adc3
 RB12-tim1LpenAck	model/GuardedSTM32H7_RCC.cs	"TIM1LPEN", 0, 0, new uint[] { 0, 1 },	"TIM1LPEN", 0, 0, new uint[] { 1 },	rcc-adc
-RB13-usartCite	model/GuardedSTM32H7_RCC.cs	+ (usart ? "; 	+ (false ? "; 	rcc-usart-lost-en
+RB13-usartCite	model/GuardedSTM32H7_RCC.cs	+ (watch != null ? "; " + watch.KernelCitation	+ (false ? "; " + watch.KernelCitation	rcc-usart-lost-en
 RB14-usart1Mux	model/GuardedSTM32H7_RCC.cs	["usart1"] = new ClockedPeripheral(UsartMux,	["usart1"] = new ClockedPeripheral(Usart2Mux,	rcc-usart-othersel
 RB15-hseZero	model/GuardedSTM32H7_RCC.cs	HseFrequency = hseFrequency == 0 ? null : hseFrequency;	HseFrequency = hseFrequency;	rcc-hse-zero
 RB16-rtcenTaken	model/GuardedSTM32H7_RCC.cs	rtcen = value & BdcrRtcen;	rtcen = 0;	rcc-rtcen

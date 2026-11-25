@@ -106,6 +106,15 @@ for i in "${!args[@]}"; do
       done
       cat /out/$n-$mode.moved-usart.txt; } >> "$plat"
   fi
+  # TVI-WO-1306: a tree with the I2C restatement gets it last, with each port's mode. The consumer's sensors (`@ i2cN`) are
+  # repointed onto the guard's variable (an `@ i2cN` binds to the cancelled entry and the load fails, E39; measured,
+  # TVI-WO-1306.measure.md §2.4), and listed in /out/N-accept.repointed-i2c.txt. A tree without it replays as before.
+  if [ -f /repo/model/stm32h7-i2c-restate.repl ]; then
+    grep -n '@ i2c[123]\b' "$plat" > /out/$n-$mode.repointed-i2c.txt || true
+    sed -i 's/@ i2c\([123]\)\b/@ tviburiI2c\1/' "$plat"
+    { echo; cat /repo/model/stm32h7-i2c-restate.repl; echo
+      for k in 1 2 3; do printf 'tviburiI2c%s:\n    mode: "%s"\n\n' $k "${ACCEPT_MODE:-recorded}"; done; } >> "$plat"
+  fi
   args[$((i + 1))]=${c/'mach create; '/'include @/tmp/release/Tviburi.cs; mach create; '}
 done
 printf '%s\n' "${args[@]}" > /out/$n-$mode.argv.txt
