@@ -11,7 +11,7 @@ on:
       of:
         # The number of shards: one per shard-N job in ci.yml.
         type: number
-        default: 9
+        default: 10
     outputs:
       ran:
         value: ${{ jobs.shard.outputs.ran }}
