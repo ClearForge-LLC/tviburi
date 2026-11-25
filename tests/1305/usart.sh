@@ -328,7 +328,10 @@ sys.exit(0 if ok else 1)
     # / HPRE 2 / D2PPRE2 2 = 8 MHz (D2PPRE1 4, which usart1 must not use), BRR 25. H: hsi_ker_ck = 64 MHz / HSIDIV 2 = 32 MHz
     # (rcc_pclk2 16 MHz, D2PPRE2 2), BRR 100. Q: pll2_q_ck = HSI / DIVM2 32 * 360 / 10 = 72 MHz, DIVN2 = 359 (a 9-bit value the
     # stock model keeps as 103), BRR 225. R: after machine Reset, PLL2 with PLL2DIVR at its reset value (p406: DIVN2 128, DIVQ2
-    # 1), 2 MHz * 129 / 2 = 129 MHz, BRR 403 (320,099 baud, 31.24 us), not the 72 MHz written before the reset.
+    # 1), 2 MHz * 129 / 2 = 129 MHz, BRR 403 (320,099 baud, 31.24 us), not the 72 MHz written before the reset. A: ArduPilot's
+    # own PLL2 (TVI-WO-1305a.measure.md §2: PLLCKSELR 0x00408040, DIVM2 8; PLL2DIVR 0x0704022C, DIVN2 44, DIVQ2 4), 8 MHz * 45 / 5 =
+    # 72 MHz, exactly the frequency the consumer declares (ruled 2026-11-25T00:00Z: kept as a test), BRR 0x271: 115,200 baud,
+    # 86.8 us (64 MHz would give 97.7 us, 200 MHz 31.25).
     byte=('sysbus WriteDoubleWord 0x40011000 0x2000001D' 'sysbus.usart1 WriteChar 0x41' 'emulation RunFor "0.00002"')
     run_case idlekernel - 'cpu IsHalted true' "$clk" 'emulation RunFor "0.0001"' \
       'sysbus WriteDoubleWord 0x58024418 0x808' 'sysbus WriteDoubleWord 0x5802441C 0x450' 'sysbus WriteDoubleWord 0x4001100C 0x19' "${byte[@]}" \
@@ -341,9 +344,13 @@ sys.exit(0 if ok else 1)
       'echo "R-Q20"' 'sysbus ReadDoubleWord 0x4001101C' 'emulation RunFor "0.00002"' 'echo "R-Q40"' 'sysbus ReadDoubleWord 0x4001101C' 'echo "R-DIVR"' 'sysbus ReadDoubleWord 0x58024438' \
       'machine Reset' 'cpu IsHalted true' "$clk" \
       'sysbus WriteDoubleWord 0x58024400 0x04000001' 'sysbus WriteDoubleWord 0x58024454 0x8' 'sysbus WriteDoubleWord 0x4001100C 0x193' "${byte[@]}" \
-      'echo "R-R20"' 'sysbus ReadDoubleWord 0x4001101C' 'emulation RunFor "0.00002"' 'echo "R-R40"' 'sysbus ReadDoubleWord 0x4001101C'
-    check "idlekernel: IDLE one frame after a byte at the kernel clock's baud (clear at 20 us, set at 40 us), not the stock frequency's, from rcc_pclk2 through D1CPRE, HPRE and D2PPRE2, from hsi_ker_ck through HSIDIV, from pll2_q_ck with a DIVN2 the stock model narrows (PLL2DIVR reads 0x01090267), and from pll2_q_ck at PLL2DIVR's reset value after a machine Reset (TVI-WO-1305a (3))" \
-      "passed idlekernel && idleat idlekernel P && idleat idlekernel H && idleat idlekernel Q && idleat idlekernel R && [ \"\$(readout idlekernel DIVR)\" = 0x01090267 ]" ;;
+      'echo "R-R20"' 'sysbus ReadDoubleWord 0x4001101C' 'emulation RunFor "0.00002"' 'echo "R-R40"' 'sysbus ReadDoubleWord 0x4001101C' \
+      'machine Reset' 'cpu IsHalted true' "$clk" \
+      'sysbus WriteDoubleWord 0x58024428 0x00408040' 'sysbus WriteDoubleWord 0x58024438 0x0704022C' 'sysbus WriteDoubleWord 0x58024400 0x04000001' \
+      'sysbus WriteDoubleWord 0x58024454 0x9' 'sysbus WriteDoubleWord 0x4001100C 0x271' 'sysbus WriteDoubleWord 0x40011000 0x2000001D' 'sysbus.usart1 WriteChar 0x41' \
+      'emulation RunFor "0.000085"' 'echo "R-A85"' 'sysbus ReadDoubleWord 0x4001101C' 'emulation RunFor "0.000004"' 'echo "R-A89"' 'sysbus ReadDoubleWord 0x4001101C'
+    check "idlekernel: IDLE one frame after a byte at the kernel clock's baud (clear at 20 us, set at 40 us), not the stock frequency's, from rcc_pclk2 through D1CPRE, HPRE and D2PPRE2, from hsi_ker_ck through HSIDIV, from pll2_q_ck with a DIVN2 the stock model narrows (PLL2DIVR reads 0x01090267), from pll2_q_ck at PLL2DIVR's reset value after a machine Reset, and from ArduPilot's own PLL2 at exactly 72 MHz (IDLE clear at 85 us, set at 89 us after the byte at BRR 0x271) (TVI-WO-1305a (3))" \
+      "passed idlekernel && idleat idlekernel P && idleat idlekernel H && idleat idlekernel Q && idleat idlekernel R && bit \"\$(readout idlekernel A85)\" 4 0 && bit \"\$(readout idlekernel A89)\" 4 1 && [ \"\$(readout idlekernel DIVR)\" = 0x01090267 ]" ;;
   idlenorule) check "idlenorule: USART1 started on csi_ker_ck, running, refuses TVI-USART-IDLE, unmodeled, at the CR1 write: the guard has no rule for its frequency and uses no default (TVI-WO-1305a (3); invariant 1)" \
     "refuses idlenorule TVI-USART-IDLE unmodeled 'r[\"access\"][\"value\"] == \"0x2000000D\" and \"USART16SEL = 100 (csi_ker_ck): no rule\" in r[\"bit\"] and \"p2034\" in r[\"citation\"]'" ;;
   idlenone)
