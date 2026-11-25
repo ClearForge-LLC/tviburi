@@ -13,7 +13,7 @@ set -euo pipefail
 
 here=$(cd "$(dirname "$0")/../.." && pwd)
 IMAGE=$(sed -n 's/^IMAGE=//p' "$here/tests/spike.sh")
-CASES="scar switch stuck clocked switched alias field pll divq pllref divm0 sw width read usart2 uncovered fields reset resetfwd spi1rst alias17c registrations hse16 recorded recordedfield ardupilot gen-s03 gen-hc16 oscclear oscsys rsrbyte misaligned ledger unenabled tim2 lost-pll lost-sel lost-en lost-osc lost-ckper stopped ckper-live blocked cfg2same sel5 divr pll1src kernelq spi1off cstart dma lost-alias adc3 unheld relost-sel relost-pll divr2rmw"
+CASES="scar switch stuck clocked switched alias field pll divq pllref divm0 sw width read usart2 uncovered fields reset resetfwd spi1rst alias17c registrations hse16 recorded recordedfield ardupilot gen-s03 gen-hc16 oscclear oscsys rsrbyte misaligned ledger unenabled tim2 lost-pll lost-sel lost-en lost-osc lost-ckper stopped ckper-live blocked cfg2same sel5 divr pll1src kernelq spi1off cstart dma lost-alias adc3 unheld relost-sel relost-pll divr2rmw usart-lost usart-stopped usart-lost-en usart-othersel usart-unheld hse-none hse-declared adc rtcen rtcen-reset hse-zero"
 scratch=${TVIBURI_SCRATCH:-$HOME/.cache/tviburi}
 mkdir -p "$scratch"
 work=$(mktemp -d "$scratch/rcc.XXXXXX")
@@ -42,7 +42,10 @@ run_case() { # run_case <name> <firmware path or -> <monitor lines...>
   local name=$1 fw=$2; shift 2
   mkdir -p "$work/$name"
   {
-    if [ -n "${PLATFORM:-}" ]; then   # a planted platform in place of the prelude's board
+    if [ -n "${PLATFORM_SED:-}" ]; then   # the board with a sed script applied (TVI-WO-1300b; as tests/1305/usart.sh)
+      sed -e 's#^using "\./#using "/repo/model/#' -e "$PLATFORM_SED" "$src/model/tviburi-nucleo-h753zi.repl" > "$work/$name/platform.repl"
+      sed "s#^machine LoadPlatformDescription .*#machine LoadPlatformDescription @/out/platform.repl#" "$src/scripts/prelude.resc"
+    elif [ -n "${PLATFORM:-}" ]; then   # a planted platform in place of the prelude's board
       sed "s#^machine LoadPlatformDescription .*#machine LoadPlatformDescription @$PLATFORM#" "$src/scripts/prelude.resc"
     else
       echo "include @/repo/scripts/prelude.resc"
@@ -59,7 +62,7 @@ run_case() { # run_case <name> <firmware path or -> <monitor lines...>
     cargo build --quiet --offline --locked --manifest-path /repo/tools/tviburi-check/Cargo.toml --target-dir /out/target || exit 90
     if [ "$1" != - ]; then
       rustc --edition 2021 --target thumbv7em-none-eabihf -C opt-level=s -C panic=abort -C debuginfo=0 --cfg "path=\"$1\"" \
-        --check-cfg "cfg(path, values(\"clocked\",\"scar\",\"switch\",\"stuck\",\"switched\",\"alias\",\"field\",\"pll\",\"divq\",\"pllref\",\"divm0\",\"sw\",\"width\",\"read\",\"usart2\",\"ardupilot\",\"gen-s03\",\"gen-hc16\",\"unenabled\",\"lost-pll\",\"lost-sel\",\"lost-en\",\"lost-osc\",\"lost-ckper\",\"stopped\",\"ckper-live\",\"blocked\",\"cfg2same\",\"sel5\",\"divr\"))" \
+        --check-cfg "cfg(path, values(\"clocked\",\"scar\",\"switch\",\"stuck\",\"switched\",\"alias\",\"field\",\"pll\",\"divq\",\"pllref\",\"divm0\",\"sw\",\"width\",\"read\",\"usart2\",\"ardupilot\",\"gen-s03\",\"gen-hc16\",\"unenabled\",\"lost-pll\",\"lost-sel\",\"lost-en\",\"lost-osc\",\"lost-ckper\",\"stopped\",\"ckper-live\",\"blocked\",\"cfg2same\",\"sel5\",\"divr\",\"usart-lost\",\"usart-stopped\",\"usart-lost-en\",\"usart-othersel\",\"hse-on\",\"adc\",\"rtcen\"))" \
         -C link-arg=-T/repo/firmware/link.x -o /out/fw.elf /repo/firmware/rcc.rs || exit 91
     fi
     timeout 120 renode --disable-gui --console --plain /out/run.resc </dev/null >/out/renode.out 2>&1
@@ -338,9 +341,10 @@ sys.exit(0 if [(r[\"rule\"], r[\"bit\"]) for r in recs] == [(\"TVI-RCC-CLOCK\", 
     check "lost-alias (adversarial): SPI1EN cleared through RCC_C1_APB2ENR (0x150, the same register, p382) under a running SPI1 refuses, TVI-RCC-CLOCK, naming the alias" \
       "[ \$rc = 3 ] && records lost-alias 'len(recs) == 1 and recs[0][\"rule\"] == \"TVI-RCC-CLOCK\" and recs[0][\"register\"] == \"RCC_C1_APB2ENR\" and recs[0][\"bit\"] == \"RCC_APB2ENR.SPI1EN (bit 12) = 0\"'" ;;
   adc3)
-    run_case adc3 - 'sysbus WriteDoubleWord 0x580244E0 0x01000000'
-    check "adc3: ADC3EN refuses unmodeled (TVI-RCC-FIELD), naming ADCx_CCR.CKMODE and p920: the ADC's clock is an ADC register the RCC guard cannot see (ruled 17:52Z)" \
-      "[ \$rc = 3 ] && records adc3 'len(recs) == 1 and recs[0][\"rule\"] == \"TVI-RCC-FIELD\" and recs[0][\"kind\"] == \"unmodeled\" and recs[0][\"bit\"] == \"RCC_AHB4ENR.ADC3EN (bit 24) = 1\" and \"CKMODE\" in recs[0][\"condition\"] and \"p920\" in recs[0][\"condition\"]'" ;;
+    on='python "print(\"ADC3-ON \" + str(self.Machine.SystemBus.IsPeripheralEnabled(self.Machine[\"sysbus.adc3\"])))"'
+    run_case adc3 - "$on" 'sysbus WriteDoubleWord 0x580244E0 0x01000000' "$on" 'echo "R-ENR"' 'sysbus ReadDoubleWord 0x580244E0'
+    check "adc3: ADC3EN is a modeled bus enable (TVI-WO-1300b (3), ruled 2026-11-25T03:03Z Q1, superseding 1300a's 17:52Z): adc3 is locked at reset and unlocked by ADC3EN = 1, with no record; AHB4ENR reads it back" \
+      "[ \$rc = 0 ] && grep -qx 'CHECK PASS' '$work/adc3.stdout' && [ \"\$(grep -o 'ADC3-ON [A-Za-z]*' '$work/adc3/renode.out' | tr '\n' ' ')\" = 'ADC3-ON False ADC3-ON True ' ] && console adc3 | grep -A1 -x R-ENR | tail -n1 | grep -qx 0x01000000" ;;
   unheld)
     PLATFORM=/repo/tests/1300/unregistered.repl run_case unheld - 'sysbus WriteDoubleWord 0x580244F0 0x00001000' 'sysbus WriteDoubleWord 0x4001300C 0x04400000'
     check "unheld (adversarial): a guarded SPI1 not registered on the RCC guard refuses its access, TVI-SPI-ENABLE, unmodeled: unwatched, it cannot pass" \
@@ -363,6 +367,48 @@ sys.exit(0 if [(r[\"rule\"], r[\"bit\"]) for r in recs] == [(\"TVI-RCC-CLOCK\", 
     run_case kernelq - 'sysbus WriteDoubleWord 0x580244F0 0x00001000' "$rq" 'sysbus WriteDoubleWord 0x58024450 0x00004000' "$rq"
     check "kernelq: the RCC guard's own query, asked from the monitor, refuses under rcc, TVI-RCC-KERNEL, predicted-fault: SPI123SEL = 000 with PLL1 off, then 100 with the mux stuck on pll1_q_ck (bench rows R1, R2)" \
       "[ \$rc = 3 ] && records kernelq '[(r[\"rule\"], r[\"kind\"], r[\"peripheral\"], r[\"bit\"]) for r in recs] == [(\"TVI-RCC-KERNEL\", \"predicted-fault\", \"sysbus.rcc\", \"RCC_D2CCIP1R.SPI123SEL = 000\"), (\"TVI-RCC-KERNEL\", \"predicted-fault\", \"sysbus.rcc\", \"RCC_D2CCIP1R.SPI123SEL = 100\")]'" ;;
+  usart-lost|usart-lost-en)
+    case $t in
+      usart-lost) port=usart1; bit='RCC_D2CCIP2R.USART16SEL (5:3) = 100'; page='p417'; cause='has not switched from rcc_pclk2' ;;
+      usart-lost-en) port=usart3; bit='RCC_APB1LENR.USART3EN (bit 18) = 0'; page='p376'; cause='USART3EN = 0' ;;
+    esac
+    run_case "$t" "$t" "$run" 'echo "TVIBURI-MARK-AFTER"' "$after"
+    check "$t: a write that stops a running $port's kernel clock (UE = 1) refuses at the RCC write, TVI-RCC-CLOCK, predicted-fault, naming the field, the port, UE = 1, $page, p2019 and the firmware's PC (TVI-WO-1300b (2))" \
+      "[ \$rc = 3 ] && records $t 'len(recs) == 1 and recs[0][\"rule\"] == \"TVI-RCC-CLOCK\" and recs[0][\"kind\"] == \"predicted-fault\" and recs[0][\"peripheral\"] == \"sysbus.rcc\" and recs[0][\"bit\"] == \"$bit\" and recs[0][\"condition\"].startswith(\"$port is enabled (UE = 1)\") and \"$cause\" in recs[0][\"condition\"] and \"$page\" in recs[0][\"citation\"] and \"p2019\" in recs[0][\"citation\"] and recs[0][\"access\"][\"pc\"] != \"none\"'" ;;
+  usart-stopped|usart-othersel)
+    run_case "$t" "$t" "$run" 'echo "TVIBURI-MARK-AFTER"' "$after"
+    check "$t: the same selector change with UE = 0 (usart-stopped), or a change of the other mux under a running USART1 (usart-othersel), passes with no record" \
+      "[ \$rc = 0 ] && grep -qx 'CHECK PASS' '$work/$t.stdout' && console $t | grep -A1 -x TVIBURI-MARK-AFTER | tail -n1 | grep -qx 0xAF7E0002" ;;
+  usart-unheld)
+    PLATFORM=/repo/tests/1300/usart-unheld.repl run_case usart-unheld - 'sysbus WriteDoubleWord 0x580244F0 0x00000010' 'sysbus WriteDoubleWord 0x4001100C 0x22C'
+    check "usart-unheld (TVI-WO-1300b (2), ruled Q2; 1305 G6): a USART guard not registered on the RCC guard refuses its access, TVI-USART-CONFIG, unmodeled: unwatched, it cannot pass" \
+      "[ \$rc = 3 ] && records usart-unheld 'len(recs) == 1 and recs[0][\"rule\"] == \"TVI-USART-CONFIG\" and recs[0][\"kind\"] == \"unmodeled\" and recs[0][\"peripheral\"] == \"sysbus.usart1\" and \"not registered on an RCC guard\" in recs[0][\"condition\"]'" ;;
+  hse-none)
+    PLATFORM_SED='/^    hseFrequency: 8000000$/d' run_case hse-none hse-on "$run" 'echo "TVIBURI-MARK-AFTER"' "$after"
+    check "hse-none: on a platform that declares no hseFrequency, the HSE's start refuses, TVI-RCC-HSE, unmodeled, naming HSEON, p384 and the firmware's PC; no 8 MHz default (TVI-WO-1300b (4))" \
+      "[ \$rc = 3 ] && ! grep -q '^    hseFrequency' '$work/hse-none/platform.repl' && records hse-none 'len(recs) == 1 and recs[0][\"rule\"] == \"TVI-RCC-HSE\" and recs[0][\"kind\"] == \"unmodeled\" and recs[0][\"bit\"] == \"RCC_CR.HSEON (bit 16) = 1\" and \"p384\" in recs[0][\"citation\"] and recs[0][\"access\"][\"pc\"] != \"none\"'" ;;
+  hse-zero)
+    PLATFORM_SED='s/^    hseFrequency: 8000000$/    hseFrequency: 0/' run_case hse-zero hse-on "$run" 'echo "TVIBURI-MARK-AFTER"' "$after"
+    check "hse-zero (adversarial): hseFrequency declared 0 is no frequency: the HSE's start refuses, TVI-RCC-HSE, unmodeled (0 Hz would pass the flash guard's latency)" \
+      "[ \$rc = 3 ] && grep -qx '    hseFrequency: 0' '$work/hse-zero/platform.repl' && records hse-zero 'len(recs) == 1 and recs[0][\"rule\"] == \"TVI-RCC-HSE\" and recs[0][\"kind\"] == \"unmodeled\"'" ;;
+  hse-declared)
+    hse='python "import System; B = System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance; g = self.Machine[\"sysbus.rcc\"]; i = g.GetType().GetField(\"inner\", B).GetValue(g); print(\"HSE guard=\" + str(g.HseFrequency) + \" stock=\" + str(i.GetType().GetField(\"hseFrequency\", B).GetValue(i)))"'
+    PLATFORM_SED='s/^    hseFrequency: 8000000$/    hseFrequency: 16000000/' run_case hse-declared hse-on "$hse" "$run" 'echo "TVIBURI-MARK-AFTER"' "$after"
+    check "hse-declared: with 16 MHz declared the same start passes, and 16 MHz reaches the guard and the owned stock RCC (usart-idlehse computes 64 MHz from it)" \
+      "[ \$rc = 0 ] && grep -qx 'CHECK PASS' '$work/hse-declared.stdout' && grep -q 'HSE guard=16000000 stock=16000000' '$work/hse-declared/renode.out' && console hse-declared | grep -A1 -x TVIBURI-MARK-AFTER | tail -n1 | grep -qx 0xAF7E0002" ;;
+  adc)
+    run_case adc adc "$run" 'echo "TVIBURI-MARK-AFTER"' "$after"
+    check "adc: the armed Sentinel-03 run's refused RCC writes, in its values (ADC12EN, ADC3EN; ADC12LPEN, ADC3LPEN, USART2LPEN, TIM1LPEN cleared) pass with no record (TVI-WO-1300b (3), ruled Q1)" \
+      "[ \$rc = 0 ] && grep -qx 'CHECK PASS' '$work/adc.stdout' && console adc | grep -A1 -x TVIBURI-MARK-AFTER | tail -n1 | grep -qx 0xAF7E0002" ;;
+  rtcen)
+    run_case rtcen rtcen "$run" 'echo "TVIBURI-MARK-AFTER"' "$after" 'echo "R-BDCR0"' 'sysbus ReadDoubleWord 0x20000108' 'echo "R-BKP"' 'sysbus ReadDoubleWord 0x2000010C' 'echo "R-BDCR1"' 'sysbus ReadDoubleWord 0x20000110'
+    check "rtcen: RCC_BDCR.RTCEN reads 0 at construction (p427); ArduPilot's set_rtc_backup order (BDCR written 0, an RTC backup register, RTCEN written 1) passes with no record; the BDCR write of 0 leaves rtc unlocked (its backup register reads back: RTCAPBEN = 1, p471); RTCEN reads 1 after (TVI-WO-1300b (5), ruled Q4)" \
+      "[ \$rc = 0 ] && grep -qx 'CHECK PASS' '$work/rtcen.stdout' && console rtcen | grep -A1 -x TVIBURI-MARK-AFTER | tail -n1 | grep -qx 0xAF7E0002 && console rtcen | grep -A1 -x R-BDCR0 | tail -n1 | grep -qx 0x00000000 && console rtcen | grep -A1 -x R-BKP | tail -n1 | grep -qx 0xA5A50001 && console rtcen | grep -A1 -x R-BDCR1 | tail -n1 | grep -qx 0x00008000" ;;
+  rtcen-reset)
+    run_case rtcen-reset - 'echo "R-0"' 'sysbus ReadDoubleWord 0x58024470' 'sysbus WriteDoubleWord 0x58024470 0x00008000' 'machine Reset' 'echo "R-RESET"' 'sysbus ReadDoubleWord 0x58024470' \
+      'sysbus WriteDoubleWord 0x58024470 0x00000000' 'sysbus WriteDoubleWord 0x58004054 0x5A5A0002' 'echo "R-0B"' 'sysbus ReadDoubleWord 0x58024470' 'echo "R-BKP"' 'sysbus ReadDoubleWord 0x58004054'
+    check "rtcen-reset: RTCEN reads 0 at construction, is kept across machine Reset (p427: only a backup domain reset clears it), and written back to 0 it reads 0 while rtc stays unlocked (its backup register reads back), with no record" \
+      "[ \$rc = 0 ] && grep -qx 'CHECK PASS' '$work/rtcen-reset.stdout' && console rtcen-reset | grep -A1 -x R-0 | tail -n1 | grep -qx 0x00000000 && console rtcen-reset | grep -A1 -x R-RESET | tail -n1 | grep -qx 0x00008000 && console rtcen-reset | grep -A1 -x R-0B | tail -n1 | grep -qx 0x00000000 && console rtcen-reset | grep -A1 -x R-BKP | tail -n1 | grep -qx 0x5A5A0002" ;;
   *) echo "unknown case $t" >&2; exit 2 ;;
   esac
 done

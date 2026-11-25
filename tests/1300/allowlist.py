@@ -48,6 +48,12 @@ ACKED_RSTR = (None, 4, 'reserved: no flop on either side; written 1 by all-ones 
 ACKED[('RCC_RSR', 'Reserved', 18)] = ([0, 1], 5, 'reserved, reset 1 by the register\'s 0x00FE0000: written 0 with RMVF, ignored by both')
 for reg, f in (('RCC_AHB1LPENR', 'DMA2LPEN'), ('RCC_AHB2LPENR', 'RNGLPEN'), ('RCC_APB1LLPENR', 'SPI2LPEN'), ('RCC_APB2LPENR', 'SPI1LPEN')):
     ACKED[(reg, f)] = ([0, 1], 6, 'the twin does not model CSleep: the clock runs while the CPU sleeps, whatever this bit says (backlog)')
+# TVI-WO-1300b (3), ruled 2026-11-25T03:03Z Q1: the armed Sentinel-03 run's four LPEN clears, acknowledged by name, those four only,
+# with A6's reason (the release resolves an acknowledgement by its A-number: tools/tviburi-release `acknowledgement`)
+RULED_1300B = '(TVI-WO-1300b, ruled 2026-11-25T03:03Z Q1)'
+ACKED_1300B = {(reg, f): ([0, 1], 'the twin does not model CSleep: the clock runs while the CPU sleeps, whatever this bit says (backlog) '
+                                  '(TVI-WO-1300 A6; extended to this bit by TVI-WO-1300b, ruled 2026-11-25T03:03Z Q1)')
+               for reg, f in (('RCC_AHB1LPENR', 'ADC12LPEN'), ('RCC_AHB4LPENR', 'ADC3LPEN'), ('RCC_APB1LLPENR', 'USART2LPEN'), ('RCC_APB2LPENR', 'TIM1LPEN'))}
 GUARD_ANY = {('RCC_PLLCKSELR', f) for f in ('PLLSRC[1:0]', 'DIVM1[5:0]', 'DIVM2[5:0]', 'DIVM3[5:0]')} | \
     {('RCC_PLLCFGR', f'DIV{o}{n}EN') for o in 'PQR' for n in '123'}
 
@@ -100,10 +106,10 @@ def build():
             if base in SIX:
                 cls, allowed, behaves = 'guard', None, "the guard's copy and the stock bus enable; the kernel clock query"
             elif base in ('ADC12EN', 'ADC3EN'):
-                # ruled 2026-11-23 17:52Z (TVI-WO-1300a): the ADC's clock is chosen by ADCx_CCR.CKMODE, which the RCC guard cannot see
-                cls, allowed, behaves = 'kernel-unmodeled', [0], ('disabled: the ADC clock is chosen by ADCx_CCR.CKMODE[1:0] (p920), an ADC register '
-                    'the RCC guard cannot see: adc_sclk unless CKMODE = 00, else the kernel clock ADCSEL selects (p419); unmodeled until an ADC guard '
-                    'reads CKMODE')
+                # TVI-WO-1300b (3), ruled 2026-11-25T03:03Z Q1 (superseding 1300a's 17:52Z): the bus enable only
+                cls, allowed, behaves = 'inherited', None, ("the guard's copy; the stock bus enable (" + sk + "): the bus lock only. The ADC's kernel "
+                    'clock is not modeled: it is chosen by ADCx_CCR.CKMODE[1:0] (p920), an ADC register the RCC guard cannot see (adc_sclk unless '
+                    'CKMODE = 00, else the kernel clock ADCSEL selects, p419), and the ADC is unguarded (an ADC guard\'s row) ' + RULED_1300B)
             elif base in EXTRA_KERNEL or 'kernel clock' in (r[8] if len(r) > 8 else ''):
                 cls, allowed, behaves = 'kernel-unmodeled', [0], 'disabled: a kernel-clocked peripheral the query does not cover (TVI-WO-1300 (4))'
             elif sk in ('computed-read',):
@@ -118,8 +124,18 @@ def build():
             cls, allowed, behaves = 'tag', [rv], 'its reset value (stock ' + sk + ')'
         if (reg, field) == ('RCC_CFGR', 'SW[2:0]'):
             cls, allowed, behaves = 'inherited', [0, 1, 2, 3], 'the stock model (stored+callback); 100-111 are reserved (p393), and the stock model keeps the old value'
+        elif (reg, field) == ('RCC_BDCR', 'RTCEN'):
+            # TVI-WO-1300b (5), ruled 2026-11-25T03:03Z Q4
+            cls, allowed, behaves = 'inherited', [0, 1], ('the guard\'s copy, served on read: 0 from construction (a backup domain reset, p427, '
+                'p334), kept across a machine reset (p427); it gates rtc_ck only (p366), which has no source while RTCSEL = 00 ("No clock", p427), '
+                'and the RTC\'s registers follow RCC_APB4ENR.RTCAPBEN (p471), so `rtc` is never locked by it; RCC_BDCR\'s write protection '
+                '(PWR_CR1.DBP, p427) is not modeled: the twin\'s PWR is a canned stub that reads DBP = 1 (acknowledged by name) (TVI-WO-1300b, '
+                'ruled 2026-11-25T03:03Z Q4)')
         elif reg == 'RCC_BDCR' and acc not in ('r', '-') and field != 'Reserved':
-            cls, allowed, behaves = 'inherited', [rv or 0], 'its reset value only: RCC_BDCR is write-protected after a system reset until PWR_CR1.DBP = 1 (p427), which the twin does not model, and the RTC\'s kernel clock (RTCSEL, RTCEN) is not modeled'
+            cls, allowed, behaves = 'inherited', [rv or 0], 'its reset value only: RCC_BDCR is write-protected after a system reset until PWR_CR1.DBP = 1 (p427), which the twin does not model, and the RTC\'s kernel clock (RTCSEL) is not modeled'
+        if (reg, field) in ACKED_1300B:
+            allowed, why = ACKED_1300B[(reg, field)]
+            cls, behaves = 'acknowledged', why
         ack = ACKED.get((reg, field)) or ACKED.get((reg, field, msb)) or (ACKED_RSTR if reg.endswith('RSTR') and field == 'Reserved' else None)
         if ack:
             allowed, a, why = ack

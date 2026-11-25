@@ -21,8 +21,20 @@
 // a write is dropped and a read returns 0, as p373 says for the write ("A write access will be ignored"). The stock model
 // starts every peripheral enabled, and the bus's lock survives a reset; neither stands (measured, TVI-WO-1300a.measure.md
 // §1.1). A guarded peripheral registered here (an SPI guard) stays unlocked on the bus: its own guard asks this guard for
-// its enable at every access and refuses by name (TVI-SPI-ENABLE). `rtc` locks only through RCC_BDCR.RTCEN, which the
-// guard does not copy (a row).
+// its enable at every access and refuses by name (TVI-SPI-ENABLE).
+//
+// RTCEN (TVI-WO-1300b (5); ruled 2026-11-25T03:03Z Q4): RCC_BDCR.RTCEN is served from the guard's copy, 0 at construction (a
+// power-on is a backup domain reset: "Reset value: 0x0000 0000, reset by Backup domain reset", p427; §8.4.6 p334) and kept
+// across a machine reset ("Any other internal or external reset will not have any effect on these bits", p427). A write of
+// 0 or 1 is taken into the copy. RTCEN gates rtc_ck only; the RTC's registers are gated by RCC_APB4ENR.RTCAPBEN (p366,
+// p471: 1 at reset, and its row holds it there), so `rtc` is never locked: the stock model, which locks `rtc` while its
+// RTCEN is 0, is always written RTCEN = 1. Safe while RTCSEL is held at 00 ("No clock", p427) by its row: rtc_ck then has
+// no source whatever RTCEN says. RCC_BDCR's write protection (PWR_CR1.DBP, p427) is not modeled: the twin's PWR is a
+// canned stub that always reads DBP = 1 (acknowledged by name).
+//
+// The HSE (TVI-WO-1300b (4); ruled Q3): the HSE's frequency is the platform's `hseFrequency`, and nothing else. A platform
+// that declares none has no HSE frequency (HseFrequency is null, never 8 MHz and never 0), and TVI-RCC-HSE refuses the
+// write that starts the HSE, from which every HSE-derived clock would follow (invariant 6).
 //
 // Rules, in the order they are evaluated. A refused access is not passed to the stock model.
 //   TVI-LOAD        (Records) the model version could not be computed: every access refuses.
@@ -30,6 +42,10 @@
 //                   for which alone §8.7 states "word, half-word and byte access" (p427, p429, p450). Those three take
 //                   sub-word accesses, each checked as the 32-bit word it makes. Both firmwares use only 32-bit (§4).
 //   TVI-RCC-READ    a read of an offset with no register (Table 84, p496-505).
+//   TVI-RCC-HSE     (TVI-WO-1300b (4)) a CR write that sets HSEON on a platform that declares no hseFrequency: the twin
+//                   cannot say what the HSE runs at (p384, HSEON; §8.5.2 p339, the HSE is an external crystal or clock).
+//                   unmodeled. Every HSE-derived clock needs HSEON: SW = HSE is TVI-RCC-SW's, a PLL from the HSE is
+//                   TVI-RCC-PLL-REF's, and per_ck on hse_ck does not run in the query.
 //   TVI-RCC-PLL     a write silicon ignores because a PLL is on: PLLSRC with any PLL on (p399), DIVMx with PLLx on
 //                   (p398-399), DIVPx/DIVQx/DIVRxEN with PLLx on (p400-401), RCC_PLLxDIVR changed with PLLx on (p403-410;
 //                   TVI-WO-1300a). predicted-fault. Silicon blocks these writes, so no clock is lost by them.
@@ -46,7 +62,8 @@
 //                   DIVM1 = 0, divides by zero). unmodeled.
 //   TVI-RCC-FIELD   the allow-list (`Fields`): a write that gives any field a value the model does not implement,
 //                   or a write to an offset with no register. unmodeled.
-//   TVI-RCC-CLOCK   (TVI-WO-1300a (3)) a write after which a guarded peripheral that runs (an SPI with SPE = 1) loses the
+//   TVI-RCC-CLOCK   (TVI-WO-1300a (3); 1300b (2)) a write after which a guarded peripheral that runs (an SPI with SPE = 1, or a
+//                   USART guard with UE = 1, ruled 2026-11-25T03:03Z Q2) loses the
 //                   kernel clock it had, by the query on the state the write leaves: a source oscillator or PLLxON cleared,
 //                   a selector or CKPERSEL changed so that its mux waits (p371-372), or the peripheral's own PERxEN cleared
 //                   (Table 62, p376). predicted-fault (p371: "no clock will be provided to the peripheral"). A clear silicon
@@ -77,12 +94,16 @@ namespace Antmicro.Renode.Peripherals.Tviburi
         // The stock entry's constructor arguments (stm32h7.repl: `systick: nvic`); the defaults are the stock model's.
         // Every property the stock entry takes is the stock model's, passed through: a consumer sets hseFrequency (or
         // csiFrequency) on this entry, never on the cancelled `rcc` (RUL-09 (b); TVI-WO-1300.rm0433.md §6.4).
-        public GuardedSTM32H7_RCC(IMachine machine, IHasDivisibleFrequency systick = null, ulong hseFrequency = 8000000,
+        // hseFrequency has no default (TVI-WO-1300b (4)): the stock model's 8 MHz is not taken. The owned stock RCC is given 0
+        // for "none", which it can reach only after TVI-RCC-HSE has fired, in recorded mode. Then sys_ck on the HSE (SW = 010,
+        // or PLL1 from the HSE) gives the stock model's systick 0 Hz, which Renode refuses by throwing: the recorded run stops
+        // there, after the HSE record, so it fails closed (TVI-WO-1300b adversarial A2; read in the stock source, not run).
+        public GuardedSTM32H7_RCC(IMachine machine, IHasDivisibleFrequency systick = null, ulong? hseFrequency = null,
             ulong csiFrequency = 4000000, string mode = Records.Enforcing)
         {
-            HseFrequency = hseFrequency;
+            HseFrequency = hseFrequency == 0 ? null : hseFrequency;   // 0 Hz is no frequency: declared 0 is none (1300b adversarial)
             CsiFrequency = csiFrequency;
-            inner = new STM32H7_RCC(machine, systick, hseFrequency, csiFrequency);
+            inner = new STM32H7_RCC(machine, systick, hseFrequency ?? 0, csiFrequency);
             host = machine;
             records = new Records(machine, this, nameof(GuardedSTM32H7_RCC), mode);
             muxes = new[] { PerMux, SpiMux, I2cMux, UsartMux, Usart2Mux, RngMux }.Select(m => new MuxState(m)).ToArray();
@@ -91,8 +112,9 @@ namespace Antmicro.Renode.Peripherals.Tviburi
 
         public long Size => 0x400;
 
-        // The constructor arguments the owned stock RCC was built with, so a test can show which reached it.
-        public ulong HseFrequency { get; }
+        // The platform's constructor arguments, so a test can show which reached the guard. HseFrequency is null when the
+        // platform declares none: a reader of it (the flash and USART guards) has no HSE frequency then.
+        public ulong? HseFrequency { get; }
         public ulong CsiFrequency { get; }
 
         public void Reset()
@@ -114,6 +136,10 @@ namespace Antmicro.Renode.Peripherals.Tviburi
             {
                 guarded[registrationPoint.Name.ToString().ToLowerInvariant()] = spi;
             }
+            if(peripheral is GuardedSTM32F7_USART usart)
+            {
+                watched[registrationPoint.Name.ToString().ToLowerInvariant()] = usart;   // watched, never unlocked (1300b (2))
+            }
             SyncEnables();
         }
 
@@ -125,13 +151,18 @@ namespace Antmicro.Renode.Peripherals.Tviburi
                 guarded.Remove(key);
                 host.SystemBus.SetPeripheralEnabled(peripheral, true);
             }
+            foreach(var key in watched.Where(w => w.Value == peripheral).Select(w => w.Key).ToArray())
+            {
+                watched.Remove(key);
+                host.SystemBus.SetPeripheralEnabled(peripheral, true);   // reachable, so its own guard refuses it (not held)
+            }
         }
 
-        // Whether this guard holds `spi` registered under `name`: only then does it keep it unlocked and watch its clock
-        // (TVI-RCC-CLOCK), so an SPI guard that is not held refuses rather than run unwatched.
-        public bool Holds(string name, IPeripheral spi)
+        // Whether this guard holds `p` (an SPI or USART guard) registered under `name`: only then does it watch its clock
+        // (TVI-RCC-CLOCK), and keep an SPI unlocked, so a guard that is not held refuses rather than run unwatched.
+        public bool Holds(string name, IPeripheral p)
         {
-            return name != null && guarded.TryGetValue(name, out var g) && g == spi;
+            return name != null && ((guarded.TryGetValue(name, out var g) && g == p) || (watched.TryGetValue(name, out var u) && u == p));
         }
 
         // Whether P's bus-clock enable is set in the guard's copy, for P's own guard (TVI-SPI-ENABLE). False when the
@@ -356,6 +387,10 @@ namespace Antmicro.Renode.Peripherals.Tviburi
         // What a read returns: the copy's bits for a copied register, the stock model's for the rest.
         private uint Served(long b)
         {
+            if(b == BdcrOffset)
+            {
+                return (inner.ReadDoubleWord(b) & ~BdcrRtcen) | rtcen;
+            }
             if(copies.TryGetValue(b, out var c))
             {
                 var mask = CopyMask(b);
@@ -379,12 +414,17 @@ namespace Antmicro.Renode.Peripherals.Tviburi
                 return true;
             }
             var b = Base(offset);
-            return RefusedPll(b, value) || RefusedPllReference(b, value) || RefusedSwitch(b, value) || RefusedField(offset, b, value)
-                || RefusedClockLoss(offset, b, value);
+            return RefusedHse(b, value) || RefusedPll(b, value) || RefusedPllReference(b, value) || RefusedSwitch(b, value)
+                || RefusedField(offset, b, value) || RefusedClockLoss(offset, b, value);
         }
 
         private void Pass(long b, uint value)
         {
+            if(b == BdcrOffset)
+            {
+                rtcen = value & BdcrRtcen;   // the copy; the stock model's RTCEN is kept at 1, so `rtc` stays unlocked (p471)
+                value |= BdcrRtcen;
+            }
             if(copies.ContainsKey(b))
             {
                 copies[b] = value;
@@ -427,6 +467,20 @@ namespace Antmicro.Renode.Peripherals.Tviburi
         }
 
         // ---- rules ---------------------------------------------------------------------------------------------
+
+        // TVI-RCC-HSE (TVI-WO-1300b (4); ruled 2026-11-25T03:03Z Q3): the HSE started on a platform that declares no frequency.
+        private bool RefusedHse(long b, uint value)
+        {
+            if(b != CrOffset || HseFrequency != null || (value & CrHseon) == 0 || (inner.ReadDoubleWord(CrOffset) & CrHseon) != 0)
+            {
+                return false;   // the start only: in recorded mode a later CR write that keeps HSEON is judged by the other rules
+            }
+            records.Refuse("TVI-RCC-HSE", Unmodeled, "RCC_CR", "RCC_CR.HSEON (bit 16) = 1",
+                "the HSE started on a platform that declares no hseFrequency: the twin cannot say what the HSE runs at, so no clock derived from it is modeled (no default is taken)",
+                "RM0433 Rev 9 §8.7.2 p384 (HSEON); §8.5.2 p339 (the HSE: an external crystal or a user external clock); TVI-WO-1300b (4), ruled 2026-11-25T03:03Z Q3",
+                State(), b, value, 32);
+            return true;
+        }
 
         private bool RefusedPll(long b, uint value)
         {
@@ -584,7 +638,8 @@ namespace Antmicro.Renode.Peripherals.Tviburi
         // muxes settle (p371). A transition only: a peripheral that runs without a clock was refused at its start.
         private bool RefusedClockLoss(long offset, long b, uint value)
         {
-            var running = guarded.Where(g => g.Value.Started && QueryKernelClock(g.Key).Running).Select(g => g.Key).ToArray();
+            var running = guarded.Where(g => g.Value.Started).Select(g => g.Key).Concat(watched.Where(w => w.Value.UeSet).Select(w => w.Key))
+                .Where(p => QueryKernelClock(p).Running).ToArray();
             if(running.Length == 0)
             {
                 return false;
@@ -636,9 +691,10 @@ namespace Antmicro.Renode.Peripherals.Tviburi
             var written = b == CrOffset ? KeptCr(value) : value;
             var changed = Fields.Where(f => f.Offset == b && f.Class != "read-only" && f.Class != "reserved" && f.Of(old) != f.Of(written)).Select(f => f.Register + "." + f.Name + " (" + f.Bits + ") = " + f.Format(f.Of(written)));
             records.Refuse("TVI-RCC-CLOCK", PredictedFault, RegisterAt(offset), string.Join(", ", changed),
-                lost + " is enabled (SPE = 1) and this write stops its kernel clock: " + after.Condition,
+                lost + " is enabled (" + (watched.ContainsKey(lost) ? "UE" : "SPE") + " = 1) and this write stops its kernel clock: " + after.Condition,
                 (after.Condition.Contains("has not switched") ? "RM0433 Rev 9 §8.5.10 p371 (\"no clock will be provided to the peripheral\"); " : "RM0433 Rev 9 ")
-                    + after.Citation.Substring("RM0433 Rev 9 ".Length),
+                    + after.Citation.Substring("RM0433 Rev 9 ".Length)
+                    + (watched.ContainsKey(lost) ? "; §48.5.1 p2019 (\"The usart_ker_ck is the USART clock source\")" : ""),
                 State(), offset, value, 32);
             return true;
         }
@@ -949,6 +1005,7 @@ namespace Antmicro.Renode.Peripherals.Tviburi
         private const uint CrCsion = 1u << 7;
         private const uint CrHsi48on = 1u << 12;
         private const uint CrHseon = 1u << 16;
+        private const uint BdcrRtcen = 1u << 15;
         private const string Unmodeled = "unmodeled";
         private const string PredictedFault = "predicted-fault";
 
@@ -956,6 +1013,11 @@ namespace Antmicro.Renode.Peripherals.Tviburi
         private readonly IMachine host;
         // The guarded peripherals registered here, by their alias's name (spi1): kept unlocked; asked whether they run.
         private readonly Dictionary<string, GuardedSTM32H7_SPI> guarded = new Dictionary<string, GuardedSTM32H7_SPI>();
+        // The USART guards registered here, by their alias's name (usart1): asked whether UE = 1, never unlocked (they rely on
+        // the bus lock for their enable; TVI-WO-1300b (2)).
+        private readonly Dictionary<string, GuardedSTM32F7_USART> watched = new Dictionary<string, GuardedSTM32F7_USART>();
+        // RCC_BDCR.RTCEN as silicon holds it: 0 at construction (a backup domain reset), never reset by Reset() (p427).
+        private uint rtcen;
         // RCC_PLLxDIVR as last written, at the reset value p403-410 give: TVI-RCC-PLL refuses a write that differs from it and
         // from what the stock model reads back, which drops the top bit of each PLL2/3 field (a read-modify-write is no change).
         private readonly Dictionary<long, uint> divr = new Dictionary<long, uint> { [Pll1divrOffset] = DivrReset, [Pll1divrOffset + 8] = DivrReset, [Pll1divrOffset + 16] = DivrReset };
@@ -1221,17 +1283,17 @@ namespace Antmicro.Renode.Peripherals.Tviburi
             R("RCC_CICR", 0x068, "§8.7.25", "LSERDYC", 1, 1, Zero, "tag", "its reset value (stock tag)", 426),
             R("RCC_CICR", 0x068, "§8.7.25", "LSIRDYC", 0, 0, Zero, "tag", "its reset value (stock tag)", 426),
             R("RCC_BDCR", 0x070, "§8.7.26", "Res31_17", 31, 17, Zero, "reserved", "reserved: dropped, reads its reset value", 427),
-            R("RCC_BDCR", 0x070, "§8.7.26", "BDRST", 16, 16, Zero, "inherited, unaudited (acknowledged by name)", "its reset value only: RCC_BDCR is write-protected after a system reset until PWR_CR1.DBP = 1 (p427), which the twin does not model, and the RTC's kernel clock (RTCSEL, RTCEN) is not modeled", 427),
-            R("RCC_BDCR", 0x070, "§8.7.26", "RTCEN", 15, 15, Zero, "inherited, unaudited (acknowledged by name)", "its reset value only: RCC_BDCR is write-protected after a system reset until PWR_CR1.DBP = 1 (p427), which the twin does not model, and the RTC's kernel clock (RTCSEL, RTCEN) is not modeled", 427),
+            R("RCC_BDCR", 0x070, "§8.7.26", "BDRST", 16, 16, Zero, "inherited, unaudited (acknowledged by name)", "its reset value only: RCC_BDCR is write-protected after a system reset until PWR_CR1.DBP = 1 (p427), which the twin does not model, and the RTC's kernel clock (RTCSEL) is not modeled", 427),
+            R("RCC_BDCR", 0x070, "§8.7.26", "RTCEN", 15, 15, new uint[] { 0, 1 }, "inherited, unaudited (acknowledged by name)", "the guard's copy, served on read: 0 from construction (a backup domain reset, p427, p334), kept across a machine reset (p427); it gates rtc_ck only (p366), which has no source while RTCSEL = 00 (\"No clock\", p427), and the RTC's registers follow RCC_APB4ENR.RTCAPBEN (p471), so `rtc` is never locked by it; RCC_BDCR's write protection (PWR_CR1.DBP, p427) is not modeled: the twin's PWR is a canned stub that reads DBP = 1 (acknowledged by name) (TVI-WO-1300b, ruled 2026-11-25T03:03Z Q4)", 427),
             R("RCC_BDCR", 0x070, "§8.7.26", "Res14_10", 14, 10, Zero, "reserved", "reserved: dropped, reads its reset value", 427),
-            R("RCC_BDCR", 0x070, "§8.7.26", "RTCSEL", 9, 8, Zero, "inherited, unaudited (acknowledged by name)", "its reset value only: RCC_BDCR is write-protected after a system reset until PWR_CR1.DBP = 1 (p427), which the twin does not model, and the RTC's kernel clock (RTCSEL, RTCEN) is not modeled", 427),
+            R("RCC_BDCR", 0x070, "§8.7.26", "RTCSEL", 9, 8, Zero, "inherited, unaudited (acknowledged by name)", "its reset value only: RCC_BDCR is write-protected after a system reset until PWR_CR1.DBP = 1 (p427), which the twin does not model, and the RTC's kernel clock (RTCSEL) is not modeled", 427),
             R("RCC_BDCR", 0x070, "§8.7.26", "Res7", 7, 7, Zero, "reserved", "reserved: dropped, reads its reset value", 427),
             R("RCC_BDCR", 0x070, "§8.7.26", "LSECSSD", 6, 6, Any, "read-only", "ignored (read-only; stock tag)", 428),
-            R("RCC_BDCR", 0x070, "§8.7.26", "LSECSSON", 5, 5, Zero, "inherited, unaudited (acknowledged by name)", "its reset value only: RCC_BDCR is write-protected after a system reset until PWR_CR1.DBP = 1 (p427), which the twin does not model, and the RTC's kernel clock (RTCSEL, RTCEN) is not modeled", 428),
-            R("RCC_BDCR", 0x070, "§8.7.26", "LSEDRV", 4, 3, Zero, "inherited, unaudited (acknowledged by name)", "its reset value only: RCC_BDCR is write-protected after a system reset until PWR_CR1.DBP = 1 (p427), which the twin does not model, and the RTC's kernel clock (RTCSEL, RTCEN) is not modeled", 428),
-            R("RCC_BDCR", 0x070, "§8.7.26", "LSEBYP", 2, 2, Zero, "inherited, unaudited (acknowledged by name)", "its reset value only: RCC_BDCR is write-protected after a system reset until PWR_CR1.DBP = 1 (p427), which the twin does not model, and the RTC's kernel clock (RTCSEL, RTCEN) is not modeled", 428),
+            R("RCC_BDCR", 0x070, "§8.7.26", "LSECSSON", 5, 5, Zero, "inherited, unaudited (acknowledged by name)", "its reset value only: RCC_BDCR is write-protected after a system reset until PWR_CR1.DBP = 1 (p427), which the twin does not model, and the RTC's kernel clock (RTCSEL) is not modeled", 428),
+            R("RCC_BDCR", 0x070, "§8.7.26", "LSEDRV", 4, 3, Zero, "inherited, unaudited (acknowledged by name)", "its reset value only: RCC_BDCR is write-protected after a system reset until PWR_CR1.DBP = 1 (p427), which the twin does not model, and the RTC's kernel clock (RTCSEL) is not modeled", 428),
+            R("RCC_BDCR", 0x070, "§8.7.26", "LSEBYP", 2, 2, Zero, "inherited, unaudited (acknowledged by name)", "its reset value only: RCC_BDCR is write-protected after a system reset until PWR_CR1.DBP = 1 (p427), which the twin does not model, and the RTC's kernel clock (RTCSEL) is not modeled", 428),
             R("RCC_BDCR", 0x070, "§8.7.26", "LSERDY", 1, 1, Any, "read-only", "ignored (read-only; stock computed-read)", 428),
-            R("RCC_BDCR", 0x070, "§8.7.26", "LSEON", 0, 0, Zero, "inherited, unaudited (acknowledged by name)", "its reset value only: RCC_BDCR is write-protected after a system reset until PWR_CR1.DBP = 1 (p427), which the twin does not model, and the RTC's kernel clock (RTCSEL, RTCEN) is not modeled", 428),
+            R("RCC_BDCR", 0x070, "§8.7.26", "LSEON", 0, 0, Zero, "inherited, unaudited (acknowledged by name)", "its reset value only: RCC_BDCR is write-protected after a system reset until PWR_CR1.DBP = 1 (p427), which the twin does not model, and the RTC's kernel clock (RTCSEL) is not modeled", 428),
             R("RCC_CSR", 0x074, "§8.7.27", "Res31_2", 31, 2, Zero, "reserved", "reserved: dropped, reads its reset value", 429),
             R("RCC_CSR", 0x074, "§8.7.27", "LSIRDY", 1, 1, Any, "read-only", "ignored (read-only; stock computed-read)", 429),
             R("RCC_CSR", 0x074, "§8.7.27", "LSION", 0, 0, Any, "inherited, unaudited (acknowledged by name)", "the stock model (stored): stored (local var)", 429),
@@ -1432,7 +1494,7 @@ namespace Antmicro.Renode.Peripherals.Tviburi
             R("RCC_AHB1ENR", 0x0D8, "§8.7.41", "ETH1TXEN", 16, 16, Any, "inherited, unaudited (acknowledged by name)", "the guard's copy; the stock bus enable (computed-read)", 455),
             R("RCC_AHB1ENR", 0x0D8, "§8.7.41", "ETH1MACEN", 15, 15, Any, "inherited, unaudited (acknowledged by name)", "the guard's copy; the stock bus enable (computed-read)", 455),
             R("RCC_AHB1ENR", 0x0D8, "§8.7.41", "Res14_6", 14, 6, Zero, "reserved", "reserved: dropped, reads its reset value", 455),
-            R("RCC_AHB1ENR", 0x0D8, "§8.7.41", "ADC12EN", 5, 5, Zero, "inherited, unaudited (acknowledged by name)", "disabled: the ADC clock is chosen by ADCx_CCR.CKMODE[1:0] (p920), an ADC register the RCC guard cannot see: adc_sclk unless CKMODE = 00, else the kernel clock ADCSEL selects (p419); unmodeled until an ADC guard reads CKMODE", 455),
+            R("RCC_AHB1ENR", 0x0D8, "§8.7.41", "ADC12EN", 5, 5, Any, "inherited, unaudited (acknowledged by name)", "the guard's copy; the stock bus enable (computed-read): the bus lock only. The ADC's kernel clock is not modeled: it is chosen by ADCx_CCR.CKMODE[1:0] (p920), an ADC register the RCC guard cannot see (adc_sclk unless CKMODE = 00, else the kernel clock ADCSEL selects, p419), and the ADC is unguarded (an ADC guard's row) (TVI-WO-1300b, ruled 2026-11-25T03:03Z Q1)", 455),
             R("RCC_AHB1ENR", 0x0D8, "§8.7.41", "Res4_2", 4, 2, Zero, "reserved", "reserved: dropped, reads its reset value", 455),
             R("RCC_AHB1ENR", 0x0D8, "§8.7.41", "DMA2EN", 1, 1, Any, "inherited, unaudited (acknowledged by name)", "the guard's copy; the stock bus enable (computed-read)", 455),
             R("RCC_AHB1ENR", 0x0D8, "§8.7.41", "DMA1EN", 0, 0, Any, "inherited, unaudited (acknowledged by name)", "the guard's copy; the stock bus enable (computed-read)", 455),
@@ -1451,7 +1513,7 @@ namespace Antmicro.Renode.Peripherals.Tviburi
             R("RCC_AHB4ENR", 0x0E0, "§8.7.43", "BKPRAMEN", 28, 28, Any, "inherited, unaudited (acknowledged by name)", "the guard's copy; the stock bus enable (computed-read)", 458),
             R("RCC_AHB4ENR", 0x0E0, "§8.7.43", "Res27_26", 27, 26, Zero, "reserved", "reserved: dropped, reads its reset value", 458),
             R("RCC_AHB4ENR", 0x0E0, "§8.7.43", "HSEMEN", 25, 25, Any, "inherited, unaudited (acknowledged by name)", "the guard's copy; the stock bus enable (computed-read)", 458),
-            R("RCC_AHB4ENR", 0x0E0, "§8.7.43", "ADC3EN", 24, 24, Zero, "inherited, unaudited (acknowledged by name)", "disabled: the ADC clock is chosen by ADCx_CCR.CKMODE[1:0] (p920), an ADC register the RCC guard cannot see: adc_sclk unless CKMODE = 00, else the kernel clock ADCSEL selects (p419); unmodeled until an ADC guard reads CKMODE", 458),
+            R("RCC_AHB4ENR", 0x0E0, "§8.7.43", "ADC3EN", 24, 24, Any, "inherited, unaudited (acknowledged by name)", "the guard's copy; the stock bus enable (computed-read): the bus lock only. The ADC's kernel clock is not modeled: it is chosen by ADCx_CCR.CKMODE[1:0] (p920), an ADC register the RCC guard cannot see (adc_sclk unless CKMODE = 00, else the kernel clock ADCSEL selects, p419), and the ADC is unguarded (an ADC guard's row) (TVI-WO-1300b, ruled 2026-11-25T03:03Z Q1)", 458),
             R("RCC_AHB4ENR", 0x0E0, "§8.7.43", "Res23_22", 23, 22, Zero, "reserved", "reserved: dropped, reads its reset value", 458),
             R("RCC_AHB4ENR", 0x0E0, "§8.7.43", "BDMAEN", 21, 21, Any, "inherited, unaudited (acknowledged by name)", "the guard's copy; the stock bus enable (computed-read)", 458),
             R("RCC_AHB4ENR", 0x0E0, "§8.7.43", "Res20", 20, 20, Zero, "reserved", "reserved: dropped, reads its reset value", 458),
@@ -1579,7 +1641,7 @@ namespace Antmicro.Renode.Peripherals.Tviburi
             R("RCC_AHB1LPENR", 0x100, "§8.7.50", "ETH1TXLPEN", 16, 16, new uint[] { 1 }, "tag", "its reset value (stock tag)", 477),
             R("RCC_AHB1LPENR", 0x100, "§8.7.50", "ETH1MACLPEN", 15, 15, new uint[] { 1 }, "tag", "its reset value (stock tag)", 477),
             R("RCC_AHB1LPENR", 0x100, "§8.7.50", "Res14_6", 14, 6, new uint[] { 256 }, "reserved", "reserved: dropped, reads its reset value", 477),
-            R("RCC_AHB1LPENR", 0x100, "§8.7.50", "ADC12LPEN", 5, 5, new uint[] { 1 }, "tag", "its reset value (stock tag)", 477),
+            R("RCC_AHB1LPENR", 0x100, "§8.7.50", "ADC12LPEN", 5, 5, new uint[] { 0, 1 }, "acknowledged by name", "the twin does not model CSleep: the clock runs while the CPU sleeps, whatever this bit says (backlog) (TVI-WO-1300 A6; extended to this bit by TVI-WO-1300b, ruled 2026-11-25T03:03Z Q1)", 477),
             R("RCC_AHB1LPENR", 0x100, "§8.7.50", "Res4_2", 4, 2, Zero, "reserved", "reserved: dropped, reads its reset value", 477),
             R("RCC_AHB1LPENR", 0x100, "§8.7.50", "DMA2LPEN", 1, 1, new uint[] { 0, 1 }, "acknowledged by name", "the twin does not model CSleep: the clock runs while the CPU sleeps, whatever this bit says (backlog) (TVI-WO-1300 A6)", 477),
             R("RCC_AHB1LPENR", 0x100, "§8.7.50", "DMA1LPEN", 0, 0, new uint[] { 1 }, "tag", "its reset value (stock tag)", 477),
@@ -1598,7 +1660,7 @@ namespace Antmicro.Renode.Peripherals.Tviburi
             R("RCC_AHB4LPENR", 0x108, "§8.7.52", "SRAM4LPEN", 29, 29, new uint[] { 1 }, "tag", "its reset value (stock tag)", 480),
             R("RCC_AHB4LPENR", 0x108, "§8.7.52", "BKPRAMLPEN", 28, 28, new uint[] { 1 }, "tag", "its reset value (stock tag)", 480),
             R("RCC_AHB4LPENR", 0x108, "§8.7.52", "Res27_25", 27, 25, Zero, "reserved", "reserved: dropped, reads its reset value", 480),
-            R("RCC_AHB4LPENR", 0x108, "§8.7.52", "ADC3LPEN", 24, 24, new uint[] { 1 }, "tag", "its reset value (stock tag)", 480),
+            R("RCC_AHB4LPENR", 0x108, "§8.7.52", "ADC3LPEN", 24, 24, new uint[] { 0, 1 }, "acknowledged by name", "the twin does not model CSleep: the clock runs while the CPU sleeps, whatever this bit says (backlog) (TVI-WO-1300 A6; extended to this bit by TVI-WO-1300b, ruled 2026-11-25T03:03Z Q1)", 480),
             R("RCC_AHB4LPENR", 0x108, "§8.7.52", "Res23_22", 23, 22, Zero, "reserved", "reserved: dropped, reads its reset value", 480),
             R("RCC_AHB4LPENR", 0x108, "§8.7.52", "BDMALPEN", 21, 21, new uint[] { 1 }, "tag", "its reset value (stock tag)", 480),
             R("RCC_AHB4LPENR", 0x108, "§8.7.52", "Res20", 20, 20, Zero, "reserved", "reserved: dropped, reads its reset value", 480),
@@ -1632,7 +1694,7 @@ namespace Antmicro.Renode.Peripherals.Tviburi
             R("RCC_APB1LLPENR", 0x110, "§8.7.54", "UART5LPEN", 20, 20, new uint[] { 1 }, "tag", "its reset value (stock tag)", 485),
             R("RCC_APB1LLPENR", 0x110, "§8.7.54", "UART4LPEN", 19, 19, new uint[] { 1 }, "tag", "its reset value (stock tag)", 485),
             R("RCC_APB1LLPENR", 0x110, "§8.7.54", "USART3LPEN", 18, 18, new uint[] { 1 }, "tag", "its reset value (stock tag)", 485),
-            R("RCC_APB1LLPENR", 0x110, "§8.7.54", "USART2LPEN", 17, 17, new uint[] { 1 }, "tag", "its reset value (stock tag)", 485),
+            R("RCC_APB1LLPENR", 0x110, "§8.7.54", "USART2LPEN", 17, 17, new uint[] { 0, 1 }, "acknowledged by name", "the twin does not model CSleep: the clock runs while the CPU sleeps, whatever this bit says (backlog) (TVI-WO-1300 A6; extended to this bit by TVI-WO-1300b, ruled 2026-11-25T03:03Z Q1)", 485),
             R("RCC_APB1LLPENR", 0x110, "§8.7.54", "SPDIFRXLPEN", 16, 16, new uint[] { 1 }, "tag", "its reset value (stock tag)", 485),
             R("RCC_APB1LLPENR", 0x110, "§8.7.54", "SPI3LPEN", 15, 15, new uint[] { 1 }, "tag", "its reset value (stock tag)", 486),
             R("RCC_APB1LLPENR", 0x110, "§8.7.54", "SPI2LPEN", 14, 14, new uint[] { 0, 1 }, "acknowledged by name", "the twin does not model CSleep: the clock runs while the CPU sleeps, whatever this bit says (backlog) (TVI-WO-1300 A6)", 486),
@@ -1677,7 +1739,7 @@ namespace Antmicro.Renode.Peripherals.Tviburi
             R("RCC_APB2LPENR", 0x118, "§8.7.56", "USART1LPEN", 4, 4, new uint[] { 1 }, "tag", "its reset value (stock tag)", 492),
             R("RCC_APB2LPENR", 0x118, "§8.7.56", "Res3_2", 3, 2, Zero, "reserved", "reserved: dropped, reads its reset value", 492),
             R("RCC_APB2LPENR", 0x118, "§8.7.56", "TIM8LPEN", 1, 1, new uint[] { 1 }, "tag", "its reset value (stock tag)", 492),
-            R("RCC_APB2LPENR", 0x118, "§8.7.56", "TIM1LPEN", 0, 0, new uint[] { 1 }, "tag", "its reset value (stock tag)", 492),
+            R("RCC_APB2LPENR", 0x118, "§8.7.56", "TIM1LPEN", 0, 0, new uint[] { 0, 1 }, "acknowledged by name", "the twin does not model CSleep: the clock runs while the CPU sleeps, whatever this bit says (backlog) (TVI-WO-1300 A6; extended to this bit by TVI-WO-1300b, ruled 2026-11-25T03:03Z Q1)", 492),
             R("RCC_APB4LPENR", 0x11C, "§8.7.57", "Res31_26", 31, 26, new uint[] { 1 }, "reserved", "reserved: dropped, reads its reset value", 493),
             R("RCC_APB4LPENR", 0x11C, "§8.7.57", "Res25_22", 25, 22, Zero, "reserved", "reserved: dropped, reads its reset value", 493),
             R("RCC_APB4LPENR", 0x11C, "§8.7.57", "SAI4LPEN", 21, 21, new uint[] { 1 }, "tag", "its reset value (stock tag)", 493),

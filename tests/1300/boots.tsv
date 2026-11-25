@@ -4,11 +4,11 @@
 # make, each "peripheral | rule | kind | bit", separated by " ; ", or "none". Any other record on any boot is a §7 stop, not an edit here.
 # The nine per_ck boards are expected to refuse at SPI1 (and SPI2 on two): the scar this work order catches. Aethelgard's AET-WO-4240e
 # fixes the generator, and a later change empties their rows.
-# d1-drv8876's ADC3EN refusal is 1300's (F8), unmodeled: its ADC3 runs on adc_sclk (ADC3_CCR.CKMODE = 11, p920), which the RCC guard
-# cannot see, so the refusal names CKMODE (ruled 17:52Z); an ADC guard that reads CKMODE removes it.
+# d1-drv8876's ADC3EN refusal (1300's F8, ruled 1300a 17:52Z) is gone: the ADC enables are modeled as bus enables, the bus lock only
+# (TVI-WO-1300b (3), ruled 2026-11-25T03:03Z Q1); the ADC's kernel clock (CKMODE, p920) stays an ADC guard's row.
 # aethelgard 75da80535ef5c4d75e59d677cfc94ef00a4c753b
 ardupilot	-	rcc,spi1,spi2	none
-d1-drv8876	crates/aethelgard-ir/tests/fixtures/d1-drv8876.json	rcc	rcc | TVI-RCC-FIELD | unmodeled | RCC_AHB4ENR.ADC3EN (bit 24) = 1
+d1-drv8876	crates/aethelgard-ir/tests/fixtures/d1-drv8876.json	rcc	none
 driver-judges-nothing	crates/aethelgard-cli/tests/fixtures/driver-judges-nothing.json	rcc	none
 hse-crystal-16	crates/aethelgard-cli/tests/fixtures/hse-crystal-16.json	rcc,spi1,spi2	none
 hse-external-8	crates/aethelgard-cli/tests/fixtures/hse-external-8.json	rcc,spi1,spi2	none

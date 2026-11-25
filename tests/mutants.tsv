@@ -394,3 +394,19 @@ US65-hseRef	model/GuardedSTM32F7_USART.cs	(ck & 3) == 2 ? rcc.HseFrequency :	(ck
 US66-sysPll1	model/GuardedSTM32F7_USART.cs	var sys = sws == 0 ? hsi : sws == 3 ?	var sys = sws == 0 ? hsi : sws == 4 ?	usart-idlehse
 US67-vcoselPassed	model/GuardedSTM32F7_USART.cs	var wide = (pllcfgr >> (n == 1 ? 1 : 5) & 1) == 0;	var wide = (rcc.ReadDoubleWord(0x2C) >> (n == 1 ? 1 : 5) & 1) == 0;	usart-idlenone
 US68-divp1	model/GuardedSTM32F7_USART.cs	Vco(rcc, 1, hsi, ref why) / ((R(0x30) >> 9 & 0x7F) + 1) : null;	Vco(rcc, 1, hsi, ref why) / 2 : null;	usart-idlehse
+RB01-usartWatched	model/GuardedSTM32H7_RCC.cs	.Concat(watched.Where(w => w.Value.UeSet).Select(w => w.Key))	.Concat(new string[0])	rcc-usart-lost
+RB02-ueRunning	model/GuardedSTM32H7_RCC.cs	watched.Where(w => w.Value.UeSet)	watched.Where(w => true)	rcc-usart-stopped
+RB03-usartHeld	model/GuardedSTM32F7_USART.cs	&& rcc.Holds(name, this)))	))	rcc-usart-unheld
+RB04-hseRule	model/GuardedSTM32H7_RCC.cs	|| HseFrequency != null ||	|| true ||	rcc-hse-none
+RB05-hseDefault	model/GuardedSTM32H7_RCC.cs	ulong? hseFrequency = null,	ulong? hseFrequency = 8000000,	rcc-hse-none
+RB06-hseToStock	model/GuardedSTM32H7_RCC.cs	new STM32H7_RCC(machine, systick, hseFrequency ?? 0, csiFrequency)	new STM32H7_RCC(machine, systick, 0, csiFrequency)	rcc-hse-declared
+RB07-rtcenServed	model/GuardedSTM32H7_RCC.cs	return (inner.ReadDoubleWord(b) & ~BdcrRtcen) | rtcen;	return inner.ReadDoubleWord(b);	rcc-rtcen
+RB08-rtcStockHeld	model/GuardedSTM32H7_RCC.cs	                value |= BdcrRtcen;\n	(empty)	rcc-rtcen
+RB09-rtcenKeptOnReset	model/GuardedSTM32H7_RCC.cs	            ResetCopies();\n            SyncEnables();	            ResetCopies();\n            rtcen = 0;\n            SyncEnables();	rcc-rtcen-reset
+RB10-adc12Enable	model/GuardedSTM32H7_RCC.cs	"ADC12EN", 5, 5, Any,	"ADC12EN", 5, 5, Zero,	rcc-adc
+RB11-adc3Enable	model/GuardedSTM32H7_RCC.cs	"ADC3EN", 24, 24, Any,	"ADC3EN", 24, 24, Zero,	rcc-adc3
+RB12-tim1LpenAck	model/GuardedSTM32H7_RCC.cs	"TIM1LPEN", 0, 0, new uint[] { 0, 1 },	"TIM1LPEN", 0, 0, new uint[] { 1 },	rcc-adc
+RB13-usartCite	model/GuardedSTM32H7_RCC.cs	(watched.ContainsKey(lost) ? "; 	(false ? "; 	rcc-usart-lost-en
+RB14-usart1Mux	model/GuardedSTM32H7_RCC.cs	["usart1"] = new ClockedPeripheral(UsartMux,	["usart1"] = new ClockedPeripheral(Usart2Mux,	rcc-usart-othersel
+RB15-hseZero	model/GuardedSTM32H7_RCC.cs	HseFrequency = hseFrequency == 0 ? null : hseFrequency;	HseFrequency = hseFrequency;	rcc-hse-zero
+RB16-rtcenTaken	model/GuardedSTM32H7_RCC.cs	rtcen = value & BdcrRtcen;	rtcen = 0;	rcc-rtcen
