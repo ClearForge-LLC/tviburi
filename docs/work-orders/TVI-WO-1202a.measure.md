@@ -1,7 +1,8 @@
 # TVI-WO-1202a — the re-weigh and the six-shard plan, predicted before this PR's run
 
 **Builder:** Claude (Opus 5.5), Furnace, 2026-11-24. Written and committed before this PR's first CI run, which measures it
-(`TVI-WO-1202a.FEEDBACK.md` §2).
+(`TVI-WO-1202a.FEEDBACK.md` §2). **Ruled 2026-11-25T00:00Z (the architect): seven shards, planned against 1.53; 1.29 is
+superseded** (§4). §3 is the six-shard plan the ruling replaced, kept because this PR's first run measured it.
 
 ## 1. What was measured
 
@@ -74,3 +75,25 @@
 - **The margin.** At 1.53 the wall has none. The 7763 took 4 of the 20 shard jobs seen on these four runs, so most runs
   of six will meet one. That is a finding for the architect (FEEDBACK), not a stop: the stop condition and (2) are stated
   on the shard, and the shard meets 20 at 1.53.
+
+## 4. The ruling, and the plan built: seven shards
+
+- **The architect, 2026-11-25T00:00Z:** with six shards the target would be met by luck. GitHub's minutes cost nothing on
+  a public repository, so build seven, plan against 1.53, and name 1.29 as superseded.
+- `tools/tviburi-route plan 7 k` on the same `tests/ci/times.tsv`, predicted as in §3: 53 s of setup, unscaled, plus
+  the items times the factor.
+
+| Shard | Cases | Mutants | Items (s, at 1.00) | Job at 1.00 (min) | at 1.29 | **at 1.53** |
+|---|---|---|---|---|---|---|
+| 1 | 41 | 50 | 580 | 10.6 | 13.4 | **15.7** |
+| 2 | 43 | 53 | 580 | 10.6 | 13.4 | **15.7** |
+| 3 | 39 | 52 | 580 | 10.6 | 13.4 | **15.7** |
+| 4 | 39 | 52 | 580 | 10.6 | 13.4 | **15.7** |
+| 5 | 42 | 49 | 580 | 10.6 | 13.4 | **15.7** |
+| 6 | 44 | 49 | 580 | 10.6 | 13.4 | **15.7** |
+| 7 | 43 | 50 | 580 | 10.6 | 13.4 | **15.7** |
+
+- **Total:** 646 items, 4,061 s.
+- **`ci`'s wall, predicted:**
+  - 12.3–12.6 min with every shard on a 6975P-C;
+  - **17.4–17.7 min with a shard on a 7763 (1.53)**, which leaves 2.3–2.6 min of margin.
