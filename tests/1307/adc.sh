@@ -11,9 +11,9 @@ set -euo pipefail
 
 here=$(cd "$(dirname "$0")/../.." && pwd)
 IMAGE=$(sed -n 's/^IMAGE=//p' "$here/tests/spike.sh")
-CASES="start res12 kernel clocklost ckmode deeppwd vreg calen cfgr undeclared early res boost boostack pcsel field width half read dfsdm oneshotnone oneshot oneshotcirc internal internalok ccrack ccrother rate rate2 rccchange rccboost revy overrun overwrite setvoltage norevision badlevels registrations recorded rccreset unheld query fields ledger regen"
+CASES="start res12 kernel clocklost ckmode deeppwd vreg calen cfgr undeclared early res boost boostack pcsel field width half read dfsdm oneshotnone oneshot oneshotcirc internal internalok ccrack ccrother rate rate2 sar rccchange rccboost revy overrun overwrite setvoltage norevision badlevels registrations recorded rccreset unheld query fields ledger regen"
 GUARDS="spi1 rcc gpioPortA gpioPortB gpioPortC gpioPortD gpioPortE gpioPortF gpioPortG gpioPortH gpioPortI gpioPortJ gpioPortK timer1 timer8 dma1 dma2 flashController usart1 usart2 usart3 uart4 uart5 usart6 uart7 uart8 i2c1 i2c2 i2c3 adcM1S2 adc3"
-MONITOR="rate rate2 rccchange rccboost revy overrun overwrite setvoltage norevision badlevels registrations recorded rccreset unheld query fields ledger regen"
+MONITOR="rate rate2 sar rccchange rccboost revy overrun overwrite setvoltage norevision badlevels registrations recorded rccreset unheld query fields ledger regen"
 PATHS=$(for c in $CASES; do case " $MONITOR " in *" $c "*) ;; *) printf '"%s",' "$c" ;; esac; done | sed 's/,$//')
 scratch=${TVIBURI_SCRATCH:-$HOME/.cache/tviburi}
 mkdir -p "$scratch"
@@ -186,6 +186,15 @@ for t in ${TVIBURI_TESTS:-$CASES}; do
       "sysbus ReadDoubleWord 0x40022000" 'emulation RunFor "0.00000006"' 'echo "R-AFTER"' "sysbus ReadDoubleWord 0x40022000"
     check "rate2: on the kernel clock (CKMODE = 00, ADCSEL = pll2_p_ck 129 MHz, PRESC /4: 16.125 MHz on rev V) EOC comes at 24.558 us: not at 24.54, set at 24.60 (395.5 cycles would be 24.527 (p920, p1039; ruled Q4)" \
       "passed rate2 && [ \"\$(readout rate2 BEFORE)\" = 0x00001001 ] && [ \"\$(readout rate2 AFTER)\" = 0x0000100F ]" ;;
+  sar)
+    # The SAR time by a margin (mutant AD12): the slowest clock the guard reaches, pll2_p_ck 129 MHz / PRESC 256 / 2 (rev V) =
+    # 251,953 Hz, a 3.97 us cycle, BOOST = 00 (p1009). 387.5 + 8.5 = 396 cycles = 1,571.72 us; 395.5 would be 1,569.74 us. Probes
+    # 1 us either side: about 1 us of virtual-time margin each way (resolution 1 ns), whatever the host's speed.
+    mapfile -t s < <(on 10 0 0x2C0000 0)
+    run_case sar - "$pll2" "${s[@]}" "$(start 0)" 'emulation RunFor "0.00157072"' 'echo "R-BEFORE"' "sysbus ReadDoubleWord 0x40022000" \
+      'emulation RunFor "0.000002"' 'echo "R-AFTER"' "sysbus ReadDoubleWord 0x40022000"
+    check "sar: at f_ADC 251,953 Hz a 396-cycle conversion (387.5 + the 16-bit SAR's 8.5, Table 214 p955) has no EOC 1,570.72 us after ADSTART and has it at 1,572.72 us; 395.5 cycles would set it at 1,569.74 us (ruled Q4)" \
+      "passed sar && [ \$(( \$(readout sar BEFORE) & 4 )) = 0 ] && [ \$(( \$(readout sar AFTER) & 4 )) = 4 ]" ;;
   rccchange)
     # Revision Y (BOOST = 1 allows any f_ADC up to 36 MHz, p1005): continuous on CKMODE = 11, adc_hclk / 4 = 16 MHz, 24.75 us a
     # conversion. At 50 us (two EOCs) DR is read and HPRE set to /2 (RCC_D1CFGR, p395): hclk 32 MHz, 8 MHz. The conversion under way
@@ -256,9 +265,10 @@ for t in ${TVIBURI_TESTS:-$CASES}; do
       "[ \$rc = 3 ] && records unheld 'len(recs) == 1 and recs[0][\"rule\"] == \"TVI-ADC-CONFIG\" and \"not registered on an RCC guard\" in recs[0][\"condition\"]'" ;;
   query)
     q() { printf 'python "print(\\"Q \\" + str(self.Machine[\\"sysbus.rcc\\"].QueryKernelClock(\\"%s\\")))"' "$1"; }
-    run_case query - "$clk" "$(q adc12)" "$pll2" "$(q adc12)" 'sysbus WriteDoubleWord 0x580244E0 0x1000000' "$(q adc3)"
-    check "query (granted Q3): adc12 with ADCSEL = 00 (pll2_p_ck, PLL2 off) is modeled and not running; with PLL2 on, running; adc3 the same mux with ADC3EN" \
-      "passed query && grep -q '^Q adc12: NOT running; .*RCC_D3CCIPR.ADCSEL = 00' '$work/query/renode.out' && grep -q '^Q adc12: running; pll2_p_ck' '$work/query/renode.out' && grep -q '^Q adc3: running; pll2_p_ck' '$work/query/renode.out'" ;;
+    run_case query - "$clk" "$(q adc12)" "$pll2" "$(q adc12)" 'sysbus WriteDoubleWord 0x580244E0 0x1000000' "$(q adc3)" \
+      'sysbus WriteDoubleWord 0x58024458 0x20000' "$(q adc12)"
+    check "query (granted Q3): adc12 with ADCSEL = 00 (pll2_p_ck, PLL2 off) is modeled and not running; with PLL2 on, running; adc3 the same mux with ADC3EN; ADCSEL = 10 with both inputs running switches to per_ck (p419, p371)" \
+      "passed query && grep -q '^Q adc12: NOT running; .*RCC_D3CCIPR.ADCSEL = 00' '$work/query/renode.out' && grep -q '^Q adc12: running; pll2_p_ck' '$work/query/renode.out' && grep -q '^Q adc3: running; pll2_p_ck' '$work/query/renode.out' && grep -q '^Q adc12: running; per_ck: CKPERSEL = 00' '$work/query/renode.out'" ;;
   fields)
     # The allow-list (RUL-17) by enumeration, recorded: every field the table allows only at 0, written its widest value with the
     # ADC disabled, records one TVI-ADC-FIELD naming that field; each write is undone by its register's reset value.

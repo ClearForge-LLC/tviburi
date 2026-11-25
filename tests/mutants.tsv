@@ -489,7 +489,7 @@ AD08-cfgrState	model/GuardedSTM32H7_ADC.cs	if(changed != 0 && adstart)	if(false)
 AD09-level	model/GuardedSTM32H7_ADC.cs	if(drChannel >= 0 && !drDeclared)	if(false)	adc-undeclared
 AD10-setVoltage	model/GuardedSTM32H7_ADC.cs	!ReferenceEquals(d.DefaultSample, s0)	false	adc-setvoltage adc-overrun
 AD11-unpaced	model/GuardedSTM32H7_ADC.cs	Schedule((Smp(ch) + Sar(Res)) / hz, () => Converted(e));	Converted(e);	adc-early adc-rate
-AD12-sar	model/GuardedSTM32H7_ADC.cs	return ResBits(res) / 2.0 + 0.5;	return ResBits(res) / 2.0;	adc-rate adc-rate2
+AD12-sar	model/GuardedSTM32H7_ADC.cs	return ResBits(res) / 2.0 + 0.5;	return ResBits(res) / 2.0;	adc-rate adc-rate2 adc-sar
 AD13-revV2	model/GuardedSTM32H7_ADC.cs	Revision == "V" ? input / 2 : input;	input;	adc-rate
 AD14-ckmodeDiv	model/GuardedSTM32H7_ADC.cs	input = bus / (ckmode == 1 ? 1 : ckmode == 2 ? 2 : 4);	input = bus / (ckmode == 1 ? 1 : 2);	adc-rate adc-revy
 AD15-presc	model/GuardedSTM32H7_ADC.cs	input = presc > 11 ? null : input / Prescale[presc];	input = presc > 11 ? null : input;	adc-rate2
