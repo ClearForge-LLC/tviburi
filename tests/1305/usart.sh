@@ -353,7 +353,8 @@ sys.exit(0 if ok else 1)
     "refuses idlenorule TVI-USART-IDLE unmodeled 'r[\"access\"][\"value\"] == \"0x2000000D\" and \"USART16SEL = 100 (csi_ker_ck): no rule\" in r[\"bit\"] and \"p2034\" in r[\"citation\"]'" ;;
   idlenone)
     # Recorded: the other ways to no rule, each from reset: (1) a byte arriving after the source moved to csi_ker_ck under the
-    # running port (the RCC guard does not refuse it for a USART); (2) rcc_pclk2 with sys_ck on the CSI; (3) pll2_q_ck from a
+    # running port (the RCC guard does not refuse it for a USART); (2) rcc_pclk2 with sys_ck on the CSI; then (6) and (7), before
+    # any PLL2 scenario leaves usart1's mux on pll2_q_ck (the RCC guard keeps it across machine Reset: a row); (3) pll2_q_ck from a
     # CSI reference; (4) pll2_q_ck after PLL2DIVR was written with DIVN2 = 359, which the stock model keeps as 103 (p407 has 9
     # bits), and a USART1RST pulse, which must not forget it; (5) pll2_q_ck with DIVN2 = 2 (x3): a 6 MHz VCO, outside p407's
     # 192-960 MHz; (6) rcc_pclk2 from PLL1 with PLL1VCOSEL = 1 (150-420 MHz, p404) and a 500 MHz VCO: the stock model reads
@@ -364,31 +365,32 @@ sys.exit(0 if ok else 1)
       'sysbus WriteDoubleWord 0x58024454 0x20' 'sysbus.usart1 WriteChar 0x41' \
       'machine Reset' 'cpu IsHalted true' "$clk" 'sysbus WriteDoubleWord 0x58024400 0x81' 'sysbus WriteDoubleWord 0x58024410 0x1' \
       'sysbus WriteDoubleWord 0x4001100C 0xC8' 'sysbus WriteDoubleWord 0x40011000 0x2000000D' \
+      'machine Reset' 'cpu IsHalted true' "$clk" 'sysbus WriteDoubleWord 0x5802442C 0x01FF0002' 'sysbus WriteDoubleWord 0x58024430 0x010106F9' \
+      'sysbus WriteDoubleWord 0x58024400 0x01000001' 'sysbus WriteDoubleWord 0x58024410 0x3' 'sysbus WriteDoubleWord 0x4001100C 0xC8' 'sysbus WriteDoubleWord 0x40011000 0x2000000D' \
+      'machine Reset' 'cpu IsHalted true' "$clk" 'sysbus WriteDoubleWord 0x58024430 0x01010480' \
+      'sysbus WriteDoubleWord 0x58024400 0x01000001' 'sysbus WriteDoubleWord 0x58024410 0x3' 'sysbus WriteDoubleWord 0x4001100C 0xC8' 'sysbus WriteDoubleWord 0x40011000 0x2000000D' \
       'machine Reset' 'cpu IsHalted true' "$clk" 'sysbus WriteDoubleWord 0x58024400 0x81' 'sysbus WriteDoubleWord 0x58024428 0x02020201' \
       'sysbus WriteDoubleWord 0x58024400 0x04000081' 'sysbus WriteDoubleWord 0x58024454 0x8' 'sysbus WriteDoubleWord 0x4001100C 0xC8' 'sysbus WriteDoubleWord 0x40011000 0x2000000D' \
       'machine Reset' 'cpu IsHalted true' "$clk" 'sysbus WriteDoubleWord 0x58024438 0x01090367' 'sysbus WriteDoubleWord 0x58024400 0x04000001' \
       'sysbus WriteDoubleWord 0x58024454 0x8' 'sysbus WriteDoubleWord 0x58024498 0x10' 'sysbus WriteDoubleWord 0x58024498 0x0' 'sysbus WriteDoubleWord 0x4001100C 0xE1' 'sysbus WriteDoubleWord 0x40011000 0x2000000D' \
       'machine Reset' 'cpu IsHalted true' "$clk" 'sysbus WriteDoubleWord 0x58024438 0x01010002' 'sysbus WriteDoubleWord 0x58024400 0x04000001' \
-      'sysbus WriteDoubleWord 0x58024454 0x8' 'sysbus WriteDoubleWord 0x4001100C 0x10' 'sysbus WriteDoubleWord 0x40011000 0x2000000D' \
-      'machine Reset' 'cpu IsHalted true' "$clk" 'sysbus WriteDoubleWord 0x5802442C 0x01FF0002' 'sysbus WriteDoubleWord 0x58024430 0x010106F9' \
-      'sysbus WriteDoubleWord 0x58024400 0x01000001' 'sysbus WriteDoubleWord 0x58024410 0x3' 'sysbus WriteDoubleWord 0x4001100C 0xC8' 'sysbus WriteDoubleWord 0x40011000 0x2000000D' \
-      'machine Reset' 'cpu IsHalted true' "$clk" 'sysbus WriteDoubleWord 0x58024430 0x01010480' \
-      'sysbus WriteDoubleWord 0x58024400 0x01000001' 'sysbus WriteDoubleWord 0x58024410 0x3' 'sysbus WriteDoubleWord 0x4001100C 0xC8' 'sysbus WriteDoubleWord 0x40011000 0x2000000D'
+      'sysbus WriteDoubleWord 0x58024454 0x8' 'sysbus WriteDoubleWord 0x4001100C 0x10' 'sysbus WriteDoubleWord 0x40011000 0x2000000D'
     check "idlenone: recorded: seven TVI-USART-IDLE would-refuses, unmodeled: a byte after the source moved to csi_ker_ck under the running port (at the byte, RDR, the byte's value), and receiver starts on rcc_pclk2 with sys_ck on the CSI, on pll2_q_ck from a CSI reference, after a PLL2DIVR the stock model narrows (kept through a USART1RST), with a VCO outside p407's range, on PLL1 with a VCO outside the medium range its VCOSEL chose, and on PLL1 after a DIVP1 the stock model ignored; nothing else; never a pass" \
       "[ \$rc = 1 ] && logged idlenone 'len(recs) == 7 and all(r[\"rule\"] == \"TVI-USART-IDLE\" and r[\"kind\"] == \"unmodeled\" for r in recs)
         and \"(csi_ker_ck): no rule for its frequency\" in recs[0][\"bit\"] and recs[0][\"access\"][\"offset\"] == \"0x24\" and recs[0][\"access\"][\"value\"] == \"0x41\"
         and \"with sys_ck not the HSI or PLL1 (RCC_CFGR.SWS = 001)\" in recs[1][\"bit\"] and recs[1][\"access\"][\"offset\"] == \"0x0\"
-        and \"(pll2_q_ck) with PLL2\" in recs[2][\"bit\"] and \"reference not the HSI\" in recs[2][\"bit\"]
-        and \"with RCC_PLL2DIVR once written with a value its read-back does not keep: no rule\" in recs[3][\"bit\"]
-        and \"with PLL2 outside its ranges\" in recs[4][\"bit\"] and \"VCO 6000000 Hz\" in recs[4][\"bit\"]
-        and \"(rcc_pclk2) with PLL1 outside its ranges (reference 2000000 Hz, VCO 500000000 Hz)\" in recs[5][\"bit\"]
-        and \"(rcc_pclk2) with RCC_PLL1DIVR once written with a value its read-back does not keep: no rule\" in recs[6][\"bit\"]'" ;;
+        and \"(rcc_pclk2) with PLL1 outside its ranges (reference 2000000 Hz, VCO 500000000 Hz)\" in recs[2][\"bit\"]
+        and \"(rcc_pclk2) with RCC_PLL1DIVR once written with a value its read-back does not keep: no rule\" in recs[3][\"bit\"]
+        and \"(pll2_q_ck) with PLL2\" in recs[4][\"bit\"] and \"reference not the HSI\" in recs[4][\"bit\"]
+        and \"with RCC_PLL2DIVR once written with a value its read-back does not keep: no rule\" in recs[5][\"bit\"]
+        and \"with PLL2 outside its ranges\" in recs[6][\"bit\"] and \"VCO 6000000 Hz\" in recs[6][\"bit\"]'" ;;
   idlehse)
     # (3), ruled 2026-11-25T01:12Z: rcc_pclk2 from sys_ck = PLL1's P output on the HSE, as hse-crystal-16's generated firmware
     # sets it up (HSEON, HSECSSON, PLLCKSELR 0x52: PLLSRC HSE, DIVM1 5; PLLCFGR 0x30004; PLL1DIVR 0x0103064F: x80, /4; PLL1ON;
     # SW = PLL1), BRR 0xC8. D: the board declares hseFrequency 16 MHz (the generated board's): 3.2 MHz * 80 / 4 = 64 MHz, 320,000
-    # baud, IDLE 31.25 us after a byte. N: the board declares no crystal: the RCC guard's own default, 8 MHz (a row for the RCC
-    # guard), so 32 MHz, 160,000 baud, 62.5 us.
+    # baud, IDLE 31.25 us after a byte. N: the board declares no crystal, so the HSE is the RCC guard's own default, 8 MHz (a row
+    # for the RCC guard). With this board's PLL settings that is a 1.6 MHz reference and a 128 MHz VCO, outside p404's 192-960:
+    # TVI-USART-IDLE, unmodeled, at the start, and the record shows the 8 MHz it took.
     hse=('cpu IsHalted true' "$clk" 'sysbus WriteDoubleWord 0x58024400 0x00010001' 'sysbus WriteDoubleWord 0x58024400 0x00090001'
       'sysbus WriteDoubleWord 0x58024428 0x52' 'sysbus WriteDoubleWord 0x5802442C 0x30004' 'sysbus WriteDoubleWord 0x58024430 0x0103064F'
       'sysbus WriteDoubleWord 0x58024400 0x01090001' 'sysbus WriteDoubleWord 0x58024410 0x3' 'sysbus WriteDoubleWord 0x4001100C 0xC8'
@@ -396,11 +398,11 @@ sys.exit(0 if ok else 1)
     PLATFORM_SED='s/^    hseFrequency: 8000000$/    hseFrequency: 16000000/' run_case idlehse - "${hse[@]}" \
       'emulation RunFor "0.00002"' 'echo "R-D20"' 'sysbus ReadDoubleWord 0x4001101C' 'emulation RunFor "0.00002"' 'echo "R-D40"' 'sysbus ReadDoubleWord 0x4001101C'
     d=$rc; mv "$work/idlehse" "$work/idlehse-d"; mv "$work/idlehse.stdout" "$work/idlehse-d.stdout"
-    PLATFORM_SED='/^    hseFrequency: 8000000$/d' run_case idlehse - "${hse[@]}" \
-      'emulation RunFor "0.00004"' 'echo "R-N40"' 'sysbus ReadDoubleWord 0x4001101C' 'emulation RunFor "0.00003"' 'echo "R-N70"' 'sysbus ReadDoubleWord 0x4001101C'
-    check "idlehse: rcc_pclk2 from PLL1's P output on the HSE (the generated hse-crystal-16 sequence): with hseFrequency 16 MHz declared, 64 MHz (IDLE clear at 20 us, set at 40); with none declared, the RCC guard's default 8 MHz, 32 MHz (clear at 40 us, set at 70)" \
-      "[ \$d = 0 ] && grep -qx 'CHECK PASS' '$work/idlehse-d.stdout' && passed idlehse && grep -q 'hseFrequency: 16000000' '$work/idlehse-d/platform.repl' && ! grep -q 'hseFrequency' '$work/idlehse/platform.repl' \
-       && bit \"\$(readout idlehse-d D20)\" 4 0 && bit \"\$(readout idlehse-d D40)\" 4 1 && bit \"\$(readout idlehse N40)\" 4 0 && bit \"\$(readout idlehse N70)\" 4 1" ;;
+    PLATFORM_SED='/^    hseFrequency: 8000000$/d' run_case idlehse - "${hse[@]}"
+    check "idlehse: rcc_pclk2 from PLL1's P output on the HSE (the generated hse-crystal-16 sequence): with hseFrequency 16 MHz declared, 64 MHz (IDLE clear at 20 us, set at 40); with none declared, the RCC guard's default 8 MHz, under which this PLL's VCO is 128 MHz, outside its range: TVI-USART-IDLE, unmodeled, at the start" \
+      "[ \$d = 0 ] && grep -qx 'CHECK PASS' '$work/idlehse-d.stdout' && grep -q 'hseFrequency: 16000000' '$work/idlehse-d/platform.repl' && ! grep -q 'hseFrequency' '$work/idlehse/platform.repl' \
+       && bit \"\$(readout idlehse-d D20)\" 4 0 && bit \"\$(readout idlehse-d D40)\" 4 1 \
+       && [ \$rc = 3 ] && first idlehse 'r[\"rule\"] == \"TVI-USART-IDLE\" and r[\"access\"][\"offset\"] == \"0x0\" and \"with PLL1 outside its ranges (reference 1600000 Hz, VCO 128000000 Hz)\" in r[\"bit\"]'" ;;
   *) echo "unknown case: $t" >&2; exit 2 ;;
   esac
 done
