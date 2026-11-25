@@ -6,7 +6,11 @@
 - The measurement and its stop: `TVI-WO-1300b.measure.md` (predictions committed first at `114990b`; the table at `c1444d3`; bus 02:19Z).
 - The ruling (03:03Z): all five questions as recommended, with two grants outside the fence (the USART guard's registration refusal; the flash guard's one line). Built to it.
 - No §7 stop fired after the measurement: no committed platform relies on the 8 MHz default, and the armed run still arms (§3).
-- Untouched: `model/Refusal.cs`, the record grammar, `tools/`, the steering documents, `docs/reviews/`, the SPI, GPIO, timer and DMA guards, and Aethelgard. One PR, left unmerged.
+- Untouched: `model/Refusal.cs`, the record grammar, `tools/`, `model/bench-checks.tsv`, the steering documents, `docs/reviews/`, the SPI, GPIO, timer and DMA guards, and Aethelgard. One PR, left unmerged.
+- **Outside the fence, for ratification:** `tests/1305/usart.sh`. Only `idlehse`'s move was covered by the 02:15Z note. Two edits were not:
+  - `rxoff` now runs the RCC guard recorded (§2);
+  - one comment in `idlenone` (adversarial R8).
+  - Both follow from (2). The two grants (the USART guard's registration refusal and the flash guard's line) are the ruling's.
 
 ---
 
@@ -94,7 +98,16 @@ The same harness ran both sides: the committed `tests/1301/replay-1301.sh` with 
   - **instructions:** the count is 5 higher (`0x1ACDABE6` to `0x1ACDABEB`).
   - **Unchanged:** the 1,653 RTC backup-register writes, every UART access, the transmitted MAVLink and the arming (`COMMAND_ACK` 400 result 0 at 9.001 s; armed from 9.775 s; 19 heartbeats).
   - **Records:** all six RCC records are gone (76,864 + 27 + 2 + 1 + 1 + 1). Only `dma1`'s two `CIRC` records remain.
-- Peaks on Furnace (armed, at load 11–13): `main` 3,073,272 KiB, branch 3,375,548 KiB. The peak rises with wall time on a loaded host (roadmap row), so this is not the budget; the budget is judged in CI.
+- **The cost, and a fix it found.**
+  - The first branch replay was about 12% slower than `main`'s: fixture 12.2 s against 13.7 s; armed 53.8 s against 61.0 s and 3,073,272 KiB against 3,375,548 KiB.
+  - The cause was mechanical, not only load. On `main`, `TVI-RCC-FIELD` refused ArduPilot's 76,864 `ADC12EN` rewrites before `TVI-RCC-CLOCK`'s trial was reached. On the branch they pass, so each ran the trial, with three USARTs up.
+  - The trial reads only `RCC_CR` and the copies. A write that is to neither, or that leaves its copy unchanged, cannot lose a clock, so it now returns first (`5b5a47a`; mutant `RB17`).
+  - **On that tree, in back-to-back pairs (load 9–12):**
+    - fixture: `main` 11.87 s and 11.95 s, branch 11.90 s and 12.10 s;
+    - armed: `main` 50.54 s and 51.21 s, branch 55.81 s and 48.12 s;
+    - armed peaks: 2,891,132 and 2,899,312 KiB on `main`, 2,990,640 and 2,774,228 KiB on the branch.
+  - The skip changed nothing: the armed run's every access and record, and its boot block, are identical with and without it.
+  - The peak rises with wall time on a loaded host (a roadmap row), so these are not the budget. The budget is judged in CI.
 
 ## 4. The adversarial pass (WO §5)
 
@@ -138,19 +151,46 @@ On Furnace, from committed trees (`git archive`), one capped container at a time
   - 0 failed.
 - **`tests/1303/dma.sh`, all** (`9cea278`): 44 ok, 0 failed.
 - **`allowlist.py check`:** the allow-list regenerates byte for byte (677 rows).
+- **The final tree (`5b5a47a`):**
+  - `tests/1300/rcc.sh`, all cases: 69 ok, 4 failed, and `usart-idlehse` failed once. Each failure was the teardown race, with no refusal: end records lost, Renode exit 0, failing closed.
+  - On rerun `switched`, `gen-hc16`, `usart-othersel` and `idlehse` passed; `cfg2same` raced again.
+  - The race measured on `cfg2same` (§5.1).
+  - Mutants `RB17`, `RB01` and `RB13` were rerun there: 3/3 killed.
 - **Mutants (`e98e0b9`), diff-sized: 29/29 killed,** each by the case its row names:
   - this WO's `RB01`–`RB16`;
   - `C26` and `C31`, retargeted to the lines this WO moved (the same mutations);
   - every `US` row whose case moved or whose text this diff touched: `US33`, `US51`, `US54`, `US57`–`US59`, `US62`, `US63`, `US65`–`US68`.
 - **The other suites** (SPI, GPIO, timer, flash, the adversarial group, the release and ledger cases) run in CI: the READY note on the bus.
-- `tests/ci/times.tsv`: this WO's 11 cases and 16 mutants at the median of the RCC rows (6.2 s, 6.3 s), until CI's logs re-weigh them.
+- `tests/ci/times.tsv`: this WO's 11 cases and 17 mutants at the median of the RCC rows (6.2 s, 6.3 s), not measured. The WO has the second merger re-weigh; `1305a` merged first, so the re-weigh is this PR's to ask for, and the architect's to rule.
 
-## 6. Rows and findings
+### 5.1 The teardown race on `cfg2same`
+
+- **Two runs, one case each at a time, alternating the trees** (load 10–13; another builder's tools container was running beside mine for part of it):
+  - **First:** `main` 8/8 passed, the branch (`5b5a47a`) 5/8. The branch's three failures were consecutive (its runs 6–8), each with no refusal: end records lost after `rcc`'s and `gpioPortB`'s, Renode exit 0.
+  - **Second:** `main` 6/6, the branch without the trial skip (`e98e0b9`) 6/6, the branch 6/6.
+- **In all:** `main` 0 of 14 raced, the branch 3 of 14 in one burst, and the no-skip tree 0 of 6.
+- Nothing in this WO runs at teardown: `Dispose` is unchanged, and `Unregister`'s new unlock is not on the quit path that logs the end records.
+- **I read the burst as host contention** (a memory note: two Renode at once raised the race from 4/13 to 9/13 on `ardupilot`), but 14 runs a side cannot exclude a small rise. It fails closed; CI reruns are the remedy, as the roadmap row says.
+
+## 6. Questions, rows and findings
+
+**Questions for the architect:**
+1. **`RUL-18` and the USART branch of `TVI-RCC-CLOCK`.** It is a `predicted-fault`, but every `TVI-RCC-CLOCK` bench row (R4–R8 in `model/bench-checks.tsv`) is an SPI procedure, and the file is outside this fence.
+   - Proposed row R11: the rcc `usart-lost` firmware, with USART1 transmitting continuously on `rcc_pclk2`; write `USART16SEL` = 100 (`csi_ker_ck`, CSI off); probe TX. Predicted: TX stops (the mux waits, p371). Alternative: TX keeps toggling.
+   - Add it under a grant, or as the architect's own row.
+2. **The ledger's `detail` for the four new `LPEN` rows** resolves to `TVI-WO-1300.rm0433.md` §8 A6, which lists only `1300`'s four bits. The row's own text says "extended to this bit by TVI-WO-1300b", but a reader who follows the `detail` finds an A6 without them. Should A6's document gain the four, or the release learn a second reference form? Both are outside this fence (`tools/`, 1300's document).
+3. **Recorded mode after `TVI-RCC-HSE`** (R2): see the first row below.
+
+**For the consumer (Aethelgard Phase 2):**
+- A platform that leaves `hseFrequency` on the cancelled `rcc:` entry, rather than on `tviburiRcc` (the `hse16-trap` form), now gets `TVI-RCC-HSE` at the HSE's start, not a silent 8 MHz.
+- Each USART guard must be registered on the RCC guard under its own name (the generated restatement does this), or every access refuses `TVI-USART-CONFIG`.
+
+**Rows and findings:**
 
 - **The USART guard's own citation** (L491, `TVI-USART-KERNEL`) says `§48.4 p2019`; the sentence is in §48.5.1. It is `1305`'s, outside this fence.
 - **Recorded mode after `TVI-RCC-HSE`** (R2): a run that goes on to put `sys_ck` on the HSE stops in Renode (0 Hz systick). **A question for the records' owner:** should a refused `HSEON` reach the stock model in recorded mode?
 - **`boots.tsv` re-pinned to Aethelgard `fa12abf4`** (Q5): the nine `per_ck` boards' `TVI-SPI-KERNEL` rows are gone there.
-- **The RTC itself is unguarded.** The stock RTC model's calendar is not gated by `rtc_ck` (an RTC guard's row). `RTCEN` = 1 with `RTCSEL` = 00 gives silicon's RTC no clock. Not measured: no committed firmware reads the calendar.
+- **The RTC itself is unguarded.** The stock RTC counts on its own fixed `wakeupTimerFrequency`, with no link to the RCC (`STM32F4_RTC.cs` L21-33, read in source), so its calendar is not gated by `rtc_ck`: an RTC guard's row. `RTCEN` = 1 with `RTCSEL` = 00 gives silicon's RTC no clock. No committed firmware reads the calendar (the armed run writes only backup registers).
 - **`DBP`** (`PWR_CR1`, the backup domain's write protection, p427): the PWR stub always reads 1. A PWR guard's row, with `BDCR` writes judged against it.
 - **A declared `hseFrequency` outside the HSE's range** (DS12117's crystal and bypass limits) is not checked. A row.
 - **Reduction findings outside the diff:**
