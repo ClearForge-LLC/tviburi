@@ -51,7 +51,7 @@
     - **timing fields differ:** `SYS_STATUS.load` 411 → 414 (+0.3 %; its voltage and current fields stay 0), `SERVO_OUTPUT_RAW.time_usec`, `TIMESYNC.ts1`.
   - **MAVLink, USART3:** the same 20 frames; only `TIMESYNC.ts1` differs.
   - **The instruction count** is +1,388,513 (+0.31 %).
-  - **Against the measurement's R3** (the scratch prototype, whose `TCIF` stood in for `HTIF`): load 412 there, 414 here, because the real half-transfer interrupt runs ChibiOS's half-buffer path. Reported to the architect at 19:07Z.
+  - **Against the measurement's R3** (the scratch prototype, whose `TCIF` stood in for `HTIF`): load 412 there, 414 here, because the real half-transfer interrupt runs ChibiOS's half-buffer path. Reported at 19:07Z; ruled within Q6 at 19:33Z (timing).
 
 ## 4. The adversarial pass (WO §5)
 
