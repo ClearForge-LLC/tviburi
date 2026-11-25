@@ -12,6 +12,7 @@ using "./stm32h7-dma-restate.repl"
 using "./stm32h7-flash-restate.repl"
 using "./stm32h7-usart-restate.repl"
 using "./stm32h7-i2c-restate.repl"
+using "./stm32h7-adc-restate.repl"
 
 // The guard's mode (RUL-19), and the stock board's `rcc: hseFrequency: 8_000_000` restated on the guard: that update
 // lands on the cancelled stock entry (TVI-WO-1300.rm0433.md §6.4).
@@ -135,3 +136,17 @@ tviburiI2c2:
     mode: "enforcing"
 tviburiI2c3:
     mode: "enforcing"
+
+// TVI-WO-1307: ADC1 (with ADC2 behind it) and ADC3 are guarded (stm32h7-adc-restate.repl cancels each stock entry and declares
+// the guard as "adcM1S2" / "adc3"). Each ADC's mode (RUL-19), and the silicon revision its clock, BOOST, LDORDY and RES codes
+// depend on (ruled 2026-11-25T21:17Z Q2: required, never defaulted). "V" is declared by this platform, not read: no held
+// document says which revision a NUCLEO-H753ZI carries (DS12117 Rev 10 describes both, its §6 for rev Y and §7 for rev V,
+// p21 note 3: 480 MHz only on rev V), and both measured firmwares assume rev V (TVI-WO-1307.measure.md §2.4). No channel's
+// level is declared here: a platform or a test declares one (`levels`, or Renode's SetVoltage), or its read refuses (Q10).
+tviburiAdc12:
+    mode: "enforcing"
+    revision: "V"
+
+tviburiAdc3:
+    mode: "enforcing"
+    revision: "V"

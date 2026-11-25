@@ -107,7 +107,7 @@ namespace Antmicro.Renode.Peripherals.Tviburi
             inner = new STM32H7_RCC(machine, systick, hseFrequency ?? 0, csiFrequency);
             host = machine;
             records = new Records(machine, this, nameof(GuardedSTM32H7_RCC), mode);
-            muxes = new[] { PerMux, SpiMux, I2cMux, UsartMux, Usart2Mux, RngMux }.Select(m => new MuxState(m)).ToArray();
+            muxes = new[] { PerMux, SpiMux, I2cMux, UsartMux, Usart2Mux, RngMux, AdcMux }.Select(m => new MuxState(m)).ToArray();
             ResetCopies();
         }
 
@@ -196,7 +196,7 @@ namespace Antmicro.Renode.Peripherals.Tviburi
             if(!Clocked.TryGetValue(peripheral, out var p))
             {
                 return new KernelClock(peripheral, false, false, "no kernel clock rule for " + peripheral, "none",
-                    "TVI-WO-1300 (4): the query covers spi1, spi2, i2c1, i2c2, usart1, usart2, usart3 and rng");
+                    "TVI-WO-1300 (4): the query covers spi1, spi2, i2c1, i2c2, usart1, usart2, usart3, rng, adc12 and adc3");
             }
             var mux = muxes.Single(m => m.Def == p.Mux);
             var enabled = Enabled(p);
@@ -979,9 +979,14 @@ namespace Antmicro.Renode.Peripherals.Tviburi
             "rcc_pclk1", "pll2_q_ck", "pll3_q_ck", "hsi_ker_ck", "csi_ker_ck", "lse_ck", "disabled", "disabled");
         private static readonly MuxDef RngMux = new MuxDef("RCC_D2CCIP2R", 0x054, "RNGSEL", 8, 2, 417,
             "hsi48_ck", "pll1_q_ck", "lse_ck", "lsi_ck");
+        // TVI-WO-1307 (ruled 2026-11-25T21:17Z Q3): ADCSEL, the kernel clock of ADC1, ADC2 and ADC3 (p419: "others: reserved, the
+        // kernel clock is disabled"). Its peripherals use it only with ADCx_CCR.CKMODE = 00 (p920); the ADC guard asks then.
+        private static readonly MuxDef AdcMux = new MuxDef("RCC_D3CCIPR", 0x058, "ADCSEL", 16, 2, 419,
+            "pll2_p_ck", "pll3_r_ck", "per_ck", "disabled");
 
         // Enables: SPI1EN APB2ENR bit 12 (p469); SPI2EN APB1LENR bit 14 (p464); I2C1EN, I2C2EN APB1LENR bits 21, 22
-        // (p463); USART1EN APB2ENR bit 4 (p470); RNGEN AHB2ENR bit 6 (p457).
+        // (p463); USART1EN APB2ENR bit 4 (p470); RNGEN AHB2ENR bit 6 (p457); ADC12EN AHB1ENR bit 5 (p455); ADC3EN AHB4ENR bit 24
+        // (p458), named by the ADCs' registration aliases (ADC12, ADC3; TVI-WO-1307 Q3).
         private static readonly Dictionary<string, ClockedPeripheral> Clocked = new Dictionary<string, ClockedPeripheral>
         {
             ["spi1"] = new ClockedPeripheral(SpiMux, 0x0F0, 12, "RCC_APB2ENR.SPI1EN", "§8.7.47 p469"),
@@ -992,6 +997,8 @@ namespace Antmicro.Renode.Peripherals.Tviburi
             ["usart2"] = new ClockedPeripheral(Usart2Mux, 0x0E8, 17, "RCC_APB1LENR.USART2EN", "§8.7.45 p463"),
             ["usart3"] = new ClockedPeripheral(Usart2Mux, 0x0E8, 18, "RCC_APB1LENR.USART3EN", "§8.7.45 p463"),
             ["rng"] = new ClockedPeripheral(RngMux, 0x0DC, 6, "RCC_AHB2ENR.RNGEN", "§8.7.42 p457"),
+            ["adc12"] = new ClockedPeripheral(AdcMux, 0x0D8, 5, "RCC_AHB1ENR.ADC12EN", "§8.7.41 p455"),
+            ["adc3"] = new ClockedPeripheral(AdcMux, 0x0E0, 24, "RCC_AHB4ENR.ADC3EN", "§8.7.43 p458"),
         };
 
         private static readonly int[] DivmShift = { 0, 4, 12, 20 };
@@ -1248,7 +1255,7 @@ namespace Antmicro.Renode.Peripherals.Tviburi
             R("RCC_D3CCIPR", 0x058, "§8.7.22", "SAI4BSEL", 26, 24, Any, "modeled by the guard", "the guard's copy, served on read; this mux's peripherals are not modeled, and their enable refuses", 418),
             R("RCC_D3CCIPR", 0x058, "§8.7.22", "SAI4ASEL", 23, 21, Any, "modeled by the guard", "the guard's copy, served on read; this mux's peripherals are not modeled, and their enable refuses", 419),
             R("RCC_D3CCIPR", 0x058, "§8.7.22", "Res20_18", 20, 18, Zero, "reserved", "reserved: dropped, reads its reset value", 419),
-            R("RCC_D3CCIPR", 0x058, "§8.7.22", "ADCSEL", 17, 16, Any, "modeled by the guard", "the guard's copy, served on read; this mux's peripherals are not modeled, and their enable refuses", 419),
+            R("RCC_D3CCIPR", 0x058, "§8.7.22", "ADCSEL", 17, 16, Any, "modeled by the guard", "the guard's copy, served on read; the ADCs' kernel clock mux, answered by the query for adc12 and adc3 (TVI-WO-1307 Q3)", 419),
             R("RCC_D3CCIPR", 0x058, "§8.7.22", "LPTIM345SEL", 15, 13, Any, "modeled by the guard", "the guard's copy, served on read; this mux's peripherals are not modeled, and their enable refuses", 419),
             R("RCC_D3CCIPR", 0x058, "§8.7.22", "LPTIM2SEL", 12, 10, Any, "modeled by the guard", "the guard's copy, served on read; this mux's peripherals are not modeled, and their enable refuses", 419),
             R("RCC_D3CCIPR", 0x058, "§8.7.22", "I2C4SEL", 9, 8, Any, "modeled by the guard", "the guard's copy, served on read; this mux's peripherals are not modeled, and their enable refuses", 420),
@@ -1501,7 +1508,7 @@ namespace Antmicro.Renode.Peripherals.Tviburi
             R("RCC_AHB1ENR", 0x0D8, "§8.7.41", "ETH1TXEN", 16, 16, Any, "inherited, unaudited (acknowledged by name)", "the guard's copy; the stock bus enable (computed-read)", 455),
             R("RCC_AHB1ENR", 0x0D8, "§8.7.41", "ETH1MACEN", 15, 15, Any, "inherited, unaudited (acknowledged by name)", "the guard's copy; the stock bus enable (computed-read)", 455),
             R("RCC_AHB1ENR", 0x0D8, "§8.7.41", "Res14_6", 14, 6, Zero, "reserved", "reserved: dropped, reads its reset value", 455),
-            R("RCC_AHB1ENR", 0x0D8, "§8.7.41", "ADC12EN", 5, 5, Any, "inherited, unaudited (acknowledged by name)", "the guard's copy; the stock bus enable (computed-read): the bus lock only. The ADC's kernel clock is not modeled: it is chosen by ADCx_CCR.CKMODE[1:0] (p920), an ADC register the RCC guard cannot see (adc_sclk unless CKMODE = 00, else the kernel clock ADCSEL selects, p419), and the ADC is unguarded (an ADC guard's row) (TVI-WO-1300b, ruled 2026-11-25T03:03Z Q1)", 455),
+            R("RCC_AHB1ENR", 0x0D8, "§8.7.41", "ADC12EN", 5, 5, Any, "inherited, unaudited (acknowledged by name)", "the guard's copy; the stock bus enable (computed-read): the bus lock only. With ADCx_CCR.CKMODE = 00 the ADC's kernel clock is the one ADCSEL selects (p920, p419), answered by the query; the ADC guard asks it at ADSTART and registers as watched (TVI-WO-1307 Q3) (TVI-WO-1300b, ruled 2026-11-25T03:03Z Q1)", 455),
             R("RCC_AHB1ENR", 0x0D8, "§8.7.41", "Res4_2", 4, 2, Zero, "reserved", "reserved: dropped, reads its reset value", 455),
             R("RCC_AHB1ENR", 0x0D8, "§8.7.41", "DMA2EN", 1, 1, Any, "inherited, unaudited (acknowledged by name)", "the guard's copy; the stock bus enable (computed-read)", 455),
             R("RCC_AHB1ENR", 0x0D8, "§8.7.41", "DMA1EN", 0, 0, Any, "inherited, unaudited (acknowledged by name)", "the guard's copy; the stock bus enable (computed-read)", 455),
@@ -1520,7 +1527,7 @@ namespace Antmicro.Renode.Peripherals.Tviburi
             R("RCC_AHB4ENR", 0x0E0, "§8.7.43", "BKPRAMEN", 28, 28, Any, "inherited, unaudited (acknowledged by name)", "the guard's copy; the stock bus enable (computed-read)", 458),
             R("RCC_AHB4ENR", 0x0E0, "§8.7.43", "Res27_26", 27, 26, Zero, "reserved", "reserved: dropped, reads its reset value", 458),
             R("RCC_AHB4ENR", 0x0E0, "§8.7.43", "HSEMEN", 25, 25, Any, "inherited, unaudited (acknowledged by name)", "the guard's copy; the stock bus enable (computed-read)", 458),
-            R("RCC_AHB4ENR", 0x0E0, "§8.7.43", "ADC3EN", 24, 24, Any, "inherited, unaudited (acknowledged by name)", "the guard's copy; the stock bus enable (computed-read): the bus lock only. The ADC's kernel clock is not modeled: it is chosen by ADCx_CCR.CKMODE[1:0] (p920), an ADC register the RCC guard cannot see (adc_sclk unless CKMODE = 00, else the kernel clock ADCSEL selects, p419), and the ADC is unguarded (an ADC guard's row) (TVI-WO-1300b, ruled 2026-11-25T03:03Z Q1)", 458),
+            R("RCC_AHB4ENR", 0x0E0, "§8.7.43", "ADC3EN", 24, 24, Any, "inherited, unaudited (acknowledged by name)", "the guard's copy; the stock bus enable (computed-read): the bus lock only. With ADCx_CCR.CKMODE = 00 the ADC's kernel clock is the one ADCSEL selects (p920, p419), answered by the query; the ADC guard asks it at ADSTART and registers as watched (TVI-WO-1307 Q3) (TVI-WO-1300b, ruled 2026-11-25T03:03Z Q1)", 458),
             R("RCC_AHB4ENR", 0x0E0, "§8.7.43", "Res23_22", 23, 22, Zero, "reserved", "reserved: dropped, reads its reset value", 458),
             R("RCC_AHB4ENR", 0x0E0, "§8.7.43", "BDMAEN", 21, 21, Any, "inherited, unaudited (acknowledged by name)", "the guard's copy; the stock bus enable (computed-read)", 458),
             R("RCC_AHB4ENR", 0x0E0, "§8.7.43", "Res20", 20, 20, Zero, "reserved", "reserved: dropped, reads its reset value", 458),
