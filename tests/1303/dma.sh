@@ -10,9 +10,9 @@ set -euo pipefail
 
 here=$(cd "$(dirname "$0")/../.." && pwd)
 IMAGE=$(sed -n 's/^IMAGE=//p' "$here/tests/spike.sh")
-CASES="axi tcm itcm partcm below wrap unmapped ndt0 reload reassert sizes fth fthzero reloadtcm en enoff done same disable width read field msize16 route0 route54 mux shared sharedx request txother usart23 fields ledger registrations irq config recorded reset clock offset offsetndt reflect regen restate"
+CASES="axi tcm itcm partcm below wrap unmapped ndt0 reload reassert sizes fth fthzero reloadtcm en enoff done same disable width read field msize16 route0 route54 mux shared sharedx request txother usart23 fields ledger registrations irq config recorded reset clock offset offsetndt reflect regen restate circ circoff circen circodd htie circm2p circm2m adc adcoff htien tcie circhi circrec"
 GUARDS="spi1 rcc gpioPortA gpioPortB gpioPortC gpioPortD gpioPortE gpioPortF gpioPortG gpioPortH gpioPortI gpioPortJ gpioPortK timer1 timer8 dma1 dma2 flashController usart1 usart2 usart3 uart4 uart5 usart6 uart7 uart8 i2c1 i2c2 i2c3"
-MONITOR="fields ledger registrations irq config recorded reset clock offset offsetndt reflect regen restate"
+MONITOR="fields ledger registrations irq config recorded reset clock offset offsetndt reflect regen restate circ circoff tcie circhi circrec"
 # The planted firmware's paths: every case but the monitor-driven ones.
 PATHS=$(for c in $CASES; do case " $MONITOR " in *" $c "*) ;; *) printf '"%s",' "$c" ;; esac; done | sed 's/,$//')
 scratch=${TVIBURI_SCRATCH:-$HOME/.cache/tviburi}
@@ -83,12 +83,15 @@ passed() { [ "$rc" = 0 ] && grep -qx 'CHECK PASS' "$work/$1.stdout"; }
 passes() { passed "$1" && after "$1"; }
 refuses() { [ "$rc" = 3 ] && first "$1" "r[\"rule\"] == \"$2\" and r[\"kind\"] == \"$3\" and r[\"access\"][\"pc\"] != \"none\" and $4"; }
 marks=('echo "TVIBURI-MARK-AFTER"' 'sysbus ReadDoubleWord 0x20000104' 'echo "R-READ"' 'sysbus ReadDoubleWord 0x20000108' 'echo "R-READ2"' 'sysbus ReadDoubleWord 0x2000010C')
+pulse=('sysbus.dmamux1 OnGPIO 41 true' 'sysbus.dmamux1 OnGPIO 41 false')   # one request on DMAMUX1 input 41, raised by hand
 clk='sysbus WriteDoubleWord 0x580244D8 0x3'   # DMA1EN, DMA2EN (p455): since TVI-WO-1300a an unclocked peripheral is locked
 
 for t in ${TVIBURI_TESTS:-$CASES}; do
   case " $MONITOR " in *" $t "*) mon=1 ;; *) mon=0 ;; esac
   if [ $mon = 0 ]; then
-    run_case "$t" "$t" 'emulation RunFor "0.001"' "${marks[@]}"
+    # The ADC paths wait on the stock ADC1, which converts once per 1 ms (its externalEventFrequency, TVI-WO-1303a §2.2).
+    case $t in adc|adcoff) rf=0.0125 ;; *) rf=0.001 ;; esac
+    run_case "$t" "$t" "emulation RunFor \"$rf\"" "${marks[@]}"
   fi
   case $t in
   axi) check "axi: a DMA1 memory-to-memory stream in AXI SRAM passes and moves its data (p108: AXI SRAM is reachable)" \
@@ -131,8 +134,24 @@ for t in ${TVIBURI_TESTS:-$CASES}; do
     "refuses width TVI-DMA-WIDTH unmodeled 'r[\"access\"][\"width\"] == 8'" ;;
   read) check "read: a read at 0xD0, where no register is, refuses TVI-DMA-READ, unmodeled" \
     "refuses read TVI-DMA-READ unmodeled 'r[\"bit\"] == \"no register at offset 0xD0\"'" ;;
-  field) check "field: CIRC = 1 refuses TVI-DMA-FIELD, unmodeled (circular mode is not modeled)" \
-    "refuses field TVI-DMA-FIELD unmodeled 'r[\"bit\"] == \"DMA_SxCR.CIRC (bit 8) = 1\"'" ;;
+  field) check "field: DBM = 1 refuses TVI-DMA-FIELD, unmodeled (double-buffer mode is not modeled)" \
+    "refuses field TVI-DMA-FIELD unmodeled 'r[\"bit\"] == \"DMA_SxCR.DBM (bit 18) = 1\"'" ;;
+  circen) check "circen: CIRC cleared while a circular stream runs refuses TVI-DMA-CIRC, unmodeled, naming the stream, the field and p664/p665 (ruled Q2)" \
+    "refuses circen TVI-DMA-CIRC unmodeled 'r[\"bit\"] == \"DMA_SxCR.CIRC of stream 0 changed to 0 (EN = 1, running)\" and \"p664\" in r[\"citation\"] and \"p665\" in r[\"citation\"]'" ;;
+  circodd) check "circodd: a circular stream enabled with NDT = 5 refuses TVI-DMA-HALF, unmodeled (p657 states no count for an odd NDT; ruled Q3)" \
+    "refuses circodd TVI-DMA-HALF unmodeled 'r[\"bit\"] == \"DMA_S0NDTR.NDT = 5 (odd, circular)\" and \"p657\" in r[\"citation\"]'" ;;
+  htie) check "htie: HTIE = 1 on a non-circular stream refuses TVI-DMA-HALF at EN, unmodeled (HTIF is modeled on circular streams only; ruled Q3)" \
+    "refuses htie TVI-DMA-HALF unmodeled 'r[\"bit\"] == \"DMA_SxCR.HTIE = 1, CIRC = 0\" and r[\"access\"][\"offset\"] == \"0x10\"'" ;;
+  htien) check "htien: HTIE set while a non-circular stream runs refuses TVI-DMA-HALF, unmodeled (no HTIF is modeled there; ruled Q3)" \
+    "refuses htien TVI-DMA-HALF unmodeled 'r[\"bit\"] == \"DMA_SxCR.HTIE of stream 0 set (EN = 1, running, CIRC = 0)\"'" ;;
+  circm2p) check "circm2p: CIRC = 1 on a memory-to-peripheral stream refuses TVI-DMA-CIRC at EN, unmodeled (the twin moves it unpaced; ruled Q5)" \
+    "refuses circm2p TVI-DMA-CIRC unmodeled 'r[\"bit\"] == \"DMA_SxCR.CIRC = 1, DIR = 1\" and \"unpaced\" in r[\"condition\"]'" ;;
+  circm2m) check "circm2m: CIRC = 1 on a memory-to-memory stream refuses TVI-DMA-CIRC at EN, unmodeled (p645: not allowed; ruled Q5)" \
+    "refuses circm2m TVI-DMA-CIRC unmodeled 'r[\"bit\"] == \"DMA_SxCR.CIRC = 1, DIR = 2\" and \"p645\" in r[\"citation\"]'" ;;
+  adc) check "adc: ArduPilot's ADC pattern, DMA1 stream 0 circular on the stock ADC1's request (9): the firmware sees TCIF at each wrap with EN still 1 and NDT reloaded to 4 (p647, p665; EN and TCIF at a wrap inferred from p654 against p665), and HTIF at each half (p657); the run passes" \
+    "passes adc && v=\$(readout adc READ) && [ \$(( v & 0xFF )) -ge 2 ] && [ \$(( v >> 8 & 0xFF )) -ge \$(( v & 0xFF )) ] && [ \$(( v >> 8 & 0xFF )) -le \$(( (v & 0xFF) + 1 )) ] && [ \$(( v >> 16 & 0xFF )) = \$(( v & 0xFF )) ] && [ \"\$(readout adc READ2)\" = 0x00000401 ]" ;;
+  adcoff) check "adcoff: the same stream with CIRC = 0 ends after 4 requests with EN cleared (p654, p665; ruled Q4): one TCIF, seen with EN = 0 and NDT = 0; the run passes" \
+    "passes adcoff && [ \"\$(readout adcoff READ)\" = 0x00000001 ] && [ \"\$(readout adcoff READ2)\" = 0x00000000 ]" ;;
   msize16) check "msize16: a memory-to-memory stream of half-words (PSIZE = MSIZE = 01) passes and moves its data (the probe ruling Q6 asked for)" \
     "passes msize16 && [ \"\$(readout msize16 READ)\" = 0x11111111 ]" ;;
   route0) check "route0: a memory-to-peripheral stream whose DMAMUX1 channel selects no request refuses TVI-DMA-ROUTE, predicted-fault (p703)" \
@@ -204,7 +223,9 @@ by = {(r[\"register\"], r[\"field\"]): r for r in f}
 ok = len(f) == 135 and len({r[\"register\"] for r in f}) == 10
 d = by[(\"DMA_SxCR\", \"DIR[1:0]\")]
 ok = ok and d[\"state\"] == \"stock-wrong\" and all(x in d[\"detail\"] for x in (\"41 usart1_rx_dma\", \"38 spi1_tx_dma\", \"40 spi2_tx_dma\", \"42 usart1_tx_dma\"))
-ok = ok and d[\"allowed\"] == [0, 1, 2] and by[(\"DMA_SxCR\", \"CIRC\")][\"allowed\"] == [0] and \"p665\" in by[(\"DMA_SxCR\", \"EN\")][\"behaves_as\"]
+ok = ok and d[\"allowed\"] == [0, 1, 2] and \"p665\" in by[(\"DMA_SxCR\", \"EN\")][\"behaves_as\"]
+ok = ok and all(by[(\"DMA_SxCR\", n)][\"allowed\"] == \"any\" and by[(\"DMA_SxCR\", n)][\"state\"] == \"guard\" for n in (\"CIRC\", \"HTIE\"))
+ok = ok and \"inferred from p654 against p665\" in by[(\"DMA_SxCR\", \"CIRC\")][\"behaves_as\"] and by[(\"DMA_LIFCR\", \"CHTIF0\")][\"state\"] == \"guard\"
 ok = ok and by[(\"DMA_SxCR\", \"PL[1:0]\")][\"state\"] == \"stock-wrong\" and by[(\"DMA_SxFCR\", \"FTH[1:0]\")][\"allowed\"] == \"any\"
 bench = sorted((r[\"field\"], r[\"rule\"], r[\"bit\"]) for r in rows if r.get(\"peripheral\") == \"Tviburi.GuardedSTM32DMA\" and r[\"row\"] == \"bench\")
 ok = ok and bench == [(\"D1\", \"TVI-DMA-TCM\", \"DMA_S0M0AR = 0x20000400 (DTCM (0x20000000-0x2001FFFF))\")]
@@ -214,7 +235,7 @@ sys.exit(0 if ok else 1)
     # A request raised at DMAMUX1 reaches the guard's stream (D11 of the measurement, through the guard).
     run_case registrations - "$clk" 'peripherals' 'sysbus WriteDoubleWord 0x40020808 0x29' 'sysbus WriteDoubleWord 0x40020048 0x40011024' \
       'sysbus WriteDoubleWord 0x4002004C 0x38001900' 'sysbus WriteDoubleWord 0x40020044 0x4' 'sysbus WriteDoubleWord 0x40020040 0x401' \
-      'sysbus.dmamux1 OnGPIO 41 true' 'sysbus.dmamux1 OnGPIO 41 false' 'echo "R-NDTR"' 'sysbus ReadDoubleWord 0x40020044'
+      "${pulse[@]}" 'echo "R-NDTR"' 'sysbus ReadDoubleWord 0x40020044'
     check "registrations: peripherals lists dma1 and dma2 as the guard; a request on DMAMUX1 input 41 routed to channel 2 moves one item on DMA1 stream 2 (NDTR 4 -> 3)" \
       "passed registrations && grep -q 'dma1 (GuardedSTM32DMA)' '$work/registrations/renode.out' && grep -q 'dma2 (GuardedSTM32DMA)' '$work/registrations/renode.out' && [ \"\$(readout registrations NDTR)\" = 0x00000003 ]" ;;
   irq)
@@ -255,11 +276,11 @@ tviburiDma2:\
     # over 0xFF bytes and NDTR, the enable, one request: the byte lands at the new base. Replaces TVI-DMA-OFFSET.
     run_case offset - "$clk" 'sysbus WriteDoubleWord 0x38001A00 0xFFFFFFFF' 'sysbus WriteDoubleWord 0x40020800 0x29' 'sysbus WriteDoubleWord 0x40020018 0x40011024' \
       'sysbus WriteDoubleWord 0x4002001C 0x38001900' 'sysbus WriteDoubleWord 0x40020014 0x8' 'sysbus WriteDoubleWord 0x40020010 0x401' \
-      'sysbus.dmamux1 OnGPIO 41 true' 'sysbus.dmamux1 OnGPIO 41 false' 'sysbus.dmamux1 OnGPIO 41 true' 'sysbus.dmamux1 OnGPIO 41 false' \
-      'sysbus.dmamux1 OnGPIO 41 true' 'sysbus.dmamux1 OnGPIO 41 false' 'echo "R-LISR0"' 'sysbus ReadDoubleWord 0x40020000' \
+      "${pulse[@]}" "${pulse[@]}" \
+      "${pulse[@]}" 'echo "R-LISR0"' 'sysbus ReadDoubleWord 0x40020000' \
       'sysbus WriteDoubleWord 0x40020010 0x400' 'echo "R-LISR"' 'sysbus ReadDoubleWord 0x40020000' 'echo "R-NDTR"' 'sysbus ReadDoubleWord 0x40020014' \
       'sysbus WriteDoubleWord 0x40020008 0x3D' 'sysbus WriteDoubleWord 0x4002001C 0x38001A00' 'sysbus WriteDoubleWord 0x40020014 0x8' \
-      'sysbus WriteDoubleWord 0x40020010 0x401' 'sysbus.dmamux1 OnGPIO 41 true' 'sysbus.dmamux1 OnGPIO 41 false' 'echo "R-BASE"' 'sysbus ReadDoubleWord 0x38001A00'
+      'sysbus WriteDoubleWord 0x40020010 0x401' "${pulse[@]}" 'echo "R-BASE"' 'sysbus ReadDoubleWord 0x38001A00'
     check "offset: a stream disabled by software after 3 of 8 items has TCIF0 set (p654; it was clear before) and NDTR 5; re-armed on a new M0AR, its next item lands at the new base (p654, p666), and the run passes" \
       "passed offset && [ \"\$(readout offset LISR0)\" = 0x00000000 ] && [ \"\$(readout offset LISR)\" = 0x00000020 ] && [ \"\$(readout offset NDTR)\" = 0x00000005 ] && [ \"\$(readout offset BASE)\" = 0xFFFFFF00 ]" ;;
   offsetndt)
@@ -267,10 +288,66 @@ tviburiDma2:\
     # p665 reloads NDT after a completed transfer, which TCIF declared this one: the twin cannot say which count runs.
     run_case offsetndt - "$clk" 'sysbus WriteDoubleWord 0x40020800 0x29' 'sysbus WriteDoubleWord 0x40020018 0x40011024' \
       'sysbus WriteDoubleWord 0x4002001C 0x38001900' 'sysbus WriteDoubleWord 0x40020014 0x8' 'sysbus WriteDoubleWord 0x40020010 0x401' \
-      'sysbus.dmamux1 OnGPIO 41 true' 'sysbus.dmamux1 OnGPIO 41 false' 'sysbus WriteDoubleWord 0x40020010 0x400' \
+      "${pulse[@]}" 'sysbus WriteDoubleWord 0x40020010 0x400' \
       'sysbus WriteDoubleWord 0x4002001C 0x38001A00' 'sysbus WriteDoubleWord 0x40020010 0x401'
     check "offsetndt: a stream re-enabled after a software suspension with no NDTR write refuses TVI-DMA-OFFSET, unmodeled (p654, p665)" \
       "[ \$rc = 3 ] && first offsetndt 'r[\"rule\"] == \"TVI-DMA-OFFSET\" and r[\"kind\"] == \"unmodeled\" and \"p654\" in r[\"citation\"]'" ;;
+  circ)
+    # TVI-WO-1303a (ruled 2026-11-25T18:49Z Q1, Q3): DMA1 stream 0, P2M on 41 (raised by hand), bytes from AXI SRAM into SRAM4,
+    # NDT = 4, CR = 0x509 (CIRC, HTIE, MINC, EN; TCIE = 0, so the stream's line is the half-transfer interrupt alone). Two
+    # requests: HTIF0 set at the second (p657), not the first, and IRQ 11 pending through the guard's line. Two more: the
+    # wrap: NDT reloaded to 4 (p647, p665), EN still 1 and TCIF0 set (inferred from p654 against p665). A fifth lands at the
+    # base (the stock offset reset). LIFCR clears both flags (p660) and the line falls (IRQ 11 cleared at the NVIC stays
+    # clear); the sixth sets HTIF again (the second cycle's half); a reset clears the guard's HTIF.
+    run_case circ - "$clk" 'sysbus WriteDoubleWord 0x40020800 0x29' 'sysbus WriteDoubleWord 0x40020018 0x24000000' 'sysbus WriteDoubleWord 0x4002001C 0x38001900' \
+      'sysbus WriteDoubleWord 0x40020014 0x4' 'sysbus WriteDoubleWord 0x40020010 0x508' 'sysbus WriteDoubleWord 0x40020010 0x509' \
+      'sysbus WriteDoubleWord 0x24000000 0x1' "${pulse[@]}" 'echo "R-LISR1"' 'sysbus ReadDoubleWord 0x40020000' 'sysbus WriteDoubleWord 0x24000000 0x2' "${pulse[@]}" 'echo "R-LISR2"' 'sysbus ReadDoubleWord 0x40020000' 'echo "R-ISPR0"' 'sysbus ReadDoubleWord 0xE000E200' \
+      'sysbus WriteDoubleWord 0x24000000 0x3' "${pulse[@]}" 'sysbus WriteDoubleWord 0x24000000 0x4' "${pulse[@]}" 'echo "R-NDTR"' 'sysbus ReadDoubleWord 0x40020014' 'echo "R-CR"' 'sysbus ReadDoubleWord 0x40020010' \
+      'echo "R-LISR4"' 'sysbus ReadDoubleWord 0x40020000' 'sysbus WriteDoubleWord 0x24000000 0x5' "${pulse[@]}" 'echo "R-BUF"' 'sysbus ReadDoubleWord 0x38001900' \
+      'sysbus WriteDoubleWord 0x40020008 0x30' 'echo "R-LISRC"' 'sysbus ReadDoubleWord 0x40020000' \
+      'sysbus WriteDoubleWord 0xE000E280 0x800' 'echo "R-ISPRC"' 'sysbus ReadDoubleWord 0xE000E200' \
+      'sysbus WriteDoubleWord 0x24000000 0x6' "${pulse[@]}" 'echo "R-LISR6"' 'sysbus ReadDoubleWord 0x40020000' 'machine Reset' "$clk" 'echo "R-LISRR"' 'sysbus ReadDoubleWord 0x40020000'
+    check "circ: a circular stream sets HTIF at half with its interrupt through the guard (p657), and at the wrap reloads NDT = 4 with EN still 1 and TCIF set (p647, p665; inferred from p654 against p665); the fifth item lands at the base; LIFCR clears both flags; a reset clears HTIF; the run passes" \
+      "passed circ && [ \"\$(readout circ LISR1)\" = 0x00000000 ] && [ \"\$(readout circ LISR2)\" = 0x00000010 ] && [ \$(( \$(readout circ ISPR0) >> 11 & 1 )) = 1 ] && [ \"\$(readout circ NDTR)\" = 0x00000004 ] && [ \"\$(readout circ CR)\" = 0x00000509 ] && [ \"\$(readout circ LISR4)\" = 0x00000030 ] && [ \"\$(readout circ BUF)\" = 0x04030205 ] && [ \"\$(readout circ LISRC)\" = 0x00000000 ] && [ \$(( \$(readout circ ISPRC) >> 11 & 1 )) = 0 ] && [ \"\$(readout circ LISR6)\" = 0x00000010 ] && [ \"\$(readout circ LISRR)\" = 0x00000000 ]" ;;
+  circoff)
+    # TVI-WO-1303a (ruled Q4): the same stream with CIRC = 0 and TCIE (CR = 0x411): at the fourth request EN is cleared
+    # (p654, p665), TCIF0 set, NDT 0, and the transfer-complete interrupt (IRQ 11) reaches the NVIC through the guard's line,
+    # raised by a request, outside any register write (the tap); a fifth request moves nothing.
+    run_case circoff - "$clk" 'sysbus WriteDoubleWord 0x40020800 0x29' 'sysbus WriteDoubleWord 0x40020018 0x24000000' 'sysbus WriteDoubleWord 0x4002001C 0x38001900' \
+      'sysbus WriteDoubleWord 0x40020014 0x4' 'sysbus WriteDoubleWord 0x40020010 0x410' 'sysbus WriteDoubleWord 0x40020010 0x411' \
+      'sysbus WriteDoubleWord 0x24000000 0x1' "${pulse[@]}" 'sysbus WriteDoubleWord 0x24000000 0x2' "${pulse[@]}" 'sysbus WriteDoubleWord 0x24000000 0x3' "${pulse[@]}" 'sysbus WriteDoubleWord 0x24000000 0x4' "${pulse[@]}" 'echo "R-CR"' 'sysbus ReadDoubleWord 0x40020010' 'echo "R-NDTR"' 'sysbus ReadDoubleWord 0x40020014' \
+      'echo "R-LISR"' 'sysbus ReadDoubleWord 0x40020000' 'echo "R-ISPR0"' 'sysbus ReadDoubleWord 0xE000E200' 'sysbus WriteDoubleWord 0x24000000 0x5' "${pulse[@]}" 'echo "R-BUF"' 'sysbus ReadDoubleWord 0x38001900'
+    check "circoff: the same stream with CIRC = 0 ends with EN cleared (CR reads 0x410), NDT 0 and TCIF set (p654, p665), its interrupt pending at the NVIC (IRQ 11); a fifth request moves nothing; the run passes" \
+      "passed circoff && [ \"\$(readout circoff CR)\" = 0x00000410 ] && [ \"\$(readout circoff NDTR)\" = 0x00000000 ] && [ \"\$(readout circoff LISR)\" = 0x00000020 ] && [ \$(( \$(readout circoff ISPR0) >> 11 & 1 )) = 1 ] && [ \"\$(readout circoff BUF)\" = 0x04030201 ]" ;;
+  tcie)
+    # TVI-WO-1303a (adversarial pass): the guard drives the line from TCIE and TCIF (Table 116 p658). A P2M stream with TCIE = 0
+    # ends after two requests (TCIF set, EN cleared, no interrupt); a CR write setting TCIE then raises IRQ 11, which the stock
+    # model's line never did (it recomputes only when TCIF changes).
+    run_case tcie - "$clk" 'sysbus WriteDoubleWord 0x40020800 0x29' 'sysbus WriteDoubleWord 0x40020018 0x24000000' 'sysbus WriteDoubleWord 0x4002001C 0x38001900' \
+      'sysbus WriteDoubleWord 0x40020014 0x2' 'sysbus WriteDoubleWord 0x40020010 0x400' 'sysbus WriteDoubleWord 0x40020010 0x401' \
+      'sysbus WriteDoubleWord 0x24000000 0x1' "${pulse[@]}" 'sysbus WriteDoubleWord 0x24000000 0x2' "${pulse[@]}" 'echo "R-ISPRA"' 'sysbus ReadDoubleWord 0xE000E200' 'echo "R-LISR"' 'sysbus ReadDoubleWord 0x40020000' \
+      'sysbus WriteDoubleWord 0x40020010 0x410' 'echo "R-ISPRB"' 'sysbus ReadDoubleWord 0xE000E200'
+    check "tcie: TCIE set after a transfer ended with TCIF pending raises the stream's interrupt at once (Table 116 p658), through the guard's line; the run passes" \
+      "passed tcie && [ \$(( \$(readout tcie ISPRA) >> 11 & 1 )) = 0 ] && [ \"\$(readout tcie LISR)\" = 0x00000020 ] && [ \$(( \$(readout tcie ISPRB) >> 11 & 1 )) = 1 ]" ;;
+  circhi)
+    # TVI-WO-1303a (adversarial pass): a high stream, DMA1 stream 7 (HISR/HIFCR, group at bit 22: HTIF7 bit 26, TCIF7 bit 27,
+    # p660-661; IRQ 47, ISPR1 bit 15), circular, NDT = 4, HTIE: two requests set HTIF7; HIFCR clears it; two more wrap.
+    run_case circhi - "$clk" 'sysbus WriteDoubleWord 0x4002081C 0x29' 'sysbus WriteDoubleWord 0x400200C0 0x24000000' 'sysbus WriteDoubleWord 0x400200C4 0x38001900' \
+      'sysbus WriteDoubleWord 0x400200BC 0x4' 'sysbus WriteDoubleWord 0x400200B8 0x508' 'sysbus WriteDoubleWord 0x400200B8 0x509' \
+      'sysbus WriteDoubleWord 0x24000000 0x1' "${pulse[@]}" 'sysbus WriteDoubleWord 0x24000000 0x2' "${pulse[@]}" 'echo "R-HISR2"' 'sysbus ReadDoubleWord 0x40020004' 'echo "R-ISPR1"' 'sysbus ReadDoubleWord 0xE000E204' \
+      'sysbus WriteDoubleWord 0x4002000C 0x4000000' 'echo "R-HISRC"' 'sysbus ReadDoubleWord 0x40020004' \
+      'sysbus WriteDoubleWord 0x24000000 0x3' "${pulse[@]}" 'sysbus WriteDoubleWord 0x24000000 0x4' "${pulse[@]}" 'echo "R-HISR4"' 'sysbus ReadDoubleWord 0x40020004' 'echo "R-NDTR"' 'sysbus ReadDoubleWord 0x400200BC'
+    check "circhi: DMA1 stream 7, circular: HTIF7 at the half in HISR (bit 26) with IRQ 47 pending, cleared by HIFCR's CHTIF7; the wrap sets TCIF7 (bit 27) and reloads NDT (p660-661, p647); the run passes" \
+      "passed circhi && [ \"\$(readout circhi HISR2)\" = 0x04000000 ] && [ \$(( \$(readout circhi ISPR1) >> 15 & 1 )) = 1 ] && [ \"\$(readout circhi HISRC)\" = 0x00000000 ] && [ \"\$(readout circhi HISR4)\" = 0x08000000 ] && [ \"\$(readout circhi NDTR)\" = 0x00000004 ]" ;;
+  circrec)
+    # TVI-WO-1303a (adversarial pass): dma1 recorded: CIRC cleared on a running circular stream records a would-refuse
+    # (TVI-DMA-CIRC), and the access goes on with CIRC kept, as the twin cannot say what silicon does with it.
+    PLATFORM_SED='/^tviburiDma1:$/{n;s/enforcing/recorded/}' run_case circrec - "$clk" 'sysbus WriteDoubleWord 0x40020800 0x29' \
+      'sysbus WriteDoubleWord 0x40020018 0x24000000' 'sysbus WriteDoubleWord 0x4002001C 0x38001900' 'sysbus WriteDoubleWord 0x40020014 0x4' \
+      'sysbus WriteDoubleWord 0x40020010 0x500' 'sysbus WriteDoubleWord 0x40020010 0x501' 'sysbus WriteDoubleWord 0x40020010 0x401' \
+      'echo "R-CR"' 'sysbus ReadDoubleWord 0x40020010'
+    check "circrec: dma1 recorded: CIRC cleared on a running circular stream records one would-refuse (TVI-DMA-CIRC) and CR keeps CIRC (reads 0x501); never a pass at the check" \
+      "[ \$rc = 1 ] && [ \"\$(grep -c '\"tviburi\":\"would-refuse\".*TVI-DMA-CIRC' '$work/circrec/renode-log.txt')\" = 1 ] && [ \"\$(readout circrec CR)\" = 0x00000501 ]" ;;
   reflect)
     # TVI-WO-1305 (ruled 2026-11-24T19:13Z): the suspension reaches the stock STM32DMA's private members by reflection; a
     # Renode build without one must refuse by name, never pass silently. Planted: a copy of the tree whose guard asks for a
