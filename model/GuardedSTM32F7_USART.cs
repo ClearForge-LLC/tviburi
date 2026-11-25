@@ -188,8 +188,7 @@ namespace Antmicro.Renode.Peripherals.Tviburi
         }
 
         // UE as this guard holds it, for the RCC guard's TVI-RCC-CLOCK (TVI-WO-1300b (2): a USART with UE = 1 is running).
-        public bool UeSet => (cr1 & UeBit) != 0;
-        public bool IsRunning => UeSet;
+        public bool IsRunning => (cr1 & UeBit) != 0;
         public string RunningName => "UE";
         public string KernelCitation => "§48.5.1 p2019 (\"The usart_ker_ck is the USART clock source\")";
 

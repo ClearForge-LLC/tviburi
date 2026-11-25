@@ -212,7 +212,7 @@ EOF
   ledger)
     mkdir -p "$work/ledger"
     rc=0; container -v "$src:/repo:ro,Z" -v "$work/ledger:/out:Z" "$IMAGE" sh -c '/repo/scripts/build-release /repo /out/release >/dev/null' </dev/null >"$work/ledger.stdout" 2>&1 || rc=$?
-    check "ledger: the release carries the I2C guard's field rows over its 11 registers (TIMINGR, DNF, ANFOFF, PE, START modeled; NACKF's absent-address acknowledgement; ICR's reserved bits 1, 2 and 6 acknowledged); the manifest restates i2c1-i2c3 and not i2c4; the stock type's guarded row lists the three, the unguarded row i2c4" \
+    check "ledger: the release carries the I2C guard's field rows over its 11 registers (TIMINGR, DNF, ANFOFF, PE, START modeled; NACKF's absent-address acknowledgement; ICR's reserved bits 1, 2 and 6 acknowledged; the ledger's acknowledged absent addresses are exactly the guard's Absent table); the manifest restates i2c1-i2c3 and not i2c4; the stock type's guarded row lists the three, the unguarded row i2c4" \
       "[ \$rc = 0 ] && python3 -I -c '
 import json, sys
 rows = [json.loads(l) for l in open(sys.argv[1]).read().splitlines()[1:]]
@@ -229,8 +229,14 @@ ok = ok and len(mg) == 1 and mg[0].get(\"guarded_by\") == g and mg[0][\"instance
 ok = ok and len(mu) == 1 and \"guarded_by\" not in mu[0] and mu[0][\"instances\"] == [\"i2c4\"]
 r = sorted(l.split()[2] for l in open(sys.argv[2]) if l.startswith(\"restate I2C.STM32F7_I2C \"))
 ok = ok and r == [\"i2c1\", \"i2c2\", \"i2c3\"]
+import re
+cs = open(sys.argv[3]).read()
+code = {p: sorted(int(x, 16) for x in re.findall(r\"0x[0-9A-F]+\", a)) for p, a in re.findall(r\"\\[\\\"(i2c\\d)\\\"\\] = new\\[\\] \\{([^}]*)\\}\", cs)}
+text = by[(\"I2C_ISR\", \"NACKF\")][\"behaves_as\"]
+said = {p: sorted(int(x, 16) for x in re.findall(r\"0x[0-9a-fA-F]+\", a)) for p, a in re.findall(r\"(i2c\\d)((?: 0x[0-9a-fA-F]+)+)\", text)}
+ok = ok and code == said and len(code) == 2
 sys.exit(0 if ok else 1)
-' '$work/ledger/release/LEDGER.jsonl' '$work/ledger/release/MANIFEST'" ;;
+' '$work/ledger/release/LEDGER.jsonl' '$work/ledger/release/MANIFEST' '$src/model/GuardedSTM32F7_I2C.cs'" ;;
   regen)
     rc=0; python3 -I "$src/tests/1306/fields.py" "$src/tests/1306/data/rm0433-rev9-i2c-fields.tsv" > "$work/fields.cs" || rc=$?
     mkdir -p "$work/regen"
