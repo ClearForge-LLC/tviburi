@@ -30,6 +30,11 @@
 //!                        reached, would abort Renode (measure.md §2.3 I8b).
 //!   path="midstart"    - config, a write of 2 with one byte sent, then a START: TVI-I2C-TRANSFER, unmodeled.
 //!   path="midcr2"      - config, a write of 2 with one byte sent, then CR2.NBYTES rewritten: TVI-I2C-TRANSFER (p2004).
+//!   path="txdrread"    - config, a read START, then a TXDR write: TVI-I2C-TRANSFER, unmodeled (p2014; the stock model would send it).
+//!   path="stopidle"    - config, then STOP with no transfer: TVI-I2C-TRANSFER, unmodeled (p2005: controller mode only).
+//!   path="startstop"   - config, then START and STOP in one CR2 write: TVI-I2C-TRANSFER, unmodeled.
+//!   path="stalestop"   - config, a read with AUTOEND (STOPF, left set), a write of 2 with one byte sent, then a START: TVI-I2C-TRANSFER,
+//!                        unmodeled, at the START (the STOPF left from before does not end the write).
 //!   path="blindclear"  - config, a read of 1 with AUTOEND (STOPF once its byte is read), ICR.STOPCF with no ISR read before it,
 //!                        then the chip id: passes (the transfer ended at the STOPF the ICR write cleared). MARK_READ = RXDR (0x60).
 //!   path="softreset"   - config, a read of 2 from the BME280 with one byte read, then PE cleared: passes. MARK_READ = ISR after the
@@ -238,6 +243,31 @@ pub unsafe extern "C" fn reset() -> ! {
         w(CR2, 2 << 16 | START | BME);
         w(TXDR, 0xD0);
         w(CR2, 3 << 16 | BME);
+    }
+    #[cfg(path = "txdrread")]
+    {
+        config();
+        w(CR2, AUTOEND | 1 << 16 | RD | START | BME);
+        w(TXDR, 0xF7);
+    }
+    #[cfg(path = "stopidle")]
+    {
+        config();
+        w(CR2, STOP);
+    }
+    #[cfg(path = "startstop")]
+    {
+        config();
+        w(CR2, 1 << 16 | START | STOP | BME);
+    }
+    #[cfg(path = "stalestop")]
+    {
+        config();
+        w(CR2, AUTOEND | 1 << 16 | RD | START | BME);
+        let _ = r(RXDR);
+        w(CR2, 2 << 16 | START | BME);
+        w(TXDR, 0xD0);
+        w(CR2, 1 << 16 | RD | START | BME);
     }
     #[cfg(path = "blindclear")]
     {

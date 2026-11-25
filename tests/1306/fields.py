@@ -83,7 +83,7 @@ def cls(reg, f, msb, lsb, page):
         return ('Zero', U, '0 only: the stock model has no register 0x14; SMBus timeouts are not modeled; reads 0')
     if r == 'ISR':
         if f == 'TXE':
-            return ('Any', I, 'the stock model: 1 written flushes TXDR; set at PE = 0 (p2011)')
+            return ('Zero', I, '0 only: the stock model\'s TXE always reads 1 (it holds no TXDR), so a flush (1 written) is not modeled; set at PE = 0 (p2011)')
         if f == 'TXIS':
             return ('Zero', I, '0 only: writing 1 generates TXIS with NOSTRETCH = 1 only, ' + TARGET)
         if f == 'NACKF':
@@ -100,7 +100,7 @@ def cls(reg, f, msb, lsb, page):
             'STOPCF': ('Any', I, 'the stock model clears STOPF'),
             'NACKCF': ('Any', I, 'clears NACKF, which the stock model never sets: a write that changes nothing (the generated firmware\'s '
                        'ICR = 0x30; ' + RULED + ' Q11)'),
-            'ADDRCF': ('Any', I, 'the stock model clears ADDR'),
+            'ADDRCF': ('Zero', I, '0 only: ' + TARGET + ' (in controller mode the stock model clears TXIS, where silicon clears ADDR and a pending START, p2012)'),
         }[f]
     if r == 'PECR':
         return ('Any', RO, 'read-only: reads 0 (PECEN 0 only); a write is ignored')

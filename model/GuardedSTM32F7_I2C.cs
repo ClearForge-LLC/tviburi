@@ -35,12 +35,16 @@
 //                     TVI-WO-1300): "The I2C kernel is clocked by i2c_ker_ck" (§47.4.3 p1954) and "no clock will be provided to
 //                     the peripheral" (p371). predicted-fault; unmodeled where the query has no rule (i2c3) or no RCC guard is
 //                     found (ruled Q3).
-//   TVI-I2C-TRANSFER  a transfer the bus would not make (ruled Q8), unmodeled: a START or a TXDR write with PE = 0 (p2003
-//                     "Peripheral disabled"); a START with NBYTES = 0 and RELOAD = 0, never passed on, even recorded (the stock
-//                     model hands the device an empty write and Renode aborts, measure.md §2.3 I8b; recorded, the write goes on
-//                     with START cleared); a START while a transfer is open; CR2's NBYTES, HEAD10R, ADD10, RD_WRN or SADD changed
-//                     while a transfer is open ("not allowed", p2004-2006). A transfer is open from a START this guard passes until
-//                     the stock model shows TC, TCR or STOPF, a STOP is written, or PE is cleared.
+//   TVI-I2C-TRANSFER  a transfer the bus would not make (ruled Q8; the adversarial pass's F1-F4), unmodeled: a START, STOP or
+//                     TXDR write with PE = 0 (p2003 "Peripheral disabled"); a TXDR write outside a write transfer's data phase
+//                     (p2014: the stock model would send the byte); START and STOP in one write; a START with NBYTES = 0 and
+//                     RELOAD = 0 (the stock model hands the device an empty write and Renode aborts, measure.md §2.3 I8b); a START
+//                     while a transfer is open (silicon queues it after NBYTES, p2005; the stock model starts at once); a STOP
+//                     with no transfer (p2005: controller mode only; the stock model sets STOPF); CR2's NBYTES, HEAD10R, ADD10,
+//                     RD_WRN or SADD changed while a transfer is open (p1973). An empty START (NBYTES = 0) is never passed on,
+//                     recorded or not: recorded, the write goes on with START cleared. A transfer is open from a START this guard
+//                     passes until the stock model shows TC, TCR or a STOPF that was not already set at that START, a STOP is
+//                     written, or PE is cleared.
 //   TVI-I2C-ABSENT    a START to an address with no device: the stock model sets no NACKF and the firmware times out, where
 //                     silicon NACKs and sends a STOP (§47.4.9 p1975). Acknowledged by name, with no record, for the measured
 //                     addresses only (`Absent`; ruled Q9); any other is unmodeled. Passing one, the guard writes the stock
@@ -108,8 +112,9 @@ namespace Antmicro.Renode.Peripherals.Tviburi
             lock(sync)
             {
                 inner.Reset();
+                inner.WriteDoubleWord(Cr1Offset, 0);   // the stock Reset leaves TXIS; its PE = 0 callback clears it (ISR 0x1, p2009)
                 cr1 = timingr = 0;
-                open = clearedLast = false;
+                open = controller = staleStopf = clearedLast = false;
             }
         }
 
@@ -204,10 +209,11 @@ namespace Antmicro.Renode.Peripherals.Tviburi
                 {
                     refused |= RefusedKernel(value);
                 }
-                var empty = false;
+                // An empty START (NBYTES = 0) never reaches the stock model, recorded or not: it hands the device an empty write.
+                var empty = offset == Cr2Offset && (value & StartBit) != 0 && ((value >> 16) & 0xFF) == 0;
                 if(!refused || records.Recorded)
                 {
-                    refused |= RefusedTransfer(offset, value, width, out empty);
+                    refused |= RefusedTransfer(offset, value, width);
                 }
                 if(!empty && (!refused || records.Recorded))
                 {
@@ -249,14 +255,16 @@ namespace Antmicro.Renode.Peripherals.Tviburi
                 inner.WriteDoubleWord(offset, word);
                 return;
             case Cr2Offset:
+                var stopf = (inner.ReadDoubleWord(IsrOffset) & StopfBit) != 0;
                 inner.WriteDoubleWord(offset, word);
                 if((word & StopBit) != 0)
                 {
-                    open = false;
+                    open = controller = false;
                 }
                 if((word & StartBit) != 0)
                 {
-                    open = true;
+                    open = controller = true;
+                    staleStopf = stopf;   // the stock START leaves STOPF, as silicon does: an earlier STOPF ends nothing here
                     var a = Address(word);
                     if(!TryGetByAddress(a, out var _))
                     {
@@ -297,7 +305,7 @@ namespace Antmicro.Renode.Peripherals.Tviburi
             }
             inner.WriteDoubleWord(Cr2Offset, cr2);
             inner.WriteDoubleWord(Cr1Offset, word);
-            open = false;
+            open = controller = staleStopf = false;
         }
 
         // ---- the rules -----------------------------------------------------------------------------------------
@@ -419,35 +427,50 @@ namespace Antmicro.Renode.Peripherals.Tviburi
         }
 
         // TVI-I2C-TRANSFER (ruled Q8).
-        private bool RefusedTransfer(long offset, uint word, int width, out bool empty)
+        private bool RefusedTransfer(long offset, uint word, int width)
         {
-            empty = false;
             string what = null, page = null;
+            var start = offset == Cr2Offset && (word & StartBit) != 0;
+            var stop = offset == Cr2Offset && (word & StopBit) != 0;
             if(offset == TxdrOffset && !IsRunning)
             {
                 what = "TXDR written with PE = 0";
                 page = "§47.9.1 p2003 (PE: \"0: Peripheral disabled\")";
             }
-            else if(offset == Cr2Offset && (word & StartBit) != 0 && !IsRunning)
+            else if(offset == TxdrOffset && !(Open() && (inner.ReadDoubleWord(Cr2Offset) & RdWrnBit) == 0))
             {
-                what = "START with PE = 0";
+                what = "TXDR written outside a write transfer's data phase (no START since, a read transfer, or its NBYTES already sent; the stock model sends the byte to the device)";
+                page = "§47.9.11 p2014 (\"These bits can be written only when TXE = 1\")";
+            }
+            else if((start || stop) && !IsRunning)
+            {
+                what = (start ? "START" : "STOP") + " with PE = 0";
                 page = "§47.9.1 p2003 (PE: \"0: Peripheral disabled\")";
             }
-            else if(offset == Cr2Offset && (word & StartBit) != 0 && ((word >> 16) & 0xFF) == 0 && (word & ReloadBit) == 0)
+            else if(start && stop)
             {
-                empty = true;
+                what = "START and STOP in one write (the stock model ignores both; RM0433 does not say what silicon does)";
+                page = "§47.9.2 p2005 (START, STOP)";
+            }
+            else if(start && ((word >> 16) & 0xFF) == 0 && (word & ReloadBit) == 0)
+            {
                 what = "START with NBYTES = 0 and RELOAD = 0 (never passed on: the stock model hands the device an empty write, and Renode aborts)";
                 page = "§47.9.2 p2004 (NBYTES); not in the text; TVI-WO-1306.measure.md §2.3 I8b";
             }
-            else if(offset == Cr2Offset && Open() && (word & StartBit) != 0)
+            else if(start && Open())
             {
-                what = "START while a transfer is open (no TC, TCR or STOPF since its START, no STOP, no PE clear)";
-                page = "§47.4.9 p1975 (a RESTART follows TC); not in the text otherwise";
+                what = "START while a transfer is open (silicon queues a repeated START after the NBYTES transfer, where the stock model starts at once and abandons the open transfer)";
+                page = "§47.9.2 p2005 (START: \"generates a repeated START condition ... after the end of the NBYTES transfer\")";
+            }
+            else if(stop && !Controller())
+            {
+                what = "STOP with no transfer (no START since the last STOP, STOPF or PE clear; the stock model sets STOPF)";
+                page = "§47.9.2 p2005 (STOP: \"This bit only pertains to controller mode\")";
             }
             else if(offset == Cr2Offset && Open() && ((inner.ReadDoubleWord(Cr2Offset) ^ word) & Cr2Held) != 0)
             {
                 what = "CR2's NBYTES, HEAD10R, ADD10, RD_WRN or SADD changed while a transfer is open";
-                page = "§47.9.2 p2004-2006 (\"Changing these bits when the START bit is set is not allowed\")";
+                page = "§47.4.9 p1973 (\"Changing these bitfields is not allowed as long as the START bit is set\"; after the address, not in the text)";
             }
             if(what == null)
             {
@@ -484,14 +507,26 @@ namespace Antmicro.Renode.Peripherals.Tviburi
         }
 
         // A transfer is open from a START this guard passed until the stock model shows TC, TCR or STOPF (checked at every access,
-        // before it is passed on), a STOP, or a PE clear.
+        // before it is passed on), a STOP, or a PE clear. A STOPF already set at that START (the stock model's START leaves it,
+        // as silicon's does) ends nothing until it has been cleared. The port is in controller mode from that START until a
+        // STOPF of its own, a STOP, or a PE clear.
         private bool Open()
         {
-            if(open && (inner.ReadDoubleWord(IsrOffset) & (TcBit | TcrBit | StopfBit)) != 0)
+            var isr = inner.ReadDoubleWord(IsrOffset);
+            staleStopf &= (isr & StopfBit) != 0;
+            var stopf = !staleStopf && (isr & StopfBit) != 0;
+            if(open && (stopf || (isr & (TcBit | TcrBit)) != 0))
             {
                 open = false;
             }
+            controller &= !stopf;
             return open;
+        }
+
+        private bool Controller()
+        {
+            Open();
+            return controller;
         }
 
         // ---- names and state -----------------------------------------------------------------------------------
@@ -550,7 +585,7 @@ namespace Antmicro.Renode.Peripherals.Tviburi
         private readonly object sync = new object();
         private readonly string shareFailure;
         private uint cr1, timingr;
-        private bool open, clearedLast;
+        private bool open, controller, staleStopf, clearedLast;
         private string config;
 
         // The absent addresses measured (TVI-WO-1306.measure.md §2.1): ArduPilot's probes on i2c1 and i2c2 (both runs), and the
@@ -581,6 +616,7 @@ namespace Antmicro.Renode.Peripherals.Tviburi
         private const uint StartBit = 1u << 13;
         private const uint StopBit = 1u << 14;
         private const uint ReloadBit = 1u << 24;
+        private const uint RdWrnBit = 1u << 10;
         private const uint Cr2Held = 0x00FF1FFF;        // NBYTES, HEAD10R, ADD10, RD_WRN, SADD (p2004-2006)
         private const uint TcBit = 1u << 6;
         private const uint TcrBit = 1u << 7;
@@ -733,7 +769,7 @@ namespace Antmicro.Renode.Peripherals.Tviburi
             R("I2C_ISR", 0x018, "§47.9.7", "ADDR", 3, 3, Any, "read-only", "read-only: a write is ignored and changes nothing (no record, RUL-18 as amended)", 2011),
             R("I2C_ISR", 0x018, "§47.9.7", "RXNE", 2, 2, Any, "read-only", "read-only: a write is ignored and changes nothing (no record, RUL-18 as amended)", 2011),
             R("I2C_ISR", 0x018, "§47.9.7", "TXIS", 1, 1, Zero, "inherited, unaudited (acknowledged by name)", "0 only: writing 1 generates TXIS with NOSTRETCH = 1 only, target (slave) mode is not modeled", 2011),
-            R("I2C_ISR", 0x018, "§47.9.7", "TXE", 0, 0, Any, "inherited, unaudited (acknowledged by name)", "the stock model: 1 written flushes TXDR; set at PE = 0 (p2011)", 2011),
+            R("I2C_ISR", 0x018, "§47.9.7", "TXE", 0, 0, Zero, "inherited, unaudited (acknowledged by name)", "0 only: the stock model's TXE always reads 1 (it holds no TXDR), so a flush (1 written) is not modeled; set at PE = 0 (p2011)", 2011),
             R("I2C_ICR", 0x01C, "§47.9.8", "Reserved", 31, 14, Zero, "reserved", "reserved: must be kept at reset value", 2012),
             R("I2C_ICR", 0x01C, "§47.9.8", "ALERTCF", 13, 13, Zero, "tag", "0 only: a stock tag; SMBus is not modeled", 2012),
             R("I2C_ICR", 0x01C, "§47.9.8", "TIMOUTCF", 12, 12, Zero, "tag", "0 only: a stock tag; SMBus is not modeled", 2012),
@@ -745,7 +781,7 @@ namespace Antmicro.Renode.Peripherals.Tviburi
             R("I2C_ICR", 0x01C, "§47.9.8", "Res6", 6, 6, Any, "inherited, unaudited (acknowledged by name)", "ChibiOS writes 1 here (ICR = 0x2, 0x4 or 0x40, the TXIS, RXNE and TC positions of ISR, at every ICR write it makes, TVI-WO-1306.measure.md §2.1); RM0433 marks the bits reserved, \"must be kept at reset value\" (p2012); a clear register: the write clears nothing (ruled 2026-11-25T05:06Z Q10)", 2012),
             R("I2C_ICR", 0x01C, "§47.9.8", "STOPCF", 5, 5, Any, "inherited, unaudited (acknowledged by name)", "the stock model clears STOPF", 2012),
             R("I2C_ICR", 0x01C, "§47.9.8", "NACKCF", 4, 4, Any, "inherited, unaudited (acknowledged by name)", "clears NACKF, which the stock model never sets: a write that changes nothing (the generated firmware's ICR = 0x30; ruled 2026-11-25T05:06Z Q11)", 2012),
-            R("I2C_ICR", 0x01C, "§47.9.8", "ADDRCF", 3, 3, Any, "inherited, unaudited (acknowledged by name)", "the stock model clears ADDR", 2012),
+            R("I2C_ICR", 0x01C, "§47.9.8", "ADDRCF", 3, 3, Zero, "inherited, unaudited (acknowledged by name)", "0 only: target (slave) mode is not modeled (in controller mode the stock model clears TXIS, where silicon clears ADDR and a pending START, p2012)", 2012),
             R("I2C_ICR", 0x01C, "§47.9.8", "Res2_1", 2, 1, Any, "inherited, unaudited (acknowledged by name)", "ChibiOS writes 1 here (ICR = 0x2, 0x4 or 0x40, the TXIS, RXNE and TC positions of ISR, at every ICR write it makes, TVI-WO-1306.measure.md §2.1); RM0433 marks the bits reserved, \"must be kept at reset value\" (p2012); a clear register: the write clears nothing (ruled 2026-11-25T05:06Z Q10)", 2012),
             R("I2C_ICR", 0x01C, "§47.9.8", "Res0", 0, 0, Zero, "reserved", "reserved: must be kept at reset value", 2012),
             R("I2C_PECR", 0x020, "§47.9.9", "Reserved", 31, 8, Any, "read-only", "reserved in a read-only register: a write is ignored and changes nothing (no record, RUL-18 as amended)", 2013),

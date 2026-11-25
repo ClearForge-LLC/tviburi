@@ -795,3 +795,13 @@ mutant	I236-completionTracked	6.3
 mutant	I237-reservedNotServed	6.3
 case	i2c-blindclear	6.2
 mutant	I238-absentListAgrees	6.3
+mutant	I239-txdrOutside	6.3
+mutant	I240-startStop	6.3
+mutant	I241-stopIdle	6.3
+mutant	I242-staleStopf	6.3
+mutant	I243-resetTxis	6.3
+mutant	I244-emptyEveryPath	6.3
+case	i2c-txdrread	6.2
+case	i2c-stopidle	6.2
+case	i2c-startstop	6.2
+case	i2c-stalestop	6.2

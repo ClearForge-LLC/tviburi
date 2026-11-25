@@ -11,7 +11,7 @@ set -euo pipefail
 
 here=$(cd "$(dirname "$0")/../.." && pwd)
 IMAGE=$(sed -n 's/^IMAGE=//p' "$here/tests/spike.sh")
-CASES="config timingrpe timingrsame timingroff dnfpe anfoff clearfield ap absent icrres field width read kernel reset resetok startoff txdroff empty midstart midcr2 blindclear softreset clock registrations recorded rccreset unheld clocklost absentname fields ledger regen"
+CASES="config timingrpe timingrsame timingroff dnfpe anfoff clearfield ap absent icrres field width read kernel reset resetok startoff txdroff empty midstart midcr2 txdrread stopidle startstop stalestop blindclear softreset clock registrations recorded rccreset unheld clocklost absentname fields ledger regen"
 GUARDS="spi1 rcc gpioPortA gpioPortB gpioPortC gpioPortD gpioPortE gpioPortF gpioPortG gpioPortH gpioPortI gpioPortJ gpioPortK timer1 timer8 dma1 dma2 flashController usart1 usart2 usart3 uart4 uart5 usart6 uart7 uart8 i2c1 i2c2 i2c3"
 MONITOR="clock registrations recorded rccreset unheld clocklost absentname fields ledger regen"
 PATHS=$(for c in $CASES; do case " $MONITOR " in *" $c "*) ;; *) printf '"%s",' "$c" ;; esac; done | sed 's/,$//')
@@ -142,8 +142,16 @@ for t in ${TVIBURI_TESTS:-$CASES}; do
     "refuses empty TVI-I2C-TRANSFER unmodeled 'r[\"access\"][\"offset\"] == \"0x4\" and \"NBYTES = 0 and RELOAD = 0\" in r[\"condition\"]' && grep -q 'renode-exit=0' '$work/empty.stdout' && ! grep -q 'Sequence contains no elements' '$work/empty/renode.out'" ;;
   midstart) check "midstart: a START while a write of 2 has sent 1 byte refuses TVI-I2C-TRANSFER, unmodeled (ruled Q8)" \
     "refuses midstart TVI-I2C-TRANSFER unmodeled 'r[\"access\"][\"value\"] == \"0x20124EC\" and \"START while a transfer is open\" in r[\"condition\"]'" ;;
-  midcr2) check "midcr2: CR2.NBYTES rewritten while a transfer is open refuses TVI-I2C-TRANSFER, unmodeled (p2004)" \
-    "refuses midcr2 TVI-I2C-TRANSFER unmodeled 'r[\"access\"][\"value\"] == \"0x300EC\" and \"changed while a transfer is open\" in r[\"condition\"] and \"p2004\" in r[\"citation\"]'" ;;
+  midcr2) check "midcr2: CR2.NBYTES rewritten while a transfer is open refuses TVI-I2C-TRANSFER, unmodeled (p1973)" \
+    "refuses midcr2 TVI-I2C-TRANSFER unmodeled 'r[\"access\"][\"value\"] == \"0x300EC\" and \"changed while a transfer is open\" in r[\"condition\"] and \"p1973\" in r[\"citation\"]'" ;;
+  txdrread) check "txdrread: a TXDR write in a read transfer refuses TVI-I2C-TRANSFER, unmodeled (p2014; the stock model would send the byte to the device; adversarial F1)" \
+    "refuses txdrread TVI-I2C-TRANSFER unmodeled 'r[\"access\"][\"offset\"] == \"0x28\" and \"outside a write transfer\" in r[\"condition\"] and \"p2014\" in r[\"citation\"]'" ;;
+  stopidle) check "stopidle: STOP with no transfer refuses TVI-I2C-TRANSFER, unmodeled (p2005: controller mode only; the stock model would set STOPF; adversarial F2)" \
+    "refuses stopidle TVI-I2C-TRANSFER unmodeled 'r[\"access\"][\"value\"] == \"0x4000\" and \"STOP with no transfer\" in r[\"condition\"] and \"p2005\" in r[\"citation\"]'" ;;
+  startstop) check "startstop: START and STOP in one CR2 write refuses TVI-I2C-TRANSFER, unmodeled (the stock model ignores both; adversarial F3)" \
+    "refuses startstop TVI-I2C-TRANSFER unmodeled 'r[\"access\"][\"value\"] == \"0x160EC\" and \"START and STOP in one write\" in r[\"condition\"]'" ;;
+  stalestop) check "stalestop: a STOPF left set from an earlier transfer does not end the next one: a START while that write of 2 has sent 1 byte refuses TVI-I2C-TRANSFER at the START, unmodeled (adversarial F2)" \
+    "refuses stalestop TVI-I2C-TRANSFER unmodeled 'r[\"access\"][\"offset\"] == \"0x4\" and r[\"access\"][\"value\"] == \"0x124EC\" and \"START while a transfer is open\" in r[\"condition\"]'" ;;
   blindclear) check "blindclear: a read of 1 with AUTOEND ends at its RXDR read (STOPF), and ICR clears STOPF with no ISR read before it; the next START passes (the transfer's end was seen at the clearing write), and the chip id reads 0x60" \
     "passes blindclear && [ \"\$(readout blindclear READ)\" = 0x00000060 ]" ;;
   softreset) check "softreset: PE cleared with a received byte unread passes; ISR then reads 0x1 (RXNE reset, TXE set, no TC: p1959, p2011; the stock model alone keeps RXNE, measure.md I4) and CR2 keeps 0x204EC (configuration, p1959)" \
@@ -161,16 +169,19 @@ for t in ${TVIBURI_TESTS:-$CASES}; do
        && grep -q 'i2c1: WriteUInt32 to 0x10 (Timing), value 0x10C7123C' '$work/registrations/renode-log.txt' && grep -q 'i2c1: ReadUInt32 from 0x0 (Control1), returned 0x0' '$work/registrations/renode-log.txt'" ;;
   recorded)
     PLATFORM_SED=$rec run_case recorded - "${cfg[@]}" 'sysbus WriteDoubleWord 0x40005410 0x10C7123D' 'sysbus WriteDoubleWord 0x40005404 0x020020EC' \
-      'sysbus WriteDoubleWord 0x40005400 0x2001' 'echo "R-TIM"' 'sysbus ReadDoubleWord 0x40005410' 'echo "R-CR1"' 'sysbus ReadDoubleWord 0x40005400'
-    check "recorded: i2c1 recorded: TIMINGR changed with PE = 1 records TVI-I2C-PE and passes on (RUL-19), reading 0x10C7123D; an empty START records TVI-I2C-TRANSFER and is passed with START cleared, so Renode does not abort; CR1's reserved bit 13 records TVI-I2C-FIELD and reads back 0 (CR1 0x1: a read that does not lie, WO §5); never a pass at the check" \
-      "[ \$rc = 1 ] && logged recorded 'len(recs) == 3 and [r[\"rule\"] for r in recs] == [\"TVI-I2C-PE\", \"TVI-I2C-TRANSFER\", \"TVI-I2C-FIELD\"] and all(r[\"tviburi\"] == \"would-refuse\" for r in recs)' \
+      'sysbus WriteDoubleWord 0x40005400 0x2001' 'echo "R-TIM"' 'sysbus ReadDoubleWord 0x40005410' 'echo "R-CR1"' 'sysbus ReadDoubleWord 0x40005400' \
+      'sysbus WriteDoubleWord 0x40005400 0x0' 'sysbus WriteDoubleWord 0x40005404 0x020020EC'
+    check "recorded: i2c1 recorded: TIMINGR changed with PE = 1 records TVI-I2C-PE and passes on (RUL-19), reading 0x10C7123D; an empty START records TVI-I2C-TRANSFER and is passed with START cleared, so Renode does not abort; CR1's reserved bit 13 records TVI-I2C-FIELD and reads back 0 (CR1 0x1: a read that does not lie, WO §5); an empty START with PE = 0 records TVI-I2C-TRANSFER and is not passed on either (adversarial F4); never a pass at the check" \
+      "[ \$rc = 1 ] && logged recorded 'len(recs) == 4 and [r[\"rule\"] for r in recs] == [\"TVI-I2C-PE\", \"TVI-I2C-TRANSFER\", \"TVI-I2C-FIELD\", \"TVI-I2C-TRANSFER\"] and all(r[\"tviburi\"] == \"would-refuse\" for r in recs)' \
        && [ \"\$(readout recorded TIM)\" = 0x10C7123D ] && [ \"\$(readout recorded CR1)\" = 0x00000001 ] && grep -q 'renode-exit=0' '$work/recorded.stdout'" ;;
   rccreset)
     # ArduPilot pulses I2C1RST (RCC_APB1LRSTR bit 21, §8.7.33 p438) before every start (measure.md §2.6): the guard's copies reset.
-    run_case rccreset - "$clk" 'sysbus WriteDoubleWord 0x40005400 0x1F00' 'sysbus WriteDoubleWord 0x40005410 0x10C7123C' 'echo "R-BEFORE"' 'sysbus ReadDoubleWord 0x40005410' \
-      'sysbus WriteDoubleWord 0x58024490 0x200000' 'sysbus WriteDoubleWord 0x58024490 0x0' 'echo "R-AFTER"' 'sysbus ReadDoubleWord 0x40005410' 'echo "R-CR1"' 'sysbus ReadDoubleWord 0x40005400'
-    check "rccreset: TIMINGR and CR1 served from the copies before; an I2C1RST pulse resets them (both read 0), as silicon's registers reset" \
-      "passed rccreset && [ \"\$(readout rccreset BEFORE)\" = 0x10C7123C ] && [ \"\$(readout rccreset AFTER)\" = 0x00000000 ] && [ \"\$(readout rccreset CR1)\" = 0x00000000 ]" ;;
+    run_case rccreset - "$clk" 'sysbus WriteDoubleWord 0x40005400 0x1F00' 'sysbus WriteDoubleWord 0x40005410 0x10C7123C' 'sysbus WriteDoubleWord 0x40005400 0x1F01' \
+      'sysbus WriteDoubleWord 0x40005404 0x000220EC' 'sysbus WriteDoubleWord 0x40005428 0xD0' 'echo "R-BEFORE"' 'sysbus ReadDoubleWord 0x40005410' 'echo "R-ISR0"' 'sysbus ReadDoubleWord 0x40005418' \
+      'sysbus WriteDoubleWord 0x58024490 0x200000' 'sysbus WriteDoubleWord 0x58024490 0x0' 'echo "R-AFTER"' 'sysbus ReadDoubleWord 0x40005410' 'echo "R-CR1"' 'sysbus ReadDoubleWord 0x40005400' \
+      'echo "R-ISR"' 'sysbus ReadDoubleWord 0x40005418'
+    check "rccreset: TIMINGR and CR1 served from the copies before; an I2C1RST pulse in the middle of a write transfer (TXIS set, ISR 0x3) resets them (both read 0) and ISR to 0x1 (p2009; the stock Reset alone leaves TXIS: adversarial F5), as silicon's registers reset" \
+      "passed rccreset && [ \"\$(readout rccreset BEFORE)\" = 0x10C7123C ] && [ \"\$(readout rccreset ISR0)\" = 0x00000003 ] && [ \"\$(readout rccreset AFTER)\" = 0x00000000 ] && [ \"\$(readout rccreset CR1)\" = 0x00000000 ] && [ \"\$(readout rccreset ISR)\" = 0x00000001 ]" ;;
   unheld)
     PLATFORM=/repo/tests/1306/unheld.repl run_case unheld - "$clk" 'sysbus WriteDoubleWord 0x40005410 0x10C7123C'
     check "unheld (ruled Q4): an I2C guard not registered on the RCC guard refuses its access, TVI-I2C-CONFIG, unmodeled: unwatched, it cannot pass" \
@@ -189,7 +200,7 @@ for t in ${TVIBURI_TESTS:-$CASES}; do
       "passed absentname && grep -q '\\[WARNING\\] i2c1: Unknown slave at address 72\\.\$' '$work/absentname/renode-log.txt' && [ \"\$(readout absentname ISR)\" = 0x00000001 ]" ;;
   fields)
     # The allow-list (RUL-17) by enumeration, recorded: every field the table allows only at 0, given its widest value with
-    # PE = 0 (and no START; TXDR's with PE = 1), records one TVI-I2C-FIELD naming that field; each write is undone by its register's 0.
+    # PE = 0 (and no START; TXDR's in a write transfer), records one TVI-I2C-FIELD naming that field; each write is undone by its register's 0.
     mapfile -t lines < <(python3 -I - "$src/tests/1306/data/rm0433-rev9-i2c-fields.tsv" "$src/tests/1306/fields.py" <<'EOF'
 import subprocess, sys, re
 rows = subprocess.run([sys.executable, '-I', sys.argv[2], sys.argv[1]], capture_output=True, text=True, check=True).stdout.splitlines()
@@ -200,13 +211,14 @@ for l in rows:
     off, msb, lsb = int(m.group(2), 16), int(m.group(4)), int(m.group(5))
     v = ((1 << (msb - lsb + 1)) - 1) << lsb
     if m.group(1) == 'I2C_TXDR':
-        print('sysbus WriteDoubleWord 0x40005400 0x1')   # TXDR with PE = 0 is TVI-I2C-TRANSFER: PE set for its rows
+        print('sysbus WriteDoubleWord 0x40005400 0x1')   # TXDR outside a write transfer is TVI-I2C-TRANSFER: PE set and a
+        print('sysbus WriteDoubleWord 0x40005404 0x220EC')   # write of 2 to the BME280 started for its rows (the two bytes)
     print('sysbus WriteDoubleWord 0x%08X 0x%X' % (0x40005400 + off, v))
     print('sysbus WriteDoubleWord 0x%08X 0x0' % (0x40005400 + off))
 EOF
 )
     PLATFORM_SED=$rec run_case fields - "$clk" "${lines[@]}"
-    n=$(printf '%s\n' "${lines[@]}" | grep -vc ' 0x0$\| 0x40005400 0x1$')
+    n=$(printf '%s\n' "${lines[@]}" | grep -vc ' 0x0$\| 0x40005400 0x1$\| 0x40005404 0x220EC$')
     check "fields: every field allowed only at 0 ($n), written its widest value with PE = 0, records one TVI-I2C-FIELD naming it, unmodeled; nothing else is recorded" \
       "[ \$rc = 1 ] && [ $n -ge 40 ] && logged fields 'len(recs) == $n and all(r[\"rule\"] == \"TVI-I2C-FIELD\" and r[\"kind\"] == \"unmodeled\" for r in recs) and len({(r[\"register\"], r[\"bit\"].split(\" \")[0]) for r in recs}) == $n'" ;;
   ledger)

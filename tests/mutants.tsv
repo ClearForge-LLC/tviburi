@@ -423,13 +423,13 @@ I209-icrRes7	model/GuardedSTM32F7_I2C.cs	"Res7", 7, 7, Zero,	"Res7", 7, 7, Any,	
 I210-resetRule	model/GuardedSTM32F7_I2C.cs	if(start && afterClear && (!refused || records.Recorded))	if(start && false && (!refused || records.Recorded))	i2c-reset
 I211-readClears	model/GuardedSTM32F7_I2C.cs	                clearedLast = false;\n                if(Unloaded(offset, 0, width)	                if(Unloaded(offset, 0, width)	i2c-resetok
 I212-kernelQuery	model/GuardedSTM32F7_I2C.cs	if(k != null && k.Modeled && k.Running)	if(k != null)	i2c-kernel
-I213-startOff	model/GuardedSTM32F7_I2C.cs	(word & StartBit) != 0 && !IsRunning)	(word & StartBit) != 0 && false)	i2c-startoff
+I213-startOff	model/GuardedSTM32F7_I2C.cs	else if((start || stop) && !IsRunning)	else if((start || stop) && false)	i2c-startoff
 I214-txdrOff	model/GuardedSTM32F7_I2C.cs	if(offset == TxdrOffset && !IsRunning)	if(offset == TxdrOffset && false)	i2c-txdroff
 I215-emptyStart	model/GuardedSTM32F7_I2C.cs	((word >> 16) & 0xFF) == 0 && (word & ReloadBit) == 0)	((word >> 16) & 0xFF) == 0 && false)	i2c-empty
 I216-emptyRecorded	model/GuardedSTM32F7_I2C.cs	Pass(offset, empty ? value & ~StartBit : value);	Pass(offset, value);	i2c-recorded
-I217-midStart	model/GuardedSTM32F7_I2C.cs	Open() && (word & StartBit) != 0)	Open() && false)	i2c-midstart
+I217-midStart	model/GuardedSTM32F7_I2C.cs	else if(start && Open())	else if(start && false)	i2c-midstart
 I218-midCr2	model/GuardedSTM32F7_I2C.cs	Cr2Held = 0x00FF1FFF;	Cr2Held = 0x00001FFF;	i2c-midcr2
-I219-openCloses	model/GuardedSTM32F7_I2C.cs	(TcBit | TcrBit | StopfBit)) != 0)	(TcrBit)) != 0)	i2c-ap i2c-config
+I219-openCloses	model/GuardedSTM32F7_I2C.cs	if(open && (stopf || (isr & (TcBit | TcrBit)) != 0))	if(open && (isr & TcrBit) != 0)	i2c-ap i2c-config
 I220-absentAck	model/GuardedSTM32F7_I2C.cs	Absent.TryGetValue(name, out var known) && known.Contains(a)	Absent.TryGetValue(name, out var known) && !known.Contains(a)	i2c-absent i2c-absentname
 I221-absentLine	model/GuardedSTM32F7_I2C.cs	"Unknown slave at address {0}.", a);	"Unknown device at address {0}.", a);	i2c-absentname
 I222-softReset	model/GuardedSTM32F7_I2C.cs	                    SoftwareReset(word);\n	                    inner.WriteDoubleWord(offset, word);\n	i2c-softreset
@@ -449,3 +449,9 @@ I235-sensorsShared	model/GuardedSTM32F7_I2C.cs	.SetValue(inner, ChildCollection)
 I236-completionTracked	model/GuardedSTM32F7_I2C.cs	                Open();   // as in Read\n	(empty)	i2c-blindclear
 I237-reservedNotServed	model/GuardedSTM32F7_I2C.cs	cr1 = word & Cr1Defined;	cr1 = word;	i2c-recorded
 I238-absentListAgrees	model/GuardedSTM32F7_I2C.cs	0x54, 0x55, 0x76 }	0x54, 0x55 }	i2c-ledger
+I239-txdrOutside	model/GuardedSTM32F7_I2C.cs	else if(offset == TxdrOffset && !(Open()	else if(offset == TxdrOffset && false && !(Open()	i2c-txdrread
+I240-startStop	model/GuardedSTM32F7_I2C.cs	else if(start && stop)	else if(false)	i2c-startstop
+I241-stopIdle	model/GuardedSTM32F7_I2C.cs	else if(stop && !Controller())	else if(stop && false)	i2c-stopidle
+I242-staleStopf	model/GuardedSTM32F7_I2C.cs	staleStopf = stopf;	staleStopf = false;	i2c-stalestop
+I243-resetTxis	model/GuardedSTM32F7_I2C.cs	                inner.WriteDoubleWord(Cr1Offset, 0);   // the stock Reset leaves TXIS	                // the stock Reset leaves TXIS	i2c-rccreset
+I244-emptyEveryPath	model/GuardedSTM32F7_I2C.cs	var empty = offset == Cr2Offset && (value & StartBit) != 0 && ((value >> 16) & 0xFF) == 0;	var empty = false;	i2c-recorded
