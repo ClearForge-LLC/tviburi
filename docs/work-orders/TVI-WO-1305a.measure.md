@@ -53,7 +53,8 @@ Not read before these predictions: any line of `1305`'s armed-run console (`~/.c
 |---|---|---|---|---|
 | ArduPilot, armed (`dbf598d8…`) | `USART16SEL` = 001, `USART234578SEL` = 001 (the RCC guard's record state, from 0.97 ms) | `pll2_q_ck` | from `PLLCKSELR` = `0x00408040` (`PLLSRC` HSI, `DIVM2` = 8) and `PLL2DIVR` | 72 MHz |
 | the 14 generated | reset (000): Aethelgard's `reset_clock` requires `D2CCIP2R & 0x303F` = 0, `HSIDIV` = 0, `SWS` = 0 and every prescaler at reset (`sentinel-03/gen/board/src/board.rs`) | `rcc_pclk1`/`rcc_pclk2` from `sys_ck` = HSI | 64 MHz | 64 MHz |
+| **corrected 2026-11-25 (the identity replay, FEEDBACK §3.1): `hse-crystal-16`, `hse-external-8`** | reset (000) | `rcc_pclk1`/`rcc_pclk2` from `sys_ck` = **PLL1's P output from the HSE** (`hse-crystal-16`: `PLLCKSELR` `0x52`, `DIVM1` 5; `PLL1DIVR` `0x0103064F`, ×80, /4; `CFGR.SW` = PLL1; `hseFrequency: 16000000` declared) | 64 MHz | 64 MHz |
 
 - **P6: right** (`pll2_q_ck`). The RCC guard's query answers that it runs, and no frequency.
-- **P7: right on the source and the 64 MHz; wrong on the stock value:** the generated platforms declare 64 MHz, not 200 or 125 MHz.
+- **P7: right for 12 boards on the source and the 64 MHz, wrong for two:** `hse-crystal-16` and `hse-external-8` run `sys_ck` from PLL1 on the HSE. I had read only `sentinel-03`'s source; the identity replay showed it. Wrong on the stock value too: the generated platforms declare 64 MHz, not 200 or 125 MHz.
 - **The stock model narrows `PLL2DIVR`** (`STM32H7_RCC.cs` L373–386 in the Renode tree `1305` read): `DIVN2` 8 bits and `DIVQ2` 6 bits, against 9 and 7 on silicon (p407). A read-back of `PLL2DIVR` through the RCC guard returns the stock model's bits (the guard keeps no served copy of it), so a written `DIVN2` ≥ 256 or `DIVQ2` ≥ 64 would read back wrong, silently.
