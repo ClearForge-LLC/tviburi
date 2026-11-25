@@ -463,7 +463,7 @@ DM53-htifSet	model/GuardedSTM32DMA.cs	                htif[s] = true;   // half	
 DM54-htifServed	model/GuardedSTM32DMA.cs	v |= htif[b + i] ? 1u << (FlagShift[i] + HtifBit) : 0;	v |= 0;	dma-circ
 DM55-chtifClear	model/GuardedSTM32DMA.cs	htif[b + i] &= (word >> (FlagShift[i] + HtifBit) & 1) == 0;	htif[b + i] &= true;	dma-circ
 DM56-htLine	model/GuardedSTM32DMA.cs	lines[s].Set(inner.Connections[s].IsSet || (htif[s] && (cr[s] & HtieBit) != 0));	lines[s].Set(inner.Connections[s].IsSet);	dma-circ
-DM57-tapLine	model/GuardedSTM32DMA.cs	parent.lines[stream]?.Set(value || (parent.htif[stream]	parent.lines[stream]?.Set(false || (parent.htif[stream]	dma-irq
+DM57-tapLine	model/GuardedSTM32DMA.cs	parent.lines[stream]?.Set(value || (parent.htif[stream]	parent.lines[stream]?.Set(false || (parent.htif[stream]	dma-circoff
 DM58-resetHtif	model/GuardedSTM32DMA.cs	                htif[i] = false;\n	(empty)	dma-circ
 DM59-circChanged	model/GuardedSTM32DMA.cs	            if(circ)\n	            if(false)\n	dma-circen
 DM60-circDir	model/GuardedSTM32DMA.cs	if((word & CircBit) != 0 && dir != PeripheralToMemory)	if(false)	dma-circm2p dma-circm2m

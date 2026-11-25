@@ -307,13 +307,14 @@ tviburiDma2:\
       "passed circ && [ \"\$(readout circ LISR2)\" = 0x00000010 ] && [ \$(( \$(readout circ ISPR0) >> 11 & 1 )) = 1 ] && [ \"\$(readout circ NDTR)\" = 0x00000004 ] && [ \"\$(readout circ CR)\" = 0x00000509 ] && [ \"\$(readout circ LISR4)\" = 0x00000030 ] && [ \"\$(readout circ BUF)\" = 0x04030205 ] && [ \"\$(readout circ LISRC)\" = 0x00000000 ] && [ \"\$(readout circ LISR6)\" = 0x00000010 ] && [ \"\$(readout circ LISRR)\" = 0x00000000 ]" ;;
   circoff)
     # TVI-WO-1303a (ruled Q4): the same stream with CIRC = 0 and TCIE (CR = 0x411): at the fourth request EN is cleared
-    # (p654, p665), TCIF0 set, NDT 0; a fifth request moves nothing.
+    # (p654, p665), TCIF0 set, NDT 0, and the transfer-complete interrupt (IRQ 11) reaches the NVIC through the guard's line,
+    # raised by a request, outside any register write (the tap); a fifth request moves nothing.
     run_case circoff - "$clk" 'sysbus WriteDoubleWord 0x40020800 0x29' 'sysbus WriteDoubleWord 0x40020018 0x24000000' 'sysbus WriteDoubleWord 0x4002001C 0x38001900' \
       'sysbus WriteDoubleWord 0x40020014 0x4' 'sysbus WriteDoubleWord 0x40020010 0x410' 'sysbus WriteDoubleWord 0x40020010 0x411' \
       'sysbus WriteDoubleWord 0x24000000 0x1' 'sysbus.dmamux1 OnGPIO 41 true' 'sysbus.dmamux1 OnGPIO 41 false' 'sysbus WriteDoubleWord 0x24000000 0x2' 'sysbus.dmamux1 OnGPIO 41 true' 'sysbus.dmamux1 OnGPIO 41 false' 'sysbus WriteDoubleWord 0x24000000 0x3' 'sysbus.dmamux1 OnGPIO 41 true' 'sysbus.dmamux1 OnGPIO 41 false' 'sysbus WriteDoubleWord 0x24000000 0x4' 'sysbus.dmamux1 OnGPIO 41 true' 'sysbus.dmamux1 OnGPIO 41 false' 'echo "R-CR"' 'sysbus ReadDoubleWord 0x40020010' 'echo "R-NDTR"' 'sysbus ReadDoubleWord 0x40020014' \
-      'echo "R-LISR"' 'sysbus ReadDoubleWord 0x40020000' 'sysbus WriteDoubleWord 0x24000000 0x5' 'sysbus.dmamux1 OnGPIO 41 true' 'sysbus.dmamux1 OnGPIO 41 false' 'echo "R-BUF"' 'sysbus ReadDoubleWord 0x38001900'
-    check "circoff: the same stream with CIRC = 0 ends with EN cleared (CR reads 0x410), NDT 0 and TCIF set (p654, p665); a fifth request moves nothing; the run passes" \
-      "passed circoff && [ \"\$(readout circoff CR)\" = 0x00000410 ] && [ \"\$(readout circoff NDTR)\" = 0x00000000 ] && [ \"\$(readout circoff LISR)\" = 0x00000020 ] && [ \"\$(readout circoff BUF)\" = 0x04030201 ]" ;;
+      'echo "R-LISR"' 'sysbus ReadDoubleWord 0x40020000' 'echo "R-ISPR0"' 'sysbus ReadDoubleWord 0xE000E200' 'sysbus WriteDoubleWord 0x24000000 0x5' 'sysbus.dmamux1 OnGPIO 41 true' 'sysbus.dmamux1 OnGPIO 41 false' 'echo "R-BUF"' 'sysbus ReadDoubleWord 0x38001900'
+    check "circoff: the same stream with CIRC = 0 ends with EN cleared (CR reads 0x410), NDT 0 and TCIF set (p654, p665), its interrupt pending at the NVIC (IRQ 11); a fifth request moves nothing; the run passes" \
+      "passed circoff && [ \"\$(readout circoff CR)\" = 0x00000410 ] && [ \"\$(readout circoff NDTR)\" = 0x00000000 ] && [ \"\$(readout circoff LISR)\" = 0x00000020 ] && [ \$(( \$(readout circoff ISPR0) >> 11 & 1 )) = 1 ] && [ \"\$(readout circoff BUF)\" = 0x04030201 ]" ;;
   reflect)
     # TVI-WO-1305 (ruled 2026-11-24T19:13Z): the suspension reaches the stock STM32DMA's private members by reflection; a
     # Renode build without one must refuse by name, never pass silently. Planted: a copy of the tree whose guard asks for a
