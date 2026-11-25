@@ -127,6 +127,7 @@ Nothing has been run in this work order.
 | | `ISR` = `0x1001` (clears `ADRDY`; bit 12 `LDORDY` is read-only); `CFGR2` = 0; `PCSEL` = `0x400`; `LTR1` = `HTR1` = 0; `LTR2/HTR2/LTR3/HTR3`, `AWD2CR`, `AWD3CR` = 0; `SMPR1` = 0, `SMPR2` = `0x6` (`SMP10` = 110, 387.5 cycles); `SQR1` = `0x280` (channel 10); `SQR2–4` = 0; `CFGR` = `0x2003` (`DMNGT` = 11, `RES` = 000, 16-bit, `CONT`, `JQDIS` = 0) | the same, `PCSEL` = `0xE0000`, `SMPR2` = `0x36C00000` (`SMP17–19` = 110), `SQR1` = `0x4D2442` (three conversions: 17, 18, 19) | `ADSTART` = 0 (p934): kept. `HTR1` written 0 against its reset `0x03FFFFFF` with every watchdog off |
 | 3.286 / 3.317 | `ADSTART` | `ADSTART` | `ADEN` = 1: kept |
 
+- **The DMA reads `ADC1_DR` as a half-word** (`ReadUInt16 from 0x40`, 13,996 times; the stream's `PSIZE` is 16-bit), against p926's "Word (32-bit) accesses". The CPU's accesses are all words.
 - **ADC2 is never accessed.** No injected group, watchdog, oversampling, offset, differential channel or dual mode is used by either firmware (all written 0 or not written).
 - **ADC1's stream** is `1303a`'s DMA1 stream 3. **ADC3's** goes to BDMA channel 7 through DMAMUX2 (unmapped in the platform): in the twin its request is wired to `dmamux1@115`, which no DMAMUX1 channel selects, so its `DR` is never read. The stock ADC3 then never finishes its first sequence ("Issued a start event before the last sequence finished", 13,995 times).
 - **ADC3's channel 19 (`VREFINT`)** is past the stock model's 19 channels (0–18); the stock never reaches it, because its first sequence never ends.
@@ -146,7 +147,7 @@ Nothing has been run in this work order.
 
 - **The conversion time:** `t_CONV` = `SMPx` (1.5, 2.5, 8.5, 16.5, 32.5, 64.5, 387.5, 810.5 cycles; p1019–1020) + SAR (16-bit 8.5, 14 7.5, 12 6.5, 10 5.5, 8 4.5; Table 214 p955). `PRESC` (1–256) only when `CKMODE` = 00 ✓ (p1039).
 - **`ADCSEL`:** 00 `pll2_p_ck` (reset), 01 `pll3_r_ck`, 10 `per_ck`, 11 "the kernel clock is disabled" (p419); one selector for all three ADCs; enables `ADC12EN` (p455), `ADC3EN` (p458).
-- **Calibration** takes `t_CAL` = 165,010 / f_ADC, and `t_ADCVREG_STUP` is 5 typ, 10 max µs (DS12117 Table 76 p167, Table 173 p273).
+- **Calibration** takes `t_CAL` = 165,010 / f_ADC for "offset and linearity" (`ADCALLIN` = 1), `t_OFF_CAL` = 1,280 / f_ADC for offset only; `t_STAB` (`ADEN` to `ADRDY`, the LDO already on) is one conversion cycle; `t_ADCVREG_STUP` is 5 typ, 10 max µs (DS12117 p167 and p273, read by me).
 - **The "only when" rules** (p934, the bits' own rows p1003–1011, p1038–1039) ✓, and what breaking one does: **"There is no hardware protection to prevent these forbidden write accesses and ADC behavior may become in an unknown state"** ✓ (p934). The text never says a forbidden write is ignored.
 - **`DMNGT`** (p1016): 00 `DR` only; 01 one-shot, which "stops generating DMA requests once the DMA has reached the last DMA transfer (when a transfer complete interrupt occurs …)" ✓ (p964), then freezes `DR`, aborts the conversion and resets the scan (p965); 10 DFSDM; 11 circular, "even if the DMA has reached the last DMA transfer" (p965).
 - **Overrun:** `OVR` is set when "a new conversion has completed while the EOC flag was already set" (`ISR`, p999), but §25.4.27 describes an eight-stage `DR` FIFO for `OVRMOD` = 0 (p962): **the two definitions are not reconciled in the text.** On an overrun "the ADC stops generating DMA requests … The DMA transfer requests are blocked until the software clears the OVR bit" ✓ (p964).
@@ -158,7 +159,7 @@ Nothing has been run in this work order.
 
 P2 holds where M1 reached it: the stock map is the generic STM32 one, not H7's (`CFGR` bit 1 `DMACFG`, a two-bit `RES` at 2–3, `ALIGN` at bit 5 where H7 has `EXTSEL[0]`; `SMPRx` tags; `CKMODE` stored with no effect; `CFGR2`'s top bits a `CKMODE` tag where H7 has `LSHIFT`; `VREFEN`/`TSEN`/`VBATEN` tags reading 0; `DEEPPWD` reserved and read 0; `LINCALRDYW1–6` read 1 always; `ADCAL` a tag; `LDORDY` = `ADVREGEN`; `ADRDY` at `ADEN` at once). Pacing is one sequence per tick of `externalEventFrequency` with `CONT` (1 kHz on the stock platform), each channel after the first converted only when `DR` is read.
 - **Measured (P, the rate check):** an appended `adcM1S2:` update reaches the constructor, and the stock thread holds the asked rate exactly (3,788 DMA reads of `DR` per 0.1 s at 37,879 Hz).
-- **Measured (F):** a **typed** redeclaration of `adc3` is refused (`Error E02: Variable 'adc3' was already declared`), because the stock entry comes from the `using` file. Cancel-and-restate works: `adc3: @none`, then `tviburiAdc3: … @ { sysbus 0x58026000; tviburiRcc RegistrationPeripheralAlias.ADC3 } as "adc3"` with the stock entry's four properties and interrupt line. Through a pass-through subclass so restated, **every `rcc`, `adc3` and `adcM1S2` access line of `d1-drv8876` (737) and of the armed run (1,004,402) is identical to M1**, as are the MAVLink stream (93 frames, byte for byte) and the boot block. Only the release hash and the `peripherals` kind (`STM32H7_ADC` → the subclass's) differ. `adc3 SetVoltage` still resolves (the subclass is an `IADC`).
+- **Measured (F):** a **typed** redeclaration of `adc3` is refused (`Error E02: Variable 'adc3' was already declared`), because the stock entry comes from the `using` file. Cancel-and-restate works: `adc3: @none`, then `tviburiAdc3: … @ { sysbus 0x58026000; tviburiRcc RegistrationPeripheralAlias.ADC3 } as "adc3"` with the stock entry's four properties and interrupt line. Through a pass-through subclass so restated, **every `rcc`, `adc3` and `adcM1S2` access line of `d1-drv8876` (737) and of the armed run (1,004,402) is identical to M1**, as are the MAVLink stream (93 frames, byte for byte) and the boot block. The boot blocks are also identical (69 values each, by `1305`'s `bootblock.py`). Only the release hash and the `peripherals` kind (`STM32H7_ADC` → the subclass's) differ. `adc3 SetVoltage` still resolves (the subclass is an `IADC`).
 
 ### 2.4 The rate silicon would make, against the stock model's
 
@@ -169,7 +170,7 @@ From each firmware's own registers (§2.1) and §2.2:
 | **ArduPilot ADC1** (one channel) | `CKMODE` 00, `ADCSEL` 01: `pll3_r_ck` = HSI 64 MHz / `DIVM3` 4 × `DIVN3` 15 / `DIVR3` 8 = **30 MHz** (`PLL3DIVR` `0x07040E0E`, `PLLCKSELR` `0x408040`, `PLL3ON`, `DIVR3EN`); `PRESC` /1 | **15 / 30 MHz** | 387.5 + 8.5 = 396 cycles: 26.4 / 13.2 µs | **37,879 / 75,758 conversions/s**, each a DMA request; `HTIF`/`TCIF` every 4 | 1,000/s |
 | **ArduPilot ADC3** (17, 18, 19) | the same | 15 / 30 MHz | 396 cycles each, 79.2 / 39.6 µs a sequence | 37,879 / 75,758 conversions/s; requests reach no DMA in the twin | stuck after its first conversion |
 | **`d1-drv8876` ADC3** (one, software-started) | `CKMODE` 11: rev V `adc_sclk` = sys_ck (`HPRE` /1) 64 MHz /4; rev Y `adc_hclk` 64 MHz /4 | **8 / 16 MHz** | 810.5 + 6.5 = 817 cycles: **102.1 / 51.1 µs** to `EOC` | one conversion | `EOC` at once |
-| calibration (`t_CAL`) | | | ArduPilot 11.0 / 5.5 ms per ADC; `d1-drv8876` 20.6 / 10.3 ms | | at once |
+| calibration | | | ArduPilot (`ADCALLIN` = 0, `t_OFF_CAL`): 85 / 43 µs per ADC; `d1-drv8876` (`ADCALLIN` = 1, `t_CAL`): 20.6 / 10.3 ms | | at once |
 
 - **The revision decides the rate by a factor of 2, and nothing declares it.** ChibiOS builds for rev V unless `STM32_ENFORCE_H7_REV_XY` (`hal_adc_lld.h`:389–449: `STM32_ADC12_CLOCK` = `STM32_ADCCLK / 2`); Aethelgard's generator chose `BOOST` 01 for its 8 MHz, the rev V range. Both firmwares therefore assume rev V; the platform says nothing.
 - **ArduPilot's `BOOST` is wrong for rev V.** ChibiOS's chain tests `> 6250000` first (`hal_adc_lld.h`:461–469), so it always writes 01 above 6.25 MHz; at 15 MHz p1009 asks for 10. On rev Y the same bits mean `BOOST` = 1, which 30 MHz requires (p1005): right. What silicon does with a wrong `BOOST` is not stated.
@@ -181,7 +182,7 @@ From each firmware's own registers (§2.1) and §2.2:
 | 37,879 Hz (rev V) | 62.42, 61.27 (+17–19 %) | 3.30–3.34 M | 9.785 s | 93, same ids; a few frames reordered | 406; 226–242 | 489,110,724 (+8.6 %) |
 | 75,758 Hz (rev Y) | 68.16, 72.94 (+30–38 %) | 3.58–3.80 M | 9.794 s | 93, same ids; a few frames reordered | 430; 242–255 | 531,463,333 (+18.0 %) |
 
-  `main` against itself is byte-identical. **It still arms, with no record from any guard**; every difference is timing (`SYS_STATUS.load`, `SERVO_OUTPUT_RAW.time_usec`, `TIMESYNC`, the order of a few frames). The prototype paces only; the guard as proposed also takes `t_CAL` (about 11 ms per ADC, rev V) and `ADRDY`'s stabilisation, so the built guard moves these further.
+  `main` against itself is byte-identical. **It still arms, with no record from any guard**; every difference is timing (`SYS_STATUS.load`, `SERVO_OUTPUT_RAW.time_usec`, `TIMESYNC`, the order of a few frames). **The +17–19 % is a floor:** the prototype paces ADC1 only. It leaves out ADC3 converting (to no reader) at the same rate, the calibration and `ADRDY` waits (about 0.1 ms each, so small), and `TVI-RCC-CLOCK`'s trial at RCC writes while a watched ADC runs (Q3; `1300b` measured about +12 % for one such watch).
 
 ### 2.5 Consumer observers each change would move, by board (O; Aethelgard `589030ca`)
 
@@ -216,6 +217,7 @@ From each firmware's own registers (§2.1) and §2.2:
 |---|---|---|
 | P1 | the clock, `PRESC`, the conversion time | **held**; the revision dependence was predicted but understated: it also moves `BOOST`, `LDORDY` and the `RES` codes |
 | P1 | `ADCAL`/`ADEN` in the wrong state are ignored by silicon | **wrong**: the text says "unknown state" (p934), never "ignored" |
+| P1 | (not predicted) | the calibration time depends on `ADCALLIN`: 165,010 or 1,280 cycles (DS12117) |
 | P1 | one-shot ends at the DMA's last transfer; overrun stops requests | held; **not predicted:** the two unreconciled overrun definitions (p962, p999) |
 | P2 | the stock map is generic STM32, not H7 | held (by source; M1 and P/F where reached) |
 | P3 | 13 boots make no ADC access | held |
@@ -256,16 +258,16 @@ From each firmware's own registers (§2.1) and §2.2:
 ## 5. The stop (WO §1, §7), and the questions
 
 **Four §7 stops fire, plus §1's own.**
-- **"The armed run would refuse … or an observer would change, on a path RM0433 says is valid."** Two of ArduPilot's accesses break a rule the text states. `ADC3_CCR`'s `VREFEN`, `TSEN` and `VBATEN` are written with `ADEN` = 1, against "only when the ADCs are disabled" (p1038). `BOOST` = 01 runs at 15 MHz on rev V, against "must be set according to the ADC clock setting" (p922, p1009). A guard that follows `RUL-17` refuses both, and the armed run with them (Q6, Q7). On the valid paths, silicon's pace moves the armed run's timing fields, its arm time (+11 ms) and its wall (+17–19 %) (§2.4). It also moves `d1-drv8876`'s instruction counts on its `CR` watchpoint (§2.5).
+- **"The armed run would refuse … or an observer would change, on a path RM0433 says is valid."** Three of ArduPilot's paths break or go beyond a rule the text states. `ADC3_CCR`'s `VREFEN`, `TSEN` and `VBATEN` are written with `ADEN` = 1, against "only when the ADCs are disabled" (p1038). `BOOST` = 01 runs at 15 MHz on rev V, against "must be set according to the ADC clock setting" (p922, p1009). Its DMA reads `ADC1_DR` by half-words, where p926 states word accesses only. A guard that follows `RUL-17` refuses all three, and the armed run with them (Q6, Q7, Q14). On the valid paths, silicon's pace moves the armed run's timing fields, its arm time (+11 ms) and its wall (+17–19 %) (§2.4). It also moves `d1-drv8876`'s instruction counts on its `CR` watchpoint (§2.5).
 - **"Declaring the samples needs a consumer property that does not exist."** The armed run's battery pin (ADC1 channel 10) has no declared level. The consumer has no property for an analog net on a foreign run, and Sentinel-03 declares a cell range, not a level (§2.6). `d1-drv8876`'s level is declared, by Renode's `SetVoltage`.
-- **A second consumer property is missing: the silicon revision.** It sets the rate by a factor of 2, and `BOOST`, `LDORDY` and the `RES` codes (§2.2). The WO says "if the rate cannot be computed from declared values, `unmodeled`", so with nothing declared every ADC start refuses (Q2).
+- **A second consumer property is missing: the silicon revision.** Nothing in the twin answers one: neither firmware reads `DBGMCU_IDCODE` (no access to `0x5C001000` in the armed run), and the platform maps no DBGMCU. It sets the rate by a factor of 2, and `BOOST`, `LDORDY` and the `RES` codes (§2.2). The WO says "if the rate cannot be computed from declared values, `unmodeled`", so with nothing declared every ADC start refuses (Q2).
 - **A tenth shard is due** by `ci`'s wall (§4).
 - **The fence:** the kernel-clock rule needs the RCC guard's query to know `ADCSEL`, and it has no ADC rule. Closing "the RCC guard's ADC row" edits RCC text (Q3).
 
 **Q1. The form.** `STM32H7_ADC` is not sealed, but a typed redeclaration of `adc3` or `adcM1S2` is refused (E02, measured): the stock entries come from the `using` file. Its register map is not H7's (§2.3).
 - **Proposal: `GuardedSTM32H7_ADC`, a subclass that re-implements the bus interfaces (`RUL-07`), cancelled and restated as `tviburiAdc3` / `tviburiAdc12` `as "adc3"` / `"adcM1S2"`.** The restatement is generated from the pinned stock file, with each entry's four properties, its interrupt line and its registration on `tviburiRcc`. The form is measured (F): every access line, the MAVLink and the boot block are identical, and `SetVoltage` still works.
 - **The guard owns the regular conversion:** pacing, `EOC`/`EOS`/`EOSMP`/`OVR`, `DR`, the DMA request (through the stock entry's `IDMA`, `dmamux1` channel 9 or 115) and the interrupt. It serves `CR`, `CFGR`, `CFGR2`, `SMPR1/2`, `CCR` and `ISR` from its own copies, because the stock fields sit at the wrong bits.
-- **The stock instance keeps** its channel sources (`SetVoltage`) and the registers it stores as H7 does (`PCSEL`, `SQRx`, the thresholds). The stock sampling thread is never started.
+- **The stock instance keeps** its channel sources (`SetVoltage`) and the registers it stores as H7 does (`SQRx`, the thresholds). **`PCSEL` moves into the guard's copies:** the stock holds 19 flags (0–18, by source), and ArduPilot's ADC3 writes bit 19 (`0xE0000`). The stock sampling thread is never started.
 - **ADC2** (`adcM1S2` + 0x100) stays the stock mock behind ADC1. Any access to it refuses `unmodeled`; neither firmware makes one.
 - **Prices for the consumer:** the `peripherals` kind for `d1-drv8876` (the class map); the restatement in its platforms; `RUL-09` (b)'s cancel-and-restate. `PCSEL` and `SQR1` read back as written.
 - **Ask:** accept?
@@ -307,7 +309,10 @@ From each firmware's own registers (§2.1) and §2.2:
   - **`LINCALRDYW1–6`** read 0 from reset and are set by a calibration with `ADCALLIN` = 1 (p931). A write that toggles one is `unmodeled` (no firmware does).
   - **Every "only when" rule** of p934 and the bits' own rows (`ADVREGEN`, `ADCAL`, `ADEN`, `ADSTART`, `ADSTP`, `ADDIS`, the `CFGR`/`SMPR`/`SQR` fields under `ADSTART`, the `CCR` fields under `ADEN`) refuses **`unmodeled`**, citing p934's "ADC behavior may become in an unknown state". It is not `predicted-fault`: the text gives no outcome, and `RUL-18` asks for one. Exceptions are Q6 and Q7.
   - The command bits are read as p1007's parenthesis lists them: `BOOST`, `ADCALLIN` and `LINCALRDYW` set do not block `ADEN`.
-  - **Measured on the valid paths:** `d1-drv8876` keeps every rule (§2.1), but its polls run longer (20.6 ms of calibration). Its witness still holds, because the conversion ends at about 20.8 ms of a 100 ms run.
+  - **A set-only bit written 1 while already 1** (ArduPilot's and `d1-drv8876`'s `ADSTART` write carries `ADEN` = 1 again) is no command, and no rule applies to it.
+  - **`ISR.LDORDY` written:** on rev V it is read-only and the write is ignored (the register legend's `r`). On rev Y it is reserved and reads 0, so ChibiOS's write-back of what it read (`0x1001` today, under the stock) carries 0.
+  - **Computed, not measured:** `d1-drv8876` keeps every rule (§2.1), but its polls run longer (20.6 ms of calibration on rev V). Its bounds (`CALIBRATION_POLLS 2*165_010*8`, `adc.rs`:47–59) cover that, and the conversion ends at about 20.8 ms of a 100 ms run, so its witness holds by arithmetic. The build replays it.
+  - **A condition on the timed rules:** the flags are set by `machine.ScheduleAction`, as the USART guard times IDLE. Whether a 10 µs wait resolves inside a 100 µs quantum (§2.0a: mid-access virtual time reads 0) is to be probed in the build. ArduPilot's `ADCAL` comes 86 µs after `ADVREGEN`, in another quantum. If a wait cannot resolve, the guard does not judge "too early" against it: it says so in its row rather than refuse on the twin's own time grain.
 - **Ask:** accept, and `unmodeled` for the "only when" rules?
 
 **Q6. ArduPilot's ADC3 `CCR` write under `ADEN` = 1** (`VREFEN`, `TSEN`, `VBATEN`; p1038 broken).
@@ -321,7 +326,7 @@ From each firmware's own registers (§2.1) and §2.2:
 
 **Q7. `BOOST` against f_ADC** (rev V: ArduPilot's 01 at 15 MHz, where p1009 asks for 10; ChibiOS's `#if` chain).
 - **(i)** `unmodeled` at `ADSTART` when `BOOST` does not match f_ADC's range. This refuses the armed run on rev V, and only there: on rev Y the same bits are right.
-- **(ii) Recommended:** a mismatch is acknowledged by name for `BOOST` below the range (the case measured), citing p922 and p1009 and the ChibiOS line. `BOOST` above the range is also acknowledged: p1009 calls it only power. Conversions run as if matched.
+- **(ii) Recommended:** a mismatch is acknowledged by name, citing p922 and p1009 and the ChibiOS line. p1009 gives only "used when" ranges and no outcome either way. Conversions run as if matched. Only a `BOOST` below f_ADC's range is measured (ArduPilot's).
 - **A row** for Aethelgard and upstream.
 - **Ask:** (i) or (ii)?
 
@@ -347,6 +352,7 @@ From each firmware's own registers (§2.1) and §2.2:
 - **The code:** round(V / VREF+ × (2^N − 1)), VREF+ the entry's `referenceVoltage` (3.3 V, as Aethelgard's `adc_code` assumes). Rounding at exactly .5 is not stated in the text: ties go up, as the consumer computes.
 - **A `DR` read before `EOC`** returns the previous conversion (reset 0), with no record. That is the WO §5 "level read before the sample time".
 - **The armed run needs a declared ADC1 channel-10 level.** The replay stands in, with Sentinel-03 at 4 S × 3.85 V nominal ÷ 11 = 1.40 V. **Aethelgard has no property for it** (§7): a row.
+- **Channel 19 can be declared only by `levels`:** `SetVoltage` asserts a channel below the stock's 19 (`IADC.AssertChannel`).
 - **To probe in the build:** that the guard can tell a `SetVoltage`'d channel from an untouched default source. If it cannot, `levels` is the only declaration, and the consumer moves its `SetVoltage` to it.
 - **Ask:** accept both declarations, and the stand-in?
 
@@ -367,7 +373,12 @@ From each firmware's own registers (§2.1) and §2.2:
   - `OFRx`, `DIFSEL` ≠ 0, `DISCEN`, `AUTDLY`, `EXTEN` ≠ 0 (hardware triggers: the timers' TRGO lines are not wired to the ADC);
   - `CCR` `DUAL`, `DELAY`, `DAMDF`;
   - `CALFACT`/`CALFACT2` writes;
-  - every reserved bit, and a sub-word access (p926: word only).
+  - every reserved bit, and a sub-word access (p926: word only), except Q14's.
 - **Ask:** accept, or a different line for `EXTEN`?
+
+**Q14. The DMA's half-word reads of `DR`** (ArduPilot's stream, `PSIZE` 16-bit; p926 states word accesses only, and nothing about a half-word).
+- **(i) `unmodeled`:** the armed run refuses at its first request.
+- **(ii) Recommended:** a half-word read at offset 0x40 returns `DR`'s low half and counts as the read (it clears `EOC`). It is acknowledged by name, citing p926's silence. "Never generates AHB errors" (p926) means silicon answers it. Any other sub-word access stays `unmodeled`.
+- **Ask:** (i) or (ii)?
 
 **Q13. A tenth shard first** (§4), as `1306` built the eighth and `1303a` the ninth. **Ask:** ten, or nine with the wall at 20?
