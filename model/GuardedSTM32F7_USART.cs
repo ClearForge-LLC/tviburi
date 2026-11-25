@@ -17,7 +17,8 @@
 // Rules, in the order they are evaluated. A refused access is not passed to the stock model.
 //   TVI-LOAD          (Records) the guard did not load: every access refuses.
 //   TVI-USART-CONFIG  the platform gives this guard what it cannot model: more than one bus registration, or
-//                     lowPowerMode (LPUART1 is outside TVI-WO-1305). unmodeled.
+//                     lowPowerMode (LPUART1 is outside TVI-WO-1305); or no RCC guard at sysbus.rcc that holds it registered
+//                     under its name, so that its enable and kernel clock go unwatched (TVI-WO-1300b (2); 1305 G6). unmodeled.
 //   TVI-USART-WIDTH   a byte or half-word access other than to RDR or TDR, or a misaligned word: "The peripheral registers
 //                     have to be accessed by words (32 bits)" (p2067). unmodeled. RDR and TDR pass by byte and half-word:
 //                     ArduPilot's DMA moves them by bytes, field evidence, not a page (ruled Q7).
@@ -186,6 +187,9 @@ namespace Antmicro.Renode.Peripherals.Tviburi
             }
         }
 
+        // UE as this guard holds it, for the RCC guard's TVI-RCC-CLOCK (TVI-WO-1300b (2): a USART with UE = 1 is running).
+        public bool UeSet => (cr1 & UeBit) != 0;
+
         public uint BaudRate => inner.BaudRate;
         public Bits StopBits => inner.StopBits;
         public Parity ParityBit => inner.ParityBit;
@@ -303,6 +307,16 @@ namespace Antmicro.Renode.Peripherals.Tviburi
                 records.Refuse("TVI-USART-CONFIG", Unmodeled, RegisterAt(offset), "none",
                     "the platform gives this USART guard what it cannot model: " + c + "; every access refuses",
                     "TVI-WO-1305.measure.md §2.3 (the form); ruled 2026-11-24T18:55Z Q1", "none", offset, value, width);
+                return true;
+            }
+            // TVI-WO-1300b (2) (ruled 2026-11-25T03:03Z Q2; TVI-WO-1305 adversarial G6): only a guard the RCC guard holds is
+            // watched for a kernel clock lost under it (TVI-RCC-CLOCK), and locked by its enable. One it does not hold refuses.
+            if(!(host.TryGetLocalName(this, out var name) && host.TryGetByName<GuardedSTM32H7_RCC>(RccName, out var rcc) && rcc.Holds(name, this)))
+            {
+                records.Refuse("TVI-USART-CONFIG", Unmodeled, RegisterAt(offset), "none",
+                    "the platform gives this USART guard what it cannot model: " + (name ?? "a USART") + " is not registered on an RCC guard at "
+                        + RccName + " under that name, so its enable and its kernel clock are not watched; every access refuses",
+                    "TVI-WO-1300b (2); ruled 2026-11-25T03:03Z Q2 (TVI-WO-1305 adversarial G6)", "none", offset, value, width);
                 return true;
             }
             return false;

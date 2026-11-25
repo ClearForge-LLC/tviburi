@@ -138,12 +138,12 @@ F02-ack1300	tools/tviburi-release/src/main.rs	("(TVI-WO-1300 A", "TVI-WO-1300.rm
 # TVI-WO-1300a: one mutant per guard it adds or changes
 C24-syncEnables	model/GuardedSTM32H7_RCC.cs	inner.WriteDoubleWord(off, Copy(off));	(empty)	rcc-tim2
 C25-syncAtReset	model/GuardedSTM32H7_RCC.cs	inner.Reset();\n            ResetCopies();\n            SyncEnables();	inner.Reset();\n            ResetCopies();	rcc-tim2
-C26-syncAtRegister	model/GuardedSTM32H7_RCC.cs	= spi;\n            }\n            SyncEnables();	= spi;\n            }	rcc-tim2 conditions
+C26-syncAtRegister	model/GuardedSTM32H7_RCC.cs	(1300b (2))\n            }\n            SyncEnables();	(1300b (2))\n            }	rcc-tim2 conditions
 C27-unlockGuarded	model/GuardedSTM32H7_RCC.cs	host.SystemBus.SetPeripheralEnabled(g, true);	(empty)	rcc-unenabled
 C28-unlockAfterEnr	model/GuardedSTM32H7_RCC.cs	if(EnableOffsets.Contains(b))	if(false)	rcc-spi1off
 C29-clockLost	model/GuardedSTM32H7_RCC.cs	if(!k.Running)\n                    {\n                        lost = p;	if(false)\n                    {\n                        lost = p;	rcc-lost-pll
 C30-trialKeptCr	model/GuardedSTM32H7_RCC.cs	crAfter = KeptCr(value);	crAfter = value;	rcc-blocked
-C31-lossIsTransition	model/GuardedSTM32H7_RCC.cs	g.Value.Started && QueryKernelClock(g.Key).Running	g.Value.Started	rcc-cstart
+C31-lossIsTransition	model/GuardedSTM32H7_RCC.cs	.Where(p => QueryKernelClock(p).Running).ToArray();	.ToArray();	rcc-cstart
 C32-divrBlocked	model/GuardedSTM32H7_RCC.cs	if(PllOn(n))	if(false)	rcc-divr
 A01-sel5	model/GuardedSTM32H7_RCC.cs	new uint[] { 0, 1, 2, 4 }, "modeled by the guard", "the guard's copy and its mux (p371)", 414	new uint[] { 0, 1, 2, 4, 5 }, "modeled by the guard", "the guard's copy and its mux (p371)", 414	rcc-sel5 allowlist
 S01-enable	model/GuardedSTM32H7_SPI.cs	else if(enabled)	else if(true)	rcc-unenabled conditions
@@ -394,3 +394,20 @@ US65-hseRef	model/GuardedSTM32F7_USART.cs	(ck & 3) == 2 ? rcc.HseFrequency :	(ck
 US66-sysPll1	model/GuardedSTM32F7_USART.cs	var sys = sws == 0 ? hsi : sws == 3 ?	var sys = sws == 0 ? hsi : sws == 4 ?	usart-idlehse
 US67-vcoselPassed	model/GuardedSTM32F7_USART.cs	var wide = (pllcfgr >> (n == 1 ? 1 : 5) & 1) == 0;	var wide = (rcc.ReadDoubleWord(0x2C) >> (n == 1 ? 1 : 5) & 1) == 0;	usart-idlenone
 US68-divp1	model/GuardedSTM32F7_USART.cs	Vco(rcc, 1, hsi, ref why) / ((R(0x30) >> 9 & 0x7F) + 1) : null;	Vco(rcc, 1, hsi, ref why) / 2 : null;	usart-idlehse
+RB01-usartWatched	model/GuardedSTM32H7_RCC.cs	.Concat(watched.Where(w => w.Value.UeSet).Select(w => w.Key))	.Concat(new string[0])	rcc-usart-lost
+RB02-ueRunning	model/GuardedSTM32H7_RCC.cs	watched.Where(w => w.Value.UeSet)	watched.Where(w => true)	rcc-usart-stopped
+RB03-usartHeld	model/GuardedSTM32F7_USART.cs	&& rcc.Holds(name, this)))	))	rcc-usart-unheld
+RB04-hseRule	model/GuardedSTM32H7_RCC.cs	|| HseFrequency != null ||	|| true ||	rcc-hse-none
+RB05-hseDefault	model/GuardedSTM32H7_RCC.cs	ulong? hseFrequency = null,	ulong? hseFrequency = 8000000,	rcc-hse-none
+RB06-hseToStock	model/GuardedSTM32H7_RCC.cs	new STM32H7_RCC(machine, systick, hseFrequency ?? 0, csiFrequency)	new STM32H7_RCC(machine, systick, 0, csiFrequency)	rcc-hse-declared
+RB07-rtcenServed	model/GuardedSTM32H7_RCC.cs	return (inner.ReadDoubleWord(b) & ~BdcrRtcen) | rtcen;	return inner.ReadDoubleWord(b);	rcc-rtcen
+RB08-rtcStockHeld	model/GuardedSTM32H7_RCC.cs	                value |= BdcrRtcen;\n	(empty)	rcc-rtcen
+RB09-rtcenKeptOnReset	model/GuardedSTM32H7_RCC.cs	            ResetCopies();\n            SyncEnables();	            ResetCopies();\n            rtcen = 0;\n            SyncEnables();	rcc-rtcen-reset
+RB10-adc12Enable	model/GuardedSTM32H7_RCC.cs	"ADC12EN", 5, 5, Any,	"ADC12EN", 5, 5, Zero,	rcc-adc
+RB11-adc3Enable	model/GuardedSTM32H7_RCC.cs	"ADC3EN", 24, 24, Any,	"ADC3EN", 24, 24, Zero,	rcc-adc3
+RB12-tim1LpenAck	model/GuardedSTM32H7_RCC.cs	"TIM1LPEN", 0, 0, new uint[] { 0, 1 },	"TIM1LPEN", 0, 0, new uint[] { 1 },	rcc-adc
+RB13-usartCite	model/GuardedSTM32H7_RCC.cs	+ (usart ? "; 	+ (false ? "; 	rcc-usart-lost-en
+RB14-usart1Mux	model/GuardedSTM32H7_RCC.cs	["usart1"] = new ClockedPeripheral(UsartMux,	["usart1"] = new ClockedPeripheral(Usart2Mux,	rcc-usart-othersel
+RB15-hseZero	model/GuardedSTM32H7_RCC.cs	HseFrequency = hseFrequency == 0 ? null : hseFrequency;	HseFrequency = hseFrequency;	rcc-hse-zero
+RB16-rtcenTaken	model/GuardedSTM32H7_RCC.cs	rtcen = value & BdcrRtcen;	rtcen = 0;	rcc-rtcen
+RB17-trialSkip	model/GuardedSTM32H7_RCC.cs	|| held == value))	|| true))	rcc-usart-lost
