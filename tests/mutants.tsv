@@ -366,8 +366,8 @@ US37-checkGuarded	tools/tviburi-release/src/main.rs	            if !restates.ite
 US38-brrStart	model/GuardedSTM32F7_USART.cs	if(offset == Cr1Offset && !Running(cr1) && Running(word) && brr < 16)	if(false)	usart-brr8
 US39-brrZeroOnly	model/GuardedSTM32F7_USART.cs	if(brr == 0 && (cr3 & (DmarBit | DmatBit)) == 0)	if((cr3 & (DmarBit | DmatBit)) == 0)	usart-brr8
 US40-brrNoDma	model/GuardedSTM32F7_USART.cs	if(brr == 0 && (cr3 & (DmarBit | DmatBit)) == 0)	if(brr == 0)	usart-brrheld
-US41-brrRewrite	model/GuardedSTM32F7_USART.cs	if(offset == BrrOffset && Running(cr1) && (word & 0xFFFF) < 16 && (word & 0xFFFF) != brr)	if(false)	usart-brrheld
-US42-brrRewriteSame	model/GuardedSTM32F7_USART.cs	if(offset == BrrOffset && Running(cr1) && (word & 0xFFFF) < 16 && (word & 0xFFFF) != brr)	if(offset == BrrOffset && Running(cr1) && (word & 0xFFFF) < 16)	usart-brrheld
+US41-brrRewrite	model/GuardedSTM32F7_USART.cs	if(offset == BrrOffset && Running(cr1) && w16 < 16 && w16 != brr)	if(false)	usart-brrheld
+US42-brrRewriteSame	model/GuardedSTM32F7_USART.cs	if(offset == BrrOffset && Running(cr1) && w16 < 16 && w16 != brr)	if(offset == BrrOffset && Running(cr1) && w16 < 16)	usart-brrheld
 US43-heldTdr	model/GuardedSTM32F7_USART.cs	return offset == TdrOffset ? RefusedHeld(offset, word, width, "a TDR write")	return offset == TdrOffset ? false	usart-brrheld
 US44-heldDma	model/GuardedSTM32F7_USART.cs	: offset == Cr3Offset && (word & (DmarBit | DmatBit)) != 0 && RefusedHeld(offset, word, width, "CR3.DMAR or DMAT set");	: false;	usart-brrheld
 US45-heldRdr	model/GuardedSTM32F7_USART.cs	if(offset == RdrOffset && RefusedHeld(offset, 0, width, "an RDR read") && !records.Recorded)	if(false)	usart-brrheld
@@ -379,9 +379,9 @@ US50-idleStart	model/GuardedSTM32F7_USART.cs	refused |= KernelHz(out var why) ==
 US51-idleFrame	model/GuardedSTM32F7_USART.cs	RefuseIdle(what, hz == null ?	if(false) RefuseIdle(what, hz == null ?	usart-idlenone
 US52-noDefault	model/GuardedSTM32F7_USART.cs	                why += ": no rule for its frequency";\n                return null;	                return 64000000;	usart-idlenorule
 US53-hsidiv	model/GuardedSTM32F7_USART.cs	var hsi = 64000000ul >> (int)(R(0x00) >> 3 & 3);	var hsi = 64000000ul;	usart-idlekernel
-US54-sws	model/GuardedSTM32F7_USART.cs	if((R(0x10) >> 3 & 7) != 0)	if(false)	usart-idlenone
+US54-sws	model/GuardedSTM32F7_USART.cs	if(sws != 0)	if(false)	usart-idlenone
 US55-d1cpre	model/GuardedSTM32F7_USART.cs	/ Div(d1 >> 8 & 0xF) / Div(d1 & 0xF)	/ Div(d1 & 0xF)	usart-idlekernel
-US56-apbField	model/GuardedSTM32F7_USART.cs	(d2 >> (usart16 ? 8 : 4) & 4) == 0 ? 1ul : 2ul << (int)(d2 >> (usart16 ? 8 : 4) & 3)	(d2 >> (usart16 ? 4 : 8) & 4) == 0 ? 1ul : 2ul << (int)(d2 >> (usart16 ? 4 : 8) & 3)	usart-idlekernel
+US56-apbField	model/GuardedSTM32F7_USART.cs	var ppre = d2 >> (usart16 ? 8 : 4) & 7;	var ppre = d2 >> (usart16 ? 4 : 8) & 7;	usart-idlekernel
 US57-pllRef	model/GuardedSTM32F7_USART.cs	if((ck & 3) != 0 || divm == 0 || pll2Wide ||	if(divm == 0 || pll2Wide ||	usart-idlenone
 US61-benchU2	model/bench-checks.tsv	Tviburi.GuardedSTM32F7_USART\tU2\tTVI-USART-BRR	Tviburi.GuardedSTM32F7_USART\tU3\tTVI-USART-BRR	usart-ledger
 US58-pllWritten	model/GuardedSTM32F7_USART.cs	r.Written += (offset, value) => pll2Wide |= offset == Pll2divrOffset && (value & 0x00400100) != 0;	(empty)	usart-idlenone

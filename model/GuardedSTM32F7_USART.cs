@@ -38,9 +38,8 @@
 //                     has no rule (usart6, uart4/5/7/8, whose enables the RCC guard already refuses) or no RCC guard is found.
 //   TVI-USART-BRR     "USARTDIV must be greater than or equal to 16" (§48.5.7 p2035; OVER8 = 0 only, so USARTDIV = BRR, the same page):
 //                     a start with BRR < 16, BRR rewritten below 16 on a running port, or a byte moving while a held start
-//                     waits. unmodeled. ArduPilot's measured start (TVI-WO-1305a.measure.md §1: BRR = 0, no DMAR or DMAT) is
-//                     held, not refused, and acknowledged by name once BRR >= 16 is written; until then a TDR write, an RDR
-//                     read, a byte received, or DMAR/DMAT set refuses (ruled at TVI-WO-1305's merge, Q2; bench row U2).
+//                     waits. unmodeled. ArduPilot's measured start is held and acknowledged by name (RefusedBrr; the BRR
+//                     field row; bench row U2).
 //   TVI-USART-IDLE    IDLE's frame time needs the kernel clock's frequency (ruled at TVI-WO-1305's merge, Q4): a receiver
 //                     start (UE and RE), or a byte needing the frame time, with a kernel clock this guard has no rule for.
 //                     unmodeled; never a default (invariant 1).
@@ -155,7 +154,7 @@ namespace Antmicro.Renode.Peripherals.Tviburi
                 {
                     return;   // no clock reaches the port (p470 USARTxEN, p2019 usart_ker_ck, p371): nothing is received
                 }
-                var taken = (cr1 & UeBit) != 0 && (cr1 & ReBit) != 0;
+                var taken = (cr1 & UeRe) == UeRe;
                 TimeInterval? frame = null;
                 if(taken)
                 {
@@ -475,7 +474,8 @@ namespace Antmicro.Renode.Peripherals.Tviburi
         // start with BRR = 0 and no DMA request, held until BRR >= 16 (cleared in Pass) while no byte moves (RefusedHeld).
         private bool RefusedBrr(long offset, uint word, int width)
         {
-            var brr = inner.ReadDoubleWord(BrrOffset) & 0xFFFF;
+            var brr = Brr;
+            var w16 = word & 0xFFFF;
             if(offset == Cr1Offset && !Running(cr1) && Running(word) && brr < 16)
             {
                 if(brr == 0 && (cr3 & (DmarBit | DmatBit)) == 0)
@@ -485,9 +485,9 @@ namespace Antmicro.Renode.Peripherals.Tviburi
                 }
                 return RefuseBrr(brr, "a start (CR1.UE with TE or RE) with BRR = 0x" + brr.ToString("X") + (brr == 0 ? " and CR3.DMAR or DMAT set" : ""), offset, word, width);
             }
-            if(offset == BrrOffset && Running(cr1) && (word & 0xFFFF) < 16 && (word & 0xFFFF) != brr)
+            if(offset == BrrOffset && Running(cr1) && w16 < 16 && w16 != brr)
             {
-                return RefuseBrr(word & 0xFFFF, "BRR rewritten to 0x" + (word & 0xFFFF).ToString("X") + " on a running port", offset, word, width);
+                return RefuseBrr(w16, "BRR rewritten to 0x" + w16.ToString("X") + " on a running port", offset, word, width);
             }
             return offset == TdrOffset ? RefusedHeld(offset, word, width, "a TDR write")
                 : offset == Cr3Offset && (word & (DmarBit | DmatBit)) != 0 && RefusedHeld(offset, word, width, "CR3.DMAR or DMAT set");
@@ -496,7 +496,7 @@ namespace Antmicro.Renode.Peripherals.Tviburi
         // A byte moving, or a DMA request enabled, while ArduPilot's held start with BRR = 0 waits for BRR >= 16.
         private bool RefusedHeld(long offset, uint value, int width, string what)
         {
-            return brrHeld && RefuseBrr(inner.ReadDoubleWord(BrrOffset) & 0xFFFF, what + " after a start with BRR = 0, before BRR >= 16 was written: the acknowledged start "
+            return brrHeld && RefuseBrr(Brr, what + " after a start with BRR = 0, before BRR >= 16 was written: the acknowledged start "
                 + "moves no byte (TVI-WO-1305a.measure.md §1)", offset, value, width);
         }
 
@@ -558,26 +558,29 @@ namespace Antmicro.Renode.Peripherals.Tviburi
             switch(sel)
             {
             case 0:
-                if((R(0x10) >> 3 & 7) != 0)
+                var sws = R(0x10) >> 3 & 7;
+                if(sws != 0)
                 {
-                    why += " with sys_ck not the HSI (RCC_CFGR.SWS = " + Convert.ToString(R(0x10) >> 3 & 7, 2).PadLeft(3, '0') + "): no rule";
+                    why += " with sys_ck not the HSI (RCC_CFGR.SWS = " + Convert.ToString(sws, 2).PadLeft(3, '0') + "): no rule";
                     return null;
                 }
                 var d1 = R(0x18);
                 var d2 = R(0x1C);
-                return hsi / Div(d1 >> 8 & 0xF) / Div(d1 & 0xF) / ((d2 >> (usart16 ? 8 : 4) & 4) == 0 ? 1ul : 2ul << (int)(d2 >> (usart16 ? 8 : 4) & 3));
+                var ppre = d2 >> (usart16 ? 8 : 4) & 7;   // D2PPRE2 or D2PPRE1 (p396): 0xx /1; 100-111 /2-/16
+                return hsi / Div(d1 >> 8 & 0xF) / Div(d1 & 0xF) / ((ppre & 4) == 0 ? 1ul : 2ul << (int)(ppre & 3));
             case 1:
                 var ck = R(0x28);
                 var divr = R(Pll2divrOffset);
                 var divm = ck >> 12 & 0x3F;
+                var refHz = divm == 0 ? 0 : hsi / divm;
                 var vco = divm == 0 ? 0 : hsi * ((divr & 0x1FF) + 1) / divm;
                 var wide = (R(0x2C) >> 5 & 1) == 0;   // PLL2VCOSEL (p402): 0 wide, 192-960 MHz; 1 medium, 150-420 MHz (p407)
-                if((ck & 3) != 0 || divm == 0 || pll2Wide || hsi / divm < 1000000 || hsi / divm > 16000000
+                if((ck & 3) != 0 || divm == 0 || pll2Wide || refHz < 1000000 || refHz > 16000000
                     || vco < (wide ? 192000000ul : 150000000ul) || vco > (wide ? 960000000ul : 420000000ul))
                 {
                     why += (ck & 3) != 0 || divm == 0 ? " with PLL2's reference not the HSI through DIVM2 (RCC_PLLCKSELR): no rule"
                         : pll2Wide ? " with RCC_PLL2DIVR once written with DIVN2 >= 256 or DIVQ2 >= 64, which the stock model narrows: no rule"
-                        : " with PLL2 outside p407's ranges (ref2_ck " + hsi / divm + " Hz, VCO " + vco + " Hz): no rule";
+                        : " with PLL2 outside p407's ranges (ref2_ck " + refHz + " Hz, VCO " + vco + " Hz): no rule";
                     return null;
                 }
                 return vco / ((divr >> 16 & 0x7F) + 1);
@@ -603,6 +606,8 @@ namespace Antmicro.Renode.Peripherals.Tviburi
             var k = host.TryGetLocalName(this, out var name) && host.TryGetByName<GuardedSTM32H7_RCC>(RccName, out rcc) ? rcc.QueryKernelClock(name) : null;
             return k == null || !k.Modeled || k.Running;
         }
+
+        private uint Brr => inner.ReadDoubleWord(BrrOffset) & 0xFFFF;
 
         private static bool Running(uint cr)
         {
@@ -660,7 +665,7 @@ namespace Antmicro.Renode.Peripherals.Tviburi
         private TimeInterval? FrameTime(string what, uint value, int width)
         {
             var hz = KernelHz(out var why);
-            var baud = hz == null ? 0 : (uint)(hz.Value / Math.Max(1u, inner.ReadDoubleWord(BrrOffset) & 0xFFFF));
+            var baud = hz == null ? 0 : (uint)(hz.Value / Math.Max(1u, Brr));
             if(baud == 0)
             {
                 RefuseIdle(what, hz == null ? why : why + " at " + hz + " Hz, below one baud at this BRR", RdrOffset, value, width);

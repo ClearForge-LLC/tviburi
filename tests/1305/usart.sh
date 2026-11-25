@@ -6,8 +6,7 @@
 #   TVIBURI_CI=1                     plain `podman run`, for a disposable CI runner only; elsewhere ~/bin/capped-run.
 # Exit 0 only if every selected case passed. Pages: RM0433 Rev 9 §48 (USART); the rulings of 2026-11-24T18:55Z (Q1-Q9) and
 # the measurement in docs/work-orders/TVI-WO-1305.measure.md. TVI-WO-1305a's cases (brr0 onward): the rulings at TVI-WO-1305's
-# merge (Q2-Q4) and docs/work-orders/TVI-WO-1305a.measure.md. The IDLE cases run at 320,000 baud: BRR 0xC8 over the kernel
-# clock, rcc_pclk2 from the HSI at reset, 64 MHz (TVI-WO-1305a (3)); the board's stock `frequency`, 200 MHz, would give 1,000,000.
+# merge (Q2-Q4) and docs/work-orders/TVI-WO-1305a.measure.md.
 set -euo pipefail
 
 here=$(cd "$(dirname "$0")/../.." && pwd)
