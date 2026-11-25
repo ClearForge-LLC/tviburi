@@ -2,7 +2,7 @@
 # must follow Aethelgard main's container/IMAGE, RUL-09), and no network for any run: every container is started with
 # --network none. Only the image pulls use the network.
 # TVI-WO-1202: parallel jobs, so the wall time is the longest job, not the sum. `route` classes the change; on code,
-# five shards run every case and every mutant between them, one case at a time each (two at once changed verdicts,
+# seven shards run every case and every mutant between them, one case at a time each (two at once changed verdicts,
 # 1202 measure §1.5), and `budget` runs the memory budget in one job. `ci` fails unless every job that had to run
 # succeeded and the shards' records show every case and mutant of the tree run exactly once. Nothing reruns itself.
 name: ci
@@ -41,7 +41,8 @@ jobs:
           TVIBURI_SCRATCH="$RUNNER_TEMP/tviburi" tests/ci/route.sh $ALL | tee "$RUNNER_TEMP/route.txt"
           grep -E '^(class=(docs|code)|budget=(yes|no))$' "$RUNNER_TEMP/route.txt" >>"$GITHUB_OUTPUT"
 
-  # Five explicit shards (ruled 2026-11-24T10:30Z, Q1 and Q4): each its own job, so each passes its own record.
+  # Seven explicit shards (ruled 2026-11-24T10:30Z, Q1 and Q4; seven 2026-11-25T00:00Z): each its own job, so each
+  # passes its own record. Their number is also shard.yml's `of` and the counts in `ci` below.
   shard-1:
     needs: route
     if: needs.route.outputs.class == 'code'
@@ -67,6 +68,16 @@ jobs:
     if: needs.route.outputs.class == 'code'
     uses: ./.github/workflows/shard.yml
     with: { shard: 5 }
+  shard-6:
+    needs: route
+    if: needs.route.outputs.class == 'code'
+    uses: ./.github/workflows/shard.yml
+    with: { shard: 6 }
+  shard-7:
+    needs: route
+    if: needs.route.outputs.class == 'code'
+    uses: ./.github/workflows/shard.yml
+    with: { shard: 7 }
 
   # TVI-WO-1201 (Scotty, 2026-11-23 evening): the memory budget, main's one file against this change's in this one
   # job. ArduPilot's ELF is built from Aethelgard's pinned image and held to its sha256; five full boots a side,
@@ -112,7 +123,7 @@ jobs:
         run: TVIBURI_SCRATCH="$RUNNER_TEMP/tviburi" tests/1201/test-budget.sh
 
   ci:
-    needs: [route, shard-1, shard-2, shard-3, shard-4, shard-5, budget, budget-tests]
+    needs: [route, shard-1, shard-2, shard-3, shard-4, shard-5, shard-6, shard-7, budget, budget-tests]
     if: always()
     runs-on: ubuntu-24.04
     timeout-minutes: 15
@@ -122,16 +133,16 @@ jobs:
           CLASS: ${{ needs.route.outputs.class }}
           BUDGET: ${{ needs.route.outputs.budget }}
           ROUTE: ${{ needs.route.result }}
-          SHARDS: ${{ needs.shard-1.result }} ${{ needs.shard-2.result }} ${{ needs.shard-3.result }} ${{ needs.shard-4.result }} ${{ needs.shard-5.result }}
+          SHARDS: ${{ needs.shard-1.result }} ${{ needs.shard-2.result }} ${{ needs.shard-3.result }} ${{ needs.shard-4.result }} ${{ needs.shard-5.result }} ${{ needs.shard-6.result }} ${{ needs.shard-7.result }}
           MEMORY: ${{ needs.budget.result }}
           MEMORY_TESTS: ${{ needs.budget-tests.result }}
         run: |
           echo "route $ROUTE (class '$CLASS', budget '$BUDGET'); shards $SHARDS; budget $MEMORY; budget-tests $MEMORY_TESTS"
           [ "$ROUTE" = success ] || { echo "FAIL the route did not succeed"; exit 1; }
-          # Five shards and the budget, each named: a result that is missing (a job renamed or dropped from `needs`) is
+          # Seven shards and the budget, each named: a result that is missing (a job renamed or dropped from `needs`) is
           # an empty word, so count them.
           set -- $SHARDS $MEMORY
-          [ $# = 6 ] || { echo "FAIL want 5 shard results and the budget's, got $#: '$SHARDS' '$MEMORY'"; exit 1; }
+          [ $# = 8 ] || { echo "FAIL want every shard's result and the budget's, got $#: '$SHARDS' '$MEMORY'"; exit 1; }
           case "$CLASS" in
             code) want=success ;;
             docs) want=skipped ;;
@@ -159,6 +170,8 @@ jobs:
           RAN3: ${{ needs.shard-3.outputs.ran }}
           RAN4: ${{ needs.shard-4.outputs.ran }}
           RAN5: ${{ needs.shard-5.outputs.ran }}
+          RAN6: ${{ needs.shard-6.outputs.ran }}
+          RAN7: ${{ needs.shard-7.outputs.ran }}
         run: |
-          for i in 1 2 3 4 5; do v=RAN$i; printf '%s\n' "${!v}" >"$RUNNER_TEMP/ran-$i.txt"; done
-          TVIBURI_SCRATCH="$RUNNER_TEMP/tviburi" tests/ci/aggregate.sh "$RUNNER_TEMP"/ran-{1,2,3,4,5}.txt
+          for i in 1 2 3 4 5 6 7; do v=RAN$i; printf '%s\n' "${!v}" >"$RUNNER_TEMP/ran-$i.txt"; done
+          TVIBURI_SCRATCH="$RUNNER_TEMP/tviburi" tests/ci/aggregate.sh "$RUNNER_TEMP"/ran-?.txt
