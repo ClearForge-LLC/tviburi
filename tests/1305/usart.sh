@@ -5,14 +5,15 @@
 #   TVIBURI_TESTS="config m1ue ..."  run only these cases.
 #   TVIBURI_CI=1                     plain `podman run`, for a disposable CI runner only; elsewhere ~/bin/capped-run.
 # Exit 0 only if every selected case passed. Pages: RM0433 Rev 9 §48 (USART); the rulings of 2026-11-24T18:55Z (Q1-Q9) and
-# the measurement in docs/work-orders/TVI-WO-1305.measure.md.
+# the measurement in docs/work-orders/TVI-WO-1305.measure.md. TVI-WO-1305a's cases (brr0 onward): the rulings at TVI-WO-1305's
+# merge (Q2-Q4) and docs/work-orders/TVI-WO-1305a.measure.md.
 set -euo pipefail
 
 here=$(cd "$(dirname "$0")/../.." && pwd)
 IMAGE=$(sed -n 's/^IMAGE=//p' "$here/tests/spike.sh")
-CASES="config m1ue over8ue psue psoff stopue reinit reinitstop disable same ap width tdrbyte read field nine kernel clock rxoff idle idleframe idlere dmarx fields ledger registrations recorded reset config2 regen"
+CASES="config m1ue over8ue psue psoff stopue reinit reinitstop disable same ap width tdrbyte read field nine kernel clock rxoff idle idleframe idlere dmarx fields ledger registrations recorded reset config2 regen brr0 brr8 brrheld overrun idlekernel idlenorule idlenone idlehse"
 GUARDS="spi1 rcc gpioPortA gpioPortB gpioPortC gpioPortD gpioPortE gpioPortF gpioPortG gpioPortH gpioPortI gpioPortJ gpioPortK timer1 timer8 dma1 dma2 flashController usart1 usart2 usart3 uart4 uart5 usart6 uart7 uart8"
-MONITOR="clock rxoff idle idleframe idlere dmarx fields ledger registrations recorded reset config2 regen"
+MONITOR="clock rxoff idle idleframe idlere dmarx fields ledger registrations recorded reset config2 regen brrheld overrun idlekernel idlenone idlehse"
 PATHS=$(for c in $CASES; do case " $MONITOR " in *" $c "*) ;; *) printf '"%s",' "$c" ;; esac; done | sed 's/,$//')
 scratch=${TVIBURI_SCRATCH:-$HOME/.cache/tviburi}
 mkdir -p "$scratch"
@@ -80,6 +81,14 @@ readout() { console "$1" | grep -A1 -x "R-$2" | tail -n1; }
 passed() { [ "$rc" = 0 ] && grep -qx 'CHECK PASS' "$work/$1.stdout"; }
 passes() { passed "$1" && after "$1"; }
 refuses() { [ "$rc" = 3 ] && first "$1" "r[\"rule\"] == \"$2\" and r[\"kind\"] == \"$3\" and r[\"peripheral\"] == \"sysbus.usart1\" and r[\"access\"][\"pc\"] != \"none\" and $4"; }
+logged() { # logged <name> <python expr over `recs`, usart1's records in the log, in order>
+  python3 -I -c '
+import json, sys
+recs = [json.loads(l.split("usart1: ", 1)[1]) for l in open(sys.argv[1]) if "usart1: {\"tviburi\":\"" in l and "\"rule\"" in l]
+sys.exit(0 if eval("(" + sys.argv[2] + ")") else 1)
+' "$work/$1/renode-log.txt" "$2"
+}
+idleat() { bit "$(readout "$1" "$2"20)" 4 0 && bit "$(readout "$1" "$2"40)" 4 1; }   # IDLE clear 20 us after a byte, set at 40 (31.25 us)
 bit() { python3 -I -c 'import sys; sys.exit(0 if int(sys.argv[1], 16) >> int(sys.argv[2]) & 1 == int(sys.argv[3]) else 1)' "$@"; }   # bit <hex> <n> <0|1>
 marks=('echo "TVIBURI-MARK-AFTER"' 'sysbus ReadDoubleWord 0x20000104' 'echo "R-READ"' 'sysbus ReadDoubleWord 0x20000108' 'echo "R-READ2"' 'sysbus ReadDoubleWord 0x2000010C')
 clk='sysbus WriteDoubleWord 0x580244F0 0x10'   # USART1EN (p470): an unclocked port is locked on the bus (TVI-WO-1300a)
@@ -130,8 +139,8 @@ for t in ${TVIBURI_TESTS:-$CASES}; do
     check "clock: CR1 written with USART1EN = 0 is dropped by the bus lock with no record (p373): it reads 0 once clocked, and the run passes" \
       "passed clock && grep -q 'Tried to write a locked peripheral: machine-0.usart1. Address 0x40011000' '$work/clock/renode.out' && [ \"\$(readout clock CR1)\" = 0x00000000 ]" ;;
   idle)
-    # IDLE (p2090, p2021; ruled Q5) at 320,000 baud (the stock frequency 200 MHz over BRR 0x271): a frame of 10 bits is 31.25 us.
-    run_case idle - 'cpu IsHalted true' "$clk" 'sysbus WriteDoubleWord 0x4001100C 0x271' 'sysbus WriteDoubleWord 0x40011000 0x2000001D' \
+    # IDLE (p2090, p2021; ruled Q5) at 320,000 baud (the kernel clock 64 MHz over BRR 0xC8): a frame of 10 bits is 31.25 us.
+    run_case idle - 'cpu IsHalted true' "$clk" 'sysbus WriteDoubleWord 0x4001100C 0xC8' 'sysbus WriteDoubleWord 0x40011000 0x2000001D' \
       'emulation RunFor "0.001"' 'echo "R-START"' 'sysbus ReadDoubleWord 0x4001101C' \
       'sysbus.usart1 WriteChar 0x41' 'emulation RunFor "0.00002"' 'echo "R-EARLY"' 'sysbus ReadDoubleWord 0x4001101C' \
       'sysbus.usart1 WriteChar 0x42' 'emulation RunFor "0.00002"' 'echo "R-RESTART"' 'sysbus ReadDoubleWord 0x4001101C' \
@@ -154,7 +163,7 @@ for t in ${TVIBURI_TESTS:-$CASES}; do
   idleframe)
     # Adversarial T2: the idle frame by M and STOP (p2068-2069, p2076): M0 = PCE = 1 (9 bits with parity) and STOP = 10 (2):
     # 1 + 9 + 2 = 12 bits at 320,000 baud, 37.5 us, where 8N1 would be 31.25 and either term alone 34.375.
-    run_case idleframe - 'cpu IsHalted true' "$clk" 'sysbus WriteDoubleWord 0x4001100C 0x271' 'sysbus WriteDoubleWord 0x40011004 0x2000' \
+    run_case idleframe - 'cpu IsHalted true' "$clk" 'sysbus WriteDoubleWord 0x4001100C 0xC8' 'sysbus WriteDoubleWord 0x40011004 0x2000' \
       'sysbus WriteDoubleWord 0x40011000 0x2000141D' 'sysbus.usart1 WriteChar 0x41' 'emulation RunFor "0.000036"' 'echo "R-36"' 'sysbus ReadDoubleWord 0x4001101C' \
       'emulation RunFor "0.000003"' 'echo "R-39"' 'sysbus ReadDoubleWord 0x4001101C'
     check "idleframe: with M0 = PCE = 1 and two stop bits the idle frame is 12 bits (37.5 us): no IDLE at 36 us, IDLE at 39 us" \
@@ -162,7 +171,7 @@ for t in ${TVIBURI_TESTS:-$CASES}; do
   idlere)
     # WO §5: a frame that ends without IDLE. RE cleared before the idle frame elapses: the receiver is off, so no idle line is
     # detected (p2070 RE; p2090), and the guard's timer must not set IDLE.
-    run_case idlere - 'cpu IsHalted true' "$clk" 'sysbus WriteDoubleWord 0x4001100C 0x271' 'sysbus WriteDoubleWord 0x40011000 0x2000001D' \
+    run_case idlere - 'cpu IsHalted true' "$clk" 'sysbus WriteDoubleWord 0x4001100C 0xC8' 'sysbus WriteDoubleWord 0x40011000 0x2000001D' \
       'sysbus.usart1 WriteChar 0x41' 'emulation RunFor "0.00001"' 'sysbus WriteDoubleWord 0x40011000 0x20000019' \
       'emulation RunFor "0.00001"' 'sysbus WriteDoubleWord 0x40011000 0x2000001D' 'emulation RunFor "0.0001"' 'echo "R-ISR"' 'sysbus ReadDoubleWord 0x4001101C'
     check "idlere: RE cleared 10 us after a byte and set again 10 us later, inside its idle frame (31.25 us): the receiver stopped, so that frame's IDLE never comes (WO §5; adversarial G5)" \
@@ -171,7 +180,7 @@ for t in ${TVIBURI_TESTS:-$CASES}; do
     # The receive request (p2048, p2070; ruled Q6), with the platform's request line: DMA1 stream 0 peripheral-to-memory on
     # request 41 into AXI SRAM. (1) armed first, three bytes; (2) a byte while the stream is disabled, then re-armed (the stock
     # model never moved it, measure.md U11); (3) DMAR set after a byte waits (U12).
-    PLATFORM_SED="$rx" run_case dmarx - 'cpu IsHalted true' "$clk" 'sysbus WriteDoubleWord 0x580244D8 0x1' 'sysbus WriteDoubleWord 0x4001100C 0x271' \
+    PLATFORM_SED="$rx" run_case dmarx - 'cpu IsHalted true' "$clk" 'sysbus WriteDoubleWord 0x580244D8 0x1' 'sysbus WriteDoubleWord 0x4001100C 0xC8' \
       'sysbus WriteDoubleWord 0x24000000 0xFFFFFFFF' 'sysbus WriteDoubleWord 0x24000100 0xFFFFFFFF' \
       'sysbus WriteDoubleWord 0x40020800 0x29' 'sysbus WriteDoubleWord 0x40020018 0x40011024' 'sysbus WriteDoubleWord 0x4002001C 0x24000000' \
       'sysbus WriteDoubleWord 0x40020014 0x8' 'sysbus WriteDoubleWord 0x40020010 0x400' 'sysbus WriteDoubleWord 0x40020010 0x401' \
@@ -231,7 +240,7 @@ EOF" ;;
   ledger)
     mkdir -p "$work/ledger"
     rc=0; container -v "$src:/repo:ro,Z" -v "$work/ledger:/out:Z" "$IMAGE" sh -c '/repo/scripts/build-release /repo /out/release >/dev/null' </dev/null >"$work/ledger.stdout" 2>&1 || rc=$?
-    check "ledger: the release carries the USART guard's 138 field rows over its 12 registers (FIFOEN, M0, RXINV acknowledged as stock-wrong; IDLEIE, DMAR modeled; BRR's re-init pattern named), bench row U1; the manifest restates the eight ports and not lpuart1; the stock type's model row is split (schema 2, ruled 19:57Z): the guarded row lists the eight under the guard, the unguarded row lpuart1 with no guard" \
+    check "ledger: the release carries the USART guard's 138 field rows over its 12 registers (FIFOEN, M0, RXINV acknowledged as stock-wrong; IDLEIE, DMAR modeled; BRR's re-init pattern and TVI-USART-BRR named, FIFOEN's TVI-USART-OVERRUN), bench rows U1 and U2; the manifest restates the eight ports and not lpuart1; the stock type's model row is split (schema 2, ruled 19:57Z): the guarded row lists the eight under the guard, the unguarded row lpuart1 with no guard" \
       "[ \$rc = 0 ] && python3 -I -c '
 import json, sys
 rows = [json.loads(l) for l in open(sys.argv[1]).read().splitlines()[1:]]
@@ -241,9 +250,10 @@ by = {(r[\"register\"], r[\"field\"]): r for r in f}
 ok = len(f) == 138 and len({r[\"register\"] for r in f}) == 12
 ok = ok and by[(\"USART_CR1\", \"FIFOEN\")][\"state\"] == \"stock-wrong\" and \"acknowledged by name\" in by[(\"USART_CR1\", \"FIFOEN\")][\"detail\"]
 ok = ok and by[(\"USART_CR1\", \"IDLEIE\")][\"state\"] == \"guard\" and by[(\"USART_CR3\", \"DMAR\")][\"state\"] == \"guard\"
+ok = ok and \"TVI-USART-BRR\" in by[(\"USART_BRR\", \"BRR\")][\"behaves_as\"] and \"TVI-USART-OVERRUN\" in by[(\"USART_CR1\", \"FIFOEN\")][\"behaves_as\"]
 ok = ok and \"usart_init on an enabled port\" in by[(\"USART_BRR\", \"BRR\")][\"behaves_as\"] and by[(\"USART_CR1\", \"M1\")][\"allowed\"] == [0]
 bench = sorted((r[\"field\"], r[\"rule\"]) for r in rows if r.get(\"peripheral\") == g and r[\"row\"] == \"bench\")
-ok = ok and bench == [(\"U1\", \"TVI-USART-UE\")]
+ok = ok and bench == [(\"U1\", \"TVI-USART-UE\"), (\"U2\", \"TVI-USART-BRR\")]
 m = [r for r in rows if r[\"row\"] == \"model\" and r[\"peripheral\"] == \"UART.STM32F7_USART\"]
 eight = [\"uart4\", \"uart5\", \"uart7\", \"uart8\", \"usart1\", \"usart2\", \"usart3\", \"usart6\"]
 mg = [x for x in m if x[\"field\"] == \"guarded\"]; mu = [x for x in m if x[\"field\"] == \"unguarded\"]
@@ -281,6 +291,118 @@ sys.exit(0 if ok else 1)
       -f /repo/model/stm32h7-usart-restate.awk /opt/renode/platforms/cpus/stm32h7.repl > /out/restate.repl' </dev/null >"$work/regen.stdout" 2>&1 || rc=$?
     check "regen: the guard's Fields table regenerates from tests/1305/data by tests/1305/fields.py, and the restatement from the pinned stm32h7.repl, byte for byte (RUL-16)" \
       "[ \$rc = 0 ] && sed -n '/^        private static readonly Row\[\] Fields =$/,/^        };$/p' '$src/model/GuardedSTM32F7_USART.cs' | sed '1,2d;\$d' | cmp -s - '$work/fields.cs' && cmp -s '$work/regen/restate.repl' '$src/model/stm32h7-usart-restate.repl'" ;;
+  brr0) check "brr0: ArduPilot's measured start (usart_init with BRR = 0, sdStop, usart_init with BRR = 0, then BRR 0x271 with UE = 1; TVI-WO-1305a.measure.md §1) passes, enforcing, acknowledged by name; the byte written after the rewrite is sent (TC); BRR reads 0x271" \
+    "passes brr0 && [ \"\$(readout brr0 READ)\" = 0x00000271 ] && bit \"\$(readout brr0 READ2)\" 6 1" ;;
+  brr8) check "brr8: a start with BRR = 8 refuses TVI-USART-BRR, unmodeled, at the CR1 write that sets UE (\"USARTDIV must be greater than or equal to 16\", p2035)" \
+    "refuses brr8 TVI-USART-BRR unmodeled 'r[\"access\"][\"offset\"] == \"0x0\" and r[\"access\"][\"value\"] == \"0x2000000D\" and r[\"bit\"] == \"BRR (15:0) = 0x8 (USARTDIV < 16)\" and r[\"condition\"].startswith(\"a start\") and \"p2035\" in r[\"citation\"]'" ;;
+  brrheld)
+    # Recorded (RUL-19), so that one run shows each way out of the acknowledged start: a start with BRR = 0 and DMAT (not the
+    # measured pattern); then the held start, and in it the same BRR again (RUL-18), a TDR write, an RDR read, DMAR set, a byte
+    # received, BRR rewritten to 5; then BRR 0xC8 ends it, and a TDR write and an RDR read pass.
+    PLATFORM_SED='/^tviburiUsart1:$/{n;s/enforcing/recorded/}' run_case brrheld - 'cpu IsHalted true' "$clk" 'emulation RunFor "0.0001"' \
+      'sysbus WriteDoubleWord 0x40011008 0x80' 'sysbus WriteDoubleWord 0x4001100C 0x0' 'sysbus WriteDoubleWord 0x40011000 0x2000000D' \
+      'sysbus WriteDoubleWord 0x40011000 0x0' 'sysbus WriteDoubleWord 0x40011008 0x0' 'sysbus WriteDoubleWord 0x40011000 0x2000000D' \
+      'sysbus WriteDoubleWord 0x4001100C 0x0' 'sysbus WriteDoubleWord 0x40011028 0x41' 'sysbus ReadDoubleWord 0x40011024' \
+      'sysbus WriteDoubleWord 0x40011008 0x40' 'sysbus.usart1 WriteChar 0x42' 'sysbus WriteDoubleWord 0x4001100C 0x5' \
+      'sysbus WriteDoubleWord 0x4001100C 0xC8' 'sysbus WriteDoubleWord 0x40011028 0x43' 'echo "R-RDR"' 'sysbus ReadDoubleWord 0x40011024'
+    check "brrheld: recorded: six TVI-USART-BRR would-refuses, unmodeled, in order: a BRR = 0 start with DMAT; in the held start a TDR write, an RDR read, DMAR set, a byte received, BRR rewritten to 5 on the running port; none for the same BRR again or after BRR 0xC8 (the byte then reads 0x42); never a pass" \
+      "[ \$rc = 1 ] && logged brrheld 'len(recs) == 6 and all(r[\"rule\"] == \"TVI-USART-BRR\" and r[\"kind\"] == \"unmodeled\" and \"p2035\" in r[\"citation\"] for r in recs)
+        and all(r[\"bit\"] == \"BRR (15:0) = 0x0 (USARTDIV < 16)\" for r in recs[:5]) and recs[5][\"bit\"] == \"BRR (15:0) = 0x5 (USARTDIV < 16)\"
+        and \"with BRR = 0x0 and CR3.DMAR or DMAT set:\" in recs[0][\"condition\"] and recs[1][\"condition\"].startswith(\"a TDR write after a start with BRR = 0, before BRR >= 16 was written: the acknowledged start moves no byte (TVI-WO-1305a.measure.md §1): \")
+        and recs[2][\"condition\"].startswith(\"an RDR read after\") and recs[3][\"condition\"].startswith(\"CR3.DMAR or DMAT set after\")
+        and recs[4][\"condition\"].startswith(\"a byte received after\") and recs[4][\"access\"][\"value\"] == \"0x42\"
+        and recs[5][\"condition\"].startswith(\"BRR rewritten to 0x5 on a running port:\")' && [ \"\$(readout brrheld RDR)\" = 0x00000042 ]" ;;
+  overrun)
+    # (2): FIFO mode first (two bytes unread, both kept: acknowledged, ruled Q8), then the same traffic with FIFOEN = 0.
+    run_case overrun - 'cpu IsHalted true' "$clk" 'sysbus WriteDoubleWord 0x4001100C 0xC8' 'sysbus WriteDoubleWord 0x40011000 0x2000000D' \
+      'sysbus.usart1 WriteChar 0x41' 'sysbus.usart1 WriteChar 0x42' 'echo "R-A"' 'sysbus ReadDoubleWord 0x40011024' 'echo "R-B"' 'sysbus ReadDoubleWord 0x40011024' \
+      'sysbus WriteDoubleWord 0x40011000 0x0' 'sysbus WriteDoubleWord 0x40011000 0xD' 'sysbus.usart1 WriteChar 0x51' 'sysbus.usart1 WriteChar 0x52' \
+      'echo "R-C"' 'sysbus ReadDoubleWord 0x40011024'
+    check "overrun: with FIFOEN = 1 two unread bytes pass and both read back (0x41, 0x42); with FIFOEN = 0 the second unread byte refuses TVI-USART-OVERRUN, unmodeled, at its arrival (p2030), and is not received (RDR 0x51)" \
+      "[ \$rc = 3 ] && records overrun 'len(recs) == 1 and recs[0][\"rule\"] == \"TVI-USART-OVERRUN\" and recs[0][\"kind\"] == \"unmodeled\" and recs[0][\"access\"][\"value\"] == \"0x52\" and recs[0][\"access\"][\"offset\"] == \"0x24\" and \"p2030\" in recs[0][\"citation\"]' \
+       && [ \"\$(readout overrun A)\" = 0x00000041 ] && [ \"\$(readout overrun B)\" = 0x00000042 ] && [ \"\$(readout overrun C)\" = 0x00000051 ]" ;;
+  idlekernel)
+    # (3): IDLE one 10-bit frame after a byte at the kernel clock's baud, 320,000 (31.25 us) unless named, in clock trees each
+    # from reset; the stock frequency (200 MHz, 125 MHz on usart2) would give another time at every BRR here. P: rcc_pclk2 =
+    # 64 MHz / D1CPRE 2 / HPRE 2 / D2PPRE2 2 = 8 MHz (D2PPRE1 4, which usart1 must not use), BRR 25. H: hsi_ker_ck = 64 MHz /
+    # HSIDIV 2 = 32 MHz (rcc_pclk2 16 MHz, D2PPRE2 2), BRR 100. A: ArduPilot's own PLL2 (TVI-WO-1305a.measure.md §2:
+    # PLLCKSELR 0x00408040, DIVM2 8; PLL2DIVR 0x0704022C, DIVN2 44, DIVQ2 4), 8 MHz * 45 / 5 = 72 MHz, exactly the frequency
+    # the consumer declares (ruled 2026-11-25T00:00Z: kept as a test), BRR 0x271: 115,200 baud, 86.8 us (64 MHz would give
+    # 97.7 us, 200 MHz 31.25); in ArduPilot's order, PLL2 first, then RCC_APB2RSTR.USART1RST pulsed (p443), which resets the
+    # port and not what it knows of PLL2; and after a wide PLL2DIVR was written before the machine Reset, which clears it.
+    # (USART16SEL only: ArduPilot's 0x9 also moves usart2's mux, and the RCC guard keeps a mux's state across machine Reset, a
+    # row for the RCC guard in this work order's feedback.)
+    # U: usart2 on rcc_pclk1 = 64 MHz / D2PPRE1 4 = 16 MHz (USART16SEL = 011 beside it, D2PPRE2 2), BRR 50.
+    byte=('sysbus WriteDoubleWord 0x40011000 0x2000001D' 'sysbus.usart1 WriteChar 0x41' 'emulation RunFor "0.00002"')
+    run_case idlekernel - 'cpu IsHalted true' "$clk" 'emulation RunFor "0.0001"' \
+      'sysbus WriteDoubleWord 0x58024418 0x808' 'sysbus WriteDoubleWord 0x5802441C 0x450' 'sysbus WriteDoubleWord 0x4001100C 0x19' "${byte[@]}" \
+      'echo "R-P20"' 'sysbus ReadDoubleWord 0x4001101C' 'emulation RunFor "0.00002"' 'echo "R-P40"' 'sysbus ReadDoubleWord 0x4001101C' \
+      'machine Reset' 'cpu IsHalted true' "$clk" \
+      'sysbus WriteDoubleWord 0x58024400 0x9' 'sysbus WriteDoubleWord 0x5802441C 0x400' 'sysbus WriteDoubleWord 0x58024454 0x18' 'sysbus WriteDoubleWord 0x4001100C 0x64' "${byte[@]}" \
+      'echo "R-H20"' 'sysbus ReadDoubleWord 0x4001101C' 'emulation RunFor "0.00002"' 'echo "R-H40"' 'sysbus ReadDoubleWord 0x4001101C' \
+      'sysbus WriteDoubleWord 0x58024438 0x01090367' 'machine Reset' 'cpu IsHalted true' "$clk" \
+      'sysbus WriteDoubleWord 0x58024428 0x00408040' 'sysbus WriteDoubleWord 0x58024438 0x0704022C' 'sysbus WriteDoubleWord 0x58024400 0x04000001' \
+      'sysbus WriteDoubleWord 0x58024454 0x8' 'sysbus WriteDoubleWord 0x58024498 0x10' 'sysbus WriteDoubleWord 0x58024498 0x0' 'sysbus WriteDoubleWord 0x4001100C 0x271' 'sysbus WriteDoubleWord 0x40011000 0x2000001D' 'sysbus.usart1 WriteChar 0x41' \
+      'emulation RunFor "0.000085"' 'echo "R-A85"' 'sysbus ReadDoubleWord 0x4001101C' 'emulation RunFor "0.000004"' 'echo "R-A89"' 'sysbus ReadDoubleWord 0x4001101C' \
+      'machine Reset' 'cpu IsHalted true' 'sysbus WriteDoubleWord 0x580244E8 0x20000' \
+      'sysbus WriteDoubleWord 0x58024454 0x18' 'sysbus WriteDoubleWord 0x5802441C 0x450' 'sysbus WriteDoubleWord 0x4000440C 0x32' 'sysbus WriteDoubleWord 0x40004400 0x2000001D' \
+      'sysbus.usart2 WriteChar 0x41' 'emulation RunFor "0.00002"' 'echo "R-U20"' 'sysbus ReadDoubleWord 0x4000441C' 'emulation RunFor "0.00002"' 'echo "R-U40"' 'sysbus ReadDoubleWord 0x4000441C'
+    check "idlekernel: IDLE one frame after a byte at the kernel clock's baud, not the stock frequency's: from rcc_pclk2 through D1CPRE, HPRE and D2PPRE2, from hsi_ker_ck through HSIDIV (each clear at 20 us, set at 40 us), from ArduPilot's own PLL2 at exactly 72 MHz after a USART1RST pulse (clear at 85 us, set at 89 us at BRR 0x271), and on usart2 from rcc_pclk1 through D2PPRE1 (TVI-WO-1305a (3))" \
+      "passed idlekernel && idleat idlekernel P && idleat idlekernel H && bit \"\$(readout idlekernel A85)\" 4 0 && bit \"\$(readout idlekernel A89)\" 4 1 && idleat idlekernel U" ;;
+  idlenorule) check "idlenorule: USART1 started on csi_ker_ck, running, refuses TVI-USART-IDLE, unmodeled, at the CR1 write: the guard has no rule for its frequency and uses no default (TVI-WO-1305a (3); invariant 1)" \
+    "refuses idlenorule TVI-USART-IDLE unmodeled 'r[\"access\"][\"value\"] == \"0x2000000D\" and \"USART16SEL = 100 (csi_ker_ck): no rule\" in r[\"bit\"] and \"p2034\" in r[\"citation\"]'" ;;
+  idlenone)
+    # Recorded: the other ways to no rule, each from reset: (1) a byte arriving after the source moved to csi_ker_ck under the
+    # running port (the RCC guard does not refuse it for a USART); (2) rcc_pclk2 with sys_ck on the CSI; then (6) and (7), before
+    # any PLL2 scenario leaves usart1's mux on pll2_q_ck (the RCC guard keeps it across machine Reset: a row); (3) pll2_q_ck from a
+    # CSI reference; (4) pll2_q_ck after PLL2DIVR was written with DIVN2 = 359, which the stock model keeps as 103 (p407 has 9
+    # bits), and a USART1RST pulse, which must not forget it; (5) pll2_q_ck with DIVN2 = 2 (x3): a 6 MHz VCO, outside p407's
+    # 192-960 MHz; (6) rcc_pclk2 from PLL1 with PLL1VCOSEL = 1 (150-420 MHz, p404) and a 500 MHz VCO: the stock model reads
+    # VCOSEL as 0 (measure §3), under which 500 MHz would pass; (7) rcc_pclk2 from PLL1 after PLL1DIVR was written with DIVP1 =
+    # 2 (/3, "odd division factors are not allowed", p404), a write the stock model ignores.
+    PLATFORM_SED='/^tviburiUsart1:$/{n;s/enforcing/recorded/}' run_case idlenone - 'cpu IsHalted true' "$clk" 'emulation RunFor "0.0001"' \
+      'sysbus WriteDoubleWord 0x4001100C 0xC8' 'sysbus WriteDoubleWord 0x40011000 0x2000000D' 'sysbus WriteDoubleWord 0x58024400 0x81' \
+      'sysbus WriteDoubleWord 0x58024454 0x20' 'sysbus.usart1 WriteChar 0x41' \
+      'machine Reset' 'cpu IsHalted true' "$clk" 'sysbus WriteDoubleWord 0x58024400 0x81' 'sysbus WriteDoubleWord 0x58024410 0x1' \
+      'sysbus WriteDoubleWord 0x4001100C 0xC8' 'sysbus WriteDoubleWord 0x40011000 0x2000000D' \
+      'machine Reset' 'cpu IsHalted true' "$clk" 'sysbus WriteDoubleWord 0x5802442C 0x01FF0002' 'sysbus WriteDoubleWord 0x58024430 0x010106F9' \
+      'sysbus WriteDoubleWord 0x58024400 0x01000001' 'sysbus WriteDoubleWord 0x58024410 0x3' 'sysbus WriteDoubleWord 0x4001100C 0xC8' 'sysbus WriteDoubleWord 0x40011000 0x2000000D' \
+      'machine Reset' 'cpu IsHalted true' "$clk" 'sysbus WriteDoubleWord 0x58024430 0x01010480' \
+      'sysbus WriteDoubleWord 0x58024400 0x01000001' 'sysbus WriteDoubleWord 0x58024410 0x3' 'sysbus WriteDoubleWord 0x4001100C 0xC8' 'sysbus WriteDoubleWord 0x40011000 0x2000000D' \
+      'machine Reset' 'cpu IsHalted true' "$clk" 'sysbus WriteDoubleWord 0x58024400 0x81' 'sysbus WriteDoubleWord 0x58024428 0x02020201' \
+      'sysbus WriteDoubleWord 0x58024400 0x04000081' 'sysbus WriteDoubleWord 0x58024454 0x8' 'sysbus WriteDoubleWord 0x4001100C 0xC8' 'sysbus WriteDoubleWord 0x40011000 0x2000000D' \
+      'machine Reset' 'cpu IsHalted true' "$clk" 'sysbus WriteDoubleWord 0x58024438 0x01090367' 'sysbus WriteDoubleWord 0x58024400 0x04000001' \
+      'sysbus WriteDoubleWord 0x58024454 0x8' 'sysbus WriteDoubleWord 0x58024498 0x10' 'sysbus WriteDoubleWord 0x58024498 0x0' 'sysbus WriteDoubleWord 0x4001100C 0xE1' 'sysbus WriteDoubleWord 0x40011000 0x2000000D' \
+      'machine Reset' 'cpu IsHalted true' "$clk" 'sysbus WriteDoubleWord 0x58024438 0x01010002' 'sysbus WriteDoubleWord 0x58024400 0x04000001' \
+      'sysbus WriteDoubleWord 0x58024454 0x8' 'sysbus WriteDoubleWord 0x4001100C 0x10' 'sysbus WriteDoubleWord 0x40011000 0x2000000D'
+    check "idlenone: recorded: seven TVI-USART-IDLE would-refuses, unmodeled: a byte after the source moved to csi_ker_ck under the running port (at the byte, RDR, the byte's value), and receiver starts on rcc_pclk2 with sys_ck on the CSI, on pll2_q_ck from a CSI reference, after a PLL2DIVR the stock model narrows (kept through a USART1RST), with a VCO outside p407's range, on PLL1 with a VCO outside the medium range its VCOSEL chose, and on PLL1 after a DIVP1 the stock model ignored; nothing else; never a pass" \
+      "[ \$rc = 1 ] && logged idlenone 'len(recs) == 7 and all(r[\"rule\"] == \"TVI-USART-IDLE\" and r[\"kind\"] == \"unmodeled\" for r in recs)
+        and \"(csi_ker_ck): no rule for its frequency\" in recs[0][\"bit\"] and recs[0][\"access\"][\"offset\"] == \"0x24\" and recs[0][\"access\"][\"value\"] == \"0x41\"
+        and \"with sys_ck not the HSI or PLL1 (RCC_CFGR.SWS = 001)\" in recs[1][\"bit\"] and recs[1][\"access\"][\"offset\"] == \"0x0\"
+        and \"(rcc_pclk2) with PLL1 outside its ranges (reference 2000000 Hz, VCO 500000000 Hz)\" in recs[2][\"bit\"]
+        and \"(rcc_pclk2) with RCC_PLL1DIVR once written with a value its read-back does not keep: no rule\" in recs[3][\"bit\"]
+        and \"(pll2_q_ck) with PLL2\" in recs[4][\"bit\"] and \"reference not the HSI\" in recs[4][\"bit\"]
+        and \"with RCC_PLL2DIVR once written with a value its read-back does not keep: no rule\" in recs[5][\"bit\"]
+        and \"with PLL2 outside its ranges\" in recs[6][\"bit\"] and \"VCO 6000000 Hz\" in recs[6][\"bit\"]'" ;;
+  idlehse)
+    # (3), ruled 2026-11-25T01:12Z: rcc_pclk2 from sys_ck = PLL1's P output on the HSE, as hse-crystal-16's generated firmware
+    # sets it up (HSEON, HSECSSON, PLLCKSELR 0x52: PLLSRC HSE, DIVM1 5; PLLCFGR 0x30004; PLL1DIVR 0x0103064F: x80, /4; PLL1ON;
+    # SW = PLL1), BRR 0xC8. D: the board declares hseFrequency 16 MHz (the generated board's): 3.2 MHz * 80 / 4 = 64 MHz, 320,000
+    # baud, IDLE 31.25 us after a byte. N: the board declares no crystal, so the HSE is the RCC guard's own default, 8 MHz (a row
+    # for the RCC guard). With this board's PLL settings that is a 1.6 MHz reference and a 128 MHz VCO, outside p404's 192-960:
+    # TVI-USART-IDLE, unmodeled, at the start, and the record shows the 8 MHz it took.
+    hse=('cpu IsHalted true' "$clk" 'sysbus WriteDoubleWord 0x58024400 0x00010001' 'sysbus WriteDoubleWord 0x58024400 0x00090001'
+      'sysbus WriteDoubleWord 0x58024428 0x52' 'sysbus WriteDoubleWord 0x5802442C 0x30004' 'sysbus WriteDoubleWord 0x58024430 0x0103064F'
+      'sysbus WriteDoubleWord 0x58024400 0x01090001' 'sysbus WriteDoubleWord 0x58024410 0x3' 'sysbus WriteDoubleWord 0x4001100C 0xC8'
+      'sysbus WriteDoubleWord 0x40011000 0x2000001D' 'sysbus.usart1 WriteChar 0x41')
+    PLATFORM_SED='s/^    hseFrequency: 8000000$/    hseFrequency: 16000000/' run_case idlehse - "${hse[@]}" \
+      'emulation RunFor "0.00002"' 'echo "R-D20"' 'sysbus ReadDoubleWord 0x4001101C' 'emulation RunFor "0.00002"' 'echo "R-D40"' 'sysbus ReadDoubleWord 0x4001101C'
+    d=$rc; mv "$work/idlehse" "$work/idlehse-d"; mv "$work/idlehse.stdout" "$work/idlehse-d.stdout"
+    PLATFORM_SED='/^    hseFrequency: 8000000$/d' run_case idlehse - "${hse[@]}"
+    check "idlehse: rcc_pclk2 from PLL1's P output on the HSE (the generated hse-crystal-16 sequence): with hseFrequency 16 MHz declared, 64 MHz (IDLE clear at 20 us, set at 40); with none declared, the RCC guard's default 8 MHz, under which this PLL's VCO is 128 MHz, outside its range: TVI-USART-IDLE, unmodeled, at the start" \
+      "[ \$d = 0 ] && grep -qx 'CHECK PASS' '$work/idlehse-d.stdout' && grep -qx '    hseFrequency: 16000000' '$work/idlehse-d/platform.repl' && ! grep -q '^    hseFrequency' '$work/idlehse/platform.repl' \
+       && bit \"\$(readout idlehse-d D20)\" 4 0 && bit \"\$(readout idlehse-d D40)\" 4 1 \
+       && [ \$rc = 3 ] && first idlehse 'r[\"rule\"] == \"TVI-USART-IDLE\" and r[\"access\"][\"offset\"] == \"0x0\" and \"with PLL1 outside its ranges (reference 1600000 Hz, VCO 128000000 Hz)\" in r[\"bit\"]'" ;;
   *) echo "unknown case: $t" >&2; exit 2 ;;
   esac
 done

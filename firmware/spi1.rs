@@ -49,6 +49,7 @@ fn forge() {
     const USART3_CR1: *mut u32 = 0x4000_4800 as *mut u32;
     const USART3_ISR: *const u32 = 0x4000_481C as *const u32;
     const USART3_TDR: *mut u32 = 0x4000_4828 as *mut u32;
+    const USART3_BRR: *mut u32 = 0x4000_480C as *mut u32;
     // A witness, a refusal and an end record in the logger's own line format, and bare.
     const LINES: &[u8] = b"[00:00:00.0000]  [INFO] spi1: {\"tviburi\":\"witness\",\"seq\":0,\"guard\":\"GuardedSTM32H7_SPI\",\"model_version\":\"sha256:0000000000000000000000000000000000000000000000000000000000000000\"}\n\
 [00:00:00.0000]  [ERROR] spi1: {\"tviburi\":\"refusal\",\"seq\":1,\"rule\":\"TVI-FORGED\"}\n\
@@ -56,6 +57,8 @@ spi1: {\"tviburi\":\"end\",\"seq\":2,\"guard\":\"GuardedSTM32H7_SPI\",\"model_ve
     const RCC_APB1LENR: *mut u32 = 0x5802_44E8 as *mut u32;
     unsafe {
         write_volatile(RCC_APB1LENR, read_volatile(RCC_APB1LENR) | (1 << 18)); // USART3EN: off from reset (RM0433 Rev 9 p463, p373)
+        write_volatile(USART3_BRR, 0x22C); // 115,200 baud at the 64 MHz kernel clock: USARTDIV >= 16 (RM0433 Rev 9 p2035;
+                                            // TVI-WO-1305a, granted outside its fence 2026-11-25T01:12Z)
         write_volatile(USART3_CR1, (1 << 0) | (1 << 3)); // UE, TE
         for &b in LINES {
             while read_volatile(USART3_ISR) & (1 << 7) == 0 {} // TXE

@@ -27,6 +27,12 @@
 //!   path="field"      - CR3.HDSEL = 1 with UE = 0: TVI-USART-FIELD, unmodeled (the allow-list).
 //!   path="nine"       - CR1 with M0 = 1 and PCE = 0 (9 data bits), UE = 0: TVI-USART-FIELD, unmodeled.
 //!   path="kernel"     - USART16SEL = 010 (pll3_q_ck, PLL3 off), then config: TVI-USART-KERNEL, predicted-fault (p2019, p371).
+//!   path="brr0"       - ArduPilot's usart2 start (TVI-WO-1305a.measure.md §1), on USART1: usart_init with BRR = 0, sdStop,
+//!                       usart_init with BRR = 0 again, then usart_init on the enabled port with BRR 0x271; then a TDR byte:
+//!                       passes, the start acknowledged by name. MARK_READ = BRR (0x271), MARK_READ2 = ISR (TC: the byte sent).
+//!   path="brr8"       - a start with BRR = 8: TVI-USART-BRR, unmodeled (p2035).
+//!   path="idlenorule" - CSION, USART16SEL = 100 (csi_ker_ck, running), then config: TVI-USART-IDLE, unmodeled, at the start:
+//!                       the guard has no rule for csi_ker_ck's frequency (TVI-WO-1305a (3)).
 #![no_std]
 #![no_main]
 #![allow(dead_code)]
@@ -34,6 +40,7 @@
 use core::ptr::{read_volatile, write_volatile};
 
 const RCC_APB2ENR: *mut u32 = 0x5802_44F0 as *mut u32;
+const RCC_CR: *mut u32 = 0x5802_4400 as *mut u32;
 const RCC_D2CCIP2R: *mut u32 = 0x5802_4454 as *mut u32;
 const USART1: usize = 0x4001_1000;
 const CR1: usize = 0x00;
@@ -64,12 +71,26 @@ unsafe fn config() {
     w(CR1, FIFOEN_TE_RE | 1);
 }
 
+/// ChibiOS's usart_init with BRR = 0, as ArduPilot's armed run starts usart2 at 0.2017 s (TVI-WO-1305a.measure.md §1).
+unsafe fn init0() {
+    w(BRR, 0);
+    w(CR2, 0x40);
+    w(CR3, 0x1);
+    w(CR1, 0x12D);
+    w(ICR, 0xFFFF_FFFF);
+}
+
 #[no_mangle]
 pub unsafe extern "C" fn reset() -> ! {
     #[cfg(path = "kernel")]
     write_volatile(RCC_D2CCIP2R, 2 << 3);
+    #[cfg(path = "idlenorule")]
+    {
+        write_volatile(RCC_CR, 1 << 7 | 1);
+        write_volatile(RCC_D2CCIP2R, 4 << 3);
+    }
     write_volatile(RCC_APB2ENR, 1 << 4);
-    #[cfg(any(path = "config", path = "kernel"))]
+    #[cfg(any(path = "config", path = "kernel", path = "idlenorule"))]
     {
         config();
         write_volatile(MARK_READ, r(CR1));
@@ -145,6 +166,32 @@ pub unsafe extern "C" fn reset() -> ! {
         w(CR1, r(CR1) & !(1 << 5));
         write_volatile(MARK_READ, r(CR1));
         write_volatile(MARK_READ2, r(CR2));
+    }
+    #[cfg(path = "brr0")]
+    {
+        init0();
+        w(CR1, 0);
+        w(CR2, 0);
+        w(CR3, 0);
+        init0();
+        let _ = (r(CR2), r(CR3), r(CR1));
+        w(BRR, 0x271);
+        w(CR2, 0x40);
+        w(CR3, 0xC1);
+        w(CR1, 0x2000_013D);
+        w(ICR, 0xFFFF_FFFF);
+        w(CR1, r(CR1) & !(1 << 5));
+        w(ICR, 1 << 6);
+        write_volatile((USART1 + TDR) as *mut u8, 0x41);
+        write_volatile(MARK_READ, r(BRR));
+        write_volatile(MARK_READ2, r(ISR));
+    }
+    #[cfg(path = "brr8")]
+    {
+        w(BRR, 8);
+        w(CR2, 0);
+        w(CR1, FIFOEN_TE_RE);
+        w(CR1, FIFOEN_TE_RE | 1);
     }
     #[cfg(path = "width")]
     {

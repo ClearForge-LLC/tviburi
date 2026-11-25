@@ -651,3 +651,45 @@ mutant	US35-frameM	6.2
 mutant	DM49-offsetNdt	5.7
 mutant	US36-ledgerSplit	1.2
 mutant	US37-checkGuarded	1.5
+# TVI-WO-1305a: its new cases and mutants, from its own CI run 45520722511 (five shards, each item the gap from the previous
+# item's last line, divided by its shard's speed against the rows above: 1.01-1.04); usart-idlehse and US65-US68 came after
+# that run and weigh the mean of the measured ones, 6.3 s.
+case	usart-brr0	6.3
+case	usart-brr8	6.3
+case	usart-brrheld	6.1
+case	usart-idlekernel	6.2
+case	usart-idlenone	6.2
+case	usart-idlenorule	6.4
+case	usart-overrun	6.0
+mutant	US38-brrStart	6.4
+mutant	US39-brrZeroOnly	6.2
+mutant	US40-brrNoDma	6.5
+mutant	US41-brrRewrite	6.5
+mutant	US42-brrRewriteSame	6.3
+mutant	US43-heldTdr	6.4
+mutant	US44-heldDma	6.1
+mutant	US45-heldRdr	6.5
+mutant	US46-heldByte	6.8
+mutant	US47-heldClear	6.4
+mutant	US48-overrunFifo	6.2
+mutant	US49-overrunRxne	6.0
+mutant	US50-idleStart	6.5
+mutant	US51-idleFrame	6.6
+mutant	US52-noDefault	6.3
+mutant	US53-hsidiv	6.4
+mutant	US54-sws	6.2
+mutant	US55-d1cpre	6.6
+mutant	US56-apbField	6.8
+mutant	US57-pllRef	6.4
+mutant	US58-pllWritten	6.3
+mutant	US59-pllWide	6.5
+mutant	US60-pllMachineReset	6.7
+mutant	US61-benchU2	1.3
+mutant	US62-pllPortReset	6.4
+mutant	US63-pllRange	6.4
+mutant	US64-selShift	6.2
+case	usart-idlehse	6.3
+mutant	US65-hseRef	6.3
+mutant	US66-sysPll1	6.3
+mutant	US67-vcoselPassed	6.3
+mutant	US68-divp1	6.3

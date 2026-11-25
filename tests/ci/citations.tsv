@@ -81,3 +81,8 @@ tests/1305/extract.py	TVI-WO-1305.measure.md
 tests/1305/fields.py	TVI-WO-1305.measure.md
 tests/1305/usart.sh	TVI-WO-1305.measure.md
 tests/1305/usart.sh	docs/
+# TVI-WO-1305a: the USART guard's new citations of its measurement, each a comment, a record string or a bench row, checked by hand 2026-11-24.
+firmware/usart.rs	TVI-WO-1305a.measure.md
+model/GuardedSTM32F7_USART.cs	TVI-WO-1305a.measure.md
+model/bench-checks.tsv	TVI-WO-1305a.measure.md
+tests/1305/usart.sh	TVI-WO-1305a.measure.md

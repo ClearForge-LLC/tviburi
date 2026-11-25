@@ -40,7 +40,8 @@ def cls(reg, f, page):
             'TXFEIE': ('Zero', U, '0 only: the stock model has no bit 30 (reserved there); the TX FIFO interrupts are not modeled'),
             'FIFOEN': ('Any', sw('FIFOEN is reserved in the stock model, which runs no FIFO: its receive queue is unbounded and ORE never sets, U8'), 'kept by the guard and served on read (the stock model has no bit 29, U2), so a read-modify-write keeps it as '
                        'silicon does; FIFO mode acknowledged by name (' + RULED + ' Q8): the receive queue is unbounded and ORE never sets '
-                       '(U8), the transmitter never fills; ' + REINIT % page),
+                       '(U8), the transmitter never fills; with FIFOEN = 0, a byte arriving while the last waits unread is TVI-USART-OVERRUN, '
+                       'unmodeled (p2030; ruled at TVI-WO-1305\'s merge, Q3); ' + REINIT % page),
             'M1': ('Zero', T, '0 only: a stock tag; 7-bit words are not modeled; ' + UE % page),
             'EOBIE': ('Zero', T, '0 only: a stock tag; smartcard mode is not modeled'),
             'RTOIE': ('Zero', I, '0 only: the stock receiver timeout runs on RTOIE alone, ignoring RTOEN, at 8 times RTO bit times '
@@ -112,7 +113,10 @@ def cls(reg, f, page):
         return ('Zero', T, '0 only: a stock tag; ' + what + ' is not modeled' + ('' if f in ('TCBGTIE', 'WUFIE', 'CTSIE') else '; ' + UE % page))
     if r == 'BRR':
         return ('Any', I, 'the stock model stores it: its BaudRate, the frequency property over BRR (baud accuracy is Aethelgard\'s); '
-                'it enters IDLE\'s frame time; ' + REINIT % page)
+                'IDLE\'s frame time is the kernel clock over BRR (p2034; TVI-USART-IDLE where the guard has no rule for the kernel clock); '
+                'USARTDIV must be >= 16 (p2035): a start with BRR < 16, or BRR rewritten below 16 on a running port, is TVI-USART-BRR, '
+                'unmodeled, but for ArduPilot\'s measured start with BRR = 0 and no DMA request, acknowledged by name until BRR >= 16 is '
+                'written while no byte moves (ruled at TVI-WO-1305\'s merge, Q2; bench row U2); ' + REINIT % page)
     if r == 'GTPR':
         return ('Zero', U, '0 only: the stock model has no register 0x10 (U1); smartcard and IrDA are not modeled; the guard keeps 0 '
                 'and serves it; ' + UE % page)

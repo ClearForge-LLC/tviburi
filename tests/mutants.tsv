@@ -362,3 +362,35 @@ US35-frameM	model/GuardedSTM32F7_USART.cs	var data = m == 1 ? 9 : m == 2 ? 7 : 8
 DM49-offsetNdt	model/GuardedSTM32DMA.cs	            if(suspended[s])	            if(false)	dma-offsetndt
 US36-ledgerSplit	tools/tviburi-release/src/main.rs	            vec![("guarded", guarded, guard), ("unguarded", rest, None)]	            vec![("", insts.clone(), guard)]	usart-ledger
 US37-checkGuarded	tools/tviburi-release/src/main.rs	            if !restates.iter().any(|(t, x)| t == ty && x == i) {	            if false {	unit
+# TVI-WO-1305a: one mutant per guard it adds to the USART guard, each with the case that must kill it.
+US38-brrStart	model/GuardedSTM32F7_USART.cs	if(offset == Cr1Offset && !Running(cr1) && Running(word) && brr < 16)	if(false)	usart-brr8
+US39-brrZeroOnly	model/GuardedSTM32F7_USART.cs	if(brr == 0 && (cr3 & (DmarBit | DmatBit)) == 0)	if((cr3 & (DmarBit | DmatBit)) == 0)	usart-brr8
+US40-brrNoDma	model/GuardedSTM32F7_USART.cs	if(brr == 0 && (cr3 & (DmarBit | DmatBit)) == 0)	if(brr == 0)	usart-brrheld
+US41-brrRewrite	model/GuardedSTM32F7_USART.cs	if(offset == BrrOffset && Running(cr1) && w16 < 16 && w16 != brr)	if(false)	usart-brrheld
+US42-brrRewriteSame	model/GuardedSTM32F7_USART.cs	if(offset == BrrOffset && Running(cr1) && w16 < 16 && w16 != brr)	if(offset == BrrOffset && Running(cr1) && w16 < 16)	usart-brrheld
+US43-heldTdr	model/GuardedSTM32F7_USART.cs	return offset == TdrOffset ? RefusedHeld(offset, word, width, "a TDR write")	return offset == TdrOffset ? false	usart-brrheld
+US44-heldDma	model/GuardedSTM32F7_USART.cs	: offset == Cr3Offset && (word & (DmarBit | DmatBit)) != 0 && RefusedHeld(offset, word, width, "CR3.DMAR or DMAT set");	: false;	usart-brrheld
+US45-heldRdr	model/GuardedSTM32F7_USART.cs	if(offset == RdrOffset && RefusedHeld(offset, 0, width, "an RDR read") && !records.Recorded)	if(false)	usart-brrheld
+US46-heldByte	model/GuardedSTM32F7_USART.cs	var refused = RefusedHeld(RdrOffset, value, 8, "a byte received");	var refused = false;	usart-brrheld
+US47-heldClear	model/GuardedSTM32F7_USART.cs	brrHeld &= (word & 0xFFFF) < 16;	(empty)	usart-brr0
+US48-overrunFifo	model/GuardedSTM32F7_USART.cs	if((cr1 & FifoenBit) != 0 || (inner.ReadDoubleWord(IsrOffset) & RxfneBit) == 0)	if((inner.ReadDoubleWord(IsrOffset) & RxfneBit) == 0)	usart-overrun
+US49-overrunRxne	model/GuardedSTM32F7_USART.cs	if((cr1 & FifoenBit) != 0 || (inner.ReadDoubleWord(IsrOffset) & RxfneBit) == 0)	if((cr1 & FifoenBit) != 0)	usart-overrun
+US50-idleStart	model/GuardedSTM32F7_USART.cs	refused |= KernelHz(out var why) == null && RefuseIdle(	refused |= KernelHz(out var why) == null && false && RefuseIdle(	usart-idlenorule
+US51-idleFrame	model/GuardedSTM32F7_USART.cs	RefuseIdle(what, hz == null ?	if(false) RefuseIdle(what, hz == null ?	usart-idlenone
+US52-noDefault	model/GuardedSTM32F7_USART.cs	                why += ": no rule for its frequency";\n                return null;	                return 64000000;	usart-idlenorule
+US53-hsidiv	model/GuardedSTM32F7_USART.cs	var hsi = 64000000ul >> (int)(R(0x00) >> 3 & 3);	var hsi = 64000000ul;	usart-idlekernel
+US54-sws	model/GuardedSTM32F7_USART.cs	: sws == 3 ? Vco(rcc, 1, hsi, ref why) / ((R(0x30) >> 9 & 0x7F) + 1) : null;	: sws == 3 ? Vco(rcc, 1, hsi, ref why) / ((R(0x30) >> 9 & 0x7F) + 1) : hsi;	usart-idlenone
+US55-d1cpre	model/GuardedSTM32F7_USART.cs	/ Div(d1 >> 8 & 0xF) / Div(d1 & 0xF)	/ Div(d1 & 0xF)	usart-idlekernel
+US56-apbField	model/GuardedSTM32F7_USART.cs	var ppre = d2 >> (usart16 ? 8 : 4) & 7;	var ppre = d2 >> (usart16 ? 4 : 8) & 7;	usart-idlekernel
+US57-pllRef	model/GuardedSTM32F7_USART.cs	ulong? input = (ck & 3) == 0 ? hsi : (ck & 3) == 2 ? rcc.HseFrequency : (ulong?)null;	ulong? input = (ck & 3) == 0 ? hsi : (ck & 3) == 2 ? rcc.HseFrequency : hsi;	usart-idlenone
+US61-benchU2	model/bench-checks.tsv	Tviburi.GuardedSTM32F7_USART\tU2\tTVI-USART-BRR	Tviburi.GuardedSTM32F7_USART\tU3\tTVI-USART-BRR	usart-ledger
+US58-pllWritten	model/GuardedSTM32F7_USART.cs	pllUntrusted[(offset - Pll1divrOffset) / 8 + 1] |= r.ReadDoubleWord(offset) != value;	(empty)	usart-idlenone
+US59-pllWide	model/GuardedSTM32F7_USART.cs	divm != 0 && !pllUntrusted[n] && refHz	divm != 0 && refHz	usart-idlenone
+US60-pllMachineReset	model/GuardedSTM32F7_USART.cs	m.MachineReset += _ => { pllUntrusted = new bool[3]; pllcfgr = PllcfgrReset; };	m.MachineReset += _ => { };	usart-idlekernel
+US62-pllPortReset	model/GuardedSTM32F7_USART.cs	                idle = brrHeld = false;	                idle = brrHeld = false; pllUntrusted = new bool[3];	usart-idlenone
+US63-pllRange	model/GuardedSTM32F7_USART.cs	&& vco >= (wide ? 192000000ul : 150000000ul) && vco <= (wide ? 960000000ul : 420000000ul))	)	usart-idlenone
+US64-selShift	model/GuardedSTM32F7_USART.cs	var sel = R(0x54) >> (usart16 ? 3 : 0) & 7;	var sel = R(0x54) >> 3 & 7;	usart-idlekernel
+US65-hseRef	model/GuardedSTM32F7_USART.cs	(ck & 3) == 2 ? rcc.HseFrequency :	(ck & 3) == 2 ? hsi :	usart-idlehse
+US66-sysPll1	model/GuardedSTM32F7_USART.cs	var sys = sws == 0 ? hsi : sws == 3 ?	var sys = sws == 0 ? hsi : sws == 4 ?	usart-idlehse
+US67-vcoselPassed	model/GuardedSTM32F7_USART.cs	var wide = (pllcfgr >> (n == 1 ? 1 : 5) & 1) == 0;	var wide = (rcc.ReadDoubleWord(0x2C) >> (n == 1 ? 1 : 5) & 1) == 0;	usart-idlenone
+US68-divp1	model/GuardedSTM32F7_USART.cs	Vco(rcc, 1, hsi, ref why) / ((R(0x30) >> 9 & 0x7F) + 1) : null;	Vco(rcc, 1, hsi, ref why) / 2 : null;	usart-idlehse
