@@ -323,16 +323,15 @@ sys.exit(0 if ok else 1)
       "[ \$rc = 3 ] && records overrun 'len(recs) == 1 and recs[0][\"rule\"] == \"TVI-USART-OVERRUN\" and recs[0][\"kind\"] == \"unmodeled\" and recs[0][\"access\"][\"value\"] == \"0x52\" and recs[0][\"access\"][\"offset\"] == \"0x24\" and \"p2030\" in recs[0][\"citation\"]' \
        && [ \"\$(readout overrun A)\" = 0x00000041 ] && [ \"\$(readout overrun B)\" = 0x00000042 ] && [ \"\$(readout overrun C)\" = 0x00000051 ]" ;;
   idlekernel)
-    # (3): IDLE one 10-bit frame after a byte at the kernel clock's baud, 320,000 (31.25 us), in three clock trees, each from
-    # reset; the stock frequency (200 MHz) would give 1,000,000 baud (10 us) at every BRR here. P: rcc_pclk2 = 64 MHz / D1CPRE 2
-    # / HPRE 2 / D2PPRE2 2 = 8 MHz (D2PPRE1 4, which usart1 must not use), BRR 25. H: hsi_ker_ck = 64 MHz / HSIDIV 2 = 32 MHz
-    # (rcc_pclk2 16 MHz, D2PPRE2 2), BRR 100. Q: pll2_q_ck = HSI / DIVM2 32 * 360 / 10 = 72 MHz, DIVN2 = 359 (a 9-bit value the
-    # stock model keeps as 103), BRR 225. R: after machine Reset, PLL2 with PLL2DIVR at its reset value (p406: DIVN2 128, DIVQ2
-    # 1), 2 MHz * 129 / 2 = 129 MHz, BRR 403 (320,099 baud, 31.24 us), not the 72 MHz written before the reset. A: ArduPilot's
-    # own PLL2 (TVI-WO-1305a.measure.md §2: PLLCKSELR 0x00408040, DIVM2 8; PLL2DIVR 0x0704022C, DIVN2 44, DIVQ2 4), 8 MHz * 45 / 5 =
-    # 72 MHz, exactly the frequency the consumer declares (ruled 2026-11-25T00:00Z: kept as a test), BRR 0x271: 115,200 baud,
-    # 86.8 us (64 MHz would give 97.7 us, 200 MHz 31.25). In ArduPilot's order: PLL2 first, then RCC_APB2RSTR.USART1RST pulsed
-    # (p443), which resets the port and must not reset what it knows of PLL2DIVR (at PLL2DIVR's reset value IDLE would come at 12.1 us).
+    # (3): IDLE one 10-bit frame after a byte at the kernel clock's baud, 320,000 (31.25 us) unless named, in clock trees each
+    # from reset; the stock frequency (200 MHz, 125 MHz on usart2) would give another time at every BRR here. P: rcc_pclk2 =
+    # 64 MHz / D1CPRE 2 / HPRE 2 / D2PPRE2 2 = 8 MHz (D2PPRE1 4, which usart1 must not use), BRR 25. H: hsi_ker_ck = 64 MHz /
+    # HSIDIV 2 = 32 MHz (rcc_pclk2 16 MHz, D2PPRE2 2), BRR 100. A: ArduPilot's own PLL2 (TVI-WO-1305a.measure.md §2:
+    # PLLCKSELR 0x00408040, DIVM2 8; PLL2DIVR 0x0704022C, DIVN2 44, DIVQ2 4), 8 MHz * 45 / 5 = 72 MHz, exactly the frequency
+    # the consumer declares (ruled 2026-11-25T00:00Z: kept as a test), BRR 0x271: 115,200 baud, 86.8 us (64 MHz would give
+    # 97.7 us, 200 MHz 31.25); in ArduPilot's order, PLL2 first, then RCC_APB2RSTR.USART1RST pulsed (p443), which resets the
+    # port and not what it knows of PLL2; and after a wide PLL2DIVR was written before the machine Reset, which clears it.
+    # U: usart2 on rcc_pclk1 = 64 MHz / D2PPRE1 4 = 16 MHz (USART16SEL = 011 beside it, D2PPRE2 2), BRR 50.
     byte=('sysbus WriteDoubleWord 0x40011000 0x2000001D' 'sysbus.usart1 WriteChar 0x41' 'emulation RunFor "0.00002"')
     run_case idlekernel - 'cpu IsHalted true' "$clk" 'emulation RunFor "0.0001"' \
       'sysbus WriteDoubleWord 0x58024418 0x808' 'sysbus WriteDoubleWord 0x5802441C 0x450' 'sysbus WriteDoubleWord 0x4001100C 0x19' "${byte[@]}" \
@@ -340,36 +339,41 @@ sys.exit(0 if ok else 1)
       'machine Reset' 'cpu IsHalted true' "$clk" \
       'sysbus WriteDoubleWord 0x58024400 0x9' 'sysbus WriteDoubleWord 0x5802441C 0x400' 'sysbus WriteDoubleWord 0x58024454 0x18' 'sysbus WriteDoubleWord 0x4001100C 0x64' "${byte[@]}" \
       'echo "R-H20"' 'sysbus ReadDoubleWord 0x4001101C' 'emulation RunFor "0.00002"' 'echo "R-H40"' 'sysbus ReadDoubleWord 0x4001101C' \
-      'machine Reset' 'cpu IsHalted true' "$clk" \
-      'sysbus WriteDoubleWord 0x58024438 0x01090367' 'sysbus WriteDoubleWord 0x58024400 0x04000001' 'sysbus WriteDoubleWord 0x58024454 0x8' 'sysbus WriteDoubleWord 0x4001100C 0xE1' "${byte[@]}" \
-      'echo "R-Q20"' 'sysbus ReadDoubleWord 0x4001101C' 'emulation RunFor "0.00002"' 'echo "R-Q40"' 'sysbus ReadDoubleWord 0x4001101C' 'echo "R-DIVR"' 'sysbus ReadDoubleWord 0x58024438' \
-      'machine Reset' 'cpu IsHalted true' "$clk" \
-      'sysbus WriteDoubleWord 0x58024400 0x04000001' 'sysbus WriteDoubleWord 0x58024454 0x8' 'sysbus WriteDoubleWord 0x4001100C 0x193' "${byte[@]}" \
-      'echo "R-R20"' 'sysbus ReadDoubleWord 0x4001101C' 'emulation RunFor "0.00002"' 'echo "R-R40"' 'sysbus ReadDoubleWord 0x4001101C' \
-      'machine Reset' 'cpu IsHalted true' "$clk" \
+      'sysbus WriteDoubleWord 0x58024438 0x01090367' 'machine Reset' 'cpu IsHalted true' "$clk" \
       'sysbus WriteDoubleWord 0x58024428 0x00408040' 'sysbus WriteDoubleWord 0x58024438 0x0704022C' 'sysbus WriteDoubleWord 0x58024400 0x04000001' \
       'sysbus WriteDoubleWord 0x58024454 0x9' 'sysbus WriteDoubleWord 0x58024498 0x10' 'sysbus WriteDoubleWord 0x58024498 0x0' 'sysbus WriteDoubleWord 0x4001100C 0x271' 'sysbus WriteDoubleWord 0x40011000 0x2000001D' 'sysbus.usart1 WriteChar 0x41' \
-      'emulation RunFor "0.000085"' 'echo "R-A85"' 'sysbus ReadDoubleWord 0x4001101C' 'emulation RunFor "0.000004"' 'echo "R-A89"' 'sysbus ReadDoubleWord 0x4001101C'
-    check "idlekernel: IDLE one frame after a byte at the kernel clock's baud (clear at 20 us, set at 40 us), not the stock frequency's, from rcc_pclk2 through D1CPRE, HPRE and D2PPRE2, from hsi_ker_ck through HSIDIV, from pll2_q_ck with a DIVN2 the stock model narrows (PLL2DIVR reads 0x01090267), from pll2_q_ck at PLL2DIVR's reset value after a machine Reset, and from ArduPilot's own PLL2 at exactly 72 MHz (IDLE clear at 85 us, set at 89 us after the byte at BRR 0x271) (TVI-WO-1305a (3))" \
-      "passed idlekernel && idleat idlekernel P && idleat idlekernel H && idleat idlekernel Q && idleat idlekernel R && bit \"\$(readout idlekernel A85)\" 4 0 && bit \"\$(readout idlekernel A89)\" 4 1 && [ \"\$(readout idlekernel DIVR)\" = 0x01090267 ]" ;;
+      'emulation RunFor "0.000085"' 'echo "R-A85"' 'sysbus ReadDoubleWord 0x4001101C' 'emulation RunFor "0.000004"' 'echo "R-A89"' 'sysbus ReadDoubleWord 0x4001101C' \
+      'machine Reset' 'cpu IsHalted true' 'sysbus WriteDoubleWord 0x580244E8 0x20000' \
+      'sysbus WriteDoubleWord 0x58024454 0x18' 'sysbus WriteDoubleWord 0x5802441C 0x450' 'sysbus WriteDoubleWord 0x4000440C 0x32' 'sysbus WriteDoubleWord 0x40004400 0x2000001D' \
+      'sysbus.usart2 WriteChar 0x41' 'emulation RunFor "0.00002"' 'echo "R-U20"' 'sysbus ReadDoubleWord 0x4000441C' 'emulation RunFor "0.00002"' 'echo "R-U40"' 'sysbus ReadDoubleWord 0x4000441C'
+    check "idlekernel: IDLE one frame after a byte at the kernel clock's baud, not the stock frequency's: from rcc_pclk2 through D1CPRE, HPRE and D2PPRE2, from hsi_ker_ck through HSIDIV (each clear at 20 us, set at 40 us), from ArduPilot's own PLL2 at exactly 72 MHz after a USART1RST pulse (clear at 85 us, set at 89 us at BRR 0x271), and on usart2 from rcc_pclk1 through D2PPRE1 (TVI-WO-1305a (3))" \
+      "passed idlekernel && idleat idlekernel P && idleat idlekernel H && bit \"\$(readout idlekernel A85)\" 4 0 && bit \"\$(readout idlekernel A89)\" 4 1 && idleat idlekernel U" ;;
   idlenorule) check "idlenorule: USART1 started on csi_ker_ck, running, refuses TVI-USART-IDLE, unmodeled, at the CR1 write: the guard has no rule for its frequency and uses no default (TVI-WO-1305a (3); invariant 1)" \
     "refuses idlenorule TVI-USART-IDLE unmodeled 'r[\"access\"][\"value\"] == \"0x2000000D\" and \"USART16SEL = 100 (csi_ker_ck): no rule\" in r[\"bit\"] and \"p2034\" in r[\"citation\"]'" ;;
   idlenone)
     # Recorded: the other ways to no rule, each from reset: (1) a byte arriving after the source moved to csi_ker_ck under the
     # running port (the RCC guard does not refuse it for a USART); (2) rcc_pclk2 with sys_ck on the CSI; (3) pll2_q_ck from a
-    # CSI reference.
+    # CSI reference; (4) pll2_q_ck after PLL2DIVR was written with DIVN2 = 359, which the stock model keeps as 103 (p407 has 9
+    # bits), and a USART1RST pulse, which must not forget it; (5) pll2_q_ck with DIVN2 = 2 (x3): a 6 MHz VCO, outside p407's
+    # 192-960 MHz.
     PLATFORM_SED='/^tviburiUsart1:$/{n;s/enforcing/recorded/}' run_case idlenone - 'cpu IsHalted true' "$clk" 'emulation RunFor "0.0001"' \
       'sysbus WriteDoubleWord 0x4001100C 0xC8' 'sysbus WriteDoubleWord 0x40011000 0x2000000D' 'sysbus WriteDoubleWord 0x58024400 0x81' \
       'sysbus WriteDoubleWord 0x58024454 0x20' 'sysbus.usart1 WriteChar 0x41' \
       'machine Reset' 'cpu IsHalted true' "$clk" 'sysbus WriteDoubleWord 0x58024400 0x81' 'sysbus WriteDoubleWord 0x58024410 0x1' \
       'sysbus WriteDoubleWord 0x4001100C 0xC8' 'sysbus WriteDoubleWord 0x40011000 0x2000000D' \
       'machine Reset' 'cpu IsHalted true' "$clk" 'sysbus WriteDoubleWord 0x58024400 0x81' 'sysbus WriteDoubleWord 0x58024428 0x02020201' \
-      'sysbus WriteDoubleWord 0x58024400 0x04000081' 'sysbus WriteDoubleWord 0x58024454 0x8' 'sysbus WriteDoubleWord 0x4001100C 0xC8' 'sysbus WriteDoubleWord 0x40011000 0x2000000D'
-    check "idlenone: recorded: three TVI-USART-IDLE would-refuses, unmodeled: a byte after the source moved to csi_ker_ck under the running port (at the byte, RDR), a receiver start on rcc_pclk2 with sys_ck on the CSI, and one on pll2_q_ck from a CSI reference; nothing else; never a pass" \
-      "[ \$rc = 1 ] && logged idlenone 'len(recs) == 3 and all(r[\"rule\"] == \"TVI-USART-IDLE\" and r[\"kind\"] == \"unmodeled\" for r in recs)
-        and \"(csi_ker_ck): no rule for its frequency\" in recs[0][\"bit\"] and recs[0][\"access\"][\"offset\"] == \"0x24\"
+      'sysbus WriteDoubleWord 0x58024400 0x04000081' 'sysbus WriteDoubleWord 0x58024454 0x8' 'sysbus WriteDoubleWord 0x4001100C 0xC8' 'sysbus WriteDoubleWord 0x40011000 0x2000000D' \
+      'machine Reset' 'cpu IsHalted true' "$clk" 'sysbus WriteDoubleWord 0x58024438 0x01090367' 'sysbus WriteDoubleWord 0x58024400 0x04000001' \
+      'sysbus WriteDoubleWord 0x58024454 0x8' 'sysbus WriteDoubleWord 0x58024498 0x10' 'sysbus WriteDoubleWord 0x58024498 0x0' 'sysbus WriteDoubleWord 0x4001100C 0xE1' 'sysbus WriteDoubleWord 0x40011000 0x2000000D' \
+      'machine Reset' 'cpu IsHalted true' "$clk" 'sysbus WriteDoubleWord 0x58024438 0x01010002' 'sysbus WriteDoubleWord 0x58024400 0x04000001' \
+      'sysbus WriteDoubleWord 0x58024454 0x8' 'sysbus WriteDoubleWord 0x4001100C 0x10' 'sysbus WriteDoubleWord 0x40011000 0x2000000D'
+    check "idlenone: recorded: five TVI-USART-IDLE would-refuses, unmodeled: a byte after the source moved to csi_ker_ck under the running port (at the byte, RDR, the byte's value), and receiver starts on rcc_pclk2 with sys_ck on the CSI, on pll2_q_ck from a CSI reference, after a PLL2DIVR the stock model narrows (kept through a USART1RST), and with a VCO outside p407's range; nothing else; never a pass" \
+      "[ \$rc = 1 ] && logged idlenone 'len(recs) == 5 and all(r[\"rule\"] == \"TVI-USART-IDLE\" and r[\"kind\"] == \"unmodeled\" for r in recs)
+        and \"(csi_ker_ck): no rule for its frequency\" in recs[0][\"bit\"] and recs[0][\"access\"][\"offset\"] == \"0x24\" and recs[0][\"access\"][\"value\"] == \"0x41\"
         and \"with sys_ck not the HSI (RCC_CFGR.SWS = 001)\" in recs[1][\"bit\"] and recs[1][\"access\"][\"offset\"] == \"0x0\"
-        and \"(pll2_q_ck) with PLL2\" in recs[2][\"bit\"] and \"reference not the HSI\" in recs[2][\"bit\"]'" ;;
+        and \"(pll2_q_ck) with PLL2\" in recs[2][\"bit\"] and \"reference not the HSI\" in recs[2][\"bit\"]
+        and \"once written with DIVN2 >= 256 or DIVQ2 >= 64, which the stock model narrows: no rule\" in recs[3][\"bit\"]
+        and \"with PLL2 outside p407\" in recs[4][\"bit\"] and \"VCO 6000000 Hz\" in recs[4][\"bit\"]'" ;;
   *) echo "unknown case: $t" >&2; exit 2 ;;
   esac
 done

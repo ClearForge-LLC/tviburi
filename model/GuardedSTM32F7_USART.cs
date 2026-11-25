@@ -36,7 +36,7 @@
 //                     existing query (QueryKernelClock, TVI-WO-1300): "The usart_ker_ck is the USART clock source" (p2019),
 //                     and "no clock will be provided to the peripheral" (p371). predicted-fault; unmodeled where the query
 //                     has no rule (usart6, uart4/5/7/8, whose enables the RCC guard already refuses) or no RCC guard is found.
-//   TVI-USART-BRR     "USARTDIV must be greater than or equal to 16" (§48.5.7 p2035; OVER8 = 0 only, so USARTDIV = BRR, p2034):
+//   TVI-USART-BRR     "USARTDIV must be greater than or equal to 16" (§48.5.7 p2035; OVER8 = 0 only, so USARTDIV = BRR, the same page):
 //                     a start with BRR < 16, BRR rewritten below 16 on a running port, or a byte moving while a held start
 //                     waits. unmodeled. ArduPilot's measured start (TVI-WO-1305a.measure.md §1: BRR = 0, no DMAR or DMAT) is
 //                     held, not refused, and acknowledged by name once BRR >= 16 is written; until then a TDR write, an RDR
@@ -92,20 +92,22 @@ namespace Antmicro.Renode.Peripherals.Tviburi
             machine.PeripheralsChanged += FindRcc;
             if(machine is Machine m)
             {
-                // PLL2DIVR returns to its reset value with the RCC (p406), at a machine reset; never at this port's own reset,
-                // which the RCC's USARTxRST runs (ArduPilot resets usart1 after setting PLL2 up).
-                m.MachineReset += _ => pll2divr = Pll2divrReset;
+                // PLL2DIVR returns to its reset value (p406, narrow) with the RCC, at a machine reset; never at this port's own
+                // reset, which the RCC's USARTxRST runs (ArduPilot resets usart1 after setting PLL2 up).
+                m.MachineReset += _ => pll2Wide = false;
             }
         }
 
         // The RCC guard's existing event `Written` (TVI-WO-1304), subscribed when the RCC guard appears at platform load, before
-        // any monitor or guest write: PLL2DIVR as written, which the stock model narrows (DIVN2 8 bits, DIVQ2 6; p407 has 9 and 7).
+        // any monitor or guest write. The stock model narrows PLL2DIVR (DIVN2 to 8 bits, DIVQ2 to 6; p407 has 9 and 7), so its
+        // read-back is PLL2's value only while no wider field was ever written: once one was, a read-modify-write writes the
+        // narrowed bits back, and no copy here could say what silicon holds. `pll2Wide` marks it, until the machine resets.
         private void FindRcc(IMachine m, PeripheralsChangedEventArgs args)
         {
             if(rccSeen == null && args.Peripheral is GuardedSTM32H7_RCC r)
             {
                 rccSeen = r;
-                r.Written += (offset, value) => { if(offset == Pll2divrOffset) { pll2divr = value; } };
+                r.Written += (offset, value) => pll2Wide |= offset == Pll2divrOffset && (value & 0x00400100) != 0;
             }
         }
 
@@ -154,14 +156,24 @@ namespace Antmicro.Renode.Peripherals.Tviburi
                     return;   // no clock reaches the port (p470 USARTxEN, p2019 usart_ker_ck, p371): nothing is received
                 }
                 var taken = (cr1 & UeBit) != 0 && (cr1 & ReBit) != 0;
-                if(taken && (RefusedHeld(RdrOffset, value, 8, "a byte received") || RefusedOverrun(value)) && !records.Recorded)
+                TimeInterval? frame = null;
+                if(taken)
                 {
-                    return;
+                    var refused = RefusedHeld(RdrOffset, value, 8, "a byte received");
+                    if(!refused || records.Recorded)
+                    {
+                        refused |= RefusedOverrun(value);
+                    }
+                    frame = !refused || records.Recorded ? FrameTime("a byte received", value, 8) : null;
+                    if((refused || frame == null) && !records.Recorded)
+                    {
+                        return;
+                    }
                 }
                 inner.WriteChar(value);
                 if(taken)
                 {
-                    ScheduleIdle();
+                    ScheduleIdle(frame);
                     Request();
                 }
             }
@@ -484,7 +496,7 @@ namespace Antmicro.Renode.Peripherals.Tviburi
         // A byte moving, or a DMA request enabled, while ArduPilot's held start with BRR = 0 waits for BRR >= 16.
         private bool RefusedHeld(long offset, uint value, int width, string what)
         {
-            return brrHeld && RefuseBrr(0, what + " after a start with BRR = 0, before BRR >= 16 was written: the acknowledged start "
+            return brrHeld && RefuseBrr(inner.ReadDoubleWord(BrrOffset) & 0xFFFF, what + " after a start with BRR = 0, before BRR >= 16 was written: the acknowledged start "
                 + "moves no byte (TVI-WO-1305a.measure.md §1)", offset, value, width);
         }
 
@@ -492,7 +504,7 @@ namespace Antmicro.Renode.Peripherals.Tviburi
         {
             records.Refuse("TVI-USART-BRR", Unmodeled, "USART_BRR", "BRR (15:0) = 0x" + brr.ToString("X") + " (USARTDIV < 16)",
                 what + ": \"USARTDIV must be greater than or equal to 16\", and the twin cannot say what silicon does below it",
-                "RM0433 Rev 9 §48.5.7 p2035, p2034 (USARTDIV = BRR with OVER8 = 0); ruled 2026-11-24 at TVI-WO-1305's merge (Q2): "
+                "RM0433 Rev 9 §48.5.7 p2035 (and: USARTDIV = BRR with OVER8 = 0); ruled 2026-11-24 at TVI-WO-1305's merge (Q2): "
                 + "ArduPilot's measured start acknowledged by name, any other unmodeled; bench row U2", State(), offset, value, width);
             return true;
         }
@@ -521,13 +533,14 @@ namespace Antmicro.Renode.Peripherals.Tviburi
             return true;
         }
 
-        // The port's kernel clock in Hz, from the RCC guard's registers (as the flash guard reads them) and, for PLL2DIVR, the
-        // value its `Written` event carried; null, with the reason, where this guard has no rule. Called only while the RCC guard's query says
+        // The port's kernel clock in Hz, from the RCC guard's registers (as the flash guard reads them), PLL2DIVR's trusted only
+        // while its `Written` event saw no wide field; null, with the reason, where this guard has no rule. Called only while the RCC guard's query says
         // the clock runs (the start's TVI-USART-KERNEL, and Clocked() for a byte), so a running PLL2 has DIVM2 > 0.
         // Rules, HSI-rooted only (TVI-WO-1305a.measure.md §2: what both firmwares select):
         //   hsi_ker_ck = 64 MHz >> HSIDIV (p341, p385);
         //   rcc_pclk2 (USART1/6) or rcc_pclk1 = sys_ck / D1CPRE / HPRE / D2PPRE2 or D2PPRE1 (pp. 394-396), with sys_ck the HSI (SWS, p393);
-        //   pll2_q_ck = HSI / DIVM2 * (DIVN2 + 1) / (DIVQ2 + 1) (p398, p407), FRACN2 0 (the RCC guard's allow-list).
+        //   pll2_q_ck = HSI / DIVM2 * (DIVN2 + 1) / (DIVQ2 + 1) (p398, p407), FRACN2 0 (the RCC guard's allow-list), from the
+        //     read-back while no wide field was written (`pll2Wide`), ref2_ck within 1-16 MHz and the VCO within PLL2VCOSEL's range (p407).
         // No rule: pll3_q_ck, csi_ker_ck, lse_ck, and sys_ck or a PLL reference from CSI, HSE or PLL1.
         private ulong? KernelHz(out string why)
         {
@@ -555,12 +568,19 @@ namespace Antmicro.Renode.Peripherals.Tviburi
                 return hsi / Div(d1 >> 8 & 0xF) / Div(d1 & 0xF) / ((d2 >> (usart16 ? 8 : 4) & 4) == 0 ? 1ul : 2ul << (int)(d2 >> (usart16 ? 8 : 4) & 3));
             case 1:
                 var ck = R(0x28);
-                if((ck & 3) != 0 || (ck >> 12 & 0x3F) == 0)
+                var divr = R(Pll2divrOffset);
+                var divm = ck >> 12 & 0x3F;
+                var vco = divm == 0 ? 0 : hsi * ((divr & 0x1FF) + 1) / divm;
+                var wide = (R(0x2C) >> 5 & 1) == 0;   // PLL2VCOSEL (p402): 0 wide, 192-960 MHz; 1 medium, 150-420 MHz (p407)
+                if((ck & 3) != 0 || divm == 0 || pll2Wide || hsi / divm < 1000000 || hsi / divm > 16000000
+                    || vco < (wide ? 192000000ul : 150000000ul) || vco > (wide ? 960000000ul : 420000000ul))
                 {
-                    why += " with PLL2's reference not the HSI through DIVM2 (RCC_PLLCKSELR): no rule";
+                    why += (ck & 3) != 0 || divm == 0 ? " with PLL2's reference not the HSI through DIVM2 (RCC_PLLCKSELR): no rule"
+                        : pll2Wide ? " with RCC_PLL2DIVR once written with DIVN2 >= 256 or DIVQ2 >= 64, which the stock model narrows: no rule"
+                        : " with PLL2 outside p407's ranges (ref2_ck " + hsi / divm + " Hz, VCO " + vco + " Hz): no rule";
                     return null;
                 }
-                return hsi * ((pll2divr & 0x1FF) + 1) / ((ck >> 12 & 0x3F) * ((pll2divr >> 16 & 0x7F) + 1));
+                return vco / ((divr >> 16 & 0x7F) + 1);
             case 3:
                 return hsi;
             default:
@@ -614,10 +634,9 @@ namespace Antmicro.Renode.Peripherals.Tviburi
         // ---- IDLE and the receive request ----------------------------------------------------------------------
 
         // One idle frame after this byte, unless a newer one arrives or the port stops (p2090, p2021).
-        private void ScheduleIdle()
+        private void ScheduleIdle(TimeInterval? t)
         {
             var g = ++idleGen;
-            var t = FrameTime();
             if(t == null)
             {
                 return;
@@ -638,13 +657,13 @@ namespace Antmicro.Renode.Peripherals.Tviburi
         // A start bit, the data bits by M (00 8, 01 9, 10 7; p2068-2069), the stop bits by STOP (00 1, 01 0.5, 10 2, 11 1.5;
         // p2076), at the kernel clock's baud over BRR (p2034), in the stock model's integer arithmetic (its BaudRate). With no
         // rule for the kernel clock, TVI-USART-IDLE and no frame (ruled Q4: never the stock `frequency`).
-        private TimeInterval? FrameTime()
+        private TimeInterval? FrameTime(string what, uint value, int width)
         {
             var hz = KernelHz(out var why);
             var baud = hz == null ? 0 : (uint)(hz.Value / Math.Max(1u, inner.ReadDoubleWord(BrrOffset) & 0xFFFF));
             if(baud == 0)
             {
-                RefuseIdle("a byte needs its idle frame", hz == null ? why : why + " at " + hz + " Hz, below one baud at this BRR", RdrOffset, 0, 8);
+                RefuseIdle(what, hz == null ? why : why + " at " + hz + " Hz, below one baud at this BRR", RdrOffset, value, width);
                 return null;
             }
             var m = ((cr1 >> 27) & 2) | ((cr1 >> 12) & 1);
@@ -687,7 +706,7 @@ namespace Antmicro.Renode.Peripherals.Tviburi
             {
                 pulsing = false;
             }
-            if(RequestLevel() && !repulse && FrameTime() is TimeInterval t)
+            if(RequestLevel() && !repulse && FrameTime("a received byte waits for its next request (no bus access)", 0, 0) is TimeInterval t)
             {
                 repulse = true;
                 host.ScheduleAction(t, _ =>
@@ -761,10 +780,9 @@ namespace Antmicro.Renode.Peripherals.Tviburi
         private ulong idleGen;
         private string config;
         private GuardedSTM32H7_RCC rccSeen;
-        private uint pll2divr = Pll2divrReset;
+        private bool pll2Wide;
 
         private const long Pll2divrOffset = 0x38;      // RCC_PLL2DIVR, §8.7.15 p406
-        private const uint Pll2divrReset = 0x01010280; // its reset value (p406)
         private const uint UeRe = UeBit | ReBit;
         private const uint DmatBit = 1u << 7;
 
