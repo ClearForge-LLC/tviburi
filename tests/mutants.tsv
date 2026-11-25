@@ -495,8 +495,8 @@ AD14-ckmodeDiv	model/GuardedSTM32H7_ADC.cs	input = bus / (ckmode == 1 ? 1 : ckmo
 AD15-presc	model/GuardedSTM32H7_ADC.cs	input = presc > 11 ? null : input / Prescale[presc];	input = presc > 11 ? null : input;	adc-rate2
 AD16-ldordyY	model/GuardedSTM32H7_ADC.cs	isr | (Revision == "V" && ldoReady ? LdordyBit : 0);	isr | (ldoReady ? LdordyBit : 0);	adc-revy
 AD17-res	model/GuardedSTM32H7_ADC.cs	return Revision == "V" ? res == 4 : res > 4;	return false;	adc-res
-AD18-boost	model/GuardedSTM32H7_ADC.cs	if(boost != want)	if(false)	adc-boost
-AD19-boostAck	model/GuardedSTM32H7_ADC.cs	if(Revision == "V" && boost == 1 && want == 2)	if(false)	adc-boostack
+AD18-boost	model/GuardedSTM32H7_ADC.cs	if(boost == want || (Revision == "V" && boost == 1 && want == 2))	if(true)	adc-boost
+AD19-boostAck	model/GuardedSTM32H7_ADC.cs	if(boost == want || (Revision == "V" && boost == 1 && want == 2))	if(boost == want)	adc-boostack
 AD20-pcsel	model/GuardedSTM32H7_ADC.cs	if((pcsel & (1u << ch)) == 0)	if(false)	adc-pcsel
 AD21-oneshotNone	model/GuardedSTM32H7_ADC.cs	if(dmngt == 2 || (dmngt == 1 && ServingState() < 0))	if(dmngt == 2)	adc-oneshotnone
 AD22-dfsdm	model/GuardedSTM32H7_ADC.cs	if(dmngt == 2 || (dmngt == 1 && ServingState() < 0))	if(dmngt == 1 && ServingState() < 0)	adc-dfsdm

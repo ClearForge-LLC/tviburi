@@ -71,7 +71,6 @@ using Antmicro.Renode.Core;
 using Antmicro.Renode.Peripherals.Analog;
 using Antmicro.Renode.Peripherals.Bus;
 using Antmicro.Renode.Peripherals.DMA;
-using Antmicro.Renode.Peripherals.Sensor;
 using Antmicro.Renode.Time;
 using Antmicro.Renode.Utilities.RESD;
 
@@ -90,7 +89,6 @@ namespace Antmicro.Renode.Peripherals.Tviburi
             dma = dmaPeripheral;
             request = dmaChannel;
             Revision = revision;
-            Levels = levels;
             records = new Records(machine, this, nameof(GuardedSTM32H7_ADC), mode,
                 new[] { new KeyValuePair<string, string>("revision", revision ?? "none") });
             config = revision == "V" || revision == "Y" ? null
@@ -108,7 +106,6 @@ namespace Antmicro.Renode.Peripherals.Tviburi
         }
 
         public string Revision { get; }
-        public string Levels { get; }
 
         // IRccWatched (granted Q3): a conversion running on the kernel clock ADCSEL selects.
         public bool IsRunning => (cr & AdstartBit) != 0 && Ckmode == 0;
@@ -207,7 +204,7 @@ namespace Antmicro.Renode.Peripherals.Tviburi
                 var word = width == 32 ? value : (Served(b) & ~(Mask(width) << (int)(8 * (offset & 3)))) | ((value & Mask(width)) << (int)(8 * (offset & 3)));
                 if(!refused || records.Recorded)
                 {
-                    if(!Writable(b))
+                    if(RegisterAt(b) == "none")
                     {
                         records.Refuse("TVI-ADC-FIELD", Unmodeled, RegisterAt(b), "write to offset 0x" + b.ToString("X"),
                             "write to an ADC offset " + Unread(b) + ": the twin cannot say what silicon does",
@@ -385,7 +382,7 @@ namespace Antmicro.Renode.Peripherals.Tviburi
                 // divider, HPRE for adc_sclk): the next conversion takes the clock as it now is, or the twin says it cannot.
                 rateStale = false;
                 var f = AdcHz(out var why);
-                var problem = f == null ? "a clock the twin cannot compute from declared values: " + why : RateProblem(f.Value, out var _);
+                var problem = f == null ? "a clock the twin cannot compute from declared values: " + why : RateProblem(f.Value, cr, true, out var _);
                 if(problem != null)
                 {
                     records.Refuse("TVI-ADC-RATE", Unmodeled, "ADC_CR", "ADSTART = 1",
@@ -773,36 +770,35 @@ namespace Antmicro.Renode.Peripherals.Tviburi
                 return RefuseRate(cmd + " = 1", Name + ": " + cmd + " with an ADC clock the twin cannot compute from declared values: " + why,
                     "RM0433 Rev 9 §25.4.3 p920, §25.7.2 p1039; ruled 2026-11-25T21:17Z Q4", word);
             }
-            var max = Revision == "V" ? 50e6 : ((cr | word) & (1u << 8)) != 0 ? 36e6 : 20e6;
-            if(f.Value > max)
+            var problem = RateProblem(f.Value, (cr & CrCommands) | (word & CrStored), cmd == "ADSTART", out var bit);
+            if(problem != null)
             {
-                return RefuseRate(cmd + " = 1", Name + ": f_ADC " + Mhz(f.Value) + " above the maximum " + Mhz(max) + " for revision " + Revision + " with this BOOST",
-                    "DS12117 Rev 10 " + (Revision == "V" ? "Table 173 p272" : "Table 76 p166") + "; ruled 2026-11-25T21:17Z Q4", word);
+                return RefuseRate(bit, Name + ": " + cmd + " with " + problem, "RM0433 Rev 9 §25.4.3 p922; §25.6.3 " + (Revision == "V" ? "p1009" : "p1005")
+                    + "; DS12117 Rev 10 " + (Revision == "V" ? "Table 173 p272" : "Table 76 p166") + "; ruled 2026-11-25T21:17Z Q4, Q7", word);
             }
-            if(cmd != "ADSTART")
-            {
-                return false;
-            }
-            if(RejectedRes(Res))
+            if(cmd == "ADSTART" && RejectedRes(Res))
             {
                 return RefuseRate("RES (4:2) = " + Convert.ToString(Res, 2).PadLeft(3, '0'),
                     Name + ": ADSTART with RES = " + Convert.ToString(Res, 2).PadLeft(3, '0') + ", a code revision " + Revision + " reserves (\"Others: Reserved, must not be used\")",
                     "RM0433 Rev 9 §25.6.4 p1016; ruled 2026-11-25T21:17Z Q2", word);
             }
-            var problem = RateProblem(f.Value, out var bit);
-            return problem != null && RefuseRate(bit, Name + ": ADSTART with " + problem,
-                "RM0433 Rev 9 §25.4.3 p922; " + (Revision == "V" ? "§25.6.3 p1009" : "§25.6.3 p1005") + "; DS12117 Rev 10 " + (Revision == "V" ? "Table 173 p272" : "Table 76 p166") + "; ruled 2026-11-25T21:17Z Q7", word);
+            return false;
         }
 
-        // f_ADC against the revision's maximum (DS12117) and the BOOST p1009 (rev V) / p1005 (rev Y) gives for it; null when it holds.
-        private string RateProblem(double f, out string bit)
+        // f_ADC against the revision's maximum (DS12117) and, when `boosted`, the BOOST p1009 (rev V) / p1005 (rev Y) gives for it (the
+        // conversions' own check: at ADSTART and after a clock change), judged on `crBits`, CR as the write leaves it; null when it holds.
+        private string RateProblem(double f, uint crBits, bool boosted, out string bit)
         {
-            var boost = (cr >> 8) & 3;
+            var boost = (crBits >> 8) & 3;
             bit = "BOOST (" + (Revision == "V" ? "9:8" : "bit 8") + ") = " + boost;
             var max = Revision == "V" ? 50e6 : (boost & 1) != 0 ? 36e6 : 20e6;
             if(f > max)
             {
                 return "f_ADC " + Mhz(f) + ", above the maximum " + Mhz(max) + " for revision " + Revision + " with this BOOST";
+            }
+            if(!boosted)
+            {
+                return null;
             }
             var want = Revision == "V" ? (f <= 6.25e6 ? 0u : f <= 12.5e6 ? 1u : f <= 25e6 ? 2u : 3u) : f > 20e6 ? 1u : boost & 1;
             if(boost == want || (Revision == "V" && boost == 1 && want == 2))
@@ -1076,12 +1072,7 @@ namespace Antmicro.Renode.Peripherals.Tviburi
 
         private static bool Readable(long b)
         {
-            return Fields.Any(f => f.Offset == b) && b != CdrOffset && b != Cdr2Offset;
-        }
-
-        private static bool Writable(long b)
-        {
-            return Fields.Any(f => f.Offset == b);
+            return RegisterAt(b) != "none" && b != CdrOffset && b != Cdr2Offset;
         }
 
         private static string Unread(long b)

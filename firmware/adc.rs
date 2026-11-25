@@ -52,8 +52,6 @@ use core::ptr::{read_volatile, write_volatile};
 const RCC_CR: usize = 0x5802_4400;
 const RCC_AHB1ENR: usize = 0x5802_44D8;
 const RCC_AHB4ENR: usize = 0x5802_44E0;
-const RCC_D1CCIPR: usize = 0x5802_444C;
-const RCC_D3CCIPR: usize = 0x5802_4458;
 const ADC1: usize = 0x4002_2000;
 const ADC3: usize = 0x5802_6000;
 const DMA1: usize = 0x4002_0000;

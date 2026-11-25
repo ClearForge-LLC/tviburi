@@ -174,17 +174,17 @@ for t in ${TVIBURI_TESTS:-$CASES}; do
   rate)
     # 8 MHz (CKMODE = 11: 64 MHz HSI / 4 / 2, rev V p1039), 387.5 + 8.5 = 396 cycles: EOC at 49.5 us after ADSTART (Table 214 p955).
     mapfile -t s < <(on 10 0)
-    run_case rate - "${s[@]}" "$(start)" 'emulation RunFor "0.0000494"' 'echo "R-BEFORE"' "sysbus ReadDoubleWord 0x40022000" \
-      'emulation RunFor "0.0000002"' 'echo "R-AFTER"' "sysbus ReadDoubleWord 0x40022000" 'echo "R-DR"' "sysbus ReadDoubleWord 0x40022040"
-    check "rate: at f_ADC 8 MHz (CKMODE = 11, rev V's /2) a 387.5-cycle 16-bit conversion's EOC is not set 49.4 us after ADSTART and is set at 49.6 us (396 cycles = 49.5 us, p1019, p955; ruled Q4); DR 0x5D17" \
+    run_case rate - "${s[@]}" "$(start)" 'emulation RunFor "0.00004945"' 'echo "R-BEFORE"' "sysbus ReadDoubleWord 0x40022000" \
+      'emulation RunFor "0.0000001"' 'echo "R-AFTER"' "sysbus ReadDoubleWord 0x40022000" 'echo "R-DR"' "sysbus ReadDoubleWord 0x40022040"
+    check "rate: at f_ADC 8 MHz (CKMODE = 11, rev V's /2) a 387.5-cycle 16-bit conversion's EOC is not set 49.45 us after ADSTART and is set at 49.55 us (396 cycles = 49.5 us; 395.5 would be 49.44, p1019, p955; ruled Q4); DR 0x5D17" \
       "passed rate && [ \"\$(readout rate BEFORE)\" = 0x00001001 ] && [ \"\$(readout rate AFTER)\" = 0x0000100F ] && [ \"\$(readout rate DR)\" = 0x00005D17 ]" ;;
   rate2)
     # CKMODE = 00 on pll2_p_ck (ADCSEL's reset, p419), PLL2 started from reset (HSI / 32 x 129 / 2 = 129 MHz) / PRESC 4 / 2 = 16.125
     # MHz, BOOST = 10: 396 cycles = 24.56 us.
     mapfile -t s < <(on 10 0 0x80000 0x200)
-    run_case rate2 - "$pll2" "${s[@]}" "$(start 0x200)" 'emulation RunFor "0.0000244"' 'echo "R-BEFORE"' \
-      "sysbus ReadDoubleWord 0x40022000" 'emulation RunFor "0.0000002"' 'echo "R-AFTER"' "sysbus ReadDoubleWord 0x40022000"
-    check "rate2: on the kernel clock (CKMODE = 00, ADCSEL = pll2_p_ck 129 MHz, PRESC /4: 16.125 MHz on rev V) EOC comes at 24.56 us, not before 24.4 us (p920, p1039; ruled Q4)" \
+    run_case rate2 - "$pll2" "${s[@]}" "$(start 0x200)" 'emulation RunFor "0.00002454"' 'echo "R-BEFORE"' \
+      "sysbus ReadDoubleWord 0x40022000" 'emulation RunFor "0.00000006"' 'echo "R-AFTER"' "sysbus ReadDoubleWord 0x40022000"
+    check "rate2: on the kernel clock (CKMODE = 00, ADCSEL = pll2_p_ck 129 MHz, PRESC /4: 16.125 MHz on rev V) EOC comes at 24.558 us: not at 24.54, set at 24.60 (395.5 cycles would be 24.527 (p920, p1039; ruled Q4)" \
       "passed rate2 && [ \"\$(readout rate2 BEFORE)\" = 0x00001001 ] && [ \"\$(readout rate2 AFTER)\" = 0x0000100F ]" ;;
   rccchange)
     # Revision Y (BOOST = 1 allows any f_ADC up to 36 MHz, p1005): continuous on CKMODE = 11, adc_hclk / 4 = 16 MHz, 24.75 us a
