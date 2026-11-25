@@ -331,7 +331,8 @@ sys.exit(0 if ok else 1)
     # 1), 2 MHz * 129 / 2 = 129 MHz, BRR 403 (320,099 baud, 31.24 us), not the 72 MHz written before the reset. A: ArduPilot's
     # own PLL2 (TVI-WO-1305a.measure.md §2: PLLCKSELR 0x00408040, DIVM2 8; PLL2DIVR 0x0704022C, DIVN2 44, DIVQ2 4), 8 MHz * 45 / 5 =
     # 72 MHz, exactly the frequency the consumer declares (ruled 2026-11-25T00:00Z: kept as a test), BRR 0x271: 115,200 baud,
-    # 86.8 us (64 MHz would give 97.7 us, 200 MHz 31.25).
+    # 86.8 us (64 MHz would give 97.7 us, 200 MHz 31.25). In ArduPilot's order: PLL2 first, then RCC_APB2RSTR.USART1RST pulsed
+    # (p443), which resets the port and must not reset what it knows of PLL2DIVR (at PLL2DIVR's reset value IDLE would come at 12.1 us).
     byte=('sysbus WriteDoubleWord 0x40011000 0x2000001D' 'sysbus.usart1 WriteChar 0x41' 'emulation RunFor "0.00002"')
     run_case idlekernel - 'cpu IsHalted true' "$clk" 'emulation RunFor "0.0001"' \
       'sysbus WriteDoubleWord 0x58024418 0x808' 'sysbus WriteDoubleWord 0x5802441C 0x450' 'sysbus WriteDoubleWord 0x4001100C 0x19' "${byte[@]}" \
@@ -347,7 +348,7 @@ sys.exit(0 if ok else 1)
       'echo "R-R20"' 'sysbus ReadDoubleWord 0x4001101C' 'emulation RunFor "0.00002"' 'echo "R-R40"' 'sysbus ReadDoubleWord 0x4001101C' \
       'machine Reset' 'cpu IsHalted true' "$clk" \
       'sysbus WriteDoubleWord 0x58024428 0x00408040' 'sysbus WriteDoubleWord 0x58024438 0x0704022C' 'sysbus WriteDoubleWord 0x58024400 0x04000001' \
-      'sysbus WriteDoubleWord 0x58024454 0x9' 'sysbus WriteDoubleWord 0x4001100C 0x271' 'sysbus WriteDoubleWord 0x40011000 0x2000001D' 'sysbus.usart1 WriteChar 0x41' \
+      'sysbus WriteDoubleWord 0x58024454 0x9' 'sysbus WriteDoubleWord 0x58024498 0x10' 'sysbus WriteDoubleWord 0x58024498 0x0' 'sysbus WriteDoubleWord 0x4001100C 0x271' 'sysbus WriteDoubleWord 0x40011000 0x2000001D' 'sysbus.usart1 WriteChar 0x41' \
       'emulation RunFor "0.000085"' 'echo "R-A85"' 'sysbus ReadDoubleWord 0x4001101C' 'emulation RunFor "0.000004"' 'echo "R-A89"' 'sysbus ReadDoubleWord 0x4001101C'
     check "idlekernel: IDLE one frame after a byte at the kernel clock's baud (clear at 20 us, set at 40 us), not the stock frequency's, from rcc_pclk2 through D1CPRE, HPRE and D2PPRE2, from hsi_ker_ck through HSIDIV, from pll2_q_ck with a DIVN2 the stock model narrows (PLL2DIVR reads 0x01090267), from pll2_q_ck at PLL2DIVR's reset value after a machine Reset, and from ArduPilot's own PLL2 at exactly 72 MHz (IDLE clear at 85 us, set at 89 us after the byte at BRR 0x271) (TVI-WO-1305a (3))" \
       "passed idlekernel && idleat idlekernel P && idleat idlekernel H && idleat idlekernel Q && idleat idlekernel R && bit \"\$(readout idlekernel A85)\" 4 0 && bit \"\$(readout idlekernel A89)\" 4 1 && [ \"\$(readout idlekernel DIVR)\" = 0x01090267 ]" ;;

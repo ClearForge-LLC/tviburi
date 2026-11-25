@@ -90,6 +90,12 @@ namespace Antmicro.Renode.Peripherals.Tviburi
             records = new Records(machine, this, nameof(GuardedSTM32F7_USART), mode);
             inner.IRQ.AddStateChangedHook(v => { innerIrq = v; UpdateIrq(); });
             machine.PeripheralsChanged += FindRcc;
+            if(machine is Machine m)
+            {
+                // PLL2DIVR returns to its reset value with the RCC (p406), at a machine reset; never at this port's own reset,
+                // which the RCC's USARTxRST runs (ArduPilot resets usart1 after setting PLL2 up).
+                m.MachineReset += _ => pll2divr = Pll2divrReset;
+            }
         }
 
         // The RCC guard's existing event `Written` (TVI-WO-1304), subscribed when the RCC guard appears at platform load, before
@@ -118,7 +124,6 @@ namespace Antmicro.Renode.Peripherals.Tviburi
                 inner.Reset();
                 cr1 = cr2 = cr3 = gtpr = presc = 0;
                 idle = brrHeld = false;
-                pll2divr = Pll2divrReset;
                 idleGen++;
                 ReceiveDmaRequest.Unset();
                 UpdateIrq();
