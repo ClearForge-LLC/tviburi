@@ -11,7 +11,7 @@ set -euo pipefail
 
 here=$(cd "$(dirname "$0")/../.." && pwd)
 IMAGE=$(sed -n 's/^IMAGE=//p' "$here/tests/spike.sh")
-CASES="config timingrpe timingrsame timingroff dnfpe anfoff clearfield ap absent icrres field width read kernel reset resetok startoff txdroff empty midstart midcr2 txdrread stopidle startstop stalestop blindclear softreset clock registrations recorded rccreset unheld clocklost absentname fields ledger regen"
+CASES="config timingrpe timingrsame timingroff dnfpe anfoff clearfield ap absentnext absent icrres field width read kernel reset resetok startoff txdroff empty midstart midcr2 txdrread stopidle startstop stalestop blindclear softreset clock registrations recorded rccreset unheld clocklost absentname fields ledger regen"
 GUARDS="spi1 rcc gpioPortA gpioPortB gpioPortC gpioPortD gpioPortE gpioPortF gpioPortG gpioPortH gpioPortI gpioPortJ gpioPortK timer1 timer8 dma1 dma2 flashController usart1 usart2 usart3 uart4 uart5 usart6 uart7 uart8 i2c1 i2c2 i2c3"
 MONITOR="clock registrations recorded rccreset unheld clocklost absentname fields ledger regen"
 PATHS=$(for c in $CASES; do case " $MONITOR " in *" $c "*) ;; *) printf '"%s",' "$c" ;; esac; done | sed 's/,$//')
@@ -119,6 +119,8 @@ for t in ${TVIBURI_TESTS:-$CASES}; do
   clearfield) check "clearfield: CR1 written from PE = 1 with PE = 0 and DNF changed in one write passes, judged as with PE = 0 (ruled Q2)" "passes clearfield" ;;
   ap) check "ap: ArduPilot's I2C1 sequence (CR1 0x90, TIMINGR 0x00300F38, CR1 0x91; transfers with software STOP; ICR 0x40, 0x4, 0x2, its reserved bits (ruled Q10); a probe of 0x30, absent, acknowledged (ruled Q9); a stop and a start) passes, enforcing; RXDR 0x60, TIMINGR 0x00300F38" \
     "passes ap && [ \"\$(readout ap READ)\" = 0x00000060 ] && [ \"\$(readout ap READ2)\" = 0x00300F38 ] && grep -q 'i2c1: Unknown slave at address 48\\.' '$work/ap/renode-log.txt'" ;;
+  absentnext) check "absentnext: the generated firmware's probe of 0x48 (no device, acknowledged: no NACKF comes, ISR polled, ICR = 0x30), then the chip id: passes (silicon NACKs and stops, so the next START is valid) and reads 0x60" \
+    "passes absentnext && [ \"\$(readout absentnext READ)\" = 0x00000060 ]" ;;
   absent) check "absent: a START to 0x31, where the platform has no device and no firmware was measured probing, refuses TVI-I2C-ABSENT, unmodeled (p1975; ruled Q9)" \
     "refuses absent TVI-I2C-ABSENT unmodeled 'r[\"access\"][\"offset\"] == \"0x4\" and \"0x31\" in r[\"condition\"] and \"p1975\" in r[\"citation\"]'" ;;
   icrres) check "icrres: ICR bit 7 (reserved, not ChibiOS's 1, 2 or 6) refuses TVI-I2C-FIELD, unmodeled (p2012)" \

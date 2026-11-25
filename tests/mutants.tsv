@@ -423,8 +423,7 @@ I209-icrRes7	model/GuardedSTM32F7_I2C.cs	"Res7", 7, 7, Zero,	"Res7", 7, 7, Any,	
 I210-resetRule	model/GuardedSTM32F7_I2C.cs	if(start && afterClear && (!refused || records.Recorded))	if(start && false && (!refused || records.Recorded))	i2c-reset
 I211-readClears	model/GuardedSTM32F7_I2C.cs	                clearedLast = false;\n                if(Unloaded(offset, 0, width)	                if(Unloaded(offset, 0, width)	i2c-resetok
 I212-kernelQuery	model/GuardedSTM32F7_I2C.cs	if(k != null && k.Modeled && k.Running)	if(k != null)	i2c-kernel
-I213-startOff	model/GuardedSTM32F7_I2C.cs	else if((start || stop) && !IsRunning)	else if((start || stop) && false)	i2c-startoff
-I214-txdrOff	model/GuardedSTM32F7_I2C.cs	if(offset == TxdrOffset && !IsRunning)	if(offset == TxdrOffset && false)	i2c-txdroff
+I213-startOff	model/GuardedSTM32F7_I2C.cs	if((offset == TxdrOffset || start || stop) && !IsRunning)	if((offset == TxdrOffset || start || stop) && false)	i2c-startoff i2c-txdroff
 I215-emptyStart	model/GuardedSTM32F7_I2C.cs	((word >> 16) & 0xFF) == 0 && (word & ReloadBit) == 0)	((word >> 16) & 0xFF) == 0 && false)	i2c-empty
 I216-emptyRecorded	model/GuardedSTM32F7_I2C.cs	Pass(offset, empty ? value & ~StartBit : value);	Pass(offset, value);	i2c-recorded
 I217-midStart	model/GuardedSTM32F7_I2C.cs	else if(start && Open())	else if(start && false)	i2c-midstart
@@ -455,3 +454,4 @@ I241-stopIdle	model/GuardedSTM32F7_I2C.cs	else if(stop && !Controller())	else if
 I242-staleStopf	model/GuardedSTM32F7_I2C.cs	staleStopf = stopf;	staleStopf = false;	i2c-stalestop
 I243-resetTxis	model/GuardedSTM32F7_I2C.cs	                inner.WriteDoubleWord(Cr1Offset, 0);   // the stock Reset leaves TXIS	                // the stock Reset leaves TXIS	i2c-rccreset
 I244-emptyEveryPath	model/GuardedSTM32F7_I2C.cs	var empty = offset == Cr2Offset && (value & StartBit) != 0 && ((value >> 16) & 0xFF) == 0;	var empty = false;	i2c-recorded
+I245-absentEndsData	model/GuardedSTM32F7_I2C.cs	                        open = false;\n                    }	                    }	i2c-absentnext

@@ -271,6 +271,9 @@ namespace Antmicro.Renode.Peripherals.Tviburi
                         // The stock model's own line (STM32F7_I2C.cs, StartTransfer), under this guard's name: the owned
                         // instance's copy has none (measure.md §2.4), and Aethelgard's absent_address reads it by source (Q9).
                         this.Log(LogLevel.Warning, "Unknown slave at address {0}.", a);
+                        // Silicon NACKs the address and sends a STOP (p1975), so no data phase follows and the next START is
+                        // valid; the stock model stays in its transfer, so the port stays in controller mode (a STOP passes).
+                        open = false;
                     }
                 }
                 return;
@@ -432,20 +435,15 @@ namespace Antmicro.Renode.Peripherals.Tviburi
             string what = null, page = null;
             var start = offset == Cr2Offset && (word & StartBit) != 0;
             var stop = offset == Cr2Offset && (word & StopBit) != 0;
-            if(offset == TxdrOffset && !IsRunning)
+            if((offset == TxdrOffset || start || stop) && !IsRunning)
             {
-                what = "TXDR written with PE = 0";
+                what = (offset == TxdrOffset ? "TXDR written" : start ? "START" : "STOP") + " with PE = 0";
                 page = "§47.9.1 p2003 (PE: \"0: Peripheral disabled\")";
             }
             else if(offset == TxdrOffset && !(Open() && (inner.ReadDoubleWord(Cr2Offset) & RdWrnBit) == 0))
             {
                 what = "TXDR written outside a write transfer's data phase (no START since, a read transfer, or its NBYTES already sent; the stock model sends the byte to the device)";
                 page = "§47.9.11 p2014 (\"These bits can be written only when TXE = 1\")";
-            }
-            else if((start || stop) && !IsRunning)
-            {
-                what = (start ? "START" : "STOP") + " with PE = 0";
-                page = "§47.9.1 p2003 (PE: \"0: Peripheral disabled\")";
             }
             else if(start && stop)
             {

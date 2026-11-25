@@ -4,8 +4,15 @@
 
 **State:**
 - §1.1 measured first, with predictions committed before any run (`b111160`). The stop went to the bus at 04:36:54Z (`TVI-WO-1306.measure.md`); every question was ruled at 05:06Z (Q1–Q12) and built to that ruling.
-- **The eighth shard came first**, as its own commit (`4aaaedc`, ruled Q12), with `1300b`'s 11 cases and 17 mutants re-weighed from main's CI run 45545853730 by `1202a`'s method.
+- **The eighth shard came first**, as its own commit (`4aaaedc`, ruled Q12), with `1300b`'s 11 cases and 17 mutants re-weighed by `1202a`'s method from CI run 45545853730, the one the ruling named (`#47`'s pull-request run, at its head `14fc84f`).
 - **Granted outside the fence (Q4):** the RCC guard's `watched` set retyped to an interface, `IRccWatched`, which the USART and I2C guards implement; the USART guard gains its three members. Nothing else in either guard changed. `1300b`'s USART cases pass unchanged; three of its mutant rows (`RB01`, `RB02`, `RB13`) follow the retyped text, killed as before.
+- **Built differently from the letter of the ruling** (named here and on the bus with READY):
+  - the adversarial pass added three `TVI-I2C-TRANSFER` refusals under Q8's rule (§5 F1–F3): `TXDR` outside a write transfer, `STOP` with no transfer, `START` with `STOP`;
+  - `ICR.ADDRCF` and `ISR.TXE` allowed at 0 only (F6, F8), where Q11's table had them allowed: no firmware writes either;
+  - every sub-word access refuses (`TVI-I2C-WIDTH`), where my stop proposed judging a byte on its word: "as measured" (Q11), and every measured access is a word;
+  - an empty `START` is stripped of `START` in recorded mode rather than passed on, so Renode does not abort (Q8 said never passed on; RUL-19 says recorded passes on);
+  - the absent-address acknowledgement is per port, the union of both firmwares', where Q9 said "per firmware" (F9: the guard cannot know the firmware, `RUL-10`);
+  - an acknowledged absent `START` ends the data phase, as silicon's NACK and automatic STOP would (p1975), so the next `START` is valid; found in review after the adversarial pass, planted as `absentnext`.
 - **The replays** (§3): the 14 generated boots, ArduPilot's fixture and the armed run, on `main` and on this branch in one harness, are identical on every RCC, I2C, USART, sensor, dump and boot-block line, but the dumped `TIMINGR`, which now reads back as written. No I2C record in any run. §7's second stop did not fire.
 - One PR, left unmerged.
 
@@ -26,7 +33,7 @@
 | **Q9** absent address | `TVI-I2C-ABSENT`, `unmodeled`, but the measured (port, address) pairs, acknowledged with no record: `i2c1` 0x30 0x38 0x39 0x48 0x54 0x55 0x76, `i2c2` 0x30 0x38 0x39 0x54 0x55. Passing one, the guard writes "Unknown slave at address N." under its own name |
 | **Q10** `ICR` reserved bits | Bits 1, 2 and 6 acknowledged by name (rows `Res2_1`, `Res6`, p2012); 0, 7 and 31:14 `unmodeled` |
 | **Q11** allow-list | 97 rows over 11 registers, every bit 31:0 once; 51 fields allowed only at 0 (case `fields` gives each outside `ISR` its widest value: 49). The adversarial pass moved `ICR.ADDRCF` and `ISR.TXE` to 0 only (§5 F6, F8): no firmware writes either |
-| **Q12** eighth shard | Built first (`4aaaedc`); this WO's 37 cases and 44 mutants added to `times.tsv` at the USART rows' medians, unmeasured |
+| **Q12** eighth shard | Built first (`4aaaedc`); this WO's 38 cases and 44 mutants added to `times.tsv` at the USART rows' medians, unmeasured |
 
 ## 2. Acceptance
 
@@ -36,12 +43,12 @@
 | A planted firmware setting `PE` with `I2C123SEL` on a stopped source refuses at the start, by the query | `kernel` (`predicted-fault`, `RCC_D2CCIP2R.I2C123SEL = 01`, p1954, p416) |
 | ArduPilot's boot, recorded, and the armed run: no I2C `would-refuse` outside the acknowledged table; sensor transfers unchanged | §3: zero I2C records; every BMP581 line identical |
 | The 14 generated boots: observers unchanged, or each difference named | §3 and §4 |
-| The budget, judged in CI | §5 |
-| CI green; every case and mutant in a shard, the aggregate showing it | §5 |
+| The budget, judged in CI | §8 |
+| CI green; every case and mutant in a shard, the aggregate showing it | §8 |
 
 ## 3. The replays
 
-`main` (`f44fb73`) and the branch in one harness (`h/replay-b.sh`: the branch's committed `replay-1301.sh` with access logging), every guard recorded, `rcc`, `i2c1`–`i2c4`, `usart1`–`usart3` logged. Compared line by line (`h/compare.py`; evidence `~/.cache/tvi-1306/r-main`, `r-br`, `identity.txt`).
+`main` (`f44fb73`) and the branch in one harness (`h/replay-b.sh`: the branch's committed `replay-1301.sh` with access logging), every guard recorded, `rcc`, `i2c1`–`i2c4`, `usart1`–`usart3` logged. Compared line by line (`h/compare.py`; evidence `~/.cache/tvi-1306/r-main`, `r-br`, `identity3.txt` for the final tree).
 
 | Runs | Lines compared a run | Differences | I2C records | "Unknown slave" under `i2c1`/`i2c2` |
 |---|---|---|---|---|
@@ -85,7 +92,7 @@ A full pass (WO §5), by an independent reader given the code, the WO and the he
 
 **Withstood:** sub-word writes (every one refuses); `PE` cleared and a field changed in one write (judged as `PE` = 0, then the software reset); `TIMINGR`'s reserved bits (refused, and masked in the copy); a `PE` 0 → 1 with any access between counts as the check (ruled Q6); a half-read transfer stays open (silicon stretches SCL, p1978); a RESTART after `TC`; `I2CxRST` resets the copies and the transfer state; the shared `ChildCollection` (sensors are disposed once); `IsRunning` read by `TVI-RCC-CLOCK` without a lock (an atomic word read; no deadlock).
 
-**Re-proved after the fixes:** the 16 replays again (identical, as §3), the 37 cases, and the 44 mutants (§7).
+**Re-proved after the fixes:** the 16 replays again (identical, as §3), the 38 cases, and the 44 mutants (§7).
 
 ## 6. Rows and findings
 
@@ -98,11 +105,19 @@ A full pass (WO §5), by an independent reader given the code, the WO and the he
 - **F11:** recorded mode drops sub-word and undefined-offset accesses instead of passing them on (as the USART guard does); enforcing refuses each.
 - **A stale `STOPF` at an `AUTOEND` start:** a transfer started with `AUTOEND` while an earlier `STOPF` is still set has no end the guard can see, so the next `START` refuses (`unmodeled`). No measured firmware does it: the generated firmware clears `STOPF`, and ArduPilot never uses `AUTOEND`.
 - **The teardown race** (`ci-runner-speed-and-race`): `config` lost its `end` records once in this build's first suite run, then passed 3 of 3. The race, not the guard: no other case lost one, and `timingrsame`/`timingroff` run the same sequence.
+- **Aethelgard's bus-fault scenarios (seam row):** its analog pass leaves a faulted bus's devices out of the `.repl` (`platform.rs`:664–674). On the guarded twin the firmware's `START` to its sensor's own address is then `TVI-I2C-ABSENT`, `unmodeled`, where the stock twin times out and Aethelgard judges `i2c_timeout`. Honest (the twin cannot say silicon's NACK), but it changes that scenario's verdict: a consumer step, or `NACKF` modeled first (the roadmap row above).
 - **`i2c3`** is guarded with no committed firmware using it; every start answers `unmodeled` (no query rule).
 - **`TVI-RCC-CLOCK` now watches a running I2C port** through `IRccWatched` (ruled Q4). My stop had called a clock lost under a running I2C a row; the ruled interface brought it in, and case `clocklost` plants it.
 - **The guard-name list is stated in eleven places** (`tests/spike.sh` ×6, each guard's harness, `scripts/tviburi-spike`): the reduction reader's finding. Out of scope; a list in one file the others read would make each guard's append one line.
 
 ## 7. Gates
 
-- **Cases:** 37 in `tests/1306/i2c.sh`, run locally on the final tree, all passing (one teardown-race loss, §6, passed on re-run). **Mutants:** 44 (`I201`–`I244`), each killed locally, plus `RB01`, `RB02`, `RB13` (the retyped RCC text), `C26` and `G17`.
-- **Reduction pass (diff):** −1 line net in code · 1 duplicate removed (the USART guard's `UeSet`, folded into `IsRunning`) · 0 dead paths · 2 protected kept (the acknowledged addresses as ledger text and as the guard's table, now held equal by `ledger` and mutant `I238`; the per-guard `Row`/`R()` plumbing, the codebase's convention) · 1 finding (§6: the guard-name lists). Rejected: dropping `R()`'s class argument, which the release reads for each ledger row's state.
+- **Cases:** 38 in `tests/1306/i2c.sh`, run locally on the final tree, all passing (one teardown-race loss, §6, passed on re-run). **Mutants:** 44 (`I201`–`I245`; `I214` folded into `I213` by the reduction pass), each killed locally, plus `RB01`, `RB02`, `RB13` (the retyped RCC text), `C26` and `G17`.
+- **Reduction pass (diff), run twice (before and after the adversarial fixes):** −6 lines net in code · 2 duplicates removed (the USART guard's `UeSet`, folded into `IsRunning`; `TVI-I2C-TRANSFER`'s two `PE` = 0 branches, one for `TXDR` and one for `START`/`STOP`, merged, with their two mutants) · 0 dead paths · 2 protected kept (the acknowledged addresses as ledger text and as the guard's table, now held equal by `ledger` and mutant `I238`; the per-guard `Row`/`R()` plumbing, the codebase's convention) · 1 finding (§6: the guard-name lists). Rejected: dropping `R()`'s class argument, which the release reads for each ledger row's state.
+
+## 8. Budget and CI
+
+- **The budget, locally, on the built guard:** `tests/1301/ci-memory.sh`, `main` (`3eb52b4`) against this tree, five boots a side: `MEDIANS main 1020876 KiB, branch 1012304 KiB, difference -8572 KiB (-8.4 MiB)`, **PASS**, every branch boot under 1,572,864 KiB. The §1.1 prototype measured −15.8 MiB with eleven boots a side. CI judges it again (below).
+- **Wall time:** no slowdown seen in the replays. The branch ran 6–17 % faster than `main`'s side, which ran under heavier load, so this is noise, not a gain. The guard reads the stock `ISR` once per access, and the RCC guard's `Holds` lookup runs at every access.
+- **Run locally on the final tree, unmutated:** the 38 cases, `spike.sh`'s own 36 cases (`unit` through `adv-cache`), `1300b`'s USART cases, `rcc-tim2`, `conditions` and `modeled`; and the 44 mutants plus `RB01`, `RB02`, `RB13`, `C26` and `G17`, each killed.
+- **CI:** (the first run's figures follow, with the re-weigh Q12 asks for.)

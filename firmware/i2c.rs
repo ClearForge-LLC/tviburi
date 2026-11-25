@@ -16,6 +16,8 @@
 //!                        and a read of 1 to the BME280 with software STOP; ICR = 0x40, 0x4, 0x2 (reserved bits, Q10); a probe of
 //!                        0x30 (no device; acknowledged, Q9) ended by STOP; a stop (CR1 = 0xD2) and a start again: passes.
 //!                        MARK_READ = RXDR (0x60), MARK_READ2 = TIMINGR (0x00300F38).
+//!   path="absentnext"  - config, the generated firmware's probe of 0x48 (no device; acknowledged, Q9): a START, ISR polled (no NACKF
+//!                        comes), ICR = 0x30; then the chip id: passes. MARK_READ = RXDR (0x60).
 //!   path="absent"      - config, then a START to 0x31 (no device, not measured): TVI-I2C-ABSENT, unmodeled (p1975).
 //!   path="icrres"      - config, then ICR = 0x80 (bit 7, reserved, not ChibiOS's): TVI-I2C-FIELD, unmodeled.
 //!   path="field"       - CR1.TXDMAEN = 1 with PE = 0: TVI-I2C-FIELD, unmodeled (the allow-list).
@@ -177,6 +179,14 @@ pub unsafe extern "C" fn reset() -> ! {
         w(TIMINGR, 0x0030_0F38);
         w(CR1, 0x91);
         write_volatile(MARK_READ2, r(TIMINGR));
+    }
+    #[cfg(path = "absentnext")]
+    {
+        config();
+        w(CR2, 1 << 16 | START | 0x48 << 1);
+        until(1 << 4);
+        w(ICR, 0x30);
+        write_volatile(MARK_READ, chip_id());
     }
     #[cfg(path = "absent")]
     {

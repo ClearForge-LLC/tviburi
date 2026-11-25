@@ -694,7 +694,7 @@ mutant	US66-sysPll1	6.3
 mutant	US67-vcoselPassed	6.3
 mutant	US68-divp1	6.3
 # TVI-WO-1300b: its new cases and mutants, re-weighed by TVI-WO-1306 (ruled 2026-11-25T05:06Z Q12) with 1202a's method from
-# main's CI run 45545853730 (#47, seven shards; shard speeds 0.975-1.037 on the 6975P-C, 1.441 and 1.489 on the EPYC 7763).
+# CI run 45545853730 (#47's pull-request run, at its head 14fc84f, seven shards; shard speeds 0.975-1.037 on the 6975P-C, 1.441 and 1.489 on the EPYC 7763).
 case	rcc-usart-lost	6.3
 case	rcc-usart-stopped	6.3
 case	rcc-usart-lost-en	6.2
@@ -769,7 +769,6 @@ mutant	I210-resetRule	6.3
 mutant	I211-readClears	6.3
 mutant	I212-kernelQuery	6.3
 mutant	I213-startOff	6.3
-mutant	I214-txdrOff	6.3
 mutant	I215-emptyStart	6.3
 mutant	I216-emptyRecorded	6.3
 mutant	I217-midStart	6.3
@@ -805,3 +804,5 @@ case	i2c-txdrread	6.2
 case	i2c-stopidle	6.2
 case	i2c-startstop	6.2
 case	i2c-stalestop	6.2
+mutant	I245-absentEndsData	6.3
+case	i2c-absentnext	6.2
