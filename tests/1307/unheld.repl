@@ -1,0 +1,17 @@
+// TVI-WO-1307 (ruled 2026-11-25T21:17Z Q1, Q3): an ADC guard declared on the bus but not registered on the RCC guard. Unwatched,
+// its kernel clock could be lost with no record: every access refuses, unmodeled.
+using "platforms/boards/nucleo_h753zi.repl"
+using "/repo/model/stm32h7-rcc-restate.repl"
+
+tviburiRcc:
+    hseFrequency: 8000000
+    mode: "enforcing"
+
+adcM1S2: @none
+
+tviburiAdc12: Tviburi.GuardedSTM32H7_ADC @ sysbus 0x40022000 as "adcM1S2"
+    referenceVoltage: 3.3
+    externalEventFrequency: 1000
+    dmaPeripheral: dmamux1
+    dmaChannel: 9
+    revision: "V"

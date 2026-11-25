@@ -115,6 +115,20 @@ for i in "${!args[@]}"; do
     { echo; cat /repo/model/stm32h7-i2c-restate.repl; echo
       for k in 1 2 3; do printf 'tviburiI2c%s:\n    mode: "%s"\n\n' $k "${ACCEPT_MODE:-recorded}"; done; } >> "$plat"
   fi
+  # TVI-WO-1307: a tree with the ADC restatement gets it last, each ADC with its mode and the revision "V" (ruled 2026-11-25T21:17Z
+  # Q2: required; declared by this replay, not read: no held document says which revision a board carries, and both measured
+  # firmwares assume rev V, TVI-WO-1307.measure.md §2.4). ACCEPT_ADC_LEVELS ("adcM1S2:10:1.40 ..."), a channel's level at the pin
+  # in volts, stands in for the consumer, whose foreign platforms declare none (Q10; a test value, cited as such where used).
+  # The consumer's own `adc3 SetVoltage` lines bind to the guard, which keeps the name. A tree without it replays as before.
+  if [ -f /repo/model/stm32h7-adc-restate.repl ]; then
+    { echo; cat /repo/model/stm32h7-adc-restate.repl; echo
+      for a in adcM1S2:tviburiAdc12 adc3:tviburiAdc3; do
+        printf '%s:\n    mode: "%s"\n    revision: "V"\n' "${a#*:}" "${ACCEPT_MODE:-recorded}"
+        lv=$(printf '%s\n' ${ACCEPT_ADC_LEVELS:-} | sed -n "s/^${a%%:*}://p" | tr '\n' ' ' | sed 's/ $//')
+        [ -z "$lv" ] || printf '    levels: "%s"\n' "$lv"
+        echo
+      done; } >> "$plat"
+  fi
   args[$((i + 1))]=${c/'mach create; '/'include @/tmp/release/Tviburi.cs; mach create; '}
 done
 printf '%s\n' "${args[@]}" > /out/$n-$mode.argv.txt

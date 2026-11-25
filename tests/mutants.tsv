@@ -172,7 +172,7 @@ G13-portFromAddress	model/GuardedSTM32_GPIOPort.cs	port = (char)('A' + (int)((st
 G14-tableData	model/GuardedSTM32_GPIOPort.cs	PA5:89:	PA5:90:	afcheck
 G15-restatedRoute	model/stm32h7-gpio-restate.repl	tviburiTimer1:\n    0 -> tviburiGpioA#07@01 | tviburiGpioA#08@01 |	tviburiTimer1:\n    0 -> tviburiGpioA#07@01 |	gpio-registrations
 G16-boardPackage	model/tviburi-nucleo-h753zi.repl	tviburiGpioH:\n    mode: "enforcing"\n    package: "LQFP144"	tviburiGpioH:\n    mode: "enforcing"	gpio-package
-G17-namesLine	scripts/tviburi-spike	gpioPortJ gpioPortK timer1 timer8 dma1 dma2 flashController usart1 usart2 usart3 uart4 uart5 usart6 uart7 uart8 i2c1 i2c2 i2c3 >	gpioPortJ timer1 timer8 dma1 dma2 flashController usart1 usart2 usart3 uart4 uart5 usart6 uart7 uart8 i2c1 i2c2 i2c3 >	modeled
+G17-namesLine	scripts/tviburi-spike	gpioPortJ gpioPortK timer1 timer8 dma1 dma2 flashController usart1 usart2 usart3 uart4 uart5 usart6 uart7 uart8 i2c1 i2c2 i2c3 adcM1S2 adc3 >	gpioPortJ timer1 timer8 dma1 dma2 flashController usart1 usart2 usart3 uart4 uart5 usart6 uart7 uart8 i2c1 i2c2 i2c3 adcM1S2 adc3 >	modeled
 G18-unlistedPinAf	model/GuardedSTM32_GPIOPort.cs	if(cell == null || cell.Text == "-")	if(cell != null && cell.Text == "-")	gpio-pk8af
 G19-unlistedPinPackage	model/GuardedSTM32_GPIOPort.cs	(!bonding.TryGetValue("P" + port + pin, out var b) || b.Pin == null)	(bonding.TryGetValue("P" + port + pin, out var b) && b.Pin == null)	gpio-pk8out
 G20-staleRefresh	model/GuardedSTM32_GPIOPort.cs	base.ReadDoubleWord(b);\n            }\n            var before = Selection();	}\n            var before = Selection();	gpio-resetwrite
@@ -478,3 +478,50 @@ DM68-flagShift	model/GuardedSTM32DMA.cs	private static readonly int[] FlagShift 
 DM69-hifcrClear	model/GuardedSTM32DMA.cs	                var b = r == LifcrOffset ? 0 : 4;\n                for(var i = 0; i < 4; i++)\n                {\n                    htif[b + i]	                var b = 0;\n                for(var i = 0; i < 4; i++)\n                {\n                    htif[b + i]	dma-circhi
 DM70-clearLine	model/GuardedSTM32DMA.cs	                    UpdateLine((r == LifcrOffset ? 0 : 4) + i);\n	(empty)	dma-circ
 DM71-circRecorded	model/GuardedSTM32DMA.cs	                word = (word & ~CircBit) | (old & CircBit);\n	(empty)	dma-circrec
+AD01-kernelRunning	model/GuardedSTM32H7_ADC.cs	if(!k.Running)	if(false)	adc-kernel
+AD02-ccrAckBroad	model/GuardedSTM32H7_ADC.cs	if(Name == "adc3" && (changed & ~InternalEnables) == 0 && !adstart	if(Name == "adc3" && !adstart	adc-ccrother
+AD03-ccrAckGone	model/GuardedSTM32H7_ADC.cs	if(Name == "adc3" && (changed & ~InternalEnables) == 0 && !adstart	if(false && Name == "adc3" && (changed & ~InternalEnables) == 0 && !adstart	adc-ccrack
+AD04-ccrState	model/GuardedSTM32H7_ADC.cs	if(changed == 0 || (cr & (AdenBit | AdcalBit | AdstartBit | AdstpBit | AddisBit | JadstartBit)) == 0)	if(true)	adc-ckmode adc-ccrother
+AD05-deeppwd	model/GuardedSTM32H7_ADC.cs	(word & AdvregenBit) != 0 && (after & DeeppwdBit) != 0)	(word & AdvregenBit) != 0 && false)	adc-deeppwd
+AD06-regulator	model/GuardedSTM32H7_ADC.cs	(after & AdvregenBit) != 0 && ldoReady;	(after & AdvregenBit) != 0;	adc-vreg
+AD07-calen	model/GuardedSTM32H7_ADC.cs	(commands & AdcalBit) != 0 && ((cr & AdenBit) != 0 || !Regulated(after))	(commands & AdcalBit) != 0 && (!Regulated(after))	adc-calen
+AD08-cfgrState	model/GuardedSTM32H7_ADC.cs	if(changed != 0 && adstart)	if(false)	adc-cfgr
+AD09-level	model/GuardedSTM32H7_ADC.cs	if(drChannel >= 0 && !drDeclared)	if(false)	adc-undeclared
+AD10-setVoltage	model/GuardedSTM32H7_ADC.cs	!ReferenceEquals(d.DefaultSample, s0)	false	adc-setvoltage adc-overrun
+AD11-unpaced	model/GuardedSTM32H7_ADC.cs	Schedule((Smp(ch) + Sar(Res)) / hz, () => Converted(e));	Converted(e);	adc-early adc-rate
+AD12-sar	model/GuardedSTM32H7_ADC.cs	return ResBits(res) / 2.0 + 0.5;	return ResBits(res) / 2.0;	adc-rate adc-rate2 adc-sar
+AD13-revV2	model/GuardedSTM32H7_ADC.cs	Revision == "V" ? input / 2 : input;	input;	adc-rate
+AD14-ckmodeDiv	model/GuardedSTM32H7_ADC.cs	input = bus / (ckmode == 1 ? 1 : ckmode == 2 ? 2 : 4);	input = bus / (ckmode == 1 ? 1 : 2);	adc-rate adc-revy
+AD15-presc	model/GuardedSTM32H7_ADC.cs	input = presc > 11 ? null : input / Prescale[presc];	input = presc > 11 ? null : input;	adc-rate2
+AD16-ldordyY	model/GuardedSTM32H7_ADC.cs	isr | (Revision == "V" && ldoReady ? LdordyBit : 0);	isr | (ldoReady ? LdordyBit : 0);	adc-revy
+AD17-res	model/GuardedSTM32H7_ADC.cs	return Revision == "V" ? res == 4 : res > 4;	return false;	adc-res
+AD18-boost	model/GuardedSTM32H7_ADC.cs	if(boost == want || (Revision == "V" && boost == 1 && want == 2))	if(true)	adc-boost
+AD19-boostAck	model/GuardedSTM32H7_ADC.cs	if(boost == want || (Revision == "V" && boost == 1 && want == 2))	if(boost == want)	adc-boostack
+AD20-pcsel	model/GuardedSTM32H7_ADC.cs	if((pcsel & (1u << ch)) == 0)	if(false)	adc-pcsel
+AD21-oneshotNone	model/GuardedSTM32H7_ADC.cs	if(dmngt == 2 || (dmngt == 1 && ServingState() < 0))	if(dmngt == 2)	adc-oneshotnone
+AD22-dfsdm	model/GuardedSTM32H7_ADC.cs	if(dmngt == 2 || (dmngt == 1 && ServingState() < 0))	if(dmngt == 1 && ServingState() < 0)	adc-dfsdm
+AD23-oneshotStop	model/GuardedSTM32H7_ADC.cs	if(dmngt == 1 && before == RunningStream && ServingState() != RunningStream)	if(false)	adc-oneshot
+AD24-overrun	model/GuardedSTM32H7_ADC.cs	var overrun = (isr & EocBit) != 0;	var overrun = false;	adc-overrun adc-overwrite
+AD25-ovrmod	model/GuardedSTM32H7_ADC.cs	if(!overrun || (regs[CfgrOffset] & OvrmodBit) != 0)	if(!overrun)	adc-overwrite
+AD26-field	model/GuardedSTM32H7_ADC.cs	if(f.Offset != b || f.Allowed == null || f.Allowed.Contains(f.Of(word)))	if(true)	adc-field adc-fields
+AD27-width	model/GuardedSTM32H7_ADC.cs	if(width == 32 && (offset & 3) == 0)	if(true)	adc-width adc-half
+AD28-halfAny	model/GuardedSTM32H7_ADC.cs	Name == "adcM1S2" && Dmngt == 3;	Name == "adcM1S2";	adc-half
+AD29-halfGone	model/GuardedSTM32H7_ADC.cs	var halfDr = width == 16 && offset == DrOffset && Name == "adcM1S2" && Dmngt == 3;	var halfDr = false;	dma-adc
+AD30-read	model/GuardedSTM32H7_ADC.cs	if(!Readable(b))	if(false)	adc-read
+AD31-revision	model/GuardedSTM32H7_ADC.cs	config = revision == "V" || revision == "Y" ? null	config = true ? null	adc-norevision
+AD32-atLoad	model/GuardedSTM32H7_ADC.cs	if(config != null && config.StartsWith("no revision", StringComparison.Ordinal))	if(false)	adc-norevision
+AD33-levelValue	model/GuardedSTM32H7_ADC.cs	levels[ch] = (ulong)Math.Round(volts * 1000000m);	levels[ch] = 0;	adc-start
+AD34-levelsParse	model/GuardedSTM32H7_ADC.cs	config = config ?? ParseLevels(levels);	ParseLevels(levels);	adc-badlevels
+AD35-held	model/GuardedSTM32H7_ADC.cs	if(!(host.TryGetByName<GuardedSTM32H7_RCC>(RccName, out var rcc) && rcc.Holds(Alias, this)))	if(false)	adc-unheld
+AD36-watched	model/GuardedSTM32H7_ADC.cs	public bool IsRunning => (cr & AdstartBit) != 0 && Ckmode == 0;	public bool IsRunning => false;	adc-clocklost
+AD37-reset	model/GuardedSTM32H7_ADC.cs	                ResetCopies();\n                IRQ.Set(false);	                IRQ.Set(false);	adc-rccreset
+AD38-eocRead	model/GuardedSTM32H7_ADC.cs	isr &= ~EocBit;   // "cleared ... by reading the ADC_DR register" (p1000)	isr = isr;	adc-start
+AD39-recorded	model/GuardedSTM32H7_ADC.cs	                Pass(b, word);\n            }\n        }\n\n        // ---- the registers	                if(!refused) Pass(b, word);\n            }\n        }\n\n        // ---- the registers	adc-recorded
+AD40-adc12Bit	model/GuardedSTM32H7_RCC.cs	["adc12"] = new ClockedPeripheral(AdcMux, 0x0D8, 5,	["adc12"] = new ClockedPeripheral(AdcMux, 0x0D8, 4,	adc-query
+AD41-adcMux	model/GuardedSTM32H7_RCC.cs	"pll2_p_ck", "pll3_r_ck", "per_ck", "disabled");	"pll2_p_ck", "pll3_r_ck", "hsi_ker_ck", "disabled");	adc-query
+AD42-classRow	tools/tviburi-release/pins.tsv	Tviburi.GuardedSTM32H7_ADC\tadc3 adcM1S2	Tviburi.GuardedSTM32H7_ADC\tadc3	adc-ledger
+AD43-restateName	model/stm32h7-adc-restate.awk	v = name == "adc3" ? "tviburiAdc3" : "tviburiAdc12"	v = name == "adc3" ? "tviburiAdc12" : "tviburiAdc3"	adc-regen
+AD44-fieldsClass	tests/1307/fields.py	'EXTEN': ('Zero', G,	'EXTEN': ('Any', G,	adc-regen
+AD45-rateStale	model/GuardedSTM32H7_ADC.cs	rateStale |= (cr & AdstartBit) != 0;	rateStale |= false;	adc-rccchange adc-rccboost
+AD46-internal	model/GuardedSTM32H7_ADC.cs	if(Name == "adc3" && ch >= 17 && (regs[CcrOffset] & (1u << (41 - ch))) == 0)	if(false)	adc-internal
+AD47-oneshotCirc	model/GuardedSTM32H7_ADC.cs	if(dmngt == 1 && ServingCircular())	if(false)	adc-oneshotcirc

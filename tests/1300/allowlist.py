@@ -99,6 +99,9 @@ def build():
             cls, allowed, behaves = 'guard', MUX_ALLOWED[(reg, field)], "the guard's copy and its mux (p371)"
         elif (reg, field) in GUARD_ANY:
             cls, allowed, behaves = 'guard', None, "the guard's copy (the kernel clock query)"
+        elif reg == 'RCC_D3CCIPR' and base == 'ADCSEL':
+            # TVI-WO-1307 (granted 2026-11-25T21:17Z Q3): the query answers adc12 and adc3 from this mux.
+            cls, allowed, behaves = 'guard-copy', None, "the guard's copy, served on read; the ADCs' kernel clock mux, answered by the query for adc12 and adc3 (TVI-WO-1307 Q3)"
         elif re.match(r'RCC_D[123]CCIP', reg):
             cls, allowed, behaves = 'guard-copy', None, "the guard's copy, served on read; this mux's peripherals are not modeled, and their enable refuses"
         elif reg.endswith('ENR') and not reg.endswith('LPENR') and acc.startswith('rw'):
@@ -106,9 +109,9 @@ def build():
                 cls, allowed, behaves = 'guard', None, "the guard's copy and the stock bus enable; the kernel clock query"
             elif base in ('ADC12EN', 'ADC3EN'):
                 # TVI-WO-1300b (3), ruled 2026-11-25T03:03Z Q1 (superseding 1300a's 17:52Z): the bus enable only
-                cls, allowed, behaves = 'inherited', None, ("the guard's copy; the stock bus enable (" + sk + "): the bus lock only. The ADC's kernel "
-                    'clock is not modeled: it is chosen by ADCx_CCR.CKMODE[1:0] (p920), an ADC register the RCC guard cannot see (adc_sclk unless '
-                    'CKMODE = 00, else the kernel clock ADCSEL selects, p419), and the ADC is unguarded (an ADC guard\'s row) ' + '(TVI-WO-1300b, ruled 2026-11-25T03:03Z Q1)')
+                cls, allowed, behaves = 'inherited', None, ("the guard's copy; the stock bus enable (" + sk + "): the bus lock only. With ADCx_CCR.CKMODE = 00 the "
+                    "ADC's kernel clock is the one ADCSEL selects (p920, p419), answered by the query; the ADC guard asks it at ADSTART and registers as "
+                    'watched (TVI-WO-1307 Q3) (TVI-WO-1300b, ruled 2026-11-25T03:03Z Q1)')
             elif base in EXTRA_KERNEL or 'kernel clock' in (r[8] if len(r) > 8 else ''):
                 cls, allowed, behaves = 'kernel-unmodeled', [0], 'disabled: a kernel-clocked peripheral the query does not cover (TVI-WO-1300 (4))'
             elif sk in ('computed-read',):

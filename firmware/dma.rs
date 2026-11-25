@@ -54,8 +54,8 @@
 //!   path="circm2m"  - M2M with CIRC = 1: TVI-DMA-CIRC, unmodeled (p645: not allowed).
 //!   path="adc"      - ArduPilot's ADC pattern (Sentinel-03's armed run, measure.md §2.1): ADC1 (ADVREGEN, ADEN, CFGR =
 //!                     0x2003: DMNGT = 11 circular, CONT; ADSTART), its request (9, adc1_dma) on DMA1 stream 0, P2M from
-//!                     ADC1_DR into SRAM4, NDT = 4 half-words, CR = 0x2D18 (CIRC, HTIE, TCIE, MINC, 16-bit). The stock
-//!                     ADC1 raises one request per conversion, every 1 ms. The firmware polls LISR: at each TCIF0 it reads
+//!                     ADC1_DR into SRAM4, NDT = 4 half-words, CR = 0x2D18 (CIRC, HTIE, TCIE, MINC, 16-bit). The guarded
+//!                     ADC1 (TVI-WO-1307) raises one request per conversion, about every 102 us (CKMODE = 11, SMP0 = 111). The firmware polls LISR: at each TCIF0 it reads
 //!                     CR and NDTR and clears TCIF0, at each HTIF0 it clears HTIF0. MARK_READ = TCIF count | HTIF count
 //!                     << 8 | (TCIFs seen with EN = 1 and NDT reloaded to 4) << 16; MARK_READ2 = EN | NDT << 8 at the
 //!                     last TCIF. MARK_AFTER is written before the loop.
@@ -133,13 +133,22 @@ unsafe fn spin() {
 /// ArduPilot's ADC1 circular pattern (path="adc").
 unsafe fn adc(cr: u32) -> ! {
     write_volatile(RCC_AHB1ENR, 0x23); // DMA1EN, DMA2EN, ADC12EN (p455)
-    w(ADC1 + 0x08, 0x1000_0000); // ADVREGEN
-    w(ADC1 + 0x08, 0x1000_0001); // ADEN
+    // TVI-WO-1307: the ADC guard's enable sequence (RM0433 Rev 9 §25.4.6-25.4.9 p926-933): the bus clock (CCR.CKMODE = 11,
+    // adc_sclk/4; rev V /2 again, p1039: 8 MHz from the 64 MHz HSI), out of deep-power-down, the regulator and its start-up
+    // time, ADEN and ADRDY; channel 0 preselected and sampled 810.5 cycles (819 with the 16-bit SAR: about 102 us a conversion).
+    w(ADC1 + 0x308, 0x3_0000); // CCR: CKMODE = 11
+    w(ADC1 + 0x08, 0); // CR: DEEPPWD = 0
+    w(ADC1 + 0x08, 0x1000_0100); // ADVREGEN, BOOST = 01 (8 MHz, rev V p1009)
+    spin(); // t_ADCVREG_STUP, 10 us at most (DS12117)
+    w(ADC1 + 0x1C, 1); // PCSEL: channel 0
+    w(ADC1 + 0x14, 7); // SMPR1: SMP0 = 111
+    w(ADC1 + 0x08, 0x1000_0101); // ADEN
+    while r(ADC1) & 1 == 0 {} // ADRDY
     w(ADC1 + 0x0C, 0x2003); // CFGR: CONT, DMNGT = 11
     w(ADC1 + 0x30, 0); // SQR1: one conversion
     cfg(DMA1, 0, 0, Some(9), ADC1 + 0x40, SRAM4, 4, cr);
     en(DMA1, 0);
-    w(ADC1 + 0x08, 0x1000_0005); // ADSTART
+    w(ADC1 + 0x08, 0x1000_0105); // ADSTART
     write_volatile(MARK_AFTER, 0xAF7E_0002);
     let (mut tc, mut ht, mut good, mut last) = (0u32, 0u32, 0u32, 0u32);
     loop {
