@@ -120,4 +120,24 @@ A full pass (WO §5), by an independent reader given the code, the WO and the he
 - **The budget, locally, on the built guard:** `tests/1301/ci-memory.sh`, `main` (`3eb52b4`) against this tree, five boots a side: `MEDIANS main 1020876 KiB, branch 1012304 KiB, difference -8572 KiB (-8.4 MiB)`, **PASS**, every branch boot under 1,572,864 KiB. The §1.1 prototype measured −15.8 MiB with eleven boots a side. CI judges it again (below).
 - **Wall time:** no slowdown seen in the replays. The branch ran 6–17 % faster than `main`'s side, which ran under heavier load, so this is noise, not a gain. The guard reads the stock `ISR` once per access, and the RCC guard's `Holds` lookup runs at every access.
 - **Run locally on the final tree, unmutated:** the 38 cases, `spike.sh`'s own 36 cases (`unit` through `adv-cache`), `1300b`'s USART cases, `rcc-tim2`, `conditions` and `modeled`; and the 44 mutants plus `RB01`, `RB02`, `RB13`, `C26` and `G17`, each killed.
-- **CI:** (the first run's figures follow, with the re-weigh Q12 asks for.)
+- **CI, the first run** (45559350378, at `86c6cee`): **green**.
+  - `ci`'s wall was **19.2 min** (06:16:14Z → 06:35:28Z).
+  - The aggregate: "795 expected (348 cases, 447 mutants), 795 ran across 8 shards, 0 failures".
+  - The budget in CI: `MEDIANS main 1006948 KiB, branch 1005308 KiB, difference -1640 KiB (-1.6 MiB)`, **PASS**.
+- **The shards in that run, by job and CPU:**
+
+  | Shard | Cases, mutants | CPU | Speed (1202a) | Job (min) |
+  |---|---|---|---|---|
+  | 1 | 45, 52 | 6975P-C | 1.00 | 11.6 |
+  | 2 | 40, 58 | 6975P-C | 0.99 | 11.7 |
+  | 3 | 51, 52 | **EPYC 7763** | **1.50** | **17.3** |
+  | 4 | 44, 55 | EPYC 9V74 | 1.10 | 12.7 |
+  | 5 | 42, 57 | 6975P-C | 1.01 | 12.0 |
+  | 6 | 43, 57 | 6973P-C | 0.96 | 11.3 |
+  | 7 | 42, 56 | 6975P-C | 1.00 | 11.7 |
+  | 8 | 41, 60 | EPYC 9V45 | 0.93 | 10.6 |
+
+- **The re-weigh (Q12), pushed after this run:**
+  - `1300b`'s 28 items are weighed as the mean of runs 45545853730 and 45559350378, each run against its own 6975P-C median.
+  - This WO's 82 items are weighed from 45559350378. A mutant run by two cases weighs 12.8–13.3 s, where the USART median it replaced was 6.3 s. That is why shard 3 ran longer than the plan.
+  - On the new weights eight shards plan evenly at 627 s each (5,016 s in all). That is **16.9 min a job at 1.53**, and `ci`'s wall 18.6–18.9 min.
