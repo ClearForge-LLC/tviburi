@@ -68,3 +68,25 @@ Not read before these predictions: any line of `1305`'s armed-run console (`~/.c
 - **P6: right** (`pll2_q_ck`). The RCC guard's query answers that it runs, and no frequency.
 - **P7: right for 12 boards on the source and the 64 MHz, wrong for two:** `hse-crystal-16` and `hse-external-8` run `sys_ck` from PLL1 on the HSE. I had read only `sentinel-03`'s source; the identity replay showed it. Wrong on the stock value too: the generated platforms declare 64 MHz, not 200 or 125 MHz.
 - **The stock model narrows `PLL2DIVR`** (`STM32H7_RCC.cs` L373–386 in the Renode tree `1305` read): `DIVN2` 8 bits and `DIVQ2` 6 bits, against 9 and 7 on silicon (p407). A read-back of `PLL2DIVR` through the RCC guard returns the stock model's bits (the guard keeps no served copy of it), so a written `DIVN2` ≥ 256 or `DIVQ2` ≥ 64 would read back wrong, silently.
+
+## 3. PLL1's read-back on the two HSE boards (ruled 2026-11-25T01:12Z: measure before building (b))
+
+**Method:** `hse-crystal-16` and `hse-external-8`, replayed on `main`'s tree with the RCC access-logged. The RCC registers were read back through the bus after the run. The columns compare what the firmware wrote with what the RCC guard returns.
+
+| Register | `hse-crystal-16`: written → read | `hse-external-8`: written → read |
+|---|---|---|
+| `RCC_PLLCKSELR` | `0x52` → `0x52` | `0x52` → `0x52` |
+| `RCC_PLL1DIVR` | `0x0103064F` → `0x0103064F` | `0x0103069F` → `0x0103069F` |
+| `RCC_PLLCFGR` | `0x00030004` → `0x00030000` | `0x00030002` → `0x00030000` |
+| `RCC_CFGR` | `0x3` → `0x1B` (`SWS` = PLL1) | `0x3` → `0x1B` |
+
+- **`PLLCKSELR` and `PLL1DIVR` read back as written** on both boards. No write was ignored, so no `PLL1DIVR` write is marked.
+- **`PLLCFGR` does not:**
+  - `PLL1RGE` (`hse-crystal-16`, bit 2) and `PLL1VCOSEL` (`hse-external-8`, bit 1) read 0;
+  - the RCC guard serves only the `DIVxyEN` bits from its copy, and the stock model's `PLL1RGE`/`PLL1VCOSEL` are tags;
+  - neither field sets a frequency, but `PLL1VCOSEL` sets the VCO range the guard checks;
+  - so the USART guard takes `VCOSEL` from the last `PLLCFGR` the RCC guard passed, not from the read-back.
+- **The frequencies:**
+  - `hse-crystal-16`: 16 MHz / 5 × 80 / 4 = 64 MHz;
+  - `hse-external-8`: 8 MHz / 5 × 160 / 4 = 64 MHz (`hseFrequency: 8000000` declared);
+  - both are the declared USART `frequency`.
