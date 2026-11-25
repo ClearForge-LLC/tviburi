@@ -103,8 +103,8 @@ Nothing has been run in this work order.
 **ArduPilot, the fixture** (5 s, `i2c1` only; ChibiOS's I2Cv2 driver).
 - **Before `I2C1EN`:** one `CR1` read and one `CR1` write, both dropped by the RCC guard's bus lock ("Tried to read/write a locked peripheral"), with no Tviburi record. The read returns 0.
 - **544 starts** (`i2c_lld_start`): `CR1` = `0x90` (`ERRIE`, `NACKIE`; `PE` = 0), `TIMINGR` = `0x00300F38`, `CR1` = `0x91`. **543 stops** clear `PE` (`i2c_lld_stop`). **Every `TIMINGR` write is made with `PE` = 0; `DNF`, `ANFOFF` and `NOSTRETCH` are always 0.** Between, `CR1` is rewritten whole with `PE` = 1 (`0x92`–`0xD7`: interrupt enables only), and read 6,831 times. No `TIMINGR` read.
-- **Transfers:** BMP581 `0x46`: W 1 ×483 (a register address), R 6 ×458, R 1 ×25, W 2 ×3; with `STOP` written by software (no `AUTOEND`). **Probes of absent addresses, 11 each:** `0x30` (W 2), `0x38`, `0x39`, `0x54` (W 1), `0x55` (W 2), and `0x76` ×3: 66 "Unknown slave" lines. No `NACKF` is ever set, so each probe ends by ChibiOS's timeout, then `STOP`, then a stop and restart of the driver.
-- **`ICR`:** besides the error clears, ChibiOS writes `ICR` = `0x2`, `0x4` and `0x40`, bits 1, 2 and 6, which are **reserved in `ICR`** (p2012: "31:14, 7:6, 2:0"), 16,522 times over the fixture and the armed run (the `TXIS`/`RXNE`/`TC` positions of `ISR`).
+- **Transfers:** BMP581 `0x46`: W 1 ×483 (a register address), R 6 ×458, R 1 ×25, W 2 ×3; with `STOP` written by software (no `AUTOEND`). **Probes of absent addresses, 11 each:** `0x30` (W 2), `0x38`, `0x39`, `0x54` (W 1), `0x55` (W 2), and `0x76` ×3: 58 "Unknown slave" lines (5 × 11 + 3). No `NACKF` is ever set, so each probe ends by ChibiOS's timeout, then `STOP`, then a stop and restart of the driver.
+- **`ICR`:** every one of ChibiOS's `ICR` writes is `0x2`, `0x4` or `0x40` (4,231 in the fixture, 12,291 in the armed run): bits 1, 2 and 6, which are **reserved in `ICR`** (p2012: "31:14, 7:6, 2:0"), at the `TXIS`/`RXNE`/`TC` positions of `ISR`. It never writes an `ICR` clear bit. The generated firmware writes `ICR` = `0x30` (`STOPCF`, `NACKCF`).
 
 **The armed run** (Sentinel-03, 13 s): `i2c1` as the fixture, longer (1,461 starts, `TIMINGR` = `0x00707CBB`, BMP581 `0x46`: R 6 ×1,334), and **`i2c2` too** (55 starts, the same probes of `0x30`–`0x55`, no device); one locked `CR1` read and write before each port's enable. **No protected change, no transfer the bus would not make.**
 
@@ -151,7 +151,7 @@ Nothing has been run in this work order.
 |---|---|---|---|
 | `peripherals` listing (`aethelgard-cli/src/renode.rs`:2834–2843; `renode/foreign.rs`:1572–1581; the kind `I2C.STM32F7_I2C`, `twin/src/platform.rs`:70–73) | each solved `i2cN` with kind exactly `STM32F7_I2C` | **yes, every board with an I2C port:** the class name (the class map's consumer step, `RUL-09`) | — |
 | sensor declarations in the emitted `.repl` (`platform.rs`:615, :1203) | `uN: … @ i2cN 0xAA` | **yes, every board with an I2C sensor:** each must be repointed to the guard's variable, or the load fails E39 (§2.4). **A new consumer step** | — |
-| `absent_address` (`renode.rs`:2257–2268; `AET-WO-3305`) | `[WARNING] i2c1: Unknown slave at address N.`, by source | **yes:** the owned instance's line has no source, so the "wrong address" evidence goes empty, silently (every generated board probing `0x48`; ArduPilot's 66) | — unless the guard writes that line under its own name (§5 Q9) |
+| `absent_address` (`renode.rs`:2257–2268; `AET-WO-3305`) | `[WARNING] i2c1: Unknown slave at address N.`, by source | **yes, on the ten generated boards that probe `0x48`** (`sentinel-01`, `-minimal`, `-ext-bmp581`, `motors-pwm`, `motors-dshot600`, `serial-dshot-9600`, `hse-crystal-16`, `hse-external-8`, `sentinel-02-shaped`, `sentinel-03`): the owned instance's line has no source, so the "wrong address" evidence goes empty, silently. The foreign judge does not parse it (`absent_address` is used only in `renode.rs`), so ArduPilot's 58 lines change no verdict | — unless the guard writes that line under its own name (§5 Q9) |
 | `i2c_timeout` (Aethelgard `docs/architecture.md`:319) | `TXIS` never rising for a missing device | no | no, unless the guard models `NACKF` (§5 Q9) |
 | `renode_error_log` (`renode.rs`:2895; `foreign.rs`:1257) | any `[ERROR]` line | no | a refusal record (`RUL-12`: Error level) fails the run, as intended |
 | sensor witnesses (`renode.rs`:2404–2424) | `[NOISY] i2c1.uN: …` | no (M3) | no |
@@ -164,7 +164,8 @@ No Aethelgard code access-logs an I2C port or reads an I2C register back; nothin
 ### 2.6 The clock (WO (2))
 
 - **`I2CxEN` = 0:** an access is dropped by the RCC guard's bus lock, a read returns 0, with no record (I0, I15): silicon's ignored write (p373). ArduPilot's two pre-enable accesses per port are covered this way today (§2.1).
-- **Every port of every run starts on a running kernel clock** (`h/clock-at-pe.py`, the RCC fields as last written before each first `PE`): generated, `I2C123SEL` = 00 (`rcc_pclk1`) with `I2CxEN` set; ArduPilot, both runs, `I2C123SEL` = 01 (`pll3_r_ck`) with `PLL3ON` and `DIVR3EN` set. The query answers "running" for `i2c1` at the end of ArduPilot's run (and `i2c2`'s "NOT running" there is `I2C2EN` = 0: the fixture never enables it).
+- **Every start of every port runs on a running kernel clock** (`h/clock-all-pe.py`: the RCC fields the query reads, as last written, at each of the 2,076 `PE` 0 → 1 writes): generated, `I2C123SEL` = 00 (`rcc_pclk1`) with `I2CxEN` set, at each port's one start; ArduPilot, `I2C123SEL` = 01 (`pll3_r_ck`) with `PLL3ON`, `DIVR3EN` and `I2CxEN` set at every one of its 544 (fixture) and 1,461 + 55 (armed) starts: one RCC state throughout.
+- **The order against `I2CxEN` and `I2CxRST`:** each port's `I2CxEN` is set once and never cleared, in every run. **ArduPilot pulses `I2C1RST` before every start** (545 pulses in the fixture; 1,462 on `i2c1` and 56 on `i2c2` in the armed run; `I2C2RST`/`I2C3RST` once at boot), `rccResetI2C1` in ChibiOS's `i2c_lld_start`. The RCC's reset of a registered peripheral runs its `Reset()` (measured for the USART guard, `1305a`), so the guard's copies (`TIMINGR`, `CR1`) return to reset at each pulse, as silicon's registers do (`RCC_APB1LRSTR`, §8.7.33 p438); the build tests it. The generated firmware pulses no I2C reset. The query answers "running" for `i2c1` at the end of ArduPilot's run (and `i2c2`'s "NOT running" there is `I2C2EN` = 0: the fixture never enables it).
 - **The query covers `i2c1` and `i2c2` only;** `i2c3` would answer "not modeled", and `i2c4`'s enable and selector are in the D3 domain (`APB4ENR`, `D3CCIPR`).
 
 ## 3. Predictions, marked
@@ -177,12 +178,23 @@ No Aethelgard code access-logs an I2C port or reads an I2C register back; nothin
 | P2 sub-word | **held** (byte widened, half-word ignored with a warning) |
 | — | **Not predicted:** a write transfer with `NBYTES` = 0 crashes Renode (I8b) |
 | P3 | **held, two details wrong:** the generated firmware reads `CR1` once before `PE`, and it also configures `i2c2` on `sentinel-01`, `-ext-bmp581` and `sentinel-03`; and it probes the unmodelled TMP117 at `0x48` (an "Unknown slave"), then polls `ISR` to the end of the window |
-| P4 | **held:** the pre-enable pair is locked with no record; 544 starts, every `TIMINGR` with `PE` = 0; no `TIMINGR` read; no DMA. Wrong: `CR1` is written whole, never read-modify-written, and `ERRIE` is stored by the stock model anyway, so a copy-served `CR1` changes nothing ArduPilot reads. **Probes of absent addresses: six addresses, 66 probes** ("tens of addresses" was wrong). Not predicted: `ICR` written with reserved bits 1, 2 and 6 |
+| P4 | **held:** the pre-enable pair is locked with no record; 544 starts, every `TIMINGR` with `PE` = 0; no `TIMINGR` read; no DMA. Wrong: `CR1` is written whole, never read-modify-written, and `ERRIE` is stored by the stock model anyway, so a copy-served `CR1` changes nothing ArduPilot reads. **Probes of absent addresses: six addresses, 58 probes** ("tens of addresses" was wrong). Not predicted: `ICR` written with reserved bits 1, 2 and 6 |
 | P5 | **held, one detail wrong:** the armed run also starts `i2c2` (55 times; no device on it) |
-| P6 | **held** (§2.6) |
+| P6 | **held** (§2.6), at every start, not only the first. Not predicted: ArduPilot pulses `I2C1RST` before every start |
 | P7 | **held** on the listing; **wrong in kind on two:** the sensor declarations must be repointed (E39), and the source-less "Unknown slave" line empties Aethelgard's `absent_address` evidence. No consumer parser reads `i2cN:` access lines |
-| P8 | §4 |
+| P8 | **held:** −15.8 MiB at the median for the wrapper ×4 (§4), inside ±12 MiB's spirit but outside its letter: the noise between sides is larger than the wrapper |
 | P9 | §5: **held in substance:** at 1.53 seven shards' jobs stay under 20 min, but `ci`'s wall reaches 19.7–20.5 min |
+
+## 4. The one-file memory, by `1201`'s budget (B)
+
+**A prototype figure, not the guard's:** M3's wrapper as all four I2C ports (the proposal guards three, Q1) in every branch boot; this branch (`main` `48abb6b` and this document) against `bench/`, the same tree plus the wrapper, its restatement, and a replay that repoints the sensors. Every branch boot carried the four wrappers ("PROBE-I2C share" ×4) and no main boot did. ArduPilot's 5 s boot (ELF `a799dfb6`, rebuilt by the harness and checked), eleven boots a side, interleaved, on Furnace (load 8–15, another builder's containers running).
+
+| | Peaks (KiB), in boot order | Median |
+|---|---|---|
+| `main` | 1,059,704; 1,020,172; 1,003,200; 1,027,804; 995,036; 994,552; 994,032; 989,416; 1,019,000; 1,013,032; 1,016,060 | 1,013,032 |
+| `main` + the wrapper ×4 | 1,004,464; 994,288; 1,001,860; 988,920; 996,820; 995,780; 995,616; 995,192; 1,028,400; 1,022,436; 1,045,016 | 996,820 |
+
+`MEDIANS main 1013032 KiB, branch 996820 KiB, difference -16212 KiB (-15.8 MiB)`, **PASS**; every branch boot under the 1,572,864 KiB ceiling; walls 11.7–12.6 s. Like `1305`'s (−6.5 MiB), the wrapper costs nothing this measurement can see; the built guard (rules, copies, records) will cost more, and the build reports the budget again, in CI.
 
 ## 5. The shard projection (S)
 
@@ -195,8 +207,13 @@ No Aethelgard code access-logs an I2C port or reads an I2C register back; nothin
 | + this guard at 542 s, seven | 4,843 | 692 | 18.5 | **20.2–20.5** |
 | + this guard at 542 s, **eight** | 4,843 | 605 | 16.3 | 18.0–18.3 |
 | + this guard at 542 s and `1300b`'s ~200 s, eight | 5,040 | 630 | 17.0 | 18.7–19.0 |
+| `1300b`'s branch (its `times.tsv`, cases and mutants), seven | 4,479 | 640 | 17.2 | 18.9–19.2 |
+| `1300b`'s branch + this guard at 402 s, seven | 4,879 | 697 | 18.7 | **20.4–20.7** |
+| `1300b`'s branch + this guard at 542 s, seven | 5,019 | 717 | 19.2 | **20.9–21.2** |
+| `1300b`'s branch + this guard at 542 s, **eight** | 5,019 | 627 | 16.9 | 18.6–18.9 |
 
 - **The slowest shard's job stays under 20 minutes at 1.53 with seven shards (18.0–18.5 min); `ci`'s wall does not** (19.7–20.5 min). `1202`'s 20-minute target is `ci`'s wall, and `1202a` F2 measured its headroom by the wall ("about one more guard"; it was the USART's 402 s, and `1305a` took 243 s of it). `1300b`, beside this, adds items too.
+- **The WO's literal trigger is not met:** the slowest shard's job stays under 20 minutes at 1.53 with seven shards, 18.0–19.2 min, `1300b`'s items included. **The eighth shard is my recommendation on the wall-time reading:** on the `main` this WO will merge (`1300b` in it), `ci`'s wall reaches 20.4–21.2 min with seven.
 - **So, by the WO's rule read as `ci`'s wall, the eighth shard comes first.** It is two lines in the shard matrix and the aggregate's count, as `1202a` built seven (§6 Q12).
 
 ## 6. The stop (WO §1.1, §7), and the questions
@@ -226,11 +243,12 @@ Nothing in the generated boots, ArduPilot's fixture or the armed run writes a pr
 - **Recommendation: (a), after `1300b`'s merge,** with the smallest change: `Register` also accepts the I2C guard into `watched` through an interface; `TVI-RCC-CLOCK`'s watch of a running I2C stays out (a row). This WO then builds against `main` with `1300b` in it.
 - **Ask:** (a), (b) or (c), and the RCC fence for it.
 
-**Q5. Reads** (`RUL-17`'s read rule). `CR1` and `TIMINGR` from the guard's copies (so `DNF`, `ANFOFF` and `TIMINGR` read back as written; the rest of `CR1` equals the stock model's, which stores it); everything else from the stock model. No observer reads either (§2.5). **Ask:** accept.
+**Q5. Reads** (`RUL-17`'s read rule). `CR1` and `TIMINGR` from the guard's copies (so `DNF`, `ANFOFF` and `TIMINGR` read back as written; the rest of `CR1` equals the stock model's, which stores it); everything else from the stock model. No observer reads either (§2.5). The copies return to their reset values at the guard's `Reset()`, which the RCC's `I2CxRST` runs (ArduPilot, before every start, §2.6) and the machine's reset runs. **Ask:** accept.
 
 **Q6. The software reset, modeled** (p1959–1960, p2011, p2013).
 - **Proposal:** at a `CR1` write that clears `PE` (1 → 0), the guard resets the owned instance (the stock `Reset`: both byte queues, every `ISR` flag, `TXE` = 1 as p2011 says, the interrupt lines) and restores the configuration it keeps: `CR1` (with `PE` = 0), `OAR1`, `OAR2` (0 under Q11), and `CR2`'s `SADD`, `RD_WRN`, `ADD10`, `NBYTES`, `RELOAD`, `AUTOEND` (p1959: only `START`, `STOP`, `PECBYTE`, `NACK` reset in `CR2`; "does not impact the configuration registers"). `TIMINGR` is the guard's own copy. That removes I4's survivors (`RXNE`, then `TC`).
 - **"At least three APB clock cycles"** (p1960): the twin cannot count them. A `CR1` write setting `PE` as the very next access to the port after the one that cleared it (no access between, so no "Check PE = 0" read) is `unmodeled`. No firmware does it (§2.1: ArduPilot always writes `CR1` = `0x90` and `TIMINGR` in between).
+- **Prototyped on the measured runs (by run, not only by source):** a copy of M3's wrapper that resets and restores at each `PE` clear (`bench2/`), replayed on ArduPilot's fixture and the armed run against M1: **identical** on every RCC, I2C and sensor line and dumped value (98,764 and 1,136,111 lines), with the reset run at all 543 and 1,514 `PE` clears (each found `ISR` `0x21` or `0x61`, `STOPF`/`TC`, which the stock model's own `PE` callback already clears). Through it, I4 reads `ISR` `0x1` after `PE` = 0 (`RXNE` gone, no `TC` after) and `CR2` keeps `0x204EC`.
 - **Ask:** accept.
 
 **Q7. The access before `I2CxEN`** (ArduPilot's one `CR1` read and one `CR1` = 0 write per port, §2.1).
@@ -240,7 +258,7 @@ Nothing in the generated boots, ArduPilot's fixture or the armed run writes a pr
 
 **Q8. Transfers the bus would not make** (WO §5), each `unmodeled` and not passed to the stock model: a `START` or a `TXDR` write with `PE` = 0 (I5: the stock transfers on a disabled peripheral; p2003 "Peripheral disabled"); a `START` with `NBYTES` = 0 and `RELOAD` = 0 (I8b: the stock model **crashes Renode**; not in the text); a `START` while the previous transfer is open, by the stock model's `ISR` (no `TC`, `TCR` or `STOPF`) and with no `STOP` or `PE` clear since (I9; not in the text); `CR2`'s `NBYTES`, `SADD`, `RD_WRN`, `ADD10`, `HEAD10R` changed while a transfer is open (p2004–2006 "not allowed"). None is measured in either firmware (§2.1). **Ask:** accept.
 
-**Q9. An address with no device (`NACKF`).** The stock model logs "Unknown slave", sets no `NACKF` and no `STOPF`, and the firmware times out; silicon NACKs and sends a STOP (p1975). Both firmwares do this on every boot (TMP117 at `0x48`, unmodelled; ArduPilot's 66 probes). Options:
+**Q9. An address with no device (`NACKF`).** The stock model logs "Unknown slave", sets no `NACKF` and no `STOPF`, and the firmware times out; silicon NACKs and sends a STOP (p1975). Both firmwares do this on every boot (TMP117 at `0x48`, unmodelled, on ten generated boards; ArduPilot's 58 probes in the fixture, more in the armed run). Options:
 - **(a) `unmodeled` at the `START`:** honest, and it refuses every generated board with the TMP117 and every ArduPilot boot: the WO's acceptance fails.
 - **(b) Acknowledged by name, as the stock model behaves:** the `START` passes, `NACKF` stays 0; the ledger row names p1975 and the stock line. The guard writes the stock model's line, "Unknown slave at address N.", under its own name, so Aethelgard's `absent_address` (and its `i2c_timeout`, which rests on `TXIS` never rising) is unchanged; the owned instance's source-less copy stays beside it.
 - **(c) `NACKF` modeled** (set, automatic STOP, `NACKIE` interrupt): silicon's behaviour, outside this WO's list, and it changes ArduPilot's control flow and Aethelgard's `i2c_timeout` observer. A later WO (the architecture already lists "I2C error flags, NACK" as a recorded gap).
@@ -250,8 +268,8 @@ Nothing in the generated boots, ArduPilot's fixture or the armed run writes a pr
 
 **Q11. The allow-list** (`RUL-17`; the WO's `unmodeled` list).
 - **Modeled:** `CR1` `PE`, `TXIE`, `RXIE`, `STOPIE`, `TCIE` (stock), `DNF`, `ANFOFF` (stored, Q5); `CR2` `SADD` (7-bit), `RD_WRN`, `START`, `STOP`, `NBYTES`, `AUTOEND` (stock); `TIMINGR` (stored); `ICR` `ADDRCF`, `STOPCF` (stock); `TXDR`, `RXDR`; `ISR` read (written `TXE` and `TXIS` only as the stock model takes them).
-- **Acknowledged by name:** `CR1.NACKIE` and `ERRIE` at 1 (ArduPilot sets both: the twin raises no NACK and no error, so neither interrupt has anything to raise; with Q9 (b)); `ICR`'s `NACKCF`, `BERRCF`, `ARLOCF`, `OVRCF`, `PECCF`, `TIMOUTCF`, `ALERTCF` at 1 (clears of flags the twin never sets: a write that changes nothing); `ICR` bits 1, 2, 6 (Q10).
-- **0 only, else `unmodeled`:** `CR1` `ADDRIE`, `TXDMAEN`, `RXDMAEN`, `SBC`, `NOSTRETCH`, `WUPEN`, `GCEN`, `SMBHEN`, `SMBDEN`, `ALERTEN`, `PECEN`; `CR2` `ADD10`, `HEAD10R`, `NACK`, `RELOAD`, `PECBYTE`; `OAR1`, `OAR2`, `TIMEOUTR` whole; `PECR` write; every reserved bit (but Q10's); a byte or half-word access other than the one the stock model widens (a byte to a register byte, judged on the word; a half-word is ignored by the stock model, so `unmodeled`), an offset with no register (0x2C–0x3FC). `RELOAD` is modeled by the stock model but used by no firmware, so it is held at 0 rather than audited.
+- **Acknowledged by name:** `CR1.NACKIE` and `ERRIE` at 1 (ArduPilot sets both: the twin raises no NACK and no error, so neither interrupt has anything to raise; with Q9 (b)); `ICR.NACKCF` at 1 (the generated firmware's `0x30`: the clear of a flag the twin never sets, a write that changes nothing); `ICR` bits 1, 2, 6 (Q10).
+- **0 only, else `unmodeled`:** `ICR` `BERRCF`, `ARLOCF`, `OVRCF`, `PECCF`, `TIMOUTCF`, `ALERTCF` (no firmware writes them); `CR1` `ADDRIE`, `TXDMAEN`, `RXDMAEN`, `SBC`, `NOSTRETCH`, `WUPEN`, `GCEN`, `SMBHEN`, `SMBDEN`, `ALERTEN`, `PECEN`; `CR2` `ADD10`, `HEAD10R`, `NACK`, `RELOAD`, `PECBYTE`; `OAR1`, `OAR2`, `TIMEOUTR` whole; `PECR` write; every reserved bit (but Q10's); a byte or half-word access other than the one the stock model widens (a byte to a register byte, judged on the word; a half-word is ignored by the stock model, so `unmodeled`), an offset with no register (0x2C–0x3FC). `RELOAD` is modeled by the stock model but used by no firmware, so it is held at 0 rather than audited.
 - **Ask:** accept, or a different line for `RELOAD`.
 
-**Q12. The eighth shard** (§5). Seven shards' jobs stay under 20 min at 1.53 (18.0–18.5 min); `ci`'s wall reaches 19.7–20.5 min. **Recommendation:** build the eighth shard first, in this WO (the fence allows it "only if the ruling adds the eighth shard"), re-planning `times.tsv` unchanged with eight. **Ask:** eight, or seven with the wall at 20.
+**Q12. The eighth shard** (§5). The WO's literal trigger is not met: seven shards' slowest job stays under 20 min at 1.53 (18.0–19.2 min, `1300b`'s items included); `ci`'s wall reaches 20.4–21.2 min on the `main` with `1300b` in it. **Recommendation:** build the eighth shard first, in this WO (the fence allows it "only if the ruling adds the eighth shard"), re-planning `times.tsv` unchanged with eight. **Ask:** eight, or seven with the wall at 20.
