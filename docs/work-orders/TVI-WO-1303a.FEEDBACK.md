@@ -144,6 +144,7 @@ All on Furnace, in the pinned image (`aethelgard-tools@sha256:1e0ab105…`), one
   - on `9aab1bf`: 53 of 53;
   - on the reduced tree `cd597ca`: 55 of 57 pass. The two failures, `same` and `disable`, lost every guard's `end` record at teardown with no refusal recorded: the teardown race (`1303` FEEDBACK §8), at load about 11. Both pass on three reruns each, at load about 8.
 - **Mutants DM50–DM71:** 22 of 22 killed on `cd597ca`, the reduced tree (`ALL MUTANTS KILLED`). DM57 survived its first named case, `irq` (§4, finding 3), and is killed by `circoff`.
+- **DM28 re-pointed** (`1303`'s row: the guard's interrupt lines replaced by fresh, unconnected ones, killed by `irq`). Its old text, `Connections => inner.Connections;`, is the line this WO replaced with the guard's own lines, so CI's first run on this PR (45686087875, shard 5) aborted at it: "mutant text not found exactly once". It is the same mutation on the new line, `Connections => connections;`, and is killed by `irq` locally. Every row in `tests/mutants.tsv` now passes the exactly-once test locally.
 - **The route and inventory** (`tests/ci/route.sh origin/main`): pass. A citation row the reduction made stale was removed (`39fb572`).
 - **The replays:** §3.
 - **Memory:** the measurement's prototype gave −0.2 MiB at the median, five boots a side, PASS (measure.md §4). CI's budget judges the built guard (below).
