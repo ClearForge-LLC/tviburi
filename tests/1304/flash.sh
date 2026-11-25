@@ -11,7 +11,7 @@ set -euo pipefail
 here=$(cd "$(dirname "$0")/../.." && pwd)
 IMAGE=$(sed -n 's/^IMAGE=//p' "$here/tests/spike.sh")
 CASES="order clockfirst lowerfast prescaler alias vosunknown vosunknownlow vos3 over225 edge vos2 d1cpre wrhrcc lockedcr lockedsame locking badkey keytwice keymid keyhalf wrhlow wrhpg worse ap gen optsr optsrnone optwrite bank1 readreg fields ledger registrations recorded reset config regen"
-GUARDS="spi1 rcc gpioPortA gpioPortB gpioPortC gpioPortD gpioPortE gpioPortF gpioPortG gpioPortH gpioPortI gpioPortJ gpioPortK timer1 timer8 dma1 dma2 flashController usart1 usart2 usart3 uart4 uart5 usart6 uart7 uart8 i2c1 i2c2 i2c3"
+GUARDS="spi1 rcc gpioPortA gpioPortB gpioPortC gpioPortD gpioPortE gpioPortF gpioPortG gpioPortH gpioPortI gpioPortJ gpioPortK timer1 timer8 dma1 dma2 flashController usart1 usart2 usart3 uart4 uart5 usart6 uart7 uart8 i2c1 i2c2 i2c3 adcM1S2 adc3"
 # The planted firmware's paths (firmware/flash.rs): every case but optsrnone (optsr's firmware) and the monitor-driven ones.
 PATHS=$(for c in $CASES; do case $c in optsrnone|fields|ledger|registrations|recorded|reset|config|regen) ;; *) printf '"%s",' "$c" ;; esac; done | sed 's/,$//')
 scratch=${TVIBURI_SCRATCH:-$HOME/.cache/tviburi}

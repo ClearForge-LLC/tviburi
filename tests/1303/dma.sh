@@ -11,7 +11,7 @@ set -euo pipefail
 here=$(cd "$(dirname "$0")/../.." && pwd)
 IMAGE=$(sed -n 's/^IMAGE=//p' "$here/tests/spike.sh")
 CASES="axi tcm itcm partcm below wrap unmapped ndt0 reload reassert sizes fth fthzero reloadtcm en enoff done same disable width read field msize16 route0 route54 mux shared sharedx request txother usart23 fields ledger registrations irq config recorded reset clock offset offsetndt reflect regen restate circ circoff circen circodd htie circm2p circm2m adc adcoff htien tcie circhi circrec"
-GUARDS="spi1 rcc gpioPortA gpioPortB gpioPortC gpioPortD gpioPortE gpioPortF gpioPortG gpioPortH gpioPortI gpioPortJ gpioPortK timer1 timer8 dma1 dma2 flashController usart1 usart2 usart3 uart4 uart5 usart6 uart7 uart8 i2c1 i2c2 i2c3"
+GUARDS="spi1 rcc gpioPortA gpioPortB gpioPortC gpioPortD gpioPortE gpioPortF gpioPortG gpioPortH gpioPortI gpioPortJ gpioPortK timer1 timer8 dma1 dma2 flashController usart1 usart2 usart3 uart4 uart5 usart6 uart7 uart8 i2c1 i2c2 i2c3 adcM1S2 adc3"
 MONITOR="fields ledger registrations irq config recorded reset clock offset offsetndt reflect regen restate circ circoff tcie circhi circrec"
 # The planted firmware's paths: every case but the monitor-driven ones.
 PATHS=$(for c in $CASES; do case " $MONITOR " in *" $c "*) ;; *) printf '"%s",' "$c" ;; esac; done | sed 's/,$//')
@@ -89,9 +89,10 @@ clk='sysbus WriteDoubleWord 0x580244D8 0x3'   # DMA1EN, DMA2EN (p455): since TVI
 for t in ${TVIBURI_TESTS:-$CASES}; do
   case " $MONITOR " in *" $t "*) mon=1 ;; *) mon=0 ;; esac
   if [ $mon = 0 ]; then
-    # The ADC paths wait on the stock ADC1, which converts once per 1 ms (its externalEventFrequency, TVI-WO-1303a §2.2).
-    case $t in adc|adcoff) rf=0.0125 ;; *) rf=0.001 ;; esac
-    run_case "$t" "$t" "emulation RunFor \"$rf\"" "${marks[@]}"
+    # The ADC paths wait on the guarded ADC1 (TVI-WO-1307), which converts about every 102 us at the firmware's clock and sample
+    # time; channel 0's level is declared by Renode's SetVoltage (1.2 V, a test value; ruled 2026-11-25T21:17Z Q10).
+    case $t in adc|adcoff) rf=0.0125; lv='sysbus.adcM1S2 SetVoltage 1200000 0' ;; *) rf=0.001; lv='echo "no level"' ;; esac
+    run_case "$t" "$t" "$lv" "emulation RunFor \"$rf\"" "${marks[@]}"
   fi
   case $t in
   axi) check "axi: a DMA1 memory-to-memory stream in AXI SRAM passes and moves its data (p108: AXI SRAM is reachable)" \
@@ -148,7 +149,7 @@ for t in ${TVIBURI_TESTS:-$CASES}; do
     "refuses circm2p TVI-DMA-CIRC unmodeled 'r[\"bit\"] == \"DMA_SxCR.CIRC = 1, DIR = 1\" and \"unpaced\" in r[\"condition\"]'" ;;
   circm2m) check "circm2m: CIRC = 1 on a memory-to-memory stream refuses TVI-DMA-CIRC at EN, unmodeled (p645: not allowed; ruled Q5)" \
     "refuses circm2m TVI-DMA-CIRC unmodeled 'r[\"bit\"] == \"DMA_SxCR.CIRC = 1, DIR = 2\" and \"p645\" in r[\"citation\"]'" ;;
-  adc) check "adc: ArduPilot's ADC pattern, DMA1 stream 0 circular on the stock ADC1's request (9): the firmware sees TCIF at each wrap with EN still 1 and NDT reloaded to 4 (p647, p665; EN and TCIF at a wrap inferred from p654 against p665), and HTIF at each half (p657); the run passes" \
+  adc) check "adc: ArduPilot's ADC pattern, DMA1 stream 0 circular on the guarded ADC1's request (9, TVI-WO-1307): the firmware sees TCIF at each wrap with EN still 1 and NDT reloaded to 4 (p647, p665; EN and TCIF at a wrap inferred from p654 against p665), and HTIF at each half (p657); the run passes" \
     "passes adc && v=\$(readout adc READ) && [ \$(( v & 0xFF )) -ge 2 ] && [ \$(( v >> 8 & 0xFF )) -ge \$(( v & 0xFF )) ] && [ \$(( v >> 8 & 0xFF )) -le \$(( (v & 0xFF) + 1 )) ] && [ \$(( v >> 16 & 0xFF )) = \$(( v & 0xFF )) ] && [ \"\$(readout adc READ2)\" = 0x00000401 ]" ;;
   adcoff) check "adcoff: the same stream with CIRC = 0 ends after 4 requests with EN cleared (p654, p665; ruled Q4): one TCIF, seen with EN = 0 and NDT = 0; the run passes" \
     "passes adcoff && [ \"\$(readout adcoff READ)\" = 0x00000001 ] && [ \"\$(readout adcoff READ2)\" = 0x00000000 ]" ;;

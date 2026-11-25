@@ -99,3 +99,11 @@ tests/1306/i2c.sh	docs/
 model/GuardedSTM32DMA.cs	TVI-WO-1303a.measure.md
 tests/1303/fields.py	TVI-WO-1303a.measure.md
 firmware/dma.rs	TVI-WO-1303a.measure.md
+# TVI-WO-1307: the ADC guard's citations of its measurement, each a comment, a record string or a ledger text, checked by hand 2026-11-25.
+model/GuardedSTM32H7_ADC.cs	TVI-WO-1307.measure.md
+model/GuardedSTM32H7_ADC.cs	docs/
+model/stm32h7-adc-restate.awk	TVI-WO-1307.measure.md
+model/tviburi-nucleo-h753zi.repl	TVI-WO-1307.measure.md
+tests/1301/replay-1301.sh	TVI-WO-1307.measure.md
+tests/1307/adc.sh	TVI-WO-1307.measure.md
+tests/1307/adc.sh	docs/
