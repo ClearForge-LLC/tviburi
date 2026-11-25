@@ -35,6 +35,11 @@
 //!   path="oneshot"     - DMNGT = 01, continuous, DMA1 stream 0 P2M on request 9 by words, NDT = 4, CIRC = 0: the stream takes 4 conversions and
 //!                        ends (EN cleared, 1303a Q4); the ADC raises no more requests and, its DR frozen, never overruns (p964-965):
 //!                        passes. MARK_READ = ISR after 2 ms (OVR, bit 4, clear), MARK_READ2 = S0NDTR (0).
+//!   path="internal"    - ADC3 (its channel 18, VSENSE, declared 0.7 V: `levels: "18:0.7"`) converted with TSEN = 0, DR read:
+//!                        TVI-ADC-LEVEL, unmodeled (p920, p1038: the source is off; WO §5, a sample the twin invents).
+//!   path="internalok"  - the same with TSEN = 1 before ADEN: passes. MARK_READ = DR (0x364D: round(0.7 / 3.3 x 65535) = 13901).
+//!   path="oneshotcirc" - DMNGT = 01 on a circular DMA stream (CIRC = 1) selecting request 9, ADSTART: TVI-ADC-DMNGT, unmodeled (its
+//!                        transfers never end; WO §5, a stream that never ends).
 //!   path="ccrack"      - ADC3 enabled, then its CCR's VREFEN, TSEN, VBATEN written one by one with ADEN = 1 (ArduPilot's order):
 //!                        passes, acknowledged by name (ruled Q6). MARK_READ = ADC3 CCR (0x01C30000).
 //!   path="ccrother"    - ADC3 enabled, then its CCR.PRESC changed with ADEN = 1: TVI-ADC-STATE, unmodeled (p1039).
@@ -290,6 +295,28 @@ pub unsafe extern "C" fn reset() -> ! {
         }
         write_volatile(MARK_READ, r(ADC1 + ISR));
         write_volatile(MARK_READ2, r(DMA1 + 0x10 + 0x04));
+    }
+    #[cfg(any(path = "internal", path = "internalok"))]
+    {
+        #[cfg(path = "internal")]
+        enable(ADC3, CKMODE_SCLK4, BOOST01, false);
+        #[cfg(path = "internalok")]
+        enable(ADC3, CKMODE_SCLK4 | 1 << 23, BOOST01, false);
+        setup(ADC3, 18, 0);
+        write_volatile(MARK_READ, convert(ADC3));
+    }
+    #[cfg(path = "oneshotcirc")]
+    {
+        enable(ADC1, CKMODE_SCLK4, BOOST01, false);
+        setup(ADC1, 10, CONT | 1);
+        w(DMAMUX1, 9);
+        w(DMA1 + 0x10 + 0x14, 0x21);
+        w(DMA1 + 0x10 + 0x08, (ADC1 + DR) as u32);
+        w(DMA1 + 0x10 + 0x0C, SRAM4 as u32);
+        w(DMA1 + 0x10 + 0x04, 4);
+        w(DMA1 + 0x10, 0x5500); // S0CR: P2M, MINC, 32-bit, CIRC
+        w(DMA1 + 0x10, 0x5501);
+        start(ADC1);
     }
     #[cfg(path = "ccrack")]
     {

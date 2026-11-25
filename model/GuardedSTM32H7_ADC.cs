@@ -367,6 +367,7 @@ namespace Antmicro.Renode.Peripherals.Tviburi
                 return;   // refused (TVI-ADC-RATE) or, recorded, a start that cannot be paced: nothing converts
             }
             hz = f.Value;
+            rateStale = false;
             var e = convEpoch;
             ScheduleNext(e);
         }
@@ -378,6 +379,23 @@ namespace Antmicro.Renode.Peripherals.Tviburi
 
         private void ScheduleNext(long e)
         {
+            if(rateStale)
+            {
+                // WO §5: a conversion on a clock silicon would not give. An RCC write under running conversions may change f_ADC (a
+                // divider, HPRE for adc_sclk): the next conversion takes the clock as it now is, or the twin says it cannot.
+                rateStale = false;
+                var f = AdcHz(out var why);
+                var problem = f == null ? "a clock the twin cannot compute from declared values: " + why : RateProblem(f.Value, out var _);
+                if(problem != null)
+                {
+                    records.Refuse("TVI-ADC-RATE", Unmodeled, "ADC_CR", "ADSTART = 1",
+                        Name + ": its clock changed under running conversions (an RCC write) to " + problem,
+                        "RM0433 Rev 9 §25.4.3 p920-922, §25.7.2 p1039; ruled 2026-11-25T21:17Z Q4, Q7", State(), CrOffset, cr, 0);
+                    StopConversions();
+                    return;
+                }
+                hz = f.Value;
+            }
             var ch = Channel(index);
             Schedule((Smp(ch) + Sar(Res)) / hz, () => Converted(e));
         }
@@ -437,7 +455,7 @@ namespace Antmicro.Renode.Peripherals.Tviburi
             if(drChannel >= 0 && !drDeclared)
             {
                 records.Refuse("TVI-ADC-LEVEL", Unmodeled, "ADC_DR", "channel " + drChannel,
-                    Name + " DR read holding a conversion of channel " + drChannel + ", whose level no `levels` entry and no SetVoltage declared: the twin will not invent one (never 0 V by default)",
+                    Name + " DR read holding a conversion of channel " + drChannel + (Name == "adc3" && drChannel >= 17 ? ", an internal channel converted with its enable (VBATEN, TSEN, VREFEN: p1038) 0 or" : ",") + " whose level no `levels` entry and no SetVoltage declared: the twin will not invent one (never 0 V by default)",
                     "TVI-WO-1307 Q10 (ruled 2026-11-25T21:17Z); RM0433 Rev 9 §25.4.30 p996", State(), DrOffset, 0, width);
                 if(!records.Recorded)
                 {
@@ -464,9 +482,22 @@ namespace Antmicro.Renode.Peripherals.Tviburi
         // DMAREQ_ID is this ADC's request (p696: DMA1's streams are channels 0-7, DMA2's 8-15); -1 when no DMA guard serves it.
         private int ServingState()
         {
+            return Serving(out var g, out var s) ? g.StreamState(s) : -1;
+        }
+
+        // The serving stream's SxCR.CIRC (bit 8, p664), read through the DMA guard's bus interface: read-only (granted Q8).
+        private bool ServingCircular()
+        {
+            return Serving(out var g, out var s) && (((IDoubleWordPeripheral)g).ReadDoubleWord(0x10 + 0x18 * s) & (1u << 8)) != 0;
+        }
+
+        private bool Serving(out GuardedSTM32DMA g, out int s)
+        {
+            g = null;
+            s = -1;
             if(!(dma is IDoubleWordPeripheral mux))
             {
-                return -1;
+                return false;
             }
             for(var c = 0; c < 16; c++)
             {
@@ -474,14 +505,22 @@ namespace Antmicro.Renode.Peripherals.Tviburi
                 {
                     continue;
                 }
-                var g = host.GetPeripheralsOfType<GuardedSTM32DMA>().FirstOrDefault(d => d.ChannelBase == c - c % 8);
-                return g == null ? -1 : g.StreamState(c % 8);
+                g = host.GetPeripheralsOfType<GuardedSTM32DMA>().FirstOrDefault(d => d.ChannelBase == c - c % 8);
+                s = c % 8;
+                return g != null;
             }
-            return -1;
+            return false;
         }
 
         private bool Level(int ch, out ulong microvolts)
         {
+            // WO §5: a sample the twin invents. ADC3's internal channels convert only with their source enabled (VBAT/4 17 with VBATEN,
+            // VSENSE 18 with TSEN, VREFINT 19 with VREFEN; p920, p1038): with it off, no declared level stands for what silicon converts.
+            if(Name == "adc3" && ch >= 17 && (regs[CcrOffset] & (1u << (41 - ch))) == 0)
+            {
+                microvolts = 0;
+                return false;
+            }
             if(levels.TryGetValue(ch, out var v))
             {
                 microvolts = v;
@@ -750,19 +789,27 @@ namespace Antmicro.Renode.Peripherals.Tviburi
                     Name + ": ADSTART with RES = " + Convert.ToString(Res, 2).PadLeft(3, '0') + ", a code revision " + Revision + " reserves (\"Others: Reserved, must not be used\")",
                     "RM0433 Rev 9 §25.6.4 p1016; ruled 2026-11-25T21:17Z Q2", word);
             }
+            var problem = RateProblem(f.Value, out var bit);
+            return problem != null && RefuseRate(bit, Name + ": ADSTART with " + problem,
+                "RM0433 Rev 9 §25.4.3 p922; " + (Revision == "V" ? "§25.6.3 p1009" : "§25.6.3 p1005") + "; DS12117 Rev 10 " + (Revision == "V" ? "Table 173 p272" : "Table 76 p166") + "; ruled 2026-11-25T21:17Z Q7", word);
+        }
+
+        // f_ADC against the revision's maximum (DS12117) and the BOOST p1009 (rev V) / p1005 (rev Y) gives for it; null when it holds.
+        private string RateProblem(double f, out string bit)
+        {
             var boost = (cr >> 8) & 3;
-            var want = Revision == "V" ? (f.Value <= 6.25e6 ? 0u : f.Value <= 12.5e6 ? 1u : f.Value <= 25e6 ? 2u : 3u) : f.Value > 20e6 ? 1u : boost & 1;
-            if(boost != want)
+            bit = "BOOST (" + (Revision == "V" ? "9:8" : "bit 8") + ") = " + boost;
+            var max = Revision == "V" ? 50e6 : (boost & 1) != 0 ? 36e6 : 20e6;
+            if(f > max)
             {
-                if(Revision == "V" && boost == 1 && want == 2)
-                {
-                    return false;   // acknowledged by name (ruled Q7): ArduPilot's BOOST = 01 where f_ADC asks for 10 (ChibiOS's #if order)
-                }
-                return RefuseRate("BOOST (" + (Revision == "V" ? "9:8" : "bit 8") + ") = " + boost,
-                    Name + ": ADSTART with BOOST = " + boost + " at f_ADC " + Mhz(f.Value) + ", where revision " + Revision + " asks for " + want + ": \"This bit must be set according to the ADC clock setting\"",
-                    "RM0433 Rev 9 §25.4.3 p922; " + (Revision == "V" ? "§25.6.3 p1009" : "§25.6.3 p1005") + "; ruled 2026-11-25T21:17Z Q7", word);
+                return "f_ADC " + Mhz(f) + ", above the maximum " + Mhz(max) + " for revision " + Revision + " with this BOOST";
             }
-            return false;
+            var want = Revision == "V" ? (f <= 6.25e6 ? 0u : f <= 12.5e6 ? 1u : f <= 25e6 ? 2u : 3u) : f > 20e6 ? 1u : boost & 1;
+            if(boost == want || (Revision == "V" && boost == 1 && want == 2))
+            {
+                return null;   // the second: acknowledged by name (ruled Q7), ArduPilot's BOOST = 01 where f_ADC asks for 10 (ChibiOS's #if order)
+            }
+            return "BOOST = " + boost + " at f_ADC " + Mhz(f) + ", where revision " + Revision + " asks for " + want + ": \"This bit must be set according to the ADC clock setting\"";
         }
 
         private bool RefuseRate(string bit, string condition, string citation, uint word)
@@ -787,6 +834,13 @@ namespace Antmicro.Renode.Peripherals.Tviburi
                 }
             }
             var dmngt = Dmngt;
+            if(dmngt == 1 && ServingCircular())
+            {
+                records.Refuse("TVI-ADC-DMNGT", Unmodeled, "ADC_CFGR", "DMNGT (1:0) = 01",
+                    Name + ": ADSTART with DMNGT = 01 (one-shot) on a circular DMA stream, whose transfers never end: the twin cannot see the DMA's last transfer (WO §5: a stream that never ends)",
+                    "RM0433 Rev 9 §25.4.27 p964-965, §25.6.4 p1016; ruled 2026-11-25T21:17Z Q8", State(), CrOffset, word, 32);
+                return true;
+            }
             if(dmngt == 2 || (dmngt == 1 && ServingState() < 0))
             {
                 records.Refuse("TVI-ADC-DMNGT", Unmodeled, "ADC_CFGR", "DMNGT (1:0) = " + Convert.ToString(dmngt, 2).PadLeft(2, '0'),
@@ -933,6 +987,7 @@ namespace Antmicro.Renode.Peripherals.Tviburi
                         pllUntrusted[(offset - 0x30) / 8 + 1] |= r.ReadDoubleWord(offset) != value;
                     }
                     pllcfgr = offset == 0x2C ? value : pllcfgr;
+                    rateStale |= (cr & AdstartBit) != 0;
                 };
             }
         }
@@ -1096,6 +1151,7 @@ namespace Antmicro.Renode.Peripherals.Tviburi
         private uint cr, isr, dr;
         private int drChannel, index;
         private bool drDeclared, ldoReady, oneShotDone;
+        private volatile bool rateStale;
         private double hz;
         private long ldoEpoch, calEpoch, rdyEpoch, convEpoch;
 

@@ -522,3 +522,6 @@ AD41-adcMux	model/GuardedSTM32H7_RCC.cs	"pll2_p_ck", "pll3_r_ck", "per_ck", "dis
 AD42-classRow	tools/tviburi-release/pins.tsv	Tviburi.GuardedSTM32H7_ADC\tadc3 adcM1S2	Tviburi.GuardedSTM32H7_ADC\tadc3	adc-ledger
 AD43-restateName	model/stm32h7-adc-restate.awk	v = name == "adc3" ? "tviburiAdc3" : "tviburiAdc12"	v = name == "adc3" ? "tviburiAdc12" : "tviburiAdc3"	adc-regen
 AD44-fieldsClass	tests/1307/fields.py	'EXTEN': ('Zero', G,	'EXTEN': ('Any', G,	adc-regen
+AD45-rateStale	model/GuardedSTM32H7_ADC.cs	rateStale |= (cr & AdstartBit) != 0;	rateStale |= false;	adc-rccchange adc-rccboost
+AD46-internal	model/GuardedSTM32H7_ADC.cs	if(Name == "adc3" && ch >= 17 && (regs[CcrOffset] & (1u << (41 - ch))) == 0)	if(false)	adc-internal
+AD47-oneshotCirc	model/GuardedSTM32H7_ADC.cs	if(dmngt == 1 && ServingCircular())	if(false)	adc-oneshotcirc

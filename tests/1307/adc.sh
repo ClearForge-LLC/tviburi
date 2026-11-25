@@ -11,9 +11,9 @@ set -euo pipefail
 
 here=$(cd "$(dirname "$0")/../.." && pwd)
 IMAGE=$(sed -n 's/^IMAGE=//p' "$here/tests/spike.sh")
-CASES="start res12 kernel clocklost ckmode deeppwd vreg calen cfgr undeclared early res boost boostack pcsel field width half read dfsdm oneshotnone oneshot ccrack ccrother rate rate2 revy overrun overwrite setvoltage norevision badlevels registrations recorded rccreset unheld query fields ledger regen"
+CASES="start res12 kernel clocklost ckmode deeppwd vreg calen cfgr undeclared early res boost boostack pcsel field width half read dfsdm oneshotnone oneshot oneshotcirc internal internalok ccrack ccrother rate rate2 rccchange rccboost revy overrun overwrite setvoltage norevision badlevels registrations recorded rccreset unheld query fields ledger regen"
 GUARDS="spi1 rcc gpioPortA gpioPortB gpioPortC gpioPortD gpioPortE gpioPortF gpioPortG gpioPortH gpioPortI gpioPortJ gpioPortK timer1 timer8 dma1 dma2 flashController usart1 usart2 usart3 uart4 uart5 usart6 uart7 uart8 i2c1 i2c2 i2c3 adcM1S2 adc3"
-MONITOR="rate rate2 revy overrun overwrite setvoltage norevision badlevels registrations recorded rccreset unheld query fields ledger regen"
+MONITOR="rate rate2 rccchange rccboost revy overrun overwrite setvoltage norevision badlevels registrations recorded rccreset unheld query fields ledger regen"
 PATHS=$(for c in $CASES; do case " $MONITOR " in *" $c "*) ;; *) printf '"%s",' "$c" ;; esac; done | sed 's/,$//')
 scratch=${TVIBURI_SCRATCH:-$HOME/.cache/tviburi}
 mkdir -p "$scratch"
@@ -46,7 +46,7 @@ run_case() { # run_case <name> <firmware path or -> <monitor lines...>
   if [ -n "${PLATFORM:-}" ]; then
     sed 's#^using "\./#using "/repo/model/#' "$src/${PLATFORM#/repo/}" > "$work/$name/platform.repl"
   else
-    { sed -e 's#^using "\./#using "/repo/model/#' "$src/model/tviburi-nucleo-h753zi.repl"; echo; printf 'tviburiAdc12:\n    levels: "10:1.2"\n'; } \
+    { sed -e 's#^using "\./#using "/repo/model/#' "$src/model/tviburi-nucleo-h753zi.repl"; echo; printf 'tviburiAdc12:\n    levels: "10:1.2"\n\ntviburiAdc3:\n    levels: "18:0.7"\n'; } \
       | sed -e "${PLATFORM_SED:-}" > "$work/$name/platform.repl"
   fi
   {
@@ -161,6 +161,12 @@ for t in ${TVIBURI_TESTS:-$CASES}; do
     "refuses oneshotnone TVI-ADC-DMNGT unmodeled 'r[\"bit\"] == \"DMNGT (1:0) = 01\" and \"request 9\" in r[\"condition\"]'" ;;
   oneshot) check "oneshot: DMNGT = 01, continuous, on a stream of 4 words: the stream ends (NDT 0) and the ADC raises no more requests and never overruns (OVR clear after 2 ms; p964-965, ruled Q8; WO §5: a stream that never ends)" \
     "passes oneshot && [ \$(( \$(readout oneshot READ) & 0x10 )) = 0 ] && [ \"\$(readout oneshot READ2)\" = 0x00000000 ]" ;;
+  oneshotcirc) check "oneshotcirc: ADSTART with DMNGT = 01 on a circular DMA stream refuses TVI-ADC-DMNGT, unmodeled: its transfers never end, so the twin cannot see the last (WO §5: a stream that never ends)" \
+    "refuses oneshotcirc TVI-ADC-DMNGT unmodeled 'r[\"bit\"] == \"DMNGT (1:0) = 01\" and \"circular\" in r[\"condition\"]'" ;;
+  internal) check "internal: ADC3's VSENSE (channel 18, declared 0.7 V) converted with TSEN = 0 refuses TVI-ADC-LEVEL at the DR read, unmodeled: the source is off (p920, p1038; WO §5: a sample the twin invents)" \
+    "refuses internal TVI-ADC-LEVEL unmodeled 'r[\"bit\"] == \"channel 18\" and \"TSEN\" in r[\"condition\"]' adc3" ;;
+  internalok) check "internalok: the same with TSEN = 1 passes and reads 0x364D (round(0.7 / 3.3 x 65535))" \
+    "passes internalok && [ \"\$(readout internalok READ)\" = 0x0000364D ]" ;;
   ccrack) check "ccrack: ADC3's CCR VREFEN, TSEN and VBATEN written one by one with ADEN = 1 (ArduPilot's order) pass, acknowledged by name (ruled Q6); they accumulate: CCR 0x01C30000" \
     "passes ccrack && [ \"\$(readout ccrack READ)\" = 0x01C30000 ]" ;;
   ccrother) check "ccrother: ADC3's CCR.PRESC changed with ADEN = 1 refuses TVI-ADC-STATE, unmodeled: only ArduPilot's internal-channel bits are acknowledged (ruled Q6)" \
@@ -180,6 +186,22 @@ for t in ${TVIBURI_TESTS:-$CASES}; do
       "sysbus ReadDoubleWord 0x40022000" 'emulation RunFor "0.0000002"' 'echo "R-AFTER"' "sysbus ReadDoubleWord 0x40022000"
     check "rate2: on the kernel clock (CKMODE = 00, ADCSEL = pll2_p_ck 129 MHz, PRESC /4: 16.125 MHz on rev V) EOC comes at 24.56 us, not before 24.4 us (p920, p1039; ruled Q4)" \
       "passed rate2 && [ \"\$(readout rate2 BEFORE)\" = 0x00001001 ] && [ \"\$(readout rate2 AFTER)\" = 0x0000100F ]" ;;
+  rccchange)
+    # Revision Y (BOOST = 1 allows any f_ADC up to 36 MHz, p1005): continuous on CKMODE = 11, adc_hclk / 4 = 16 MHz, 24.75 us a
+    # conversion. At 50 us (two EOCs) DR is read and HPRE set to /2 (RCC_D1CFGR, p395): hclk 32 MHz, 8 MHz. The conversion under way
+    # ends at 74.25 us; the next takes the new clock, 49.5 us, so its EOC comes at 123.75 us, not at 99 us.
+    mapfile -t s < <(on 10 0x2000)
+    PLATFORM_SED='/^tviburiAdc12:$/,/^$/s/revision: "V"/revision: "Y"/' run_case rccchange - "${s[@]}" "$(start)" 'emulation RunFor "0.00005"' \
+      'sysbus ReadDoubleWord 0x40022040' 'sysbus WriteDoubleWord 0x58024418 0x8' 'emulation RunFor "0.00003"' 'sysbus ReadDoubleWord 0x40022040' \
+      'emulation RunFor "0.00003"' 'echo "R-MID"' "sysbus ReadDoubleWord 0x40022000" 'emulation RunFor "0.00002"' 'echo "R-END"' "sysbus ReadDoubleWord 0x40022000"
+    check "rccchange: HPRE changed (/2) under continuous conversions on adc_hclk (rev Y): the next conversion takes the new clock, 49.5 us, not the rate computed at ADSTART (no EOC at 110 us, EOC by 130 us; p920-921; WO §5)" \
+      "passed rccchange && [ \$(( \$(readout rccchange MID) & 4 )) = 0 ] && [ \$(( \$(readout rccchange END) & 4 )) = 4 ]" ;;
+  rccboost)
+    # Revision V: the same change halves f_ADC from 8 to 4 MHz, below BOOST = 01's range (p1009).
+    mapfile -t s < <(on 10 0x2000)
+    run_case rccboost - "${s[@]}" "$(start)" 'emulation RunFor "0.0001"' 'sysbus WriteDoubleWord 0x58024418 0x8' 'emulation RunFor "0.0002"'
+    check "rccboost: HPRE changed under continuous conversions on rev V takes f_ADC to 4 MHz, where BOOST = 01 no longer holds: TVI-ADC-RATE, unmodeled, at the next conversion (p1009; ruled Q7)" \
+      "[ \$rc = 3 ] && records rccboost 'len(recs) == 1 and recs[0][\"rule\"] == \"TVI-ADC-RATE\" and \"changed under running conversions\" in recs[0][\"condition\"] and \"4 MHz\" in recs[0][\"condition\"]'" ;;
   revy)
     mapfile -t s < <(on 10 0)
     PLATFORM_SED='/^tviburiAdc12:$/,/^$/s/revision: "V"/revision: "Y"/' run_case revy - "${s[@]}" "$(start)" 'emulation RunFor "0.0000246"' 'echo "R-BEFORE"' \
