@@ -98,5 +98,4 @@ tests/1306/i2c.sh	docs/
 # TVI-WO-1303a: the circular mode's citations, each a comment or a record string, checked by hand 2026-11-25.
 model/GuardedSTM32DMA.cs	TVI-WO-1303a.measure.md
 tests/1303/fields.py	TVI-WO-1303a.measure.md
-tests/1303/dma.sh	TVI-WO-1303a.measure.md
 firmware/dma.rs	TVI-WO-1303a.measure.md
