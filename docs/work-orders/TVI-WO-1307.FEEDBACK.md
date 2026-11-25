@@ -130,4 +130,8 @@ Also: the DMA suite's `adc`/`adcoff` firmware now gives ADC1 a valid start (`CKM
   - CI's first run, on the built guard: `MEDIANS main 1021940 KiB, branch 1024068 KiB, difference 2128 KiB (+2.1 MiB)`, **PASS**.
   - The §1 probe: +6.7 MiB, eleven boots a side.
 - **CI, the first run** (45707633754, at `bdea34d`): seven of ten shards green, three red, as §6 sets out. The budget and its tests passed. Shard jobs took 10.5–16.6 min; the longest was shard 4, on an EPYC 7763 (1.48 × the reference). That is inside the 20 minutes the tenth shard was built for.
-- **CI on the final head:** below, once it has run.
+- **CI on the final code head** (45713069587, at `76790f7`): **green**.
+  - `ci`'s wall was **16.3 min**; the shard jobs took 10.9–14.6 min.
+  - The aggregate: "923 expected (407 cases, 516 mutants), 923 ran across 10 shards, 0 failures".
+  - The budget: `MEDIANS main 808628 KiB, branch 806528 KiB, difference -2100 KiB (-2.1 MiB)`, **PASS**.
+  - This commit adds only this line; the route reruns every shard on it.
