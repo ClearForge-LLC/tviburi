@@ -138,12 +138,12 @@ F02-ack1300	tools/tviburi-release/src/main.rs	("(TVI-WO-1300 A", "TVI-WO-1300.rm
 # TVI-WO-1300a: one mutant per guard it adds or changes
 C24-syncEnables	model/GuardedSTM32H7_RCC.cs	inner.WriteDoubleWord(off, Copy(off));	(empty)	rcc-tim2
 C25-syncAtReset	model/GuardedSTM32H7_RCC.cs	inner.Reset();\n            ResetCopies();\n            SyncEnables();	inner.Reset();\n            ResetCopies();	rcc-tim2
-C26-syncAtRegister	model/GuardedSTM32H7_RCC.cs	= spi;\n            }\n            SyncEnables();	= spi;\n            }	rcc-tim2 conditions
+C26-syncAtRegister	model/GuardedSTM32H7_RCC.cs	(1300b (2))\n            }\n            SyncEnables();	(1300b (2))\n            }	rcc-tim2 conditions
 C27-unlockGuarded	model/GuardedSTM32H7_RCC.cs	host.SystemBus.SetPeripheralEnabled(g, true);	(empty)	rcc-unenabled
 C28-unlockAfterEnr	model/GuardedSTM32H7_RCC.cs	if(EnableOffsets.Contains(b))	if(false)	rcc-spi1off
 C29-clockLost	model/GuardedSTM32H7_RCC.cs	if(!k.Running)\n                    {\n                        lost = p;	if(false)\n                    {\n                        lost = p;	rcc-lost-pll
 C30-trialKeptCr	model/GuardedSTM32H7_RCC.cs	crAfter = KeptCr(value);	crAfter = value;	rcc-blocked
-C31-lossIsTransition	model/GuardedSTM32H7_RCC.cs	g.Value.Started && QueryKernelClock(g.Key).Running	g.Value.Started	rcc-cstart
+C31-lossIsTransition	model/GuardedSTM32H7_RCC.cs	.Where(p => QueryKernelClock(p).Running).ToArray();	.ToArray();	rcc-cstart
 C32-divrBlocked	model/GuardedSTM32H7_RCC.cs	if(PllOn(n))	if(false)	rcc-divr
 A01-sel5	model/GuardedSTM32H7_RCC.cs	new uint[] { 0, 1, 2, 4 }, "modeled by the guard", "the guard's copy and its mux (p371)", 414	new uint[] { 0, 1, 2, 4, 5 }, "modeled by the guard", "the guard's copy and its mux (p371)", 414	rcc-sel5 allowlist
 S01-enable	model/GuardedSTM32H7_SPI.cs	else if(enabled)	else if(true)	rcc-unenabled conditions
