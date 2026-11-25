@@ -155,6 +155,7 @@ namespace Antmicro.Renode.Peripherals.Tviburi
         {
             lock(sync)
             {
+                Open();   // a completion the stock model shows ends the open transfer before this access (an ICR write may clear it)
                 clearedLast = false;
                 if(Unloaded(offset, 0, width) || Narrow(offset, 0, width, "read"))
                 {
@@ -175,6 +176,7 @@ namespace Antmicro.Renode.Peripherals.Tviburi
         {
             lock(sync)
             {
+                Open();   // as in Read
                 var afterClear = clearedLast;
                 clearedLast = false;
                 if(Unloaded(offset, value, width) || Narrow(offset, value, width, "write"))
@@ -237,7 +239,7 @@ namespace Antmicro.Renode.Peripherals.Tviburi
             {
             case Cr1Offset:
                 var before = cr1;
-                cr1 = word;
+                cr1 = word & Cr1Defined;   // reserved bits keep their reset value, 0 (p2001), even recorded
                 if((before & PeBit) != 0 && (word & PeBit) == 0)
                 {
                     SoftwareReset(word);
@@ -265,7 +267,7 @@ namespace Antmicro.Renode.Peripherals.Tviburi
                 }
                 return;
             case TimingrOffset:
-                timingr = word;   // the stock model's TIMINGR is all tags: kept here, never forwarded
+                timingr = word & TimingrMask;   // the stock model's TIMINGR is all tags: kept here, never forwarded; 27:24 reserved
                 return;
             case TimeoutrOffset:  // 0 only (Fields); the stock model has no register 0x14
             case PecrOffset:      // read-only
@@ -481,7 +483,8 @@ namespace Antmicro.Renode.Peripherals.Tviburi
             return true;
         }
 
-        // A transfer is open from a START this guard passed until the stock model shows TC, TCR or STOPF, a STOP, or a PE clear.
+        // A transfer is open from a START this guard passed until the stock model shows TC, TCR or STOPF (checked at every access,
+        // before it is passed on), a STOP, or a PE clear.
         private bool Open()
         {
             if(open && (inner.ReadDoubleWord(IsrOffset) & (TcBit | TcrBit | StopfBit)) != 0)
@@ -574,6 +577,7 @@ namespace Antmicro.Renode.Peripherals.Tviburi
         private const uint PeBit = 1u << 0;
         private const uint Cr1Protected = 0x00021F00;   // NOSTRETCH (17), ANFOFF (12), DNF (11:8): p2002-2003
         private const uint TimingrMask = 0xF0FFFFFF;    // every TIMINGR field (p2008); 27:24 reserved
+        private const uint Cr1Defined = 0x00FFDFFF;     // CR1 without its reserved 31:24 and 13 (p2001-2002)
         private const uint StartBit = 1u << 13;
         private const uint StopBit = 1u << 14;
         private const uint ReloadBit = 1u << 24;

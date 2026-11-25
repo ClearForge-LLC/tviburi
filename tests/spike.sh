@@ -38,6 +38,9 @@ ACCEPTANCE="$ACCEPTANCE $(for c in $FLASH_CASES; do printf 'flash-%s ' "$c"; don
 # TVI-WO-1305: the USART guard's cases live in tests/1305/usart.sh; each is a test here, usart-<case>, in the acceptance group.
 USART_CASES=$(sed -n 's/^CASES="\(.*\)"$/\1/p' "$(dirname "$0")/1305/usart.sh")
 ACCEPTANCE="$ACCEPTANCE $(for c in $USART_CASES; do printf 'usart-%s ' "$c"; done)"
+# TVI-WO-1306: the I2C guard's cases live in tests/1306/i2c.sh; each is a test here, i2c-<case>, in the acceptance group.
+I2C_CASES=$(sed -n 's/^CASES="\(.*\)"$/\1/p' "$(dirname "$0")/1306/i2c.sh")
+ACCEPTANCE="$ACCEPTANCE $(for c in $I2C_CASES; do printf 'i2c-%s ' "$c"; done)"
 ALL="$ACCEPTANCE $ADVERSARIAL"
 if [ "${TVIBURI_TESTS:-}" = list ]; then printf '%s\n' $ALL; exit 0; fi
 here=$(cd "$(dirname "$0")/.." && pwd)
@@ -719,6 +722,17 @@ t_usart() { # t_usart <case>: one case of tests/1305/usart.sh on this source, it
   fails=$((fails + f))
 }
 for c in $USART_CASES; do eval "t_usart-$c() { t_usart $c; }"; done
+t_i2c() { # t_i2c <case>: one case of tests/1306/i2c.sh on this source, its ok/FAIL lines counted here (TVI-WO-1306)
+  local out trc=0
+  out=$(TVIBURI_TESTS="$1" TVIBURI_SCRATCH="$work" "$src/tests/1306/i2c.sh" "$src" 2>&1) || trc=$?
+  grep -E '^(ok|FAIL) ' <<<"$out" || true
+  local f; f=$(grep -c '^FAIL ' <<<"$out" || true)
+  if [ "$trc" -ne 0 ] && [ "$f" -eq 0 ]; then
+    echo "FAIL i2c-$1: tests/1306/i2c.sh exited $trc with no verdict"; f=1
+  fi
+  fails=$((fails + f))
+}
+for c in $I2C_CASES; do eval "t_i2c-$c() { t_i2c $c; }"; done
 
 for t in ${TVIBURI_TESTS:-acceptance}; do
   case "$t" in

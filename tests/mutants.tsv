@@ -411,3 +411,40 @@ RB14-usart1Mux	model/GuardedSTM32H7_RCC.cs	["usart1"] = new ClockedPeripheral(Us
 RB15-hseZero	model/GuardedSTM32H7_RCC.cs	HseFrequency = hseFrequency == 0 ? null : hseFrequency;	HseFrequency = hseFrequency;	rcc-hse-zero
 RB16-rtcenTaken	model/GuardedSTM32H7_RCC.cs	rtcen = value & BdcrRtcen;	rtcen = 0;	rcc-rtcen
 RB17-trialSkip	model/GuardedSTM32H7_RCC.cs	|| held == value))	|| true))	rcc-usart-lost
+I201-timingrProtected	model/GuardedSTM32F7_I2C.cs	var mask = offset == TimingrOffset ? TimingrMask	var mask = offset == TimingrOffset ? 0u	i2c-timingrpe
+I202-dnfProtected	model/GuardedSTM32F7_I2C.cs	Cr1Protected = 0x00021F00;	Cr1Protected = 0x00020000;	i2c-dnfpe
+I203-sameValuePasses	model/GuardedSTM32F7_I2C.cs	var changed = (Served(offset) ^ word) & mask;	var changed = mask;	i2c-timingrsame
+I204-clearJudgedOff	model/GuardedSTM32F7_I2C.cs	if(!IsRunning || (offset == Cr1Offset && (word & PeBit) == 0))	if(!IsRunning)	i2c-clearfield
+I205-timingrServed	model/GuardedSTM32F7_I2C.cs	case TimingrOffset: return timingr;	case TimingrOffset: return 0;	i2c-config i2c-timingroff
+I206-cr1Served	model/GuardedSTM32F7_I2C.cs	case Cr1Offset: return cr1;	case Cr1Offset: return inner.ReadDoubleWord(offset);	i2c-anfoff
+I207-allowList	model/GuardedSTM32F7_I2C.cs	f.Allowed == null || f.Allowed.Contains(f.Of(word))	f.Allowed == null || true	i2c-field i2c-fields
+I208-icrRes6Ack	model/GuardedSTM32F7_I2C.cs	"Res6", 6, 6, Any,	"Res6", 6, 6, Zero,	i2c-ap i2c-regen
+I209-icrRes7	model/GuardedSTM32F7_I2C.cs	"Res7", 7, 7, Zero,	"Res7", 7, 7, Any,	i2c-icrres
+I210-resetRule	model/GuardedSTM32F7_I2C.cs	if(start && afterClear && (!refused || records.Recorded))	if(start && false && (!refused || records.Recorded))	i2c-reset
+I211-readClears	model/GuardedSTM32F7_I2C.cs	                clearedLast = false;\n                if(Unloaded(offset, 0, width)	                if(Unloaded(offset, 0, width)	i2c-resetok
+I212-kernelQuery	model/GuardedSTM32F7_I2C.cs	if(k != null && k.Modeled && k.Running)	if(k != null)	i2c-kernel
+I213-startOff	model/GuardedSTM32F7_I2C.cs	(word & StartBit) != 0 && !IsRunning)	(word & StartBit) != 0 && false)	i2c-startoff
+I214-txdrOff	model/GuardedSTM32F7_I2C.cs	if(offset == TxdrOffset && !IsRunning)	if(offset == TxdrOffset && false)	i2c-txdroff
+I215-emptyStart	model/GuardedSTM32F7_I2C.cs	((word >> 16) & 0xFF) == 0 && (word & ReloadBit) == 0)	((word >> 16) & 0xFF) == 0 && false)	i2c-empty
+I216-emptyRecorded	model/GuardedSTM32F7_I2C.cs	Pass(offset, empty ? value & ~StartBit : value);	Pass(offset, value);	i2c-recorded
+I217-midStart	model/GuardedSTM32F7_I2C.cs	Open() && (word & StartBit) != 0)	Open() && false)	i2c-midstart
+I218-midCr2	model/GuardedSTM32F7_I2C.cs	Cr2Held = 0x00FF1FFF;	Cr2Held = 0x00001FFF;	i2c-midcr2
+I219-openCloses	model/GuardedSTM32F7_I2C.cs	(TcBit | TcrBit | StopfBit)) != 0)	(TcrBit)) != 0)	i2c-ap i2c-config
+I220-absentAck	model/GuardedSTM32F7_I2C.cs	Absent.TryGetValue(name, out var known) && known.Contains(a)	Absent.TryGetValue(name, out var known) && !known.Contains(a)	i2c-absent i2c-absentname
+I221-absentLine	model/GuardedSTM32F7_I2C.cs	"Unknown slave at address {0}.", a);	"Unknown device at address {0}.", a);	i2c-absentname
+I222-softReset	model/GuardedSTM32F7_I2C.cs	                    SoftwareReset(word);\n	                    inner.WriteDoubleWord(offset, word);\n	i2c-softreset
+I223-resetKeepsCr2	model/GuardedSTM32F7_I2C.cs	            inner.WriteDoubleWord(Cr2Offset, cr2);\n	(empty)	i2c-softreset
+I224-copiesReset	model/GuardedSTM32F7_I2C.cs	cr1 = timingr = 0;	cr1 = 0;	i2c-rccreset
+I225-width	model/GuardedSTM32F7_I2C.cs	if(width == 32 && (offset & 3) == 0)	if(true)	i2c-width
+I226-undefinedRead	model/GuardedSTM32F7_I2C.cs	return offset >= 0 && offset <= TxdrOffset;	return offset >= 0 && offset <= 0x3FC;	i2c-read
+I227-held	model/GuardedSTM32F7_I2C.cs	rcc.Holds(name, this)))\n            {\n                records.Refuse("TVI-I2C-CONFIG"	true))\n            {\n                records.Refuse("TVI-I2C-CONFIG"	i2c-unheld
+I228-watchedI2c	model/GuardedSTM32H7_RCC.cs	if(peripheral is IRccWatched w)	if(peripheral is GuardedSTM32F7_USART w)	i2c-clocklost
+I229-peRunning	model/GuardedSTM32F7_I2C.cs	public bool IsRunning => (cr1 & PeBit) != 0;	public bool IsRunning => false;	i2c-clocklost
+I230-runningName	model/GuardedSTM32F7_I2C.cs	public string RunningName => "PE";	public string RunningName => "SPE";	i2c-clocklost
+I231-lockedWhileOff	model/GuardedSTM32H7_RCC.cs	            foreach(var g in guarded.Values)\n	            foreach(var g in guarded.Values.Cast<IPeripheral>().Concat(watched.Values))\n	i2c-clock
+I232-accessNames	model/GuardedSTM32F7_I2C.cs	            Timing = 0x10,	            TimingX = 0x10,	i2c-registrations
+I233-classRow	tools/tviburi-release/pins.tsv	Tviburi.GuardedSTM32F7_I2C\ti2c1 i2c2 i2c3	Tviburi.GuardedSTM32F7_I2C\ti2c1 i2c2	i2c-ledger
+I234-restateSet	model/stm32h7-i2c-restate.awk	/^i2c[123]: I2C	/^i2c[12]: I2C	i2c-regen
+I235-sensorsShared	model/GuardedSTM32F7_I2C.cs	.SetValue(inner, ChildCollection);	.SetValue(inner, new Dictionary<int, II2CPeripheral>());	i2c-config
+I236-completionTracked	model/GuardedSTM32F7_I2C.cs	                Open();   // as in Read\n	(empty)	i2c-config
+I237-reservedNotServed	model/GuardedSTM32F7_I2C.cs	cr1 = word & Cr1Defined;	cr1 = word;	i2c-recorded

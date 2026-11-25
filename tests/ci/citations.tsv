@@ -86,3 +86,12 @@ firmware/usart.rs	TVI-WO-1305a.measure.md
 model/GuardedSTM32F7_USART.cs	TVI-WO-1305a.measure.md
 model/bench-checks.tsv	TVI-WO-1305a.measure.md
 tests/1305/usart.sh	TVI-WO-1305a.measure.md
+# TVI-WO-1306: the I2C guard's citations of its measurement, each a comment, a record string or a ledger text, checked by hand 2026-11-25.
+firmware/i2c.rs	TVI-WO-1306.measure.md
+model/GuardedSTM32F7_I2C.cs	TVI-WO-1306.measure.md
+model/GuardedSTM32F7_I2C.cs	docs/
+model/stm32h7-i2c-restate.awk	TVI-WO-1306.measure.md
+tests/1301/replay-1301.sh	TVI-WO-1306.measure.md
+tests/1306/fields.py	TVI-WO-1306.measure.md
+tests/1306/i2c.sh	TVI-WO-1306.measure.md
+tests/1306/i2c.sh	docs/
