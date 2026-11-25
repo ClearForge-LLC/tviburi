@@ -23,18 +23,9 @@
 // §1.1). A guarded peripheral registered here (an SPI guard) stays unlocked on the bus: its own guard asks this guard for
 // its enable at every access and refuses by name (TVI-SPI-ENABLE).
 //
-// RTCEN (TVI-WO-1300b (5); ruled 2026-11-25T03:03Z Q4): RCC_BDCR.RTCEN is served from the guard's copy, 0 at construction (a
-// power-on is a backup domain reset: "Reset value: 0x0000 0000, reset by Backup domain reset", p427; §8.4.6 p334) and kept
-// across a machine reset ("Any other internal or external reset will not have any effect on these bits", p427). A write of
-// 0 or 1 is taken into the copy. RTCEN gates rtc_ck only; the RTC's registers are gated by RCC_APB4ENR.RTCAPBEN (p366,
-// p471: 1 at reset, and its row holds it there), so `rtc` is never locked: the stock model, which locks `rtc` while its
-// RTCEN is 0, is always written RTCEN = 1. Safe while RTCSEL is held at 00 ("No clock", p427) by its row: rtc_ck then has
-// no source whatever RTCEN says. RCC_BDCR's write protection (PWR_CR1.DBP, p427) is not modeled: the twin's PWR is a
-// canned stub that always reads DBP = 1 (acknowledged by name).
-//
-// The HSE (TVI-WO-1300b (4); ruled Q3): the HSE's frequency is the platform's `hseFrequency`, and nothing else. A platform
-// that declares none has no HSE frequency (HseFrequency is null, never 8 MHz and never 0), and TVI-RCC-HSE refuses the
-// write that starts the HSE, from which every HSE-derived clock would follow (invariant 6).
+// RTCEN (TVI-WO-1300b (5); ruled 2026-11-25T03:03Z Q4): served from the guard's copy, 0 at construction and kept across a
+// reset (p427); the stock model, which locks `rtc` while its RTCEN is 0, is always written RTCEN = 1, since the RTC's
+// registers follow RTCAPBEN (p471). Why that is safe: the RCC_BDCR.RTCEN row.
 //
 // Rules, in the order they are evaluated. A refused access is not passed to the stock model.
 //   TVI-LOAD        (Records) the model version could not be computed: every access refuses.
@@ -687,14 +678,15 @@ namespace Antmicro.Renode.Peripherals.Tviburi
             {
                 return false;
             }
+            var usart = watched.ContainsKey(lost);
             var old = b == CrOffset ? inner.ReadDoubleWord(CrOffset) : Served(b);
             var written = b == CrOffset ? KeptCr(value) : value;
             var changed = Fields.Where(f => f.Offset == b && f.Class != "read-only" && f.Class != "reserved" && f.Of(old) != f.Of(written)).Select(f => f.Register + "." + f.Name + " (" + f.Bits + ") = " + f.Format(f.Of(written)));
             records.Refuse("TVI-RCC-CLOCK", PredictedFault, RegisterAt(offset), string.Join(", ", changed),
-                lost + " is enabled (" + (watched.ContainsKey(lost) ? "UE" : "SPE") + " = 1) and this write stops its kernel clock: " + after.Condition,
+                lost + " is enabled (" + (usart ? "UE" : "SPE") + " = 1) and this write stops its kernel clock: " + after.Condition,
                 (after.Condition.Contains("has not switched") ? "RM0433 Rev 9 §8.5.10 p371 (\"no clock will be provided to the peripheral\"); " : "RM0433 Rev 9 ")
                     + after.Citation.Substring("RM0433 Rev 9 ".Length)
-                    + (watched.ContainsKey(lost) ? "; §48.5.1 p2019 (\"The usart_ker_ck is the USART clock source\")" : ""),
+                    + (usart ? "; §48.5.1 p2019 (\"The usart_ker_ck is the USART clock source\")" : ""),
                 State(), offset, value, 32);
             return true;
         }

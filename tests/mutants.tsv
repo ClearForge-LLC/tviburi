@@ -406,7 +406,7 @@ RB09-rtcenKeptOnReset	model/GuardedSTM32H7_RCC.cs	            ResetCopies();\n  
 RB10-adc12Enable	model/GuardedSTM32H7_RCC.cs	"ADC12EN", 5, 5, Any,	"ADC12EN", 5, 5, Zero,	rcc-adc
 RB11-adc3Enable	model/GuardedSTM32H7_RCC.cs	"ADC3EN", 24, 24, Any,	"ADC3EN", 24, 24, Zero,	rcc-adc3
 RB12-tim1LpenAck	model/GuardedSTM32H7_RCC.cs	"TIM1LPEN", 0, 0, new uint[] { 0, 1 },	"TIM1LPEN", 0, 0, new uint[] { 1 },	rcc-adc
-RB13-usartCite	model/GuardedSTM32H7_RCC.cs	(watched.ContainsKey(lost) ? "; 	(false ? "; 	rcc-usart-lost-en
+RB13-usartCite	model/GuardedSTM32H7_RCC.cs	+ (usart ? "; 	+ (false ? "; 	rcc-usart-lost-en
 RB14-usart1Mux	model/GuardedSTM32H7_RCC.cs	["usart1"] = new ClockedPeripheral(UsartMux,	["usart1"] = new ClockedPeripheral(Usart2Mux,	rcc-usart-othersel
 RB15-hseZero	model/GuardedSTM32H7_RCC.cs	HseFrequency = hseFrequency == 0 ? null : hseFrequency;	HseFrequency = hseFrequency;	rcc-hse-zero
 RB16-rtcenTaken	model/GuardedSTM32H7_RCC.cs	rtcen = value & BdcrRtcen;	rtcen = 0;	rcc-rtcen

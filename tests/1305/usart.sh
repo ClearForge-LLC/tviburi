@@ -391,10 +391,8 @@ sys.exit(0 if ok else 1)
     # (3), ruled 2026-11-25T01:12Z: rcc_pclk2 from sys_ck = PLL1's P output on the HSE, as hse-crystal-16's generated firmware
     # sets it up (HSEON, HSECSSON, PLLCKSELR 0x52: PLLSRC HSE, DIVM1 5; PLLCFGR 0x30004; PLL1DIVR 0x0103064F: x80, /4; PLL1ON;
     # SW = PLL1), BRR 0xC8. D: the board declares hseFrequency 16 MHz (the generated board's): 3.2 MHz * 80 / 4 = 64 MHz, 320,000
-    # baud, IDLE 31.25 us after a byte. N: the board declares no crystal. Until TVI-WO-1300b the HSE was then the RCC guard's own
-    # default, 8 MHz, and this half refused TVI-USART-IDLE at the start (a 128 MHz VCO). TVI-WO-1300b (4) removed the default
-    # (ruled 2026-11-25T03:03Z Q3): the first record is now the RCC guard's TVI-RCC-HSE, unmodeled, at the write that starts the
-    # HSE, and no frequency is taken.
+    # baud, IDLE 31.25 us after a byte. N: the board declares no crystal: the first record is the RCC guard's TVI-RCC-HSE,
+    # unmodeled, at the write that starts the HSE, and no frequency is taken (TVI-WO-1300b (4)).
     hse=('cpu IsHalted true' "$clk" 'sysbus WriteDoubleWord 0x58024400 0x00010001' 'sysbus WriteDoubleWord 0x58024400 0x00090001'
       'sysbus WriteDoubleWord 0x58024428 0x52' 'sysbus WriteDoubleWord 0x5802442C 0x30004' 'sysbus WriteDoubleWord 0x58024430 0x0103064F'
       'sysbus WriteDoubleWord 0x58024400 0x01090001' 'sysbus WriteDoubleWord 0x58024410 0x3' 'sysbus WriteDoubleWord 0x4001100C 0xC8'

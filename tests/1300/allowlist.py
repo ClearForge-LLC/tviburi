@@ -50,7 +50,6 @@ for reg, f in (('RCC_AHB1LPENR', 'DMA2LPEN'), ('RCC_AHB2LPENR', 'RNGLPEN'), ('RC
     ACKED[(reg, f)] = ([0, 1], 6, 'the twin does not model CSleep: the clock runs while the CPU sleeps, whatever this bit says (backlog)')
 # TVI-WO-1300b (3), ruled 2026-11-25T03:03Z Q1: the armed Sentinel-03 run's four LPEN clears, acknowledged by name, those four only,
 # with A6's reason (the release resolves an acknowledgement by its A-number: tools/tviburi-release `acknowledgement`)
-RULED_1300B = '(TVI-WO-1300b, ruled 2026-11-25T03:03Z Q1)'
 ACKED_1300B = {(reg, f): ([0, 1], 'the twin does not model CSleep: the clock runs while the CPU sleeps, whatever this bit says (backlog) '
                                   '(TVI-WO-1300 A6; extended to this bit by TVI-WO-1300b, ruled 2026-11-25T03:03Z Q1)')
                for reg, f in (('RCC_AHB1LPENR', 'ADC12LPEN'), ('RCC_AHB4LPENR', 'ADC3LPEN'), ('RCC_APB1LLPENR', 'USART2LPEN'), ('RCC_APB2LPENR', 'TIM1LPEN'))}
@@ -109,7 +108,7 @@ def build():
                 # TVI-WO-1300b (3), ruled 2026-11-25T03:03Z Q1 (superseding 1300a's 17:52Z): the bus enable only
                 cls, allowed, behaves = 'inherited', None, ("the guard's copy; the stock bus enable (" + sk + "): the bus lock only. The ADC's kernel "
                     'clock is not modeled: it is chosen by ADCx_CCR.CKMODE[1:0] (p920), an ADC register the RCC guard cannot see (adc_sclk unless '
-                    'CKMODE = 00, else the kernel clock ADCSEL selects, p419), and the ADC is unguarded (an ADC guard\'s row) ' + RULED_1300B)
+                    'CKMODE = 00, else the kernel clock ADCSEL selects, p419), and the ADC is unguarded (an ADC guard\'s row) ' + '(TVI-WO-1300b, ruled 2026-11-25T03:03Z Q1)')
             elif base in EXTRA_KERNEL or 'kernel clock' in (r[8] if len(r) > 8 else ''):
                 cls, allowed, behaves = 'kernel-unmodeled', [0], 'disabled: a kernel-clocked peripheral the query does not cover (TVI-WO-1300 (4))'
             elif sk in ('computed-read',):
