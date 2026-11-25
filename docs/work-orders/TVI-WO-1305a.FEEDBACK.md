@@ -1,6 +1,6 @@
 # TVI-WO-1305a — FEEDBACK
 
-**Builder:** Claude (Opus 5.5), Furnace, 2026-11-24/25. **Branch:** `wo/tvi-1305a-usart-followups`, from `main` `d9bb3da`.
+**Builder:** Claude (Opus 5.5), Furnace, 2026-11-24/25. **Branch:** `wo/tvi-1305a-usart-followups`, from `main` `d9bb3da`; `main` `3b63470` (#43, seven shards) merged before the final push.
 
 **State:**
 - (1) measured first, with predictions committed before any run (`7df3c3d`). The answer went to the bus before the build: **no byte moves under `BRR` < 16**, so §7's first stop did not fire (`TVI-WO-1305a.measure.md` §1).
@@ -9,14 +9,21 @@
   - (3) the frequency computed in the USART guard from the RCC guard's registers and its `Written` event, with HSI-rooted rules only.
 - **Built differently from the letter of (3)'s ruling, after the adversarial pass** (posted on the bus):
   - `PLL2DIVR` is not computed from a copy kept from `Written`. A firmware's read-modify-write writes the stock's narrowed bits back, so such a copy can be wrong silently.
-  - Instead, the read-back is used, and it is exact while no wide field was ever written. A wide write (`DIVN2` ≥ 256 or `DIVQ2` ≥ 64) makes `pll2_q_ck` `unmodeled` until the machine resets.
-  - p407's reference and VCO ranges are new no-rule conditions.
-- **Open: one question (§7 Q1).** The HSI-only scope was accepted on my statement that the 14 generated boards are HSI-rooted. That statement was wrong for two of them, `hse-crystal-16` and `hse-external-8`. I posted the correction with options and am waiting for a ruling.
+  - Instead, the read-back is used. A `PLLxDIVR` write that does not read back as written (the stock narrows `DIVN2`/`DIVQ2`, and ignores an odd `DIVP1`) marks that PLL `unmodeled` until the machine resets.
+  - p404's and p407's reference and VCO ranges are new no-rule conditions.
+  - Accepted at 01:12Z.
+- **The HSE boards** (ruled (b) at 01:12Z, after a measurement):
+  - I had told the architect all 14 generated boards are HSI-rooted. That was wrong for `hse-crystal-16` and `hse-external-8`, as the identity replay showed (§3.1).
+  - **Measured first** (measure §3): their `PLLCKSELR` and `PLL1DIVR` read back as written. `PLLCFGR`'s `PLL1RGE`/`PLL1VCOSEL` read 0, so `VCOSEL` comes from the last `PLLCFGR` the RCC guard passed.
+  - **Built:** `sys_ck` = PLL1's P output, from an HSI or HSE reference, the HSE at the RCC guard's `HseFrequency`.
+  - **Now all 14 boards are identical to `main`.**
+  - `PLLSRC` is shared by the three PLLs (p399), so PLL2's reference may now be the HSE as well. That widens (3)'s ruling by the same rule; named here.
+- **Granted outside the fence (01:12Z):** one line in `firmware/spi1.rs`. The `forge` path set no `BRR` on USART3, so it transmitted under `BRR` = 0, which `TVI-USART-BRR` refuses; it now sets `BRR` = `0x22C` first.
 - **The armed run arms** and is identical to `main`'s (§3.2). §7's second stop did not fire.
 - **Untouched:**
   - the RCC guard: only its query, its bus reads and its existing event are used;
   - every other guard, `model/Refusal.cs`, `tools/`, the steering documents and Aethelgard;
-  - `tests/ci/times.tsv`: it has no USART rows (each USART item weighs its kind's median), and `TVI-WO-1202a` re-weighs from CI.
+  - `tests/ci/times.tsv` except this WO's 39 rows: 34 weighed from its own CI run by 1202a's method, and 5 that came after it at their mean (6.3 s).
 - One PR, left unmerged.
 
 ## 1. What was built
@@ -33,13 +40,17 @@ All in `model/GuardedSTM32F7_USART.cs`, with cases in `tests/1305/usart.sh` and 
 **How `TVI-USART-IDLE` finds the kernel clock:**
 - **The source** comes from `D2CCIP2R` (copy-served, p417), not from the query's text.
 - **The registers** are read through the RCC guard's bus methods, as the flash guard does (1304).
-- **Rules (HSI-rooted only, as ruled):**
+- **Rules (ruled 00:00Z and 01:12Z):**
   - `hsi_ker_ck` = 64 MHz >> `HSIDIV` (p341, p385).
-  - `rcc_pclk2` (USART1/6) or `rcc_pclk1` = `sys_ck` (the HSI, by `SWS`, p393) / `D1CPRE` / `HPRE` / `D2PPRE2` or `D2PPRE1` (pp. 394–396).
-  - `pll2_q_ck` = HSI / `DIVM2` × (`DIVN2` + 1) / (`DIVQ2` + 1) (p398, p407). It applies only with `ref2_ck` in 1–16 MHz and the VCO in `PLL2VCOSEL`'s range (p402, p407).
-- **`PLL2DIVR`'s read-back is trusted only while no wide field was ever written.** The RCC guard's `Written` event marks a written `DIVN2` ≥ 256 or `DIVQ2` ≥ 64, which the stock model narrows to 8 and 6 bits (p407 has 9 and 7). The mark holds until the machine resets.
-- **`PLL2FRACR` is not tracked:** the RCC guard's allow-list takes `FRACN2` only at 0, so a fraction refuses at the RCC write.
-- **No rule:** `csi_ker_ck`, `pll3_q_ck`, `lse_ck`, and `sys_ck` or a PLL reference from the CSI, the HSE or PLL1.
+  - `rcc_pclk2` (USART1/6) or `rcc_pclk1` = `sys_ck` / `D1CPRE` / `HPRE` / `D2PPRE2` or `D2PPRE1` (pp. 394–396). `sys_ck` is the HSI or PLL1's P output, by `SWS` (p393); PLL1's P output is vco1 / (`DIVP1` + 1) (p404).
+  - `pll2_q_ck` = vco2 / (`DIVQ2` + 1) (p407).
+  - A PLL's VCO is its reference (the HSI, or the HSE at the RCC guard's `HseFrequency`; `PLLSRC`, p399) over `DIVMn`, times `DIVNn` + 1. It applies only with the reference in 1–16 MHz and the VCO in `PLLnVCOSEL`'s range (pp. 402, 404, 407).
+- **A `PLLxDIVR` read-back is trusted only while every write to it read back as written.** The RCC guard's `Written` event compares each write with its read-back.
+  - The stock model narrows `DIVN2`/`DIVQ2` (8 and 6 bits; p407 has 9 and 7), and ignores an odd `DIVP1` (p404) and some other PLL1 writes.
+  - A mismatch marks that PLL until the machine resets, never at the port's own reset (`USARTxRST`).
+- **`VCOSEL` comes from the last `PLLCFGR` the RCC guard passed,** because the stock model drops `PLL1VCOSEL` (measure §3).
+- **`PLLxFRACR` is not tracked:** the RCC guard's allow-list takes `FRACN` only at 0.
+- **No rule:** `csi_ker_ck`, `pll3_q_ck`, `lse_ck`, `sys_ck` from the CSI or straight from the HSE, and a CSI reference.
 
 ## 2. Acceptance (WO §2)
 
@@ -50,7 +61,8 @@ All in `model/GuardedSTM32F7_USART.cs`, with cases in `tests/1305/usart.sh` and 
 | (1) the other ways out | `brrheld` (recorded) | six would-refuses, in order: a start with `DMAT`; in the hold, a `TDR` write, an `RDR` read, `DMAR` set, a byte received, and `BRR` rewritten to 5. None for the same `BRR` again, and none after `BRR` `0xC8` |
 | (2) a planted overrun with `FIFOEN` = 0 is `unmodeled`, with p2030; the same traffic with `FIFOEN` = 1 passes | `overrun` | `FIFOEN` = 1: both bytes kept (0x41, 0x42). `FIFOEN` = 0: one refusal, at the second byte, and it is not received |
 | (3) `IDLE` at the kernel clock's baud, not the stock frequency's | `idlekernel` | five clock trees, each from reset:<br>• `rcc_pclk2` through `D1CPRE`, `HPRE` and `D2PPRE2`;<br>• `hsi_ker_ck` through `HSIDIV`;<br>• **ArduPilot's own PLL2 at exactly 72 MHz** (ruled: kept as a test), after a `USART1RST` pulse and a machine reset;<br>• `usart2` on `rcc_pclk1` through `D2PPRE1`.<br>The stock `frequency` (200 or 125 MHz) gives another time in each |
-| (3) a planted source with no rule gives `unmodeled` | `idlenorule` (firmware, `csi_ker_ck`); `idlenone` (recorded) | `idlenorule`: refused at the start, PC located. `idlenone`: five no-rule paths: a source switched to `csi_ker_ck` under a running port (at the byte); `sys_ck` on the CSI; PLL2 from the CSI; a wide `PLL2DIVR` kept through `USART1RST`; a VCO outside p407's range |
+| (3) a planted source with no rule gives `unmodeled` | `idlenorule` (firmware, `csi_ker_ck`); `idlenone` (recorded) | `idlenorule`: refused at the start, PC located. `idlenone`: seven no-rule paths:<br>• a source switched to `csi_ker_ck` under a running port (at the byte);<br>• `sys_ck` on the CSI;<br>• PLL1 with a VCO outside the medium range its `VCOSEL` chose (the stock reads `VCOSEL` 0);<br>• PLL1 after a `DIVP1` the stock ignored;<br>• PLL2 from the CSI;<br>• a wide `PLL2DIVR`, kept through `USART1RST`;<br>• a VCO outside p407's range |
+| (3), ruled 01:12Z: `sys_ck` from PLL1 on the HSE; the 8 MHz default named | `idlehse` | The generated `hse-crystal-16` sequence on the Nucleo board, run twice:<br>• with `hseFrequency` 16 MHz declared: 64 MHz;<br>• **with none declared:** the RCC guard's own 8 MHz default. The record shows the 1.6 MHz reference it implies: a 128 MHz VCO, outside p404's range, so `TVI-USART-IDLE` `unmodeled` |
 | Bench row U2, named by the ledger | `ledger` | `U1` and `U2`; the `BRR` and `FIFOEN` rows name the new rules |
 
 **The Nucleo `IDLE` cases that moved (named, as ruled):**
@@ -63,24 +75,23 @@ All in `model/GuardedSTM32F7_USART.cs`, with cases in `tests/1305/usart.sh` and 
 
 ### 3.1 The 14 generated boots and ArduPilot's fixture boot
 
-- **Method:** each boot replayed on `main`'s tree (`d9bb3da`) and on this branch (`c69382b`), every guard recorded, the nine UARTs access-logged, and the UART registers dumped after `RunFor`.
+- **Method:** each boot replayed on `main`'s tree (`d9bb3da`; `3b63470` changes only `tests/ci` and docs) and on this branch (`fe5a2c5`), every guard recorded, the nine UARTs access-logged, and the UART registers dumped after `RunFor`.
 - **Compared:**
   - every UART access, with its value and virtual time;
   - every Tviburi record (model hash normalised);
   - every monitor output (the boot block, `ExecutedInstructions`, the dump), except the host-speed `PerformanceInMips`.
 - **Scripts:** `~/.cache/tvi-1305a/h/ident.sh` and `ident-cmp.py`, scratch.
 
-**Results:**
-- **Identical: 12 generated boards and the fixture.**
-- **Different: `hse-crystal-16` and `hse-external-8`:**
-  - their `sys_ck` is PLL1's P output from the HSE (`hse-crystal-16`: 16 MHz / `DIVM1` 5 × 80 / 4 = 64 MHz, the declared frequency);
-  - under the HSI-only rules, `usart2`'s `rcc_pclk1` has no rule, so each receiver start and each echo byte is `TVI-USART-IDLE` (18 would-refuses);
-  - `ISR` then reads without `IDLE` (`0x206000C0` against `0x206000D0`).
-- This is §7 Q1.
+**Results at `fe5a2c5`: all 14 generated boards and the fixture are identical to `main`.**
+
+**Before (b), at `c69382b`:**
+- `hse-crystal-16` and `hse-external-8` differed: their `sys_ck` is PLL1's P output from the HSE (16 MHz / 5 × 80 / 4, and 8 MHz / 5 × 160 / 4, both 64 MHz).
+- With no rule, each receiver start and each echo byte was `TVI-USART-IDLE` (18 would-refuses), and `ISR` read without `IDLE`.
+- Ruled (b), built, now identical.
 
 ### 3.2 The armed run (Furnace; CI has only the fixture ELF)
 
-- **Setup:** 1305's Sentinel-03 capture, ELF `dbf598d8…`, its plan of 21 unpadded frames, and `usart1`'s request wired as 1305 did. Run in the same harness on `main` and on this branch (`c69382b`), recorded.
+- **Setup:** 1305's Sentinel-03 capture, ELF `dbf598d8…`, its plan of 21 unpadded frames, and `usart1`'s request wired as 1305 did. Run in the same harness on `main` and on this branch (`fe5a2c5`), recorded.
 - **Identical to `main`:**
   - 4,815 UART accesses;
   - 76,812 records;
@@ -106,7 +117,7 @@ A fresh reviewer read the code and the manual, not my conclusions. It worked by 
 | Finding | Disposition |
 |---|---|
 | **1 (high):** a USART reset restores the `PLL2DIVR` copy | already found by the armed run and fixed (`a2b51d7`); the reviewer's independent finding agrees |
-| **2 (medium):** a read-modify-write of `PLL2DIVR` writes the stock's narrowed bits back, so `Written` carries a wrong value and `IDLE` is mistimed silently | **fixed:** the copy is gone. The read-back is used, and is exact while no field wider than the stock's was written. A wide write marks "no rule" until the machine resets (`idlenone`, US58, US59, US62) |
+| **2 (medium):** a read-modify-write of `PLL2DIVR` writes the stock's narrowed bits back, so `Written` carries a wrong value and `IDLE` is mistimed silently | **fixed:** the copy is gone. The read-back is used; a write that does not read back as written marks "no rule" until the machine resets (a wide `DIVN2`/`DIVQ2`, an ignored `DIVP1`) (`idlenone`, US58, US59, US62) |
 | **3:** `pll2_q_ck` outside p407's ranges | **fixed:** `ref2_ck` must be in 1–16 MHz and the VCO in `PLL2VCOSEL`'s range (`idlenone`, US63) |
 | **4:** the frame-time record from a byte carried value 0 and let the byte in under enforcing | **fixed:** judged before the byte is taken, with the byte in the record. In recorded mode, overrun is now evaluated after a held refusal (it was short-circuited) |
 | **5:** `usart2`, `rcc_pclk1`, `D2PPRE1` and `USART234578SEL` were untested | **fixed:** `idlekernel` U (US56, US64) |
@@ -136,24 +147,27 @@ Reduction pass (diff): +4 net · 11 copies of 8 facts removed · 2 dead paths re
 
 ## 6. Suites, mutants and CI
 
-**On Furnace** (one capped container at a time, `nice -n 10`; each run from a `git archive` of the commit named):
-- **`tests/1305/usart.sh`**, 37 cases:
-  - 37/37 at `e048f4b`, the guard as shipped (`c69382b` changes docs only);
-  - `tdrbyte` and `idlere` lost end records to the teardown race in the full run (exit 1, no refusal), and both passed on rerun;
-  - earlier full runs: 37/37 at `6f8bb63`.
-- **`tests/1303/dma.sh`**, the cases that drive the USART guard (`usart23`, `txother`, `offset`, `offsetndt`, `reflect`, `ledger`): pass at `e048f4b`.
-- **`tests/1300/rcc.sh`** `usart2` and `ardupilot`: pass at `c69382b`.
-- **Mutants:**
-  - this WO's 27 (US38–US64): all killed at `e048f4b`;
-  - every earlier USART mutant (US01–US37): all killed at `c69382b`.
-- **`tests/ci/route.sh origin/main`:** its tests and the citation inventory pass; `class=code`, `budget=yes`.
-- **The identity (§3.1) and the armed run (§3.2):** rerun at `c69382b`, with the results as stated there.
+**On Furnace, at `fe5a2c5`** (one capped container at a time, `nice -n 10`, from a `git archive` of the commit):
+- `tests/1305/usart.sh`: 38/38.
+- `tests/spike.sh` `forge` and `stock-forge` (the granted line): pass.
+- `tests/ci/route.sh origin/main`: its tests and the citation inventory pass.
+- **Mutants: all 68 USART mutants (US01–US68) killed.** This WO's 31 are US38–US68.
+- The identity (§3.1) and the armed run (§3.2): as stated there.
 
-**CI:** the budget is judged there. The run on the pushed head is reported in the READY note on the bus: a FEEDBACK-only commit would rerun every shard.
+**Earlier, before (b), also on Furnace:**
+- `tests/1303/dma.sh`'s USART cases (`usart23`, `txother`, `offset`, `offsetndt`, `reflect`, `ledger`) at `e048f4b`;
+- `tests/1300/rcc.sh` `usart2` and `ardupilot` at `c69382b`.
+
+**CI:**
+- **Run 45520722511** (`19d22cb`, the first push):
+  - route, budget, budget-tests and shards 1–4 passed;
+  - **budget: `MEDIANS main 909792 KiB, branch 908964 KiB, difference -828` (−0.8 MiB), PASS;**
+  - shard 5 failed `forge` and `stock-forge` (the forger's `BRR`, fixed by the granted line).
+- **The run on the final head** is reported in the READY note on the bus.
 
 ## 7. Questions for the architect
 
-1. **The two HSE boards** (§3.1; on the bus with options). Should their `sys_ck` from PLL1's P output from the HSE get a rule, at the RCC guard's `HseFrequency` (the board's declared crystal, as the flash guard reads it), with `PLL1DIVR` from its read-back? Or do they refuse `TVI-USART-IDLE` at `usart2`'s start as a named change? **My recommendation is the rule**, with one caveat: the RCC guard defaults `hseFrequency` to 8 MHz when a platform declares none. That default is the RCC guard's, not something the USART guard can see.
+None open. The HSE boards (ruled (b), 01:12Z) and the forger's line (granted) are done.
 
 ## 8. Rows and findings
 
@@ -165,7 +179,12 @@ Reduction pass (diff): +4 net · 11 copies of 8 facts removed · 2 dead paths re
 
 **For the RCC guard (outside this fence):**
 - **Its mux state survives a machine reset.** After a reset that returns `D2CCIP2R` to 0, a mux left on `pll2_q_ck` (with PLL2 now off) refuses the switch back to `rcc_pclk1`, so a start is `TVI-USART-KERNEL` `predicted-fault`. Found by `idlekernel` U; the case selects `USART16SEL` only, to stay clear of it.
-- **`hseFrequency` defaults to 8 MHz** when undeclared (§7 Q1).
+- **`hseFrequency` defaults to 8 MHz** when undeclared (as ruled, a row).
+  - A platform that declares no crystal gets 8 MHz for every HSE-rooted clock, and the flash guard's AXI clock too.
+  - `idlehse` shows it: the 16 MHz board's PLL settings then give a 128 MHz VCO, and the start is `unmodeled`.
+  - A board whose PLL happens to stay in range at 8 MHz would be timed at 8 MHz, silently: the RCC guard's default, not the USART guard's.
+- **`PLL1RGE`/`PLL1VCOSEL` are stock tags** that read 0 (measure §3). A firmware's read-modify-write of `PLLCFGR` would write 0 back. The USART guard then takes `VCOSEL` = 0 (the wide range) from what the RCC guard passed, where silicon keeps 1. The copy-serving belongs to the RCC guard.
+- **The PLL1 computation now lives twice,** in the flash guard (`Pll1`) and in the USART guard (`Vco`): a phase-gate reduction item. The RCC guard's query could answer frequencies for both.
 - **`TVI-RCC-CLOCK` does not watch the USART guards** (1305's row). This WO adds the arrival-time `TVI-USART-IDLE` for a source changed under a running port, but a source change that keeps a rule (`hsi_ker_ck` to `rcc_pclk2`) passes, and is timed at the new clock.
 - **`PLL2DIVR`/`PLL3DIVR` narrowed by the stock model** (roadmap row): this guard now refuses its own use of a wide value. The RCC guard still serves the narrowed read-back to firmware.
 
