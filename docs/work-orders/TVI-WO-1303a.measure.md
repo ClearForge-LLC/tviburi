@@ -131,7 +131,7 @@
 
 | | DMA1 stream 3 | BDMA channel 7 |
 |---|---|---|
-| Request | DMAMUX1 channel 3, id 9 `adc1_dma` (Table 124 p697) | DMAMUX2 channel 7 = 17 (`adc3_dma`), written at `0x5802581C`, which the platform does not map ("WriteDoubleWord to non existing peripheral", tag `DMAMUX2`) |
+| Request | DMAMUX1 channel 3, id 9 `adc1_dma` (Table 124 p697) | DMAMUX2 channel 7 = 17 (`dma_adc3`, `dmamux2_req_in17`, p608), written at `0x5802581C`, which the platform does not map ("WriteDoubleWord to non existing peripheral", tag `DMAMUX2`) |
 | Direction, addresses | P→M, `PAR` `0x40022040` (`ADC1_DR`), `M0AR` `0x38001A60` (SRAM4) | P→M, `CPAR` `0x58026040` (`ADC3_DR`), `CM0AR` `0x38001AA0` (SRAM4) |
 | `NDT` | 8 (16-bit items: one channel × `ADC_DMA_BUF_DEPTH` 8) | 24 (`0x18`) |
 | `CR` | `0x22D1E`, then `0x22D1F` (`EN`), at 3.286 ms, pc `0x081041B0`/`0x081041B8`: `CIRC`, `HTIE`, `TCIE`, `TEIE`, `DMEIE`, `MINC`, `PSIZE` = `MSIZE` = 01, `PL` = 10 | `0x25AE` (`CIRC`, `HTIE`, `TCIE`, `TEIE`, `MINC`, 16-bit, `PL` = 10), read back `0x0`, then **`0x1`** (ChibiOS's read-modify-write of `EN`), at 3.317 ms |
@@ -144,7 +144,7 @@
 - `adccallback` reads the buffer;
 - **`S3NDTR` is never read, and nothing polls a flag.** The stream is interrupt-driven, so a stream that never interrupts leaves ArduPilot waiting on nothing: its analog inputs simply stop counting samples.
 
-**The stock BDMA** (`STM32LDMA.cs` `fb7951bf…`) models circular mode, reloading at 0 and setting `HalfTransfer` when the remaining count equals initial/2 (integer division) (L283–291). But its `CCR` reads 0, so ChibiOS's read-modify-write enables channel 7 with `CIRC`, `HTIE` and `TCIE` cleared (L358). And with no DMAMUX2, no request reaches it. **A row for a BDMA guard; outside this WO's fence.**
+**BDMA's registers** are §16.6 (`BDMA_CCRx` §16.6.3 p686, `CIRC` bit 5 p688, `DIR` bit 4 p689). ADC3's request on DMAMUX2 is `dmamux2_req_in17` (p608), and on DMAMUX1 it is `dmamux1_req_in115` (p606). **The stock BDMA** (`STM32LDMA.cs` `fb7951bf…`) models circular mode, reloading at 0 and setting `HalfTransfer` when the remaining count equals initial/2 (integer division) (L283–291). But its `CCR` reads 0, so ChibiOS's read-modify-write enables channel 7 with `CIRC`, `HTIE` and `TCIE` cleared (L358). And with no DMAMUX2, no request reaches it. **A row for a BDMA guard; outside this WO's fence.**
 
 ### 2.2 Whether each request is raised, and how often
 
@@ -182,13 +182,15 @@
   - R4 (`EN` cleared at a non-circular P→M end) changes only the values of ArduPilot's `CR` reads on its SPI receive streams: 2,354 reads of DMA1 `S2CR` and 19 of DMA2 `S1CR` return `EN` = 0 where `main` returns 1 (`0x10417` → `0x10416`). The access count, every other line and the boot block are identical.
 - **The armed run, R3 against R1:**
   - **It still arms:** `COMMAND_ACK` 400 result 0 at 9.001 s, `COMMAND_ACK` 400 result 4 at 7.005 s, 19 heartbeats, "armed" (base_mode `0x80`) from **9.776 s** (`main` 9.775 s).
-  - **The DMA records:** both `CIRC` records are gone, and no DMA record replaces them.
+  - **The records:** both `CIRC` records are gone, and **R3's armed console has no `would-refuse` from any guard** (R1: the two `CIRC` records only). The WO's ground, "an armed run is not a pass on main's guards", is met on this run by Q1 (a).
   - **The instruction count** rises by 846,958 (+0.19 %; `0x1ACDABEB` → `0x1ADA9859`), and the boot block's final PC differs.
   - **MAVLink:** the same 93 frames, 2,908 bytes, with the same IDs in the same order. Payloads differ in timing fields only:
     - `SYS_STATUS` (×7): `load` 411 → 412 (0.1 % more CPU); its voltage and current fields stay 0;
     - `SERVO_OUTPUT_RAW` (×35): `time_usec`;
-    - `TIMESYNC` (×1): `ts1`.
-    - `HEARTBEAT`, `COMMAND_ACK`, `PARAM_VALUE` and `STATUSTEXT` payloads are identical; their stamps shift by microseconds (USART1 lines −0.6 ms to +3.1 ms; USART2 and USART3 lines the same values, shifted).
+    - `TIMESYNC` (×1 on USART1, ×1 on USART3): `ts1`.
+    - `HEARTBEAT`, `COMMAND_ACK`, `PARAM_VALUE` and `STATUSTEXT` payloads are identical. Their virtual-time stamps move by −0.6 ms to +3.1 ms over the run.
+  - **USART3, ArduPilot's second MAVLink port** (20 frames; `h/mavdiff.py … usart3`): only `TIMESYNC.ts1` differs (with its CRC bytes); its 19 heartbeats differ in time only.
+  - **USART2:** every access the same in value and PC, shifted in time.
   - **The access log** gains 13,988 `adcM1S2 ReadUInt16 from 0x40 (DataRegister)` lines. These are the stock DMA engine's reads, **stamped with whatever PC the CPU is at**: `1303`'s USART1 `TDR` finding, again, for Aethelgard.
 - **The armed run, R4 against R3:** only the 39,074 `CR` reads of DMA2's SPI receive streams change (`EN` 1 → 0). The boot block, every other line and the MAVLink are identical.
 
@@ -196,7 +198,7 @@
 
 | Prediction | Verdict |
 |---|---|
-| P1 | held: every page as stated. `EN` at a wrap and `TCIF` at each wrap are inferred, `HTIF` for odd `NDT` is silent, and `CIRC` has no per-field line |
+| P1 | held. Each page in §2.3 was checked by me with `rmpage.sh`, at its section heading. The non-circular `EN` sentence is §15.3.15 p654 (heading p653 L25354, sentence L25376), and the guard's suspension citation, §15.3.16 p654 (L25381), is a different sentence on the same page. `EN` at a wrap and `TCIF` at each wrap are inferred, `HTIF` for odd `NDT` is silent, and `CIRC` has no per-field line |
 | P2 | held: the stock DMA served 8 and logged one "no data to send"; the ADC raises one request per conversion at 1 kHz; the overrun stops it (ADC1 `ISR` `0x101F`) |
 | P3, generated boots | held for DMA (0 accesses). **Not predicted:** `d1-drv8876` polls ADC3 by the CPU (no DMA) |
 | P3, fixture | held: no circular stream, no ADC access |
@@ -232,11 +234,12 @@
 
 - **No ninth shard is due by the projection:** the slowest job stays at 17.3 min, and `ci`'s wall at 19.3 min or less.
 - **The margin is thin.** `1306`'s first CI run measured `ci`'s wall at 19.2 min with eight shards, about 0.3–0.6 min over this model for the same plan (its shard 3, on an EPYC 7763 at 1.50, took 17.3 min). With this WO's items, a real run could reach about 19.5–19.9 min.
-- **Recommendation:** eight shards. The ninth is the next WO's, or this one's if CI passes 20 minutes, which is §7's own trigger.
+- **What Q1–Q5 as recommended imply:** about 10 cases and 14 mutants (circular wrap, `CIRC` = 0 ending with `EN` cleared, `CIRC` under `EN`, the half-transfer flag and interrupt with its clear, odd `NDT`, circular memory-to-peripheral and memory-to-memory, and the ledger rows). By the model, 10 and 14 give `ci`'s wall 19.1–19.4 min, and the model crosses 20.0 at about 30 and 30. **With the measured real-run gap (0.3–0.6 min), 10 and 14 reach 19.4–20.0 min:** at the line.
+- **Recommendation (Q7): the ninth shard first, in this WO, as `1306` built the eighth.** It is outside this WO's fence (`.github/workflows/ci.yml`'s shard jobs, `shard.yml`'s `of`, the aggregate's count), so it needs the fence granted. Otherwise, eight shards, and §7's trigger decides in CI.
 
 ## 5. The stop (WO §1 step 1, §7), and the questions
 
-**Two §7 stops fire. Neither is a budget or shard stop (§4).**
+**Two §7 stops fire. The shard stop is at the line, not past it (§4, Q7).**
 - **"Ruling the ADC stream needs the ADC's own model," in part.** The request is raised, so the WO's two options for "a request the twin never raises" do not fit. It is raised by the unguarded stock ADC, at 1 kHz and of 0 mV, and today only until an overrun that circular mode would prevent (§2.2). The DMA's side can be ruled without an ADC guard (Q1). What one would need is listed below Q1.
 - **"An observer would change, on a path RM0433 says is valid."** Modeling circular mode changes the armed run's MAVLink in three timing fields and its instruction count (§2.4), on a path p647 and p965 call valid. The fixture and the generated boots are unchanged. **The order:** the ADC's stream starts at 3.286 ms (`ADSTART`, then `S3CR` `EN`); the first difference is its first half-transfer interrupt (`LISR`/`LIFCR` at 7.286 ms, after four requests; `main`'s first interrupt is the transfer complete at 11.286 ms); every later difference follows from the added interrupts.
 
@@ -272,8 +275,9 @@
 
 **Q3. `HTIF`.**
 - **Odd `NDT`: RM0433 is silent** (§2.3).
-  - **(i) Recommended:** a circular stream with `HTIE` = 1 and odd `NDT` refuses `unmodeled` at `EN`. With `HTIE` = 0 and odd `NDT`, `HTIF` is never set, and the row says so.
+  - **(i) Recommended:** a circular stream with odd `NDT` refuses `unmodeled` at `EN`, whatever `HTIE` is. Silicon sets `HTIF` at a count the twin cannot name, and a firmware may poll the flag with `HTIE` = 0 (WO §5: "a flag that lies").
   - (ii) Renode's stock BDMA rule (remaining = programmed/2, integer division; `STM32LDMA.cs` L289), named "inherited from a sibling stock model, unaudited", which is not silicon's.
+  - (iii) With odd `NDT`, `HTIF` is never set, acknowledged by name. That is a flag silicon sets and the twin does not, so it is listed for completeness, not recommended.
   - ArduPilot's `NDT` is 8.
 - **The scope:**
   - **Recommended:** `HTIF` is modeled on circular streams, where this WO's acceptance asks for it. On a non-circular stream the acknowledged row "`HTIF` never sets" stays, and `HTIE` = 1 there stays refused as today.
@@ -304,10 +308,12 @@
 **Q6. The armed run's observer differences (the second §7 stop).**
 - Accept them, named in the FEEDBACK, as the consequence of the stream now running as on silicon:
   - `SYS_STATUS.load` +0.1 %;
-  - `SERVO_OUTPUT_RAW.time_usec` and `TIMESYNC.ts1`;
+  - `SERVO_OUTPUT_RAW.time_usec`, and `TIMESYNC.ts1` on USART1 and USART3;
   - the "armed" heartbeat 1 ms later;
   - the instruction count +0.19 %.
 - **Ask:** accepted?
+
+**Q7. The ninth shard** (§4): build it first, in this WO, with the fence for `.github/workflows/ci.yml`, `shard.yml` and the aggregate's count granted; or stay at eight, and let CI's wall decide.
 
 **Rows, outside this WO:**
 - **BDMA and DMAMUX2** (§2.1):
