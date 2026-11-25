@@ -410,3 +410,4 @@ RB13-usartCite	model/GuardedSTM32H7_RCC.cs	+ (usart ? "; 	+ (false ? "; 	rcc-usa
 RB14-usart1Mux	model/GuardedSTM32H7_RCC.cs	["usart1"] = new ClockedPeripheral(UsartMux,	["usart1"] = new ClockedPeripheral(Usart2Mux,	rcc-usart-othersel
 RB15-hseZero	model/GuardedSTM32H7_RCC.cs	HseFrequency = hseFrequency == 0 ? null : hseFrequency;	HseFrequency = hseFrequency;	rcc-hse-zero
 RB16-rtcenTaken	model/GuardedSTM32H7_RCC.cs	rtcen = value & BdcrRtcen;	rtcen = 0;	rcc-rtcen
+RB17-trialSkip	model/GuardedSTM32H7_RCC.cs	|| held == value))	|| true))	rcc-usart-lost

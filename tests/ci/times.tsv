@@ -721,3 +721,4 @@ mutant	RB13-usartCite	6.3
 mutant	RB14-usart1Mux	6.3
 mutant	RB15-hseZero	6.3
 mutant	RB16-rtcenTaken	6.3
+mutant	RB17-trialSkip	6.3

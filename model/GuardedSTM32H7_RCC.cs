@@ -629,6 +629,11 @@ namespace Antmicro.Renode.Peripherals.Tviburi
         // muxes settle (p371). A transition only: a peripheral that runs without a clock was refused at its start.
         private bool RefusedClockLoss(long offset, long b, uint value)
         {
+            // The query reads RCC_CR and the copies only: a write to neither, or one that leaves its copy as it is, loses no clock.
+            if(b != CrOffset && (!copies.TryGetValue(b, out var held) || held == value))
+            {
+                return false;
+            }
             var running = guarded.Where(g => g.Value.Started).Select(g => g.Key).Concat(watched.Where(w => w.Value.UeSet).Select(w => w.Key))
                 .Where(p => QueryKernelClock(p).Running).ToArray();
             if(running.Length == 0)
