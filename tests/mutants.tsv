@@ -446,5 +446,5 @@ I232-accessNames	model/GuardedSTM32F7_I2C.cs	            Timing = 0x10,	        
 I233-classRow	tools/tviburi-release/pins.tsv	Tviburi.GuardedSTM32F7_I2C\ti2c1 i2c2 i2c3	Tviburi.GuardedSTM32F7_I2C\ti2c1 i2c2	i2c-ledger
 I234-restateSet	model/stm32h7-i2c-restate.awk	/^i2c[123]: I2C	/^i2c[12]: I2C	i2c-regen
 I235-sensorsShared	model/GuardedSTM32F7_I2C.cs	.SetValue(inner, ChildCollection);	.SetValue(inner, new Dictionary<int, II2CPeripheral>());	i2c-config
-I236-completionTracked	model/GuardedSTM32F7_I2C.cs	                Open();   // as in Read\n	(empty)	i2c-config
+I236-completionTracked	model/GuardedSTM32F7_I2C.cs	                Open();   // as in Read\n	(empty)	i2c-blindclear
 I237-reservedNotServed	model/GuardedSTM32F7_I2C.cs	cr1 = word & Cr1Defined;	cr1 = word;	i2c-recorded

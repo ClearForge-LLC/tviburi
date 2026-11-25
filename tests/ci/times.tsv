@@ -793,3 +793,4 @@ mutant	I234-restateSet	6.3
 mutant	I235-sensorsShared	6.3
 mutant	I236-completionTracked	6.3
 mutant	I237-reservedNotServed	6.3
+case	i2c-blindclear	6.2

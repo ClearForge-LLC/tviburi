@@ -30,6 +30,8 @@
 //!                        reached, would abort Renode (measure.md §2.3 I8b).
 //!   path="midstart"    - config, a write of 2 with one byte sent, then a START: TVI-I2C-TRANSFER, unmodeled.
 //!   path="midcr2"      - config, a write of 2 with one byte sent, then CR2.NBYTES rewritten: TVI-I2C-TRANSFER (p2004).
+//!   path="blindclear"  - config, a read of 1 with AUTOEND (STOPF once its byte is read), ICR.STOPCF with no ISR read before it,
+//!                        then the chip id: passes (the transfer ended at the STOPF the ICR write cleared). MARK_READ = RXDR (0x60).
 //!   path="softreset"   - config, a read of 2 from the BME280 with one byte read, then PE cleared: passes. MARK_READ = ISR after the
 //!                        clear (0x1: RXNE reset, TXE set, p1959, p2011), MARK_READ2 = CR2 (0x204EC: the configuration kept).
 #![no_std]
@@ -236,6 +238,14 @@ pub unsafe extern "C" fn reset() -> ! {
         w(CR2, 2 << 16 | START | BME);
         w(TXDR, 0xD0);
         w(CR2, 3 << 16 | BME);
+    }
+    #[cfg(path = "blindclear")]
+    {
+        config();
+        w(CR2, AUTOEND | 1 << 16 | RD | START | BME);
+        let _ = r(RXDR);
+        w(ICR, 1 << 5);
+        write_volatile(MARK_READ, chip_id());
     }
     #[cfg(path = "softreset")]
     {

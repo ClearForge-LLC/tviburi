@@ -11,7 +11,7 @@ set -euo pipefail
 
 here=$(cd "$(dirname "$0")/../.." && pwd)
 IMAGE=$(sed -n 's/^IMAGE=//p' "$here/tests/spike.sh")
-CASES="config timingrpe timingrsame timingroff dnfpe anfoff clearfield ap absent icrres field width read kernel reset resetok startoff txdroff empty midstart midcr2 softreset clock registrations recorded rccreset unheld clocklost absentname fields ledger regen"
+CASES="config timingrpe timingrsame timingroff dnfpe anfoff clearfield ap absent icrres field width read kernel reset resetok startoff txdroff empty midstart midcr2 blindclear softreset clock registrations recorded rccreset unheld clocklost absentname fields ledger regen"
 GUARDS="spi1 rcc gpioPortA gpioPortB gpioPortC gpioPortD gpioPortE gpioPortF gpioPortG gpioPortH gpioPortI gpioPortJ gpioPortK timer1 timer8 dma1 dma2 flashController usart1 usart2 usart3 uart4 uart5 usart6 uart7 uart8 i2c1 i2c2 i2c3"
 MONITOR="clock registrations recorded rccreset unheld clocklost absentname fields ledger regen"
 PATHS=$(for c in $CASES; do case " $MONITOR " in *" $c "*) ;; *) printf '"%s",' "$c" ;; esac; done | sed 's/,$//')
@@ -144,6 +144,8 @@ for t in ${TVIBURI_TESTS:-$CASES}; do
     "refuses midstart TVI-I2C-TRANSFER unmodeled 'r[\"access\"][\"value\"] == \"0x20124EC\" and \"START while a transfer is open\" in r[\"condition\"]'" ;;
   midcr2) check "midcr2: CR2.NBYTES rewritten while a transfer is open refuses TVI-I2C-TRANSFER, unmodeled (p2004)" \
     "refuses midcr2 TVI-I2C-TRANSFER unmodeled 'r[\"access\"][\"value\"] == \"0x300EC\" and \"changed while a transfer is open\" in r[\"condition\"] and \"p2004\" in r[\"citation\"]'" ;;
+  blindclear) check "blindclear: a read of 1 with AUTOEND ends at its RXDR read (STOPF), and ICR clears STOPF with no ISR read before it; the next START passes (the transfer's end was seen at the clearing write), and the chip id reads 0x60" \
+    "passes blindclear && [ \"\$(readout blindclear READ)\" = 0x00000060 ]" ;;
   softreset) check "softreset: PE cleared with a received byte unread passes; ISR then reads 0x1 (RXNE reset, TXE set, no TC: p1959, p2011; the stock model alone keeps RXNE, measure.md I4) and CR2 keeps 0x204EC (configuration, p1959)" \
     "passes softreset && [ \"\$(readout softreset READ)\" = 0x00000001 ] && [ \"\$(readout softreset READ2)\" = 0x000204EC ]" ;;
   clock)
