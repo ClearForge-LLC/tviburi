@@ -1,0 +1,12 @@
+// TVI-WO-1306 (ruled 2026-11-25T05:06Z Q4): an I2C guard declared on the bus but not registered on the RCC guard. Unwatched,
+// its kernel clock could be lost with no record: every access refuses, unmodeled.
+using "platforms/boards/nucleo_h753zi.repl"
+using "/repo/model/stm32h7-rcc-restate.repl"
+
+tviburiRcc:
+    hseFrequency: 8000000
+    mode: "enforcing"
+
+i2c1: @none
+
+tviburiI2c1: Tviburi.GuardedSTM32F7_I2C @ sysbus 0x40005400 as "i2c1"

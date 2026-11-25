@@ -11,7 +11,7 @@ set -euo pipefail
 here=$(cd "$(dirname "$0")/../.." && pwd)
 IMAGE=$(sed -n 's/^IMAGE=//p' "$here/tests/spike.sh")
 CASES="axi tcm itcm partcm below wrap unmapped ndt0 reload reassert sizes fth fthzero reloadtcm en enoff done same disable width read field msize16 route0 route54 mux shared sharedx request txother usart23 fields ledger registrations irq config recorded reset clock offset offsetndt reflect regen restate"
-GUARDS="spi1 rcc gpioPortA gpioPortB gpioPortC gpioPortD gpioPortE gpioPortF gpioPortG gpioPortH gpioPortI gpioPortJ gpioPortK timer1 timer8 dma1 dma2 flashController usart1 usart2 usart3 uart4 uart5 usart6 uart7 uart8"
+GUARDS="spi1 rcc gpioPortA gpioPortB gpioPortC gpioPortD gpioPortE gpioPortF gpioPortG gpioPortH gpioPortI gpioPortJ gpioPortK timer1 timer8 dma1 dma2 flashController usart1 usart2 usart3 uart4 uart5 usart6 uart7 uart8 i2c1 i2c2 i2c3"
 MONITOR="fields ledger registrations irq config recorded reset clock offset offsetndt reflect regen restate"
 # The planted firmware's paths: every case but the monitor-driven ones.
 PATHS=$(for c in $CASES; do case " $MONITOR " in *" $c "*) ;; *) printf '"%s",' "$c" ;; esac; done | sed 's/,$//')

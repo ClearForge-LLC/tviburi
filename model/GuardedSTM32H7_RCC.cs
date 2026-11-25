@@ -79,6 +79,16 @@ using Antmicro.Renode.Time;
 
 namespace Antmicro.Renode.Peripherals.Tviburi
 {
+    // TVI-WO-1306 (ruled 2026-11-25T05:06Z Q4): a guard this RCC guard watches and never unlocks (TVI-WO-1300b (2)): the USART
+    // guards and the I2C guards. Registered on it, it is held (Holds) and watched for a kernel clock lost while it runs
+    // (TVI-RCC-CLOCK); not registered, it refuses every access by its own rule.
+    public interface IRccWatched : IPeripheral
+    {
+        bool IsRunning { get; }          // UE = 1 (a USART), PE = 1 (an I2C port)
+        string RunningName { get; }      // "UE", "PE": named in TVI-RCC-CLOCK's record
+        string KernelCitation { get; }   // its own chapter's kernel-clock page, appended to TVI-RCC-CLOCK's citation
+    }
+
     public class GuardedSTM32H7_RCC : IDoubleWordPeripheral, IWordPeripheral, IBytePeripheral, IKnownSize, IDisposable,
         IRegisterablePeripheral<IPeripheral, EnumRegistrationPoint<STM32H7_RCC.RegistrationPeripheralAlias>>
     {
@@ -127,9 +137,9 @@ namespace Antmicro.Renode.Peripherals.Tviburi
             {
                 guarded[registrationPoint.Name.ToString().ToLowerInvariant()] = spi;
             }
-            if(peripheral is GuardedSTM32F7_USART usart)
+            if(peripheral is IRccWatched w)
             {
-                watched[registrationPoint.Name.ToString().ToLowerInvariant()] = usart;   // watched, never unlocked (1300b (2))
+                watched[registrationPoint.Name.ToString().ToLowerInvariant()] = w;   // watched, never unlocked (1300b (2))
             }
             SyncEnables();
         }
@@ -149,7 +159,7 @@ namespace Antmicro.Renode.Peripherals.Tviburi
             }
         }
 
-        // Whether this guard holds `p` (an SPI or USART guard) registered under `name`: only then does it watch its clock
+        // Whether this guard holds `p` (an SPI guard, or a watched USART or I2C guard) registered under `name`: only then does it watch its clock
         // (TVI-RCC-CLOCK), and keep an SPI unlocked, so a guard that is not held refuses rather than run unwatched.
         public bool Holds(string name, IPeripheral p)
         {
@@ -634,7 +644,7 @@ namespace Antmicro.Renode.Peripherals.Tviburi
             {
                 return false;
             }
-            var running = guarded.Where(g => g.Value.Started).Select(g => g.Key).Concat(watched.Where(w => w.Value.UeSet).Select(w => w.Key))
+            var running = guarded.Where(g => g.Value.Started).Select(g => g.Key).Concat(watched.Where(w => w.Value.IsRunning).Select(w => w.Key))
                 .Where(p => QueryKernelClock(p).Running).ToArray();
             if(running.Length == 0)
             {
@@ -683,15 +693,15 @@ namespace Antmicro.Renode.Peripherals.Tviburi
             {
                 return false;
             }
-            var usart = watched.ContainsKey(lost);
+            watched.TryGetValue(lost, out var watch);
             var old = b == CrOffset ? inner.ReadDoubleWord(CrOffset) : Served(b);
             var written = b == CrOffset ? KeptCr(value) : value;
             var changed = Fields.Where(f => f.Offset == b && f.Class != "read-only" && f.Class != "reserved" && f.Of(old) != f.Of(written)).Select(f => f.Register + "." + f.Name + " (" + f.Bits + ") = " + f.Format(f.Of(written)));
             records.Refuse("TVI-RCC-CLOCK", PredictedFault, RegisterAt(offset), string.Join(", ", changed),
-                lost + " is enabled (" + (usart ? "UE" : "SPE") + " = 1) and this write stops its kernel clock: " + after.Condition,
+                lost + " is enabled (" + (watch != null ? watch.RunningName : "SPE") + " = 1) and this write stops its kernel clock: " + after.Condition,
                 (after.Condition.Contains("has not switched") ? "RM0433 Rev 9 §8.5.10 p371 (\"no clock will be provided to the peripheral\"); " : "RM0433 Rev 9 ")
                     + after.Citation.Substring("RM0433 Rev 9 ".Length)
-                    + (usart ? "; §48.5.1 p2019 (\"The usart_ker_ck is the USART clock source\")" : ""),
+                    + (watch != null ? "; " + watch.KernelCitation : ""),
                 State(), offset, value, 32);
             return true;
         }
@@ -1012,7 +1022,7 @@ namespace Antmicro.Renode.Peripherals.Tviburi
         private readonly Dictionary<string, GuardedSTM32H7_SPI> guarded = new Dictionary<string, GuardedSTM32H7_SPI>();
         // The USART guards registered here, by their alias's name (usart1): asked whether UE = 1, never unlocked (they rely on
         // the bus lock for their enable; TVI-WO-1300b (2)).
-        private readonly Dictionary<string, GuardedSTM32F7_USART> watched = new Dictionary<string, GuardedSTM32F7_USART>();
+        private readonly Dictionary<string, IRccWatched> watched = new Dictionary<string, IRccWatched>();
         // RCC_BDCR.RTCEN as silicon holds it: 0 at construction (a backup domain reset), never reset by Reset() (p427).
         private uint rtcen;
         // RCC_PLLxDIVR as last written, at the reset value p403-410 give: TVI-RCC-PLL refuses a write that differs from it and

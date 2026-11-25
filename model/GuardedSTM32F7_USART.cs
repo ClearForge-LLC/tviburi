@@ -79,7 +79,7 @@ using Antmicro.Renode.Time;
 
 namespace Antmicro.Renode.Peripherals.Tviburi
 {
-    public class GuardedSTM32F7_USART : IDoubleWordPeripheral, IWordPeripheral, IBytePeripheral, IKnownSize, IUART, IDisposable
+    public class GuardedSTM32F7_USART : IDoubleWordPeripheral, IWordPeripheral, IBytePeripheral, IKnownSize, IUART, IDisposable, IRccWatched
     {
         // `frequency`, `lowPowerMode`: the stock entry's (the restatement copies them). `mode` (RUL-19) is this guard's.
         public GuardedSTM32F7_USART(IMachine machine, uint frequency, bool lowPowerMode = false, string mode = Records.Enforcing)
@@ -188,7 +188,9 @@ namespace Antmicro.Renode.Peripherals.Tviburi
         }
 
         // UE as this guard holds it, for the RCC guard's TVI-RCC-CLOCK (TVI-WO-1300b (2): a USART with UE = 1 is running).
-        public bool UeSet => (cr1 & UeBit) != 0;
+        public bool IsRunning => (cr1 & UeBit) != 0;
+        public string RunningName => "UE";
+        public string KernelCitation => "§48.5.1 p2019 (\"The usart_ker_ck is the USART clock source\")";
 
         public uint BaudRate => inner.BaudRate;
         public Bits StopBits => inner.StopBits;
