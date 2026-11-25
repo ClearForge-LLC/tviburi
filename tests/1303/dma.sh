@@ -2,7 +2,6 @@
 # tests/1303/dma.sh [SRC] — TVI-WO-1303's acceptance cases for the DMA guard, run on the host as tests/1302/timer.sh is:
 # each case one container in the pinned tools image (tests/spike.sh's IMAGE), no network, the source read-only. SRC
 # defaults to a `git archive HEAD` export. tests/spike.sh runs each case as dma-<case> in its acceptance group.
-# TVI-WO-1303a's circular cases (circ ... adcoff): ruled 2026-11-25T18:49Z, TVI-WO-1303a.measure.md §5.
 #   TVIBURI_TESTS="axi tcm ..."  run only these cases.
 #   TVIBURI_CI=1                 plain `podman run`, for a disposable CI runner only; elsewhere ~/bin/capped-run.
 # Exit 0 only if every selected case passed. Pages: RM0433 Rev 9 §15.5 (DMA registers, pp. 659-667), §2.1.6 p108 (the
@@ -84,6 +83,7 @@ passed() { [ "$rc" = 0 ] && grep -qx 'CHECK PASS' "$work/$1.stdout"; }
 passes() { passed "$1" && after "$1"; }
 refuses() { [ "$rc" = 3 ] && first "$1" "r[\"rule\"] == \"$2\" and r[\"kind\"] == \"$3\" and r[\"access\"][\"pc\"] != \"none\" and $4"; }
 marks=('echo "TVIBURI-MARK-AFTER"' 'sysbus ReadDoubleWord 0x20000104' 'echo "R-READ"' 'sysbus ReadDoubleWord 0x20000108' 'echo "R-READ2"' 'sysbus ReadDoubleWord 0x2000010C')
+pulse=('sysbus.dmamux1 OnGPIO 41 true' 'sysbus.dmamux1 OnGPIO 41 false')   # one request on DMAMUX1 input 41, raised by hand
 clk='sysbus WriteDoubleWord 0x580244D8 0x3'   # DMA1EN, DMA2EN (p455): since TVI-WO-1300a an unclocked peripheral is locked
 
 for t in ${TVIBURI_TESTS:-$CASES}; do
@@ -235,7 +235,7 @@ sys.exit(0 if ok else 1)
     # A request raised at DMAMUX1 reaches the guard's stream (D11 of the measurement, through the guard).
     run_case registrations - "$clk" 'peripherals' 'sysbus WriteDoubleWord 0x40020808 0x29' 'sysbus WriteDoubleWord 0x40020048 0x40011024' \
       'sysbus WriteDoubleWord 0x4002004C 0x38001900' 'sysbus WriteDoubleWord 0x40020044 0x4' 'sysbus WriteDoubleWord 0x40020040 0x401' \
-      'sysbus.dmamux1 OnGPIO 41 true' 'sysbus.dmamux1 OnGPIO 41 false' 'echo "R-NDTR"' 'sysbus ReadDoubleWord 0x40020044'
+      "${pulse[@]}" 'echo "R-NDTR"' 'sysbus ReadDoubleWord 0x40020044'
     check "registrations: peripherals lists dma1 and dma2 as the guard; a request on DMAMUX1 input 41 routed to channel 2 moves one item on DMA1 stream 2 (NDTR 4 -> 3)" \
       "passed registrations && grep -q 'dma1 (GuardedSTM32DMA)' '$work/registrations/renode.out' && grep -q 'dma2 (GuardedSTM32DMA)' '$work/registrations/renode.out' && [ \"\$(readout registrations NDTR)\" = 0x00000003 ]" ;;
   irq)
@@ -276,11 +276,11 @@ tviburiDma2:\
     # over 0xFF bytes and NDTR, the enable, one request: the byte lands at the new base. Replaces TVI-DMA-OFFSET.
     run_case offset - "$clk" 'sysbus WriteDoubleWord 0x38001A00 0xFFFFFFFF' 'sysbus WriteDoubleWord 0x40020800 0x29' 'sysbus WriteDoubleWord 0x40020018 0x40011024' \
       'sysbus WriteDoubleWord 0x4002001C 0x38001900' 'sysbus WriteDoubleWord 0x40020014 0x8' 'sysbus WriteDoubleWord 0x40020010 0x401' \
-      'sysbus.dmamux1 OnGPIO 41 true' 'sysbus.dmamux1 OnGPIO 41 false' 'sysbus.dmamux1 OnGPIO 41 true' 'sysbus.dmamux1 OnGPIO 41 false' \
-      'sysbus.dmamux1 OnGPIO 41 true' 'sysbus.dmamux1 OnGPIO 41 false' 'echo "R-LISR0"' 'sysbus ReadDoubleWord 0x40020000' \
+      "${pulse[@]}" "${pulse[@]}" \
+      "${pulse[@]}" 'echo "R-LISR0"' 'sysbus ReadDoubleWord 0x40020000' \
       'sysbus WriteDoubleWord 0x40020010 0x400' 'echo "R-LISR"' 'sysbus ReadDoubleWord 0x40020000' 'echo "R-NDTR"' 'sysbus ReadDoubleWord 0x40020014' \
       'sysbus WriteDoubleWord 0x40020008 0x3D' 'sysbus WriteDoubleWord 0x4002001C 0x38001A00' 'sysbus WriteDoubleWord 0x40020014 0x8' \
-      'sysbus WriteDoubleWord 0x40020010 0x401' 'sysbus.dmamux1 OnGPIO 41 true' 'sysbus.dmamux1 OnGPIO 41 false' 'echo "R-BASE"' 'sysbus ReadDoubleWord 0x38001A00'
+      'sysbus WriteDoubleWord 0x40020010 0x401' "${pulse[@]}" 'echo "R-BASE"' 'sysbus ReadDoubleWord 0x38001A00'
     check "offset: a stream disabled by software after 3 of 8 items has TCIF0 set (p654; it was clear before) and NDTR 5; re-armed on a new M0AR, its next item lands at the new base (p654, p666), and the run passes" \
       "passed offset && [ \"\$(readout offset LISR0)\" = 0x00000000 ] && [ \"\$(readout offset LISR)\" = 0x00000020 ] && [ \"\$(readout offset NDTR)\" = 0x00000005 ] && [ \"\$(readout offset BASE)\" = 0xFFFFFF00 ]" ;;
   offsetndt)
@@ -288,7 +288,7 @@ tviburiDma2:\
     # p665 reloads NDT after a completed transfer, which TCIF declared this one: the twin cannot say which count runs.
     run_case offsetndt - "$clk" 'sysbus WriteDoubleWord 0x40020800 0x29' 'sysbus WriteDoubleWord 0x40020018 0x40011024' \
       'sysbus WriteDoubleWord 0x4002001C 0x38001900' 'sysbus WriteDoubleWord 0x40020014 0x8' 'sysbus WriteDoubleWord 0x40020010 0x401' \
-      'sysbus.dmamux1 OnGPIO 41 true' 'sysbus.dmamux1 OnGPIO 41 false' 'sysbus WriteDoubleWord 0x40020010 0x400' \
+      "${pulse[@]}" 'sysbus WriteDoubleWord 0x40020010 0x400' \
       'sysbus WriteDoubleWord 0x4002001C 0x38001A00' 'sysbus WriteDoubleWord 0x40020010 0x401'
     check "offsetndt: a stream re-enabled after a software suspension with no NDTR write refuses TVI-DMA-OFFSET, unmodeled (p654, p665)" \
       "[ \$rc = 3 ] && first offsetndt 'r[\"rule\"] == \"TVI-DMA-OFFSET\" and r[\"kind\"] == \"unmodeled\" and \"p654\" in r[\"citation\"]'" ;;
@@ -301,12 +301,12 @@ tviburiDma2:\
     # clear); the sixth sets HTIF again (the second cycle's half); a reset clears the guard's HTIF.
     run_case circ - "$clk" 'sysbus WriteDoubleWord 0x40020800 0x29' 'sysbus WriteDoubleWord 0x40020018 0x24000000' 'sysbus WriteDoubleWord 0x4002001C 0x38001900' \
       'sysbus WriteDoubleWord 0x40020014 0x4' 'sysbus WriteDoubleWord 0x40020010 0x508' 'sysbus WriteDoubleWord 0x40020010 0x509' \
-      'sysbus WriteDoubleWord 0x24000000 0x1' 'sysbus.dmamux1 OnGPIO 41 true' 'sysbus.dmamux1 OnGPIO 41 false' 'echo "R-LISR1"' 'sysbus ReadDoubleWord 0x40020000' 'sysbus WriteDoubleWord 0x24000000 0x2' 'sysbus.dmamux1 OnGPIO 41 true' 'sysbus.dmamux1 OnGPIO 41 false' 'echo "R-LISR2"' 'sysbus ReadDoubleWord 0x40020000' 'echo "R-ISPR0"' 'sysbus ReadDoubleWord 0xE000E200' \
-      'sysbus WriteDoubleWord 0x24000000 0x3' 'sysbus.dmamux1 OnGPIO 41 true' 'sysbus.dmamux1 OnGPIO 41 false' 'sysbus WriteDoubleWord 0x24000000 0x4' 'sysbus.dmamux1 OnGPIO 41 true' 'sysbus.dmamux1 OnGPIO 41 false' 'echo "R-NDTR"' 'sysbus ReadDoubleWord 0x40020014' 'echo "R-CR"' 'sysbus ReadDoubleWord 0x40020010' \
-      'echo "R-LISR4"' 'sysbus ReadDoubleWord 0x40020000' 'sysbus WriteDoubleWord 0x24000000 0x5' 'sysbus.dmamux1 OnGPIO 41 true' 'sysbus.dmamux1 OnGPIO 41 false' 'echo "R-BUF"' 'sysbus ReadDoubleWord 0x38001900' \
+      'sysbus WriteDoubleWord 0x24000000 0x1' "${pulse[@]}" 'echo "R-LISR1"' 'sysbus ReadDoubleWord 0x40020000' 'sysbus WriteDoubleWord 0x24000000 0x2' "${pulse[@]}" 'echo "R-LISR2"' 'sysbus ReadDoubleWord 0x40020000' 'echo "R-ISPR0"' 'sysbus ReadDoubleWord 0xE000E200' \
+      'sysbus WriteDoubleWord 0x24000000 0x3' "${pulse[@]}" 'sysbus WriteDoubleWord 0x24000000 0x4' "${pulse[@]}" 'echo "R-NDTR"' 'sysbus ReadDoubleWord 0x40020014' 'echo "R-CR"' 'sysbus ReadDoubleWord 0x40020010' \
+      'echo "R-LISR4"' 'sysbus ReadDoubleWord 0x40020000' 'sysbus WriteDoubleWord 0x24000000 0x5' "${pulse[@]}" 'echo "R-BUF"' 'sysbus ReadDoubleWord 0x38001900' \
       'sysbus WriteDoubleWord 0x40020008 0x30' 'echo "R-LISRC"' 'sysbus ReadDoubleWord 0x40020000' \
       'sysbus WriteDoubleWord 0xE000E280 0x800' 'echo "R-ISPRC"' 'sysbus ReadDoubleWord 0xE000E200' \
-      'sysbus WriteDoubleWord 0x24000000 0x6' 'sysbus.dmamux1 OnGPIO 41 true' 'sysbus.dmamux1 OnGPIO 41 false' 'echo "R-LISR6"' 'sysbus ReadDoubleWord 0x40020000' 'machine Reset' "$clk" 'echo "R-LISRR"' 'sysbus ReadDoubleWord 0x40020000'
+      'sysbus WriteDoubleWord 0x24000000 0x6' "${pulse[@]}" 'echo "R-LISR6"' 'sysbus ReadDoubleWord 0x40020000' 'machine Reset' "$clk" 'echo "R-LISRR"' 'sysbus ReadDoubleWord 0x40020000'
     check "circ: a circular stream sets HTIF at half with its interrupt through the guard (p657), and at the wrap reloads NDT = 4 with EN still 1 and TCIF set (p647, p665; inferred from p654 against p665); the fifth item lands at the base; LIFCR clears both flags; a reset clears HTIF; the run passes" \
       "passed circ && [ \"\$(readout circ LISR1)\" = 0x00000000 ] && [ \"\$(readout circ LISR2)\" = 0x00000010 ] && [ \$(( \$(readout circ ISPR0) >> 11 & 1 )) = 1 ] && [ \"\$(readout circ NDTR)\" = 0x00000004 ] && [ \"\$(readout circ CR)\" = 0x00000509 ] && [ \"\$(readout circ LISR4)\" = 0x00000030 ] && [ \"\$(readout circ BUF)\" = 0x04030205 ] && [ \"\$(readout circ LISRC)\" = 0x00000000 ] && [ \$(( \$(readout circ ISPRC) >> 11 & 1 )) = 0 ] && [ \"\$(readout circ LISR6)\" = 0x00000010 ] && [ \"\$(readout circ LISRR)\" = 0x00000000 ]" ;;
   circoff)
@@ -315,8 +315,8 @@ tviburiDma2:\
     # raised by a request, outside any register write (the tap); a fifth request moves nothing.
     run_case circoff - "$clk" 'sysbus WriteDoubleWord 0x40020800 0x29' 'sysbus WriteDoubleWord 0x40020018 0x24000000' 'sysbus WriteDoubleWord 0x4002001C 0x38001900' \
       'sysbus WriteDoubleWord 0x40020014 0x4' 'sysbus WriteDoubleWord 0x40020010 0x410' 'sysbus WriteDoubleWord 0x40020010 0x411' \
-      'sysbus WriteDoubleWord 0x24000000 0x1' 'sysbus.dmamux1 OnGPIO 41 true' 'sysbus.dmamux1 OnGPIO 41 false' 'sysbus WriteDoubleWord 0x24000000 0x2' 'sysbus.dmamux1 OnGPIO 41 true' 'sysbus.dmamux1 OnGPIO 41 false' 'sysbus WriteDoubleWord 0x24000000 0x3' 'sysbus.dmamux1 OnGPIO 41 true' 'sysbus.dmamux1 OnGPIO 41 false' 'sysbus WriteDoubleWord 0x24000000 0x4' 'sysbus.dmamux1 OnGPIO 41 true' 'sysbus.dmamux1 OnGPIO 41 false' 'echo "R-CR"' 'sysbus ReadDoubleWord 0x40020010' 'echo "R-NDTR"' 'sysbus ReadDoubleWord 0x40020014' \
-      'echo "R-LISR"' 'sysbus ReadDoubleWord 0x40020000' 'echo "R-ISPR0"' 'sysbus ReadDoubleWord 0xE000E200' 'sysbus WriteDoubleWord 0x24000000 0x5' 'sysbus.dmamux1 OnGPIO 41 true' 'sysbus.dmamux1 OnGPIO 41 false' 'echo "R-BUF"' 'sysbus ReadDoubleWord 0x38001900'
+      'sysbus WriteDoubleWord 0x24000000 0x1' "${pulse[@]}" 'sysbus WriteDoubleWord 0x24000000 0x2' "${pulse[@]}" 'sysbus WriteDoubleWord 0x24000000 0x3' "${pulse[@]}" 'sysbus WriteDoubleWord 0x24000000 0x4' "${pulse[@]}" 'echo "R-CR"' 'sysbus ReadDoubleWord 0x40020010' 'echo "R-NDTR"' 'sysbus ReadDoubleWord 0x40020014' \
+      'echo "R-LISR"' 'sysbus ReadDoubleWord 0x40020000' 'echo "R-ISPR0"' 'sysbus ReadDoubleWord 0xE000E200' 'sysbus WriteDoubleWord 0x24000000 0x5' "${pulse[@]}" 'echo "R-BUF"' 'sysbus ReadDoubleWord 0x38001900'
     check "circoff: the same stream with CIRC = 0 ends with EN cleared (CR reads 0x410), NDT 0 and TCIF set (p654, p665), its interrupt pending at the NVIC (IRQ 11); a fifth request moves nothing; the run passes" \
       "passed circoff && [ \"\$(readout circoff CR)\" = 0x00000410 ] && [ \"\$(readout circoff NDTR)\" = 0x00000000 ] && [ \"\$(readout circoff LISR)\" = 0x00000020 ] && [ \$(( \$(readout circoff ISPR0) >> 11 & 1 )) = 1 ] && [ \"\$(readout circoff BUF)\" = 0x04030201 ]" ;;
   tcie)
@@ -325,7 +325,7 @@ tviburiDma2:\
     # model's line never did (it recomputes only when TCIF changes).
     run_case tcie - "$clk" 'sysbus WriteDoubleWord 0x40020800 0x29' 'sysbus WriteDoubleWord 0x40020018 0x24000000' 'sysbus WriteDoubleWord 0x4002001C 0x38001900' \
       'sysbus WriteDoubleWord 0x40020014 0x2' 'sysbus WriteDoubleWord 0x40020010 0x400' 'sysbus WriteDoubleWord 0x40020010 0x401' \
-      'sysbus WriteDoubleWord 0x24000000 0x1' 'sysbus.dmamux1 OnGPIO 41 true' 'sysbus.dmamux1 OnGPIO 41 false' 'sysbus WriteDoubleWord 0x24000000 0x2' 'sysbus.dmamux1 OnGPIO 41 true' 'sysbus.dmamux1 OnGPIO 41 false' 'echo "R-ISPRA"' 'sysbus ReadDoubleWord 0xE000E200' 'echo "R-LISR"' 'sysbus ReadDoubleWord 0x40020000' \
+      'sysbus WriteDoubleWord 0x24000000 0x1' "${pulse[@]}" 'sysbus WriteDoubleWord 0x24000000 0x2' "${pulse[@]}" 'echo "R-ISPRA"' 'sysbus ReadDoubleWord 0xE000E200' 'echo "R-LISR"' 'sysbus ReadDoubleWord 0x40020000' \
       'sysbus WriteDoubleWord 0x40020010 0x410' 'echo "R-ISPRB"' 'sysbus ReadDoubleWord 0xE000E200'
     check "tcie: TCIE set after a transfer ended with TCIF pending raises the stream's interrupt at once (Table 116 p658), through the guard's line; the run passes" \
       "passed tcie && [ \$(( \$(readout tcie ISPRA) >> 11 & 1 )) = 0 ] && [ \"\$(readout tcie LISR)\" = 0x00000020 ] && [ \$(( \$(readout tcie ISPRB) >> 11 & 1 )) = 1 ]" ;;
@@ -334,9 +334,9 @@ tviburiDma2:\
     # p660-661; IRQ 47, ISPR1 bit 15), circular, NDT = 4, HTIE: two requests set HTIF7; HIFCR clears it; two more wrap.
     run_case circhi - "$clk" 'sysbus WriteDoubleWord 0x4002081C 0x29' 'sysbus WriteDoubleWord 0x400200C0 0x24000000' 'sysbus WriteDoubleWord 0x400200C4 0x38001900' \
       'sysbus WriteDoubleWord 0x400200BC 0x4' 'sysbus WriteDoubleWord 0x400200B8 0x508' 'sysbus WriteDoubleWord 0x400200B8 0x509' \
-      'sysbus WriteDoubleWord 0x24000000 0x1' 'sysbus.dmamux1 OnGPIO 41 true' 'sysbus.dmamux1 OnGPIO 41 false' 'sysbus WriteDoubleWord 0x24000000 0x2' 'sysbus.dmamux1 OnGPIO 41 true' 'sysbus.dmamux1 OnGPIO 41 false' 'echo "R-HISR2"' 'sysbus ReadDoubleWord 0x40020004' 'echo "R-ISPR1"' 'sysbus ReadDoubleWord 0xE000E204' \
+      'sysbus WriteDoubleWord 0x24000000 0x1' "${pulse[@]}" 'sysbus WriteDoubleWord 0x24000000 0x2' "${pulse[@]}" 'echo "R-HISR2"' 'sysbus ReadDoubleWord 0x40020004' 'echo "R-ISPR1"' 'sysbus ReadDoubleWord 0xE000E204' \
       'sysbus WriteDoubleWord 0x4002000C 0x4000000' 'echo "R-HISRC"' 'sysbus ReadDoubleWord 0x40020004' \
-      'sysbus WriteDoubleWord 0x24000000 0x3' 'sysbus.dmamux1 OnGPIO 41 true' 'sysbus.dmamux1 OnGPIO 41 false' 'sysbus WriteDoubleWord 0x24000000 0x4' 'sysbus.dmamux1 OnGPIO 41 true' 'sysbus.dmamux1 OnGPIO 41 false' 'echo "R-HISR4"' 'sysbus ReadDoubleWord 0x40020004' 'echo "R-NDTR"' 'sysbus ReadDoubleWord 0x400200BC'
+      'sysbus WriteDoubleWord 0x24000000 0x3' "${pulse[@]}" 'sysbus WriteDoubleWord 0x24000000 0x4' "${pulse[@]}" 'echo "R-HISR4"' 'sysbus ReadDoubleWord 0x40020004' 'echo "R-NDTR"' 'sysbus ReadDoubleWord 0x400200BC'
     check "circhi: DMA1 stream 7, circular: HTIF7 at the half in HISR (bit 26) with IRQ 47 pending, cleared by HIFCR's CHTIF7; the wrap sets TCIF7 (bit 27) and reloads NDT (p660-661, p647); the run passes" \
       "passed circhi && [ \"\$(readout circhi HISR2)\" = 0x04000000 ] && [ \$(( \$(readout circhi ISPR1) >> 15 & 1 )) = 1 ] && [ \"\$(readout circhi HISRC)\" = 0x00000000 ] && [ \"\$(readout circhi HISR4)\" = 0x08000000 ] && [ \"\$(readout circhi NDTR)\" = 0x00000004 ]" ;;
   circrec)

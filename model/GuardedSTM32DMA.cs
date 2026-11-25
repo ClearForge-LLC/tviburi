@@ -76,8 +76,7 @@
 //                     direct modes are not allowed", §15.3.8 p645). unmodeled.
 //   TVI-DMA-HALF      a circular stream with an odd NDT: HTIF is set "once half the data have been transferred" (p657),
 //                     and RM0433 states no count for an odd NDT; or HTIE = 1 on a non-circular stream, where the twin
-//                     models no HTIF (ruled Q3). unmodeled. Also judged on a write that sets HTIE while a non-circular
-//                     stream is enabled (below).
+//                     models no HTIF (ruled Q3). unmodeled.
 //   And on any write while the stream is enabled (running or completed), before TVI-DMA-EN:
 //   TVI-DMA-CIRC      CIRC changed: p664 states no rule for a CIRC write under EN, and p665's "It is forbidden to write
 //                     these registers when the EN bit is read as 1" says nothing of what silicon does (ruled Q2).
@@ -105,14 +104,12 @@
 //             that has moved half the programmed NDT (even only, TVI-DMA-HALF), the guard sets HTIF (p657); that it does so
 //             in every cycle is inferred from p647 ("the DMA requests continue to be served") with p657.
 //   EN clear  with CIRC = 0, at the request that takes NDT to 0, the guard clears EN in the stock stream: "the DMA is
-//             stopped (EN bit ... is cleared by Hardware)" (§15.3.15 p654; EN p665; ruled Q4). Memory-to-peripheral and
-//             memory-to-memory transfers, which the stock model completes at the EN write, keep EN set (the completed
-//             state above, ruled 1303 Q3 (c)).
+//             stopped (EN bit ... is cleared by Hardware)" (§15.3.15 p654; EN p665; ruled Q4).
 //   HTIF      the guard's own flag, served in LISR/HISR, cleared by CHTIFx in LIFCR/HIFCR (p659-661).
 //   lines     the guard drives each stream's interrupt line itself: TCIE (the copy) && TCIF (the stock model's), or
 //             HTIE && HTIF (Table 116 p658). The stock model recomputes its own line only when TCIF changes
-//             (STM32DMA.cs L119-137, L259-264), so a TCIE write did not move it; a tap on the stock line catches TCIF
-//             changes made inside a request.
+//             (STM32DMA.cs L119-137, L259-264), so a TCIE write did not move it. The guard recomputes a stream's line
+//             after every access to it and every request it serves, which is everywhere the stock model changes TCIF.
 //   The request's source is not judged here: on the armed Sentinel-03 run it is the unguarded stock ADC1, which converts
 //   at its externalEventFrequency (1 kHz) with 0 mV samples, where silicon converts at its sample time and kernel clock
 //   (the ADC guard's row, TVI-WO-1303a.measure.md §5 Q1).
@@ -143,11 +140,6 @@ namespace Antmicro.Renode.Peripherals.Tviburi
             this.machine = machine;
             this.dmamux = dmamux;
             inner = new STM32DMA(machine);
-            for(var i = 0; i < Streams; i++)
-            {
-                lines[i] = new GPIO();
-                inner.Connections[i].Connect(new Tap(this, i), 0);
-            }
             connections = Enumerable.Range(0, Streams).ToDictionary(i => i, i => (IGPIO)lines[i]);
             records = new Records(machine, this, nameof(GuardedSTM32DMA), mode);
             ResetCopies();
@@ -155,19 +147,20 @@ namespace Antmicro.Renode.Peripherals.Tviburi
 
         public long Size => 0x400;
 
-        // The streams' interrupt lines, the platform's `[0-7] -> nvic@[...]`: the stock model's line, or HTIE && HTIF.
+        // The streams' interrupt lines, the platform's `[0-7] -> nvic@[...]` (UpdateLine).
         public IReadOnlyDictionary<int, IGPIO> Connections => connections;
 
         // DMAMUX1's request lines for this controller's streams (`dmamux1: [0-7] -> tviburiDma1@[0-7]`).
-        // A rising request on a peripheral-to-memory stream that moved an item: circular mode and the end of a transfer.
+        // A request that moved an item: circular mode and the end of a transfer. The stock model moves one only on a rising
+        // request to an enabled peripheral-to-memory stream (STM32DMA.cs L164-183); AfterRequest sees NDT unchanged otherwise.
         public void OnGPIO(int number, bool value)
         {
-            var served = value && number >= 0 && number < Streams && Enabled(number) && ((cr[number] >> 6) & 3) == PeripheralToMemory;
-            var before = served ? Items(number) : 0;
+            var before = number >= 0 && number < Streams ? Items(number) : 0;
             inner.OnGPIO(number, value);
-            if(served && before != 0)
+            if(before != 0)
             {
                 AfterRequest(number, before);
+                UpdateLine(number);
             }
         }
 
@@ -402,7 +395,6 @@ namespace Antmicro.Renode.Peripherals.Tviburi
             else if(n % 2 == 0 && n - left == n / 2)
             {
                 htif[s] = true;   // half the data transferred (p657)
-                UpdateLine(s);
             }
         }
 
@@ -472,10 +464,11 @@ namespace Antmicro.Renode.Peripherals.Tviburi
             var old = Served(offset);
             var reg = Name(r);
             var running = state == Running;
+            var at = running ? "running" : "completed in the twin";
             var circ = r == CrOffset && ((word ^ old) & CircBit) != 0;
             if(circ)
             {
-                records.Refuse("TVI-DMA-CIRC", Unmodeled, reg, "DMA_SxCR.CIRC of stream " + s + " changed to " + ((word >> 8) & 1) + " (EN = 1, " + (running ? "running" : "completed in the twin") + ")",
+                records.Refuse("TVI-DMA-CIRC", Unmodeled, reg, "DMA_SxCR.CIRC of stream " + s + " changed to " + ((word >> 8) & 1) + " (EN = 1, " + at + ")",
                     "DMA_SxCR.CIRC changed while the stream is enabled: RM0433 states no rule for this write, and forbids writing the register while EN reads 1 without saying what silicon does, so the twin cannot say whether the stream wraps",
                     "RM0433 Rev 9 §15.5.5 p664 (CIRC: no rule for a write under EN); p665 (EN: \"It is forbidden to write these registers when the EN bit is read as 1\")",
                     State(s), offset, word, 32);
@@ -488,7 +481,7 @@ namespace Antmicro.Renode.Peripherals.Tviburi
             var half = r == CrOffset && (word & HtieBit) != 0 && (old & HtieBit) == 0 && (old & CircBit) == 0;
             if(half)
             {
-                records.Refuse("TVI-DMA-HALF", Unmodeled, reg, "DMA_SxCR.HTIE of stream " + s + " set (EN = 1, " + (running ? "running" : "completed in the twin") + ", CIRC = 0)",
+                records.Refuse("TVI-DMA-HALF", Unmodeled, reg, "DMA_SxCR.HTIE of stream " + s + " set (EN = 1, " + at + ", CIRC = 0)",
                     "DMA_SxCR.HTIE set while a non-circular stream is enabled: the twin models HTIF on circular streams only, so this stream's half-transfer interrupt would never fire",
                     "RM0433 Rev 9 §15.3.19 p657 (HTIF); Table 116 p658; TVI-WO-1303a ruled 2026-11-25T18:49Z Q3", State(s), offset, word, 32);
                 if(!records.Recorded)
@@ -503,7 +496,7 @@ namespace Antmicro.Renode.Peripherals.Tviburi
                 return circ || half;
             }
             records.Refuse(running ? "TVI-DMA-EN" : "TVI-DMA-DONE", running ? PredictedFault : Unmodeled, reg,
-                reg + " bits 0x" + changed.ToString("X8") + " of stream " + s + " (EN = 1, " + (running ? "running" : "completed in the twin") + ")",
+                reg + " bits 0x" + changed.ToString("X8") + " of stream " + s + " (EN = 1, " + at + ")",
                 running
                     ? reg + " written with a change to bits that can be written only while the stream is disabled: silicon ignores the write, so the stream does not do what the firmware wrote"
                     : changed == 0
@@ -869,9 +862,9 @@ namespace Antmicro.Renode.Peripherals.Tviburi
         private readonly Records records;
         private readonly uint[] cr = new uint[Streams];
         private readonly uint[] fcr = new uint[Streams];
-        // The guard's half-transfer flags (p659-661) and the streams' interrupt lines (Tap).
+        // The guard's half-transfer flags (p659-661) and the streams' interrupt lines (UpdateLine).
         private readonly bool[] htif = new bool[Streams];
-        private readonly GPIO[] lines = new GPIO[Streams];
+        private readonly GPIO[] lines = Enumerable.Range(0, Streams).Select(_ => new GPIO()).ToArray();
         private readonly IReadOnlyDictionary<int, IGPIO> connections;
         // The NDT software last wrote to each stream, which silicon reloads at a re-enable (p665).
         private readonly uint[] programmed = new uint[Streams];
@@ -968,31 +961,6 @@ namespace Antmicro.Renode.Peripherals.Tviburi
             "dfsdm1_dma0", "dfsdm1_dma1", "dfsdm1_dma2", "dfsdm1_dma3", "TIM15_CH1", "TIM15_UP", "TIM15_TRIG", "TIM15_COM",
             "TIM16_CH1", "TIM16_UP", "TIM17_CH1", "TIM17_UP", "sai3_a_dma", "sai3_b_dma", "adc3_dma",
         };
-
-        // Recomputes stream `stream`'s line when the stock model's line for it changes (TCIF set or cleared).
-        private sealed class Tap : IGPIOReceiver
-        {
-            public Tap(GuardedSTM32DMA parent, int stream)
-            {
-                this.parent = parent;
-                this.stream = stream;
-            }
-
-            public void OnGPIO(int number, bool value)
-            {
-                if(parent.lines[stream] != null)
-                {
-                    parent.UpdateLine(stream);
-                }
-            }
-
-            public void Reset()
-            {
-            }
-
-            private readonly GuardedSTM32DMA parent;
-            private readonly int stream;
-        }
 
         // ---- the allow-list (RUL-16, RUL-17): one row per field, every bit 31:0 of every register ---------------
 

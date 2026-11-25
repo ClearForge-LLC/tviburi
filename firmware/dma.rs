@@ -130,8 +130,7 @@ unsafe fn spin() {
     }
 }
 
-/// ArduPilot's ADC1 circular pattern (see path="adc"): ADC1 and DMA1 stream 0 on request 9, CR `cr` then EN; then polls
-/// LISR for stream 0's TCIF (bit 5) and HTIF (bit 4), clearing each in LIFCR, and never returns.
+/// ArduPilot's ADC1 circular pattern (path="adc").
 unsafe fn adc(cr: u32) -> ! {
     write_volatile(RCC_AHB1ENR, 0x23); // DMA1EN, DMA2EN, ADC12EN (p455)
     w(ADC1 + 0x08, 0x1000_0000); // ADVREGEN
