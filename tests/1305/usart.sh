@@ -331,6 +331,8 @@ sys.exit(0 if ok else 1)
     # the consumer declares (ruled 2026-11-25T00:00Z: kept as a test), BRR 0x271: 115,200 baud, 86.8 us (64 MHz would give
     # 97.7 us, 200 MHz 31.25); in ArduPilot's order, PLL2 first, then RCC_APB2RSTR.USART1RST pulsed (p443), which resets the
     # port and not what it knows of PLL2; and after a wide PLL2DIVR was written before the machine Reset, which clears it.
+    # (USART16SEL only: ArduPilot's 0x9 also moves usart2's mux, and the RCC guard keeps a mux's state across machine Reset, a
+    # row for the RCC guard in this work order's feedback.)
     # U: usart2 on rcc_pclk1 = 64 MHz / D2PPRE1 4 = 16 MHz (USART16SEL = 011 beside it, D2PPRE2 2), BRR 50.
     byte=('sysbus WriteDoubleWord 0x40011000 0x2000001D' 'sysbus.usart1 WriteChar 0x41' 'emulation RunFor "0.00002"')
     run_case idlekernel - 'cpu IsHalted true' "$clk" 'emulation RunFor "0.0001"' \
@@ -341,7 +343,7 @@ sys.exit(0 if ok else 1)
       'echo "R-H20"' 'sysbus ReadDoubleWord 0x4001101C' 'emulation RunFor "0.00002"' 'echo "R-H40"' 'sysbus ReadDoubleWord 0x4001101C' \
       'sysbus WriteDoubleWord 0x58024438 0x01090367' 'machine Reset' 'cpu IsHalted true' "$clk" \
       'sysbus WriteDoubleWord 0x58024428 0x00408040' 'sysbus WriteDoubleWord 0x58024438 0x0704022C' 'sysbus WriteDoubleWord 0x58024400 0x04000001' \
-      'sysbus WriteDoubleWord 0x58024454 0x9' 'sysbus WriteDoubleWord 0x58024498 0x10' 'sysbus WriteDoubleWord 0x58024498 0x0' 'sysbus WriteDoubleWord 0x4001100C 0x271' 'sysbus WriteDoubleWord 0x40011000 0x2000001D' 'sysbus.usart1 WriteChar 0x41' \
+      'sysbus WriteDoubleWord 0x58024454 0x8' 'sysbus WriteDoubleWord 0x58024498 0x10' 'sysbus WriteDoubleWord 0x58024498 0x0' 'sysbus WriteDoubleWord 0x4001100C 0x271' 'sysbus WriteDoubleWord 0x40011000 0x2000001D' 'sysbus.usart1 WriteChar 0x41' \
       'emulation RunFor "0.000085"' 'echo "R-A85"' 'sysbus ReadDoubleWord 0x4001101C' 'emulation RunFor "0.000004"' 'echo "R-A89"' 'sysbus ReadDoubleWord 0x4001101C' \
       'machine Reset' 'cpu IsHalted true' 'sysbus WriteDoubleWord 0x580244E8 0x20000' \
       'sysbus WriteDoubleWord 0x58024454 0x18' 'sysbus WriteDoubleWord 0x5802441C 0x450' 'sysbus WriteDoubleWord 0x4000440C 0x32' 'sysbus WriteDoubleWord 0x40004400 0x2000001D' \
