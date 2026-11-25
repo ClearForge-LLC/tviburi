@@ -35,6 +35,16 @@ Not read before these predictions: any line of `1305`'s armed-run console (`~/.c
 
 **The answer: no byte moves, transmitted or received, while `BRR` < 16, in either reading.** Both runs give the same result.
 
+**The control and the values:**
+- **The tracker sees DMA-moved bytes.** A DMA stream's `RDR` read is logged with no `[cpu: …]` prefix, and the tracker's first version missed it. With that fixed, `usart1` shows its 837 injected bytes read (all by DMA) and 2,908 `TDR` writes, while `usart2` shows none of either.
+- **`BRR` values written, per port, over 14 s:**
+  - `usart1`: `0x271` ×4;
+  - `usart2`: `0` ×2, `0x271` ×16, `0x2D0` ×6, `0x168` ×6, `0xAD` ×6, `0x24` ×6;
+  - `usart3`: `0x4E2` ×2, `0x271` ×1.
+
+  **0 is the only value below 16 ever written.**
+- **No other byte source on `usart2`:** neither the argv nor the booted platform attaches one (no analyzer, file backend or socket), and the injection plan writes only to `usart1`.
+
 | Prediction | Measured |
 |---|---|
 | P1: one start with `BRR` < 16 | **two**, both `usart2`, both `BRR` = 0, both at 0.201709480 s: ChibiOS's `usart_init` (`CR1` `0x12D` at PC `0x08105B88`), then `sdStop` (`CR1`, `CR2`, `CR3` = 0), then `usart_init` again. 35 starts in the run: 33 on `usart2`, one each on `usart1` and `usart3`, which start with `BRR` = `0x271` |

@@ -7,6 +7,10 @@
 - The architect accepted both readings on the bus (2026-11-25T00:00Z):
   - (1) as built, with the running-port rewrite kept as a rule;
   - (3) the frequency computed in the USART guard from the RCC guard's registers and its `Written` event, with HSI-rooted rules only.
+- **Built differently from the letter of (3)'s ruling, after the adversarial pass** (posted on the bus):
+  - `PLL2DIVR` is not computed from a copy kept from `Written`. A firmware's read-modify-write writes the stock's narrowed bits back, so such a copy can be wrong silently.
+  - Instead, the read-back is used, and it is exact while no wide field was ever written. A wide write (`DIVN2` ≥ 256 or `DIVQ2` ≥ 64) makes `pll2_q_ck` `unmodeled` until the machine resets.
+  - p407's reference and VCO ranges are new no-rule conditions.
 - **Open: one question (§7 Q1).** The HSI-only scope was accepted on my statement that the 14 generated boards are HSI-rooted. That statement was wrong for two of them, `hse-crystal-16` and `hse-external-8`. I posted the correction with options and am waiting for a ruling.
 - **The armed run arms** and is identical to `main`'s (§3.2). §7's second stop did not fire.
 - **Untouched:**
@@ -59,7 +63,7 @@ All in `model/GuardedSTM32F7_USART.cs`, with cases in `tests/1305/usart.sh` and 
 
 ### 3.1 The 14 generated boots and ArduPilot's fixture boot
 
-- **Method:** each boot replayed on `main`'s tree (`d9bb3da`) and on this branch, every guard recorded, the nine UARTs access-logged, and the UART registers dumped after `RunFor`.
+- **Method:** each boot replayed on `main`'s tree (`d9bb3da`) and on this branch (`c69382b`), every guard recorded, the nine UARTs access-logged, and the UART registers dumped after `RunFor`.
 - **Compared:**
   - every UART access, with its value and virtual time;
   - every Tviburi record (model hash normalised);
@@ -76,7 +80,7 @@ All in `model/GuardedSTM32F7_USART.cs`, with cases in `tests/1305/usart.sh` and 
 
 ### 3.2 The armed run (Furnace; CI has only the fixture ELF)
 
-- **Setup:** 1305's Sentinel-03 capture, ELF `dbf598d8…`, its plan of 21 unpadded frames, and `usart1`'s request wired as 1305 did. Run in the same harness on `main` and on this branch, recorded.
+- **Setup:** 1305's Sentinel-03 capture, ELF `dbf598d8…`, its plan of 21 unpadded frames, and `usart1`'s request wired as 1305 did. Run in the same harness on `main` and on this branch (`c69382b`), recorded.
 - **Identical to `main`:**
   - 4,815 UART accesses;
   - 76,812 records;
@@ -132,7 +136,20 @@ Reduction pass (diff): +4 net · 11 copies of 8 facts removed · 2 dead paths re
 
 ## 6. Suites, mutants and CI
 
-<!-- filled in at close -->
+**On Furnace** (one capped container at a time, `nice -n 10`; each run from a `git archive` of the commit named):
+- **`tests/1305/usart.sh`**, 37 cases:
+  - 37/37 at `e048f4b`, the guard as shipped (`c69382b` changes docs only);
+  - `tdrbyte` and `idlere` lost end records to the teardown race in the full run (exit 1, no refusal), and both passed on rerun;
+  - earlier full runs: 37/37 at `6f8bb63`.
+- **`tests/1303/dma.sh`**, the cases that drive the USART guard (`usart23`, `txother`, `offset`, `offsetndt`, `reflect`, `ledger`): pass at `e048f4b`.
+- **`tests/1300/rcc.sh`** `usart2` and `ardupilot`: pass at `c69382b`.
+- **Mutants:**
+  - this WO's 27 (US38–US64): all killed at `e048f4b`;
+  - every earlier USART mutant (US01–US37): all killed at `c69382b`.
+- **`tests/ci/route.sh origin/main`:** its tests and the citation inventory pass; `class=code`, `budget=yes`.
+- **The identity (§3.1) and the armed run (§3.2):** rerun at `c69382b`, with the results as stated there.
+
+**CI:** the budget is judged there. The run on the pushed head is reported in the READY note on the bus: a FEEDBACK-only commit would rerun every shard.
 
 ## 7. Questions for the architect
 
