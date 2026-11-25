@@ -22,7 +22,7 @@
 //!                     (0x100417: TRBUFF, PL... kept by the guard's copy), MARK_READ2 = S0FCR (0x21).
 //!   path="width"    - a byte write to S0NDTR: TVI-DMA-WIDTH, unmodeled (p659).
 //!   path="read"     - a read at 0xD0 (no register): TVI-DMA-READ, unmodeled.
-//!   path="field"    - CR with CIRC = 1: TVI-DMA-FIELD, unmodeled.
+//!   path="field"    - CR with DBM = 1 (double-buffer mode, a stock tag): TVI-DMA-FIELD, unmodeled.
 //!   path="msize16"  - M2M half-words (PSIZE = MSIZE = 01), 4 items: passes; MARK_READ = the destination's first word.
 //!   path="route0"   - M2P with DMAMUX1 channel 0 left 0 (no request, p703): TVI-DMA-ROUTE, predicted-fault.
 //!   path="route54"  - P2M on request 54 (reserved, Table 124 p697): TVI-DMA-ROUTE, predicted-fault.
@@ -44,6 +44,21 @@
 //!                     (p667). MARK_READ = S0FCR (0x20).
 //!   path="reloadtcm" - M2M AXI to AXI, 4 words (completed), disabled, M0AR moved into DTCM, enabled again without NDTR: the
 //!                     reloaded span (p665) is in DTCM: TVI-DMA-TCM, predicted-fault (p108).
+//! TVI-WO-1303a, circular mode (ruled 2026-11-25T18:49Z; TVI-WO-1303a.measure.md §5):
+//!   path="circen"   - P2M on 41, CIRC = 1, enabled; then CR with CIRC cleared and EN still set: TVI-DMA-CIRC, unmodeled
+//!                     (p664 states no rule; p665).
+//!   path="circodd"  - P2M on 41, CIRC = 1, NDT = 5: TVI-DMA-HALF, unmodeled (p657 states no count for an odd NDT).
+//!   path="htie"     - P2M on 41, CIRC = 0, HTIE = 1: TVI-DMA-HALF, unmodeled (HTIF is modeled on circular streams only).
+//!   path="circm2p"  - M2P on 42 with CIRC = 1: TVI-DMA-CIRC, unmodeled (the twin moves it at EN, unpaced).
+//!   path="circm2m"  - M2M with CIRC = 1: TVI-DMA-CIRC, unmodeled (p645: not allowed).
+//!   path="adc"      - ArduPilot's ADC pattern (Sentinel-03's armed run, measure.md §2.1): ADC1 (ADVREGEN, ADEN, CFGR =
+//!                     0x2003: DMNGT = 11 circular, CONT; ADSTART), its request (9, adc1_dma) on DMA1 stream 0, P2M from
+//!                     ADC1_DR into SRAM4, NDT = 4 half-words, CR = 0x2D18 (CIRC, HTIE, TCIE, MINC, 16-bit). The stock
+//!                     ADC1 raises one request per conversion, every 1 ms. The firmware polls LISR: at each TCIF0 it reads
+//!                     CR and NDTR and clears TCIF0, at each HTIF0 it clears HTIF0. MARK_READ = TCIF count | HTIF count
+//!                     << 8 | (TCIFs seen with EN = 1 and NDT reloaded to 4) << 16; MARK_READ2 = EN | NDT << 8 at the
+//!                     last TCIF. MARK_AFTER is written before the loop.
+//!   path="adcoff"   - the same with CR = 0x2C10 (CIRC = 0, HTIE = 0): EN is cleared at the end (p654, p665).
 #![no_std]
 #![no_main]
 #![allow(dead_code)]
@@ -62,6 +77,7 @@ const USART1_TDR: usize = 0x4001_1028;
 const USART2_RDR: usize = 0x4000_4424;
 const USART3_RDR: usize = 0x4000_4824;
 const USART3_TDR: usize = 0x4000_4828;
+const ADC1: usize = 0x4002_2000;
 const MARK_AFTER: *mut u32 = 0x2000_0104 as *mut u32;
 const MARK_READ: *mut u32 = 0x2000_0108 as *mut u32;
 const MARK_READ2: *mut u32 = 0x2000_010C as *mut u32;
@@ -110,6 +126,39 @@ unsafe fn spin() {
     while i < 2000 {
         write_volatile(MARK_READ2, read_volatile(MARK_READ2));
         i += 1;
+    }
+}
+
+/// ArduPilot's ADC1 circular pattern (see path="adc"): ADC1 and DMA1 stream 0 on request 9, CR `cr` then EN; then polls
+/// LISR for stream 0's TCIF (bit 5) and HTIF (bit 4), clearing each in LIFCR, and never returns.
+unsafe fn adc(cr: u32) -> ! {
+    write_volatile(RCC_AHB1ENR, 0x23); // DMA1EN, DMA2EN, ADC12EN (p455)
+    w(ADC1 + 0x08, 0x1000_0000); // ADVREGEN
+    w(ADC1 + 0x08, 0x1000_0001); // ADEN
+    w(ADC1 + 0x0C, 0x2003); // CFGR: CONT, DMNGT = 11
+    w(ADC1 + 0x30, 0); // SQR1: one conversion
+    cfg(DMA1, 0, 0, Some(9), ADC1 + 0x40, SRAM4, 4, cr);
+    en(DMA1, 0);
+    w(ADC1 + 0x08, 0x1000_0005); // ADSTART
+    write_volatile(MARK_AFTER, 0xAF7E_0002);
+    let (mut tc, mut ht, mut good, mut last) = (0u32, 0u32, 0u32, 0u32);
+    loop {
+        let isr = r(DMA1);
+        if isr & 0x20 != 0 {
+            let (c, n) = (r(s(DMA1, 0, CR)), r(s(DMA1, 0, NDTR)));
+            tc += 1;
+            if c & 1 == 1 && n == 4 {
+                good += 1;
+            }
+            last = (c & 1) | (n << 8);
+            w(DMA1 + 0x08, 0x20);
+        }
+        if isr & 0x10 != 0 {
+            ht += 1;
+            w(DMA1 + 0x08, 0x10);
+        }
+        write_volatile(MARK_READ, tc | ht << 8 | good << 16);
+        write_volatile(MARK_READ2, last);
     }
 }
 
@@ -207,7 +256,41 @@ pub unsafe extern "C" fn reset() -> ! {
     }
     #[cfg(path = "field")]
     {
+        cfg(DMA1, 0, 0, Some(41), USART1_RDR, SRAM4, 4, P2M | 0x4_0000);
+    }
+    #[cfg(path = "circen")]
+    {
         cfg(DMA1, 0, 0, Some(41), USART1_RDR, SRAM4, 4, P2M | 0x100);
+        en(DMA1, 0);
+        w(s(DMA1, 0, CR), r(s(DMA1, 0, CR)) & !0x100);
+    }
+    #[cfg(path = "circodd")]
+    {
+        cfg(DMA1, 0, 0, Some(41), USART1_RDR, SRAM4, 5, P2M | 0x100);
+        en(DMA1, 0);
+    }
+    #[cfg(path = "htie")]
+    {
+        cfg(DMA1, 0, 0, Some(41), USART1_RDR, SRAM4, 4, P2M | 0x8);
+        en(DMA1, 0);
+    }
+    #[cfg(path = "circm2p")]
+    {
+        cfg(DMA1, 0, 0, Some(42), USART1_TDR, SRAM4, 4, M2P | 0x100);
+        en(DMA1, 0);
+    }
+    #[cfg(path = "circm2m")]
+    {
+        cfg(DMA1, 0, 0, None, AXI, AXI + 0x1000, 4, M2M | 0x100);
+        en(DMA1, 0);
+    }
+    #[cfg(path = "adc")]
+    {
+        adc(0x2D18);
+    }
+    #[cfg(path = "adcoff")]
+    {
+        adc(0x2C10);
     }
     #[cfg(path = "msize16")]
     {

@@ -2,6 +2,7 @@
 # tests/1303/dma.sh [SRC] — TVI-WO-1303's acceptance cases for the DMA guard, run on the host as tests/1302/timer.sh is:
 # each case one container in the pinned tools image (tests/spike.sh's IMAGE), no network, the source read-only. SRC
 # defaults to a `git archive HEAD` export. tests/spike.sh runs each case as dma-<case> in its acceptance group.
+# TVI-WO-1303a's circular cases (circ ... adcoff): ruled 2026-11-25T18:49Z, TVI-WO-1303a.measure.md §5.
 #   TVIBURI_TESTS="axi tcm ..."  run only these cases.
 #   TVIBURI_CI=1                 plain `podman run`, for a disposable CI runner only; elsewhere ~/bin/capped-run.
 # Exit 0 only if every selected case passed. Pages: RM0433 Rev 9 §15.5 (DMA registers, pp. 659-667), §2.1.6 p108 (the
@@ -10,9 +11,9 @@ set -euo pipefail
 
 here=$(cd "$(dirname "$0")/../.." && pwd)
 IMAGE=$(sed -n 's/^IMAGE=//p' "$here/tests/spike.sh")
-CASES="axi tcm itcm partcm below wrap unmapped ndt0 reload reassert sizes fth fthzero reloadtcm en enoff done same disable width read field msize16 route0 route54 mux shared sharedx request txother usart23 fields ledger registrations irq config recorded reset clock offset offsetndt reflect regen restate"
+CASES="axi tcm itcm partcm below wrap unmapped ndt0 reload reassert sizes fth fthzero reloadtcm en enoff done same disable width read field msize16 route0 route54 mux shared sharedx request txother usart23 fields ledger registrations irq config recorded reset clock offset offsetndt reflect regen restate circ circoff circen circodd htie circm2p circm2m adc adcoff"
 GUARDS="spi1 rcc gpioPortA gpioPortB gpioPortC gpioPortD gpioPortE gpioPortF gpioPortG gpioPortH gpioPortI gpioPortJ gpioPortK timer1 timer8 dma1 dma2 flashController usart1 usart2 usart3 uart4 uart5 usart6 uart7 uart8 i2c1 i2c2 i2c3"
-MONITOR="fields ledger registrations irq config recorded reset clock offset offsetndt reflect regen restate"
+MONITOR="fields ledger registrations irq config recorded reset clock offset offsetndt reflect regen restate circ circoff"
 # The planted firmware's paths: every case but the monitor-driven ones.
 PATHS=$(for c in $CASES; do case " $MONITOR " in *" $c "*) ;; *) printf '"%s",' "$c" ;; esac; done | sed 's/,$//')
 scratch=${TVIBURI_SCRATCH:-$HOME/.cache/tviburi}
@@ -88,7 +89,9 @@ clk='sysbus WriteDoubleWord 0x580244D8 0x3'   # DMA1EN, DMA2EN (p455): since TVI
 for t in ${TVIBURI_TESTS:-$CASES}; do
   case " $MONITOR " in *" $t "*) mon=1 ;; *) mon=0 ;; esac
   if [ $mon = 0 ]; then
-    run_case "$t" "$t" 'emulation RunFor "0.001"' "${marks[@]}"
+    # The ADC paths wait on the stock ADC1, which converts once per 1 ms (its externalEventFrequency, TVI-WO-1303a §2.2).
+    case $t in adc|adcoff) rf=0.0125 ;; *) rf=0.001 ;; esac
+    run_case "$t" "$t" "emulation RunFor \"$rf\"" "${marks[@]}"
   fi
   case $t in
   axi) check "axi: a DMA1 memory-to-memory stream in AXI SRAM passes and moves its data (p108: AXI SRAM is reachable)" \
@@ -131,8 +134,22 @@ for t in ${TVIBURI_TESTS:-$CASES}; do
     "refuses width TVI-DMA-WIDTH unmodeled 'r[\"access\"][\"width\"] == 8'" ;;
   read) check "read: a read at 0xD0, where no register is, refuses TVI-DMA-READ, unmodeled" \
     "refuses read TVI-DMA-READ unmodeled 'r[\"bit\"] == \"no register at offset 0xD0\"'" ;;
-  field) check "field: CIRC = 1 refuses TVI-DMA-FIELD, unmodeled (circular mode is not modeled)" \
-    "refuses field TVI-DMA-FIELD unmodeled 'r[\"bit\"] == \"DMA_SxCR.CIRC (bit 8) = 1\"'" ;;
+  field) check "field: DBM = 1 refuses TVI-DMA-FIELD, unmodeled (double-buffer mode is not modeled)" \
+    "refuses field TVI-DMA-FIELD unmodeled 'r[\"bit\"] == \"DMA_SxCR.DBM (bit 18) = 1\"'" ;;
+  circen) check "circen: CIRC cleared while a circular stream runs refuses TVI-DMA-CIRC, unmodeled, naming the stream, the field and p664/p665 (ruled Q2)" \
+    "refuses circen TVI-DMA-CIRC unmodeled 'r[\"bit\"] == \"DMA_SxCR.CIRC of stream 0 changed to 0 (EN = 1, running)\" and \"p664\" in r[\"citation\"] and \"p665\" in r[\"citation\"]'" ;;
+  circodd) check "circodd: a circular stream enabled with NDT = 5 refuses TVI-DMA-HALF, unmodeled (p657 states no count for an odd NDT; ruled Q3)" \
+    "refuses circodd TVI-DMA-HALF unmodeled 'r[\"bit\"] == \"DMA_S0NDTR.NDT = 5 (odd, circular)\" and \"p657\" in r[\"citation\"]'" ;;
+  htie) check "htie: HTIE = 1 on a non-circular stream refuses TVI-DMA-HALF at EN, unmodeled (HTIF is modeled on circular streams only; ruled Q3)" \
+    "refuses htie TVI-DMA-HALF unmodeled 'r[\"bit\"] == \"DMA_SxCR.HTIE = 1, CIRC = 0\" and r[\"access\"][\"offset\"] == \"0x10\"'" ;;
+  circm2p) check "circm2p: CIRC = 1 on a memory-to-peripheral stream refuses TVI-DMA-CIRC at EN, unmodeled (the twin moves it unpaced; ruled Q5)" \
+    "refuses circm2p TVI-DMA-CIRC unmodeled 'r[\"bit\"] == \"DMA_SxCR.CIRC = 1, DIR = 1\" and \"unpaced\" in r[\"condition\"]'" ;;
+  circm2m) check "circm2m: CIRC = 1 on a memory-to-memory stream refuses TVI-DMA-CIRC at EN, unmodeled (p645: not allowed; ruled Q5)" \
+    "refuses circm2m TVI-DMA-CIRC unmodeled 'r[\"bit\"] == \"DMA_SxCR.CIRC = 1, DIR = 2\" and \"p645\" in r[\"citation\"]'" ;;
+  adc) check "adc: ArduPilot's ADC pattern, DMA1 stream 0 circular on the stock ADC1's request (9): the firmware sees TCIF at each wrap with EN still 1 and NDT reloaded to 4 (p647, p665; EN and TCIF at a wrap inferred from p654 against p665), and HTIF at each half (p657); the run passes" \
+    "passes adc && v=\$(readout adc READ) && [ \$(( v & 0xFF )) -ge 2 ] && [ \$(( v >> 8 & 0xFF )) -ge 2 ] && [ \$(( v >> 16 & 0xFF )) = \$(( v & 0xFF )) ] && [ \"\$(readout adc READ2)\" = 0x00000401 ]" ;;
+  adcoff) check "adcoff: the same stream with CIRC = 0 ends after 4 requests with EN cleared (p654, p665; ruled Q4): one TCIF, seen with EN = 0 and NDT = 0; the run passes" \
+    "passes adcoff && [ \"\$(readout adcoff READ)\" = 0x00000001 ] && [ \"\$(readout adcoff READ2)\" = 0x00000000 ]" ;;
   msize16) check "msize16: a memory-to-memory stream of half-words (PSIZE = MSIZE = 01) passes and moves its data (the probe ruling Q6 asked for)" \
     "passes msize16 && [ \"\$(readout msize16 READ)\" = 0x11111111 ]" ;;
   route0) check "route0: a memory-to-peripheral stream whose DMAMUX1 channel selects no request refuses TVI-DMA-ROUTE, predicted-fault (p703)" \
@@ -204,7 +221,9 @@ by = {(r[\"register\"], r[\"field\"]): r for r in f}
 ok = len(f) == 135 and len({r[\"register\"] for r in f}) == 10
 d = by[(\"DMA_SxCR\", \"DIR[1:0]\")]
 ok = ok and d[\"state\"] == \"stock-wrong\" and all(x in d[\"detail\"] for x in (\"41 usart1_rx_dma\", \"38 spi1_tx_dma\", \"40 spi2_tx_dma\", \"42 usart1_tx_dma\"))
-ok = ok and d[\"allowed\"] == [0, 1, 2] and by[(\"DMA_SxCR\", \"CIRC\")][\"allowed\"] == [0] and \"p665\" in by[(\"DMA_SxCR\", \"EN\")][\"behaves_as\"]
+ok = ok and d[\"allowed\"] == [0, 1, 2] and \"p665\" in by[(\"DMA_SxCR\", \"EN\")][\"behaves_as\"]
+ok = ok and all(by[(\"DMA_SxCR\", n)][\"allowed\"] == \"any\" and by[(\"DMA_SxCR\", n)][\"state\"] == \"guard\" for n in (\"CIRC\", \"HTIE\"))
+ok = ok and \"inferred from p654 against p665\" in by[(\"DMA_SxCR\", \"CIRC\")][\"behaves_as\"] and by[(\"DMA_LIFCR\", \"CHTIF0\")][\"state\"] == \"guard\"
 ok = ok and by[(\"DMA_SxCR\", \"PL[1:0]\")][\"state\"] == \"stock-wrong\" and by[(\"DMA_SxFCR\", \"FTH[1:0]\")][\"allowed\"] == \"any\"
 bench = sorted((r[\"field\"], r[\"rule\"], r[\"bit\"]) for r in rows if r.get(\"peripheral\") == \"Tviburi.GuardedSTM32DMA\" and r[\"row\"] == \"bench\")
 ok = ok and bench == [(\"D1\", \"TVI-DMA-TCM\", \"DMA_S0M0AR = 0x20000400 (DTCM (0x20000000-0x2001FFFF))\")]
@@ -271,6 +290,30 @@ tviburiDma2:\
       'sysbus WriteDoubleWord 0x4002001C 0x38001A00' 'sysbus WriteDoubleWord 0x40020010 0x401'
     check "offsetndt: a stream re-enabled after a software suspension with no NDTR write refuses TVI-DMA-OFFSET, unmodeled (p654, p665)" \
       "[ \$rc = 3 ] && first offsetndt 'r[\"rule\"] == \"TVI-DMA-OFFSET\" and r[\"kind\"] == \"unmodeled\" and \"p654\" in r[\"citation\"]'" ;;
+  circ)
+    # TVI-WO-1303a (ruled 2026-11-25T18:49Z Q1, Q3): DMA1 stream 0, P2M on 41 (raised by hand), bytes from AXI SRAM into SRAM4,
+    # NDT = 4, CR = 0x509 (CIRC, HTIE, MINC, EN; TCIE = 0, so the stream's line is the half-transfer interrupt alone). Two
+    # requests: HTIF0 set (p657), IRQ 11 pending through the guard's line. Two more: the wrap: NDT reloaded to 4 (p647, p665),
+    # EN still 1 and TCIF0 set (inferred from p654 against p665). A fifth lands at the base (the stock offset reset). LIFCR
+    # clears both flags (p660); a reset clears the guard's HTIF.
+    run_case circ - "$clk" 'sysbus WriteDoubleWord 0x40020800 0x29' 'sysbus WriteDoubleWord 0x40020018 0x24000000' 'sysbus WriteDoubleWord 0x4002001C 0x38001900' \
+      'sysbus WriteDoubleWord 0x40020014 0x4' 'sysbus WriteDoubleWord 0x40020010 0x508' 'sysbus WriteDoubleWord 0x40020010 0x509' \
+      'sysbus WriteDoubleWord 0x24000000 0x1' 'sysbus.dmamux1 OnGPIO 41 true' 'sysbus.dmamux1 OnGPIO 41 false' 'sysbus WriteDoubleWord 0x24000000 0x2' 'sysbus.dmamux1 OnGPIO 41 true' 'sysbus.dmamux1 OnGPIO 41 false' 'echo "R-LISR2"' 'sysbus ReadDoubleWord 0x40020000' 'echo "R-ISPR0"' 'sysbus ReadDoubleWord 0xE000E200' \
+      'sysbus WriteDoubleWord 0x24000000 0x3' 'sysbus.dmamux1 OnGPIO 41 true' 'sysbus.dmamux1 OnGPIO 41 false' 'sysbus WriteDoubleWord 0x24000000 0x4' 'sysbus.dmamux1 OnGPIO 41 true' 'sysbus.dmamux1 OnGPIO 41 false' 'echo "R-NDTR"' 'sysbus ReadDoubleWord 0x40020014' 'echo "R-CR"' 'sysbus ReadDoubleWord 0x40020010' \
+      'echo "R-LISR4"' 'sysbus ReadDoubleWord 0x40020000' 'sysbus WriteDoubleWord 0x24000000 0x5' 'sysbus.dmamux1 OnGPIO 41 true' 'sysbus.dmamux1 OnGPIO 41 false' 'echo "R-BUF"' 'sysbus ReadDoubleWord 0x38001900' \
+      'sysbus WriteDoubleWord 0x40020008 0x30' 'echo "R-LISRC"' 'sysbus ReadDoubleWord 0x40020000' \
+      'sysbus WriteDoubleWord 0x24000000 0x6' 'sysbus.dmamux1 OnGPIO 41 true' 'sysbus.dmamux1 OnGPIO 41 false' 'echo "R-LISR6"' 'sysbus ReadDoubleWord 0x40020000' 'machine Reset' "$clk" 'echo "R-LISRR"' 'sysbus ReadDoubleWord 0x40020000'
+    check "circ: a circular stream sets HTIF at half with its interrupt through the guard (p657), and at the wrap reloads NDT = 4 with EN still 1 and TCIF set (p647, p665; inferred from p654 against p665); the fifth item lands at the base; LIFCR clears both flags; a reset clears HTIF; the run passes" \
+      "passed circ && [ \"\$(readout circ LISR2)\" = 0x00000010 ] && [ \$(( \$(readout circ ISPR0) >> 11 & 1 )) = 1 ] && [ \"\$(readout circ NDTR)\" = 0x00000004 ] && [ \"\$(readout circ CR)\" = 0x00000509 ] && [ \"\$(readout circ LISR4)\" = 0x00000030 ] && [ \"\$(readout circ BUF)\" = 0x04030205 ] && [ \"\$(readout circ LISRC)\" = 0x00000000 ] && [ \"\$(readout circ LISR6)\" = 0x00000010 ] && [ \"\$(readout circ LISRR)\" = 0x00000000 ]" ;;
+  circoff)
+    # TVI-WO-1303a (ruled Q4): the same stream with CIRC = 0 and TCIE (CR = 0x411): at the fourth request EN is cleared
+    # (p654, p665), TCIF0 set, NDT 0; a fifth request moves nothing.
+    run_case circoff - "$clk" 'sysbus WriteDoubleWord 0x40020800 0x29' 'sysbus WriteDoubleWord 0x40020018 0x24000000' 'sysbus WriteDoubleWord 0x4002001C 0x38001900' \
+      'sysbus WriteDoubleWord 0x40020014 0x4' 'sysbus WriteDoubleWord 0x40020010 0x410' 'sysbus WriteDoubleWord 0x40020010 0x411' \
+      'sysbus WriteDoubleWord 0x24000000 0x1' 'sysbus.dmamux1 OnGPIO 41 true' 'sysbus.dmamux1 OnGPIO 41 false' 'sysbus WriteDoubleWord 0x24000000 0x2' 'sysbus.dmamux1 OnGPIO 41 true' 'sysbus.dmamux1 OnGPIO 41 false' 'sysbus WriteDoubleWord 0x24000000 0x3' 'sysbus.dmamux1 OnGPIO 41 true' 'sysbus.dmamux1 OnGPIO 41 false' 'sysbus WriteDoubleWord 0x24000000 0x4' 'sysbus.dmamux1 OnGPIO 41 true' 'sysbus.dmamux1 OnGPIO 41 false' 'echo "R-CR"' 'sysbus ReadDoubleWord 0x40020010' 'echo "R-NDTR"' 'sysbus ReadDoubleWord 0x40020014' \
+      'echo "R-LISR"' 'sysbus ReadDoubleWord 0x40020000' 'sysbus WriteDoubleWord 0x24000000 0x5' 'sysbus.dmamux1 OnGPIO 41 true' 'sysbus.dmamux1 OnGPIO 41 false' 'echo "R-BUF"' 'sysbus ReadDoubleWord 0x38001900'
+    check "circoff: the same stream with CIRC = 0 ends with EN cleared (CR reads 0x410), NDT 0 and TCIF set (p654, p665); a fifth request moves nothing; the run passes" \
+      "passed circoff && [ \"\$(readout circoff CR)\" = 0x00000410 ] && [ \"\$(readout circoff NDTR)\" = 0x00000000 ] && [ \"\$(readout circoff LISR)\" = 0x00000020 ] && [ \"\$(readout circoff BUF)\" = 0x04030201 ]" ;;
   reflect)
     # TVI-WO-1305 (ruled 2026-11-24T19:13Z): the suspension reaches the stock STM32DMA's private members by reflection; a
     # Renode build without one must refuse by name, never pass silently. Planted: a copy of the tree whose guard asks for a

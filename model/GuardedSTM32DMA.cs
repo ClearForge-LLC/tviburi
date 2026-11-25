@@ -69,6 +69,18 @@
 //                     predicted-fault; on one whose stream the twin has completed with EN still set: unmodeled.
 //   TVI-DMA-REQUEST   a request outside RaisedToMemory / RaisedFromMemory (below: those a model raises, and those
 //                     acknowledged by name for ArduPilot's recorded boot, ruled Q5 (c)). unmodeled.
+//   Circular mode (TVI-WO-1303a, ruled 2026-11-25T18:49Z Q1-Q5; TVI-WO-1303a.measure.md §5), judged at the same EN write,
+//   after TVI-DMA-SIZE:
+//   TVI-DMA-CIRC      CIRC = 1 on a memory-to-peripheral stream (the twin moves it at the EN write, unpaced by any request,
+//                     measure.md D9, so a reload would wrap with no request) or a memory-to-memory one ("the circular and
+//                     direct modes are not allowed", §15.3.8 p645). unmodeled.
+//   TVI-DMA-HALF      a circular stream with an odd NDT: HTIF is set "once half the data have been transferred" (p657),
+//                     and RM0433 states no count for an odd NDT; or HTIE = 1 on a non-circular stream, where the twin
+//                     models no HTIF (ruled Q3). unmodeled.
+//   And on any write while the stream is enabled (running or completed), before TVI-DMA-EN:
+//   TVI-DMA-CIRC      CIRC changed: p664 states no rule for a CIRC write under EN, and p665's "It is forbidden to write
+//                     these registers when the EN bit is read as 1" says nothing of what silicon does (ruled Q2).
+//                     unmodeled; in recorded mode CIRC keeps its old value.
 // Enforcing: the first rule that fires refuses the access. Recorded mode (RUL-19): every rule is evaluated and records what
 // it finds, and the access goes on as if none had fired (model/Refusal.cs), with protected fields kept as silicon keeps them.
 //
@@ -82,9 +94,27 @@
 //                     NDTR write since: the manual has software rewrite NDTR (p654), and says NDT reloads after a completed
 //                     transfer (p665), so whether the remaining or the programmed count runs is not stated. unmodeled.
 //
+// Modeled (TVI-WO-1303a, ruled 2026-11-25T18:49Z), at each request a peripheral-to-memory stream serves (OnGPIO):
+//   circular  with CIRC = 1, at the request that leaves NDT = 0 the guard writes the programmed NDT back into the stock
+//             stream, whose TCIF and offset reset are the stock model's own (STM32DMA.cs L259-264): "the number of data
+//             items to be transferred is automatically reloaded ... and the DMA requests continue to be served" (§15.3.10
+//             p647; NDT p665). EN stays 1 and TCIF is set at each wrap: both inferred from p654 against p665 (§15.3.15
+//             p654 clears EN at the end of a transfer only "in non-circular mode"); RM0433 states neither. At the request
+//             that has moved half the programmed NDT (even only, TVI-DMA-HALF), the guard sets HTIF (p657).
+//   EN clear  with CIRC = 0, at the request that takes NDT to 0, the guard clears EN in the stock stream: "the DMA is
+//             stopped (EN bit ... is cleared by Hardware)" (§15.3.15 p654; EN p665; ruled Q4). Memory-to-peripheral and
+//             memory-to-memory transfers, which the stock model completes at the EN write, keep EN set (the completed
+//             state above, ruled 1303 Q3 (c)).
+//   HTIF      the guard's own flag, served in LISR/HISR, cleared by CHTIFx in LIFCR/HIFCR (p659-661). The stock
+//             interrupt line is TCIE && TCIF only (STM32DMA.cs L128-137), so the guard drives each stream's line itself:
+//             the stock line, or HTIE && HTIF (Table 116 p658).
+//   The request's source is not judged here: on the armed Sentinel-03 run it is the unguarded stock ADC1, which converts
+//   at its externalEventFrequency (1 kHz) with 0 mV samples, where silicon converts at its sample time and kernel clock
+//   (the ADC guard's row, TVI-WO-1303a.measure.md §5 Q1).
+//
 // Reads: CR from the guard's copy (every field but EN, which is the stock model's), so a read-modify-write keeps the
 // fields the stock model drops (PL, TEIE, DMEIE, TRBUFF; measure.md §2.1); FCR from its copy, reset 0x21 (p667; the stock
-// model resets it to 0x00). The rest from the stock model.
+// model resets it to 0x00); LISR/HISR from the stock model with the guard's HTIF bits. The rest from the stock model.
 
 using System;
 using System.Collections.Generic;
@@ -108,25 +138,42 @@ namespace Antmicro.Renode.Peripherals.Tviburi
             this.machine = machine;
             this.dmamux = dmamux;
             inner = new STM32DMA(machine);
+            for(var i = 0; i < Streams; i++)
+            {
+                lines[i] = new GPIO();
+                inner.Connections[i].Connect(new Tap(this, i), 0);
+            }
+            connections = Enumerable.Range(0, Streams).ToDictionary(i => i, i => (IGPIO)lines[i]);
             records = new Records(machine, this, nameof(GuardedSTM32DMA), mode);
             ResetCopies();
         }
 
         public long Size => 0x400;
 
-        // The stock model's stream interrupt lines: the platform's `[0-7] -> nvic@[...]` bind here.
-        public IReadOnlyDictionary<int, IGPIO> Connections => inner.Connections;
+        // The streams' interrupt lines, the platform's `[0-7] -> nvic@[...]`: the stock model's line, or HTIE && HTIF.
+        public IReadOnlyDictionary<int, IGPIO> Connections => connections;
 
         // DMAMUX1's request lines for this controller's streams (`dmamux1: [0-7] -> tviburiDma1@[0-7]`).
+        // A rising request on a peripheral-to-memory stream that moved an item: circular mode and the end of a transfer.
         public void OnGPIO(int number, bool value)
         {
+            var served = value && number >= 0 && number < Streams && Enabled(number) && ((cr[number] >> 6) & 3) == PeripheralToMemory;
+            var before = served ? Items(number) : 0;
             inner.OnGPIO(number, value);
+            if(served && before != 0)
+            {
+                AfterRequest(number, before);
+            }
         }
 
         public void Reset()
         {
             inner.Reset();
             ResetCopies();
+            for(var i = 0; i < Streams; i++)
+            {
+                UpdateLine(i);
+            }
         }
 
         public void Dispose()
@@ -269,6 +316,16 @@ namespace Antmicro.Renode.Peripherals.Tviburi
             {
                 return fcr[s];
             }
+            if(r == LisrOffset || r == HisrOffset)
+            {
+                var v = inner.ReadDoubleWord(offset);
+                var b = r == LisrOffset ? 0 : 4;
+                for(var i = 0; i < 4; i++)
+                {
+                    v |= htif[b + i] ? 1u << (FlagShift[i] + HtifBit) : 0;
+                }
+                return v;
+            }
             return inner.ReadDoubleWord(offset);
         }
 
@@ -289,11 +346,64 @@ namespace Antmicro.Renode.Peripherals.Tviburi
                 programmed[s] = word & 0xFFFF;   // written only while disabled (p665); a refused write keeps nothing
                 suspended[s] = false;
             }
+            else if(r == LifcrOffset || r == HifcrOffset)
+            {
+                var b = r == LifcrOffset ? 0 : 4;
+                for(var i = 0; i < 4; i++)
+                {
+                    htif[b + i] &= (word >> (FlagShift[i] + HtifBit) & 1) == 0;   // CHTIFx (p660-661)
+                }
+            }
             inner.WriteDoubleWord(offset, word);
             if(suspend)
             {
                 Suspend(s);
             }
+            if(s >= 0)
+            {
+                UpdateLine(s);   // HTIE written
+            }
+            else if(r == LifcrOffset || r == HifcrOffset)
+            {
+                for(var i = 0; i < 4; i++)
+                {
+                    UpdateLine((r == LifcrOffset ? 0 : 4) + i);
+                }
+            }
+        }
+
+        // Stream s served a request that moved an item, from `before` items left (OnGPIO).
+        private void AfterRequest(int s, uint before)
+        {
+            var left = Items(s);
+            if(left == before)
+            {
+                return;
+            }
+            var b = StreamBase(s);
+            var n = programmed[s];
+            if((cr[s] & CircBit) == 0)
+            {
+                if(left == 0)
+                {
+                    inner.WriteDoubleWord(b + CrOffset, inner.ReadDoubleWord(b + CrOffset) & ~EnBit);   // p654, p665
+                }
+                return;
+            }
+            if(left == 0 && n != 0)
+            {
+                inner.WriteDoubleWord(b + NdtrOffset, n);   // the wrap (p647, p665); TCIF is the stock model's
+            }
+            else if(n % 2 == 0 && n - left == n / 2)
+            {
+                htif[s] = true;   // half the data transferred (p657)
+                UpdateLine(s);
+            }
+        }
+
+        private void UpdateLine(int s)
+        {
+            lines[s].Set(inner.Connections[s].IsSet || (htif[s] && (cr[s] & HtieBit) != 0));
         }
 
         // Software cleared EN while stream s ran (NDT > 0): silicon sets TCIF "to indicate the end of transfer due to the
@@ -312,6 +422,7 @@ namespace Antmicro.Renode.Peripherals.Tviburi
             for(var i = 0; i < Streams; i++)
             {
                 cr[i] = 0;
+                htif[i] = false;
                 fcr[i] = FcrReset;
                 programmed[i] = 0;
                 suspended[i] = false;
@@ -352,14 +463,27 @@ namespace Antmicro.Renode.Peripherals.Tviburi
             }
             var mask = Protected(r);
             var old = Served(offset);
+            var reg = Name(r);
+            var running = state == Running;
+            var circ = r == CrOffset && ((word ^ old) & CircBit) != 0;
+            if(circ)
+            {
+                records.Refuse("TVI-DMA-CIRC", Unmodeled, reg, "DMA_SxCR.CIRC of stream " + s + " changed to " + ((word >> 8) & 1) + " (EN = 1, " + (running ? "running" : "completed in the twin") + ")",
+                    "DMA_SxCR.CIRC changed while the stream is enabled: RM0433 states no rule for this write, and forbids writing the register while EN reads 1 without saying what silicon does, so the twin cannot say whether the stream wraps",
+                    "RM0433 Rev 9 §15.5.5 p664 (CIRC: no rule for a write under EN); p665 (EN: \"It is forbidden to write these registers when the EN bit is read as 1\")",
+                    State(s), offset, word, 32);
+                word = (word & ~CircBit) | (old & CircBit);
+                if(!records.Recorded)
+                {
+                    return true;
+                }
+            }
             var changed = (word ^ old) & mask;
             var restart = state == Completed && r == CrOffset && (word & EnBit) != 0 && programmed[s] != 0;
             if(changed == 0 && !restart)
             {
-                return false;
+                return circ;
             }
-            var reg = Name(r);
-            var running = state == Running;
             records.Refuse(running ? "TVI-DMA-EN" : "TVI-DMA-DONE", running ? PredictedFault : Unmodeled, reg,
                 reg + " bits 0x" + changed.ToString("X8") + " of stream " + s + " (EN = 1, " + (running ? "running" : "completed in the twin") + ")",
                 running
@@ -429,6 +553,33 @@ namespace Antmicro.Renode.Peripherals.Tviburi
                 refused = Refuse(offset, s, word, "TVI-DMA-SIZE", Unmodeled, "DMA_SxCR.PSIZE = " + ((word >> 11) & 3) + ", MSIZE = " + ((word >> 13) & 3),
                     "stream " + s + " enabled with PSIZE and MSIZE different: silicon forces MSIZE to PSIZE in direct mode and runs memory-to-memory in FIFO mode only, while the stock model counts the transfer in MSIZE items, so the twin cannot say what moves",
                     "RM0433 Rev 9 §15.5.5 p663 (MSIZE); §15.3.8 p645 (memory-to-memory: direct mode not allowed); p648 (NDT in PSIZE items)");
+                if(!records.Recorded)
+                {
+                    return true;
+                }
+            }
+            if((word & CircBit) != 0 && dir != PeripheralToMemory)
+            {
+                var m2m = dir == MemoryToMemory;
+                refused |= Refuse(offset, s, word, "TVI-DMA-CIRC", Unmodeled, "DMA_SxCR.CIRC = 1, DIR = " + dir,
+                    "stream " + s + " enabled in circular mode " + (m2m
+                        ? "memory-to-memory, which RM0433 does not allow (\"the circular and direct modes are not allowed\"), and does not say what silicon does with it"
+                        : "memory-to-peripheral: the twin moves a memory-to-peripheral transfer at the EN write, unpaced by any request, so a circular one would wrap with no request")
+                        + ": the twin cannot say what silicon moves when",
+                    m2m ? "RM0433 Rev 9 §15.3.8 p645; §15.5.5 p664 (CIRC)" : "RM0433 Rev 9 §15.3.10 p647; §15.5.5 p664 (CIRC); TVI-WO-1303.measure.md D9");
+                if(!records.Recorded)
+                {
+                    return true;
+                }
+            }
+            if((word & CircBit) != 0 ? items % 2 == 1 : (word & HtieBit) != 0)
+            {
+                var circular = (word & CircBit) != 0;
+                refused |= Refuse(offset, s, word, "TVI-DMA-HALF", Unmodeled, circular ? "DMA_S" + s + "NDTR.NDT = " + items + " (odd, circular)" : "DMA_SxCR.HTIE = 1, CIRC = 0",
+                    circular
+                        ? "stream " + s + " enabled in circular mode with an odd NDT (" + items + "): HTIF is set once half the data have been transferred, and RM0433 states no count for an odd NDT, so the twin cannot say when HTIF sets"
+                        : "stream " + s + " enabled with HTIE = 1 and CIRC = 0: the twin models HTIF on circular streams only, so this stream's half-transfer interrupt would never fire",
+                    circular ? "RM0433 Rev 9 §15.3.19 p657 (HTIF); §15.5.6 p665 (NDT)" : "RM0433 Rev 9 §15.3.19 p657 (HTIF); TVI-WO-1303a ruled 2026-11-25T18:49Z Q3");
                 if(!records.Recorded)
                 {
                     return true;
@@ -700,6 +851,10 @@ namespace Antmicro.Renode.Peripherals.Tviburi
         private readonly Records records;
         private readonly uint[] cr = new uint[Streams];
         private readonly uint[] fcr = new uint[Streams];
+        // The guard's half-transfer flags (p659-661) and the streams' interrupt lines (Tap).
+        private readonly bool[] htif = new bool[Streams];
+        private readonly GPIO[] lines = new GPIO[Streams];
+        private readonly IReadOnlyDictionary<int, IGPIO> connections;
         // The NDT software last wrote to each stream, which silicon reloads at a re-enable (p665).
         private readonly uint[] programmed = new uint[Streams];
         // Suspended by software (Suspend) with no NDTR write since: TVI-DMA-OFFSET at the next enable.
@@ -719,6 +874,15 @@ namespace Antmicro.Renode.Peripherals.Tviburi
         private const long M1arOffset = 0x20;
         private const long FcrOffset = 0x24;
         private const uint EnBit = 1;
+        private const uint HtieBit = 1u << 3;
+        private const uint CircBit = 1u << 8;
+        private const long LisrOffset = 0x00;
+        private const long HisrOffset = 0x04;
+        private const long LifcrOffset = 0x08;
+        private const long HifcrOffset = 0x0C;
+        // Each stream's group of flags in LISR/HISR and LIFCR/HIFCR starts at bit 0, 6, 16 or 22; HTIF is bit 4 of it (p659-661).
+        private static readonly int[] FlagShift = { 0, 6, 16, 22 };
+        private const int HtifBit = 4;
         private const uint PincBit = 1u << 9;
         private const uint MincBit = 1u << 10;
         private const uint DmdisBit = 1u << 2;
@@ -785,6 +949,28 @@ namespace Antmicro.Renode.Peripherals.Tviburi
             "TIM16_CH1", "TIM16_UP", "TIM17_CH1", "TIM17_UP", "sai3_a_dma", "sai3_b_dma", "adc3_dma",
         };
 
+        // Recomputes stream `stream`'s line when the stock model's line for it changes.
+        private sealed class Tap : IGPIOReceiver
+        {
+            public Tap(GuardedSTM32DMA parent, int stream)
+            {
+                this.parent = parent;
+                this.stream = stream;
+            }
+
+            public void OnGPIO(int number, bool value)
+            {
+                parent.lines[stream]?.Set(value || (parent.htif[stream] && (parent.cr[stream] & HtieBit) != 0));
+            }
+
+            public void Reset()
+            {
+            }
+
+            private readonly GuardedSTM32DMA parent;
+            private readonly int stream;
+        }
+
         // ---- the allow-list (RUL-16, RUL-17): one row per field, every bit 31:0 of every register ---------------
 
         private sealed class Row
@@ -837,114 +1023,115 @@ namespace Antmicro.Renode.Peripherals.Tviburi
             return new Row(reg, off, sec, name, msb, lsb, allowed, behaves, page);
         }
 
-        // Generated by tests/1303/fields.py from RM0433 Rev 9 §15.5 (pp. 659-667), with the classes ruled 2026-11-24T14:10Z.
+        // Generated by tests/1303/fields.py from RM0433 Rev 9 §15.5 (pp. 659-667), with the classes ruled 2026-11-24T14:10Z and
+        // TVI-WO-1303a's circular mode (ruled 2026-11-25T18:49Z).
         // Stream registers at stream 0's offset; the guard applies each row to all eight streams.
         private static readonly Row[] Fields =
         {
             R("DMA_LISR", 0x00, "§15.5.1", "Res31_28", 31, 28, Zero, "reserved", "reserved: must be kept at reset value", 659),
-            R("DMA_LISR", 0x00, "§15.5.1", "TCIF3", 27, 27, Any, "read-only", "read-only (silicon ignores a write; so does the guard's stock model): set when the stock model completes a transfer (probed, TVI-WO-1303.measure.md D2), and by the guard when software clears EN while the stream runs (p654; TVI-WO-1305, ruled 2026-11-24T18:55Z Q6)", 659),
-            R("DMA_LISR", 0x00, "§15.5.1", "HTIF3", 26, 26, Any, "read-only", "read-only (silicon ignores a write): the stock model never sets it; silicon sets HTIF at half transfer and TEIF, DMEIF, FEIF on errors, none modeled", 659),
-            R("DMA_LISR", 0x00, "§15.5.1", "TEIF3", 25, 25, Any, "read-only", "read-only (silicon ignores a write): the stock model never sets it; silicon sets HTIF at half transfer and TEIF, DMEIF, FEIF on errors, none modeled", 659),
-            R("DMA_LISR", 0x00, "§15.5.1", "DMEIF3", 24, 24, Any, "read-only", "read-only (silicon ignores a write): the stock model never sets it; silicon sets HTIF at half transfer and TEIF, DMEIF, FEIF on errors, none modeled", 659),
+            R("DMA_LISR", 0x00, "§15.5.1", "TCIF3", 27, 27, Any, "read-only", "read-only (silicon ignores a write; so does the guard's stock model): set when the stock model completes a transfer (probed, TVI-WO-1303.measure.md D2), at each wrap of a circular stream (p657; each wrap is inferred from p654 against p665), and by the guard when software clears EN while the stream runs (p654; TVI-WO-1305, ruled 2026-11-24T18:55Z Q6)", 659),
+            R("DMA_LISR", 0x00, "§15.5.1", "HTIF3", 26, 26, Any, "read-only", "read-only (silicon ignores a write): set by the guard once half of a circular stream's NDT has been transferred in each cycle (p657), served on read and cleared by CHTIFx; never set on a non-circular stream, where HTIE = 1 refuses (TVI-DMA-HALF; ruled 2026-11-25T18:49Z Q3); the stock model never sets it", 659),
+            R("DMA_LISR", 0x00, "§15.5.1", "TEIF3", 25, 25, Any, "read-only", "read-only (silicon ignores a write): the stock model never sets it; silicon sets TEIF, DMEIF and FEIF on errors, none modeled", 659),
+            R("DMA_LISR", 0x00, "§15.5.1", "DMEIF3", 24, 24, Any, "read-only", "read-only (silicon ignores a write): the stock model never sets it; silicon sets TEIF, DMEIF and FEIF on errors, none modeled", 659),
             R("DMA_LISR", 0x00, "§15.5.1", "Res23", 23, 23, Zero, "reserved", "reserved: must be kept at reset value", 659),
-            R("DMA_LISR", 0x00, "§15.5.1", "FEIF3", 22, 22, Any, "read-only", "read-only (silicon ignores a write): the stock model never sets it; silicon sets HTIF at half transfer and TEIF, DMEIF, FEIF on errors, none modeled", 659),
-            R("DMA_LISR", 0x00, "§15.5.1", "TCIF2", 21, 21, Any, "read-only", "read-only (silicon ignores a write; so does the guard's stock model): set when the stock model completes a transfer (probed, TVI-WO-1303.measure.md D2), and by the guard when software clears EN while the stream runs (p654; TVI-WO-1305, ruled 2026-11-24T18:55Z Q6)", 659),
-            R("DMA_LISR", 0x00, "§15.5.1", "HTIF2", 20, 20, Any, "read-only", "read-only (silicon ignores a write): the stock model never sets it; silicon sets HTIF at half transfer and TEIF, DMEIF, FEIF on errors, none modeled", 659),
-            R("DMA_LISR", 0x00, "§15.5.1", "TEIF2", 19, 19, Any, "read-only", "read-only (silicon ignores a write): the stock model never sets it; silicon sets HTIF at half transfer and TEIF, DMEIF, FEIF on errors, none modeled", 659),
-            R("DMA_LISR", 0x00, "§15.5.1", "DMEIF2", 18, 18, Any, "read-only", "read-only (silicon ignores a write): the stock model never sets it; silicon sets HTIF at half transfer and TEIF, DMEIF, FEIF on errors, none modeled", 659),
+            R("DMA_LISR", 0x00, "§15.5.1", "FEIF3", 22, 22, Any, "read-only", "read-only (silicon ignores a write): the stock model never sets it; silicon sets TEIF, DMEIF and FEIF on errors, none modeled", 659),
+            R("DMA_LISR", 0x00, "§15.5.1", "TCIF2", 21, 21, Any, "read-only", "read-only (silicon ignores a write; so does the guard's stock model): set when the stock model completes a transfer (probed, TVI-WO-1303.measure.md D2), at each wrap of a circular stream (p657; each wrap is inferred from p654 against p665), and by the guard when software clears EN while the stream runs (p654; TVI-WO-1305, ruled 2026-11-24T18:55Z Q6)", 659),
+            R("DMA_LISR", 0x00, "§15.5.1", "HTIF2", 20, 20, Any, "read-only", "read-only (silicon ignores a write): set by the guard once half of a circular stream's NDT has been transferred in each cycle (p657), served on read and cleared by CHTIFx; never set on a non-circular stream, where HTIE = 1 refuses (TVI-DMA-HALF; ruled 2026-11-25T18:49Z Q3); the stock model never sets it", 659),
+            R("DMA_LISR", 0x00, "§15.5.1", "TEIF2", 19, 19, Any, "read-only", "read-only (silicon ignores a write): the stock model never sets it; silicon sets TEIF, DMEIF and FEIF on errors, none modeled", 659),
+            R("DMA_LISR", 0x00, "§15.5.1", "DMEIF2", 18, 18, Any, "read-only", "read-only (silicon ignores a write): the stock model never sets it; silicon sets TEIF, DMEIF and FEIF on errors, none modeled", 659),
             R("DMA_LISR", 0x00, "§15.5.1", "Res17", 17, 17, Zero, "reserved", "reserved: must be kept at reset value", 659),
-            R("DMA_LISR", 0x00, "§15.5.1", "FEIF2", 16, 16, Any, "read-only", "read-only (silicon ignores a write): the stock model never sets it; silicon sets HTIF at half transfer and TEIF, DMEIF, FEIF on errors, none modeled", 659),
+            R("DMA_LISR", 0x00, "§15.5.1", "FEIF2", 16, 16, Any, "read-only", "read-only (silicon ignores a write): the stock model never sets it; silicon sets TEIF, DMEIF and FEIF on errors, none modeled", 659),
             R("DMA_LISR", 0x00, "§15.5.1", "Res15_12", 15, 12, Zero, "reserved", "reserved: must be kept at reset value", 659),
-            R("DMA_LISR", 0x00, "§15.5.1", "TCIF1", 11, 11, Any, "read-only", "read-only (silicon ignores a write; so does the guard's stock model): set when the stock model completes a transfer (probed, TVI-WO-1303.measure.md D2), and by the guard when software clears EN while the stream runs (p654; TVI-WO-1305, ruled 2026-11-24T18:55Z Q6)", 659),
-            R("DMA_LISR", 0x00, "§15.5.1", "HTIF1", 10, 10, Any, "read-only", "read-only (silicon ignores a write): the stock model never sets it; silicon sets HTIF at half transfer and TEIF, DMEIF, FEIF on errors, none modeled", 659),
-            R("DMA_LISR", 0x00, "§15.5.1", "TEIF1", 9, 9, Any, "read-only", "read-only (silicon ignores a write): the stock model never sets it; silicon sets HTIF at half transfer and TEIF, DMEIF, FEIF on errors, none modeled", 659),
-            R("DMA_LISR", 0x00, "§15.5.1", "DMEIF1", 8, 8, Any, "read-only", "read-only (silicon ignores a write): the stock model never sets it; silicon sets HTIF at half transfer and TEIF, DMEIF, FEIF on errors, none modeled", 659),
+            R("DMA_LISR", 0x00, "§15.5.1", "TCIF1", 11, 11, Any, "read-only", "read-only (silicon ignores a write; so does the guard's stock model): set when the stock model completes a transfer (probed, TVI-WO-1303.measure.md D2), at each wrap of a circular stream (p657; each wrap is inferred from p654 against p665), and by the guard when software clears EN while the stream runs (p654; TVI-WO-1305, ruled 2026-11-24T18:55Z Q6)", 659),
+            R("DMA_LISR", 0x00, "§15.5.1", "HTIF1", 10, 10, Any, "read-only", "read-only (silicon ignores a write): set by the guard once half of a circular stream's NDT has been transferred in each cycle (p657), served on read and cleared by CHTIFx; never set on a non-circular stream, where HTIE = 1 refuses (TVI-DMA-HALF; ruled 2026-11-25T18:49Z Q3); the stock model never sets it", 659),
+            R("DMA_LISR", 0x00, "§15.5.1", "TEIF1", 9, 9, Any, "read-only", "read-only (silicon ignores a write): the stock model never sets it; silicon sets TEIF, DMEIF and FEIF on errors, none modeled", 659),
+            R("DMA_LISR", 0x00, "§15.5.1", "DMEIF1", 8, 8, Any, "read-only", "read-only (silicon ignores a write): the stock model never sets it; silicon sets TEIF, DMEIF and FEIF on errors, none modeled", 659),
             R("DMA_LISR", 0x00, "§15.5.1", "Res7", 7, 7, Zero, "reserved", "reserved: must be kept at reset value", 659),
-            R("DMA_LISR", 0x00, "§15.5.1", "FEIF1", 6, 6, Any, "read-only", "read-only (silicon ignores a write): the stock model never sets it; silicon sets HTIF at half transfer and TEIF, DMEIF, FEIF on errors, none modeled", 659),
-            R("DMA_LISR", 0x00, "§15.5.1", "TCIF0", 5, 5, Any, "read-only", "read-only (silicon ignores a write; so does the guard's stock model): set when the stock model completes a transfer (probed, TVI-WO-1303.measure.md D2), and by the guard when software clears EN while the stream runs (p654; TVI-WO-1305, ruled 2026-11-24T18:55Z Q6)", 659),
-            R("DMA_LISR", 0x00, "§15.5.1", "HTIF0", 4, 4, Any, "read-only", "read-only (silicon ignores a write): the stock model never sets it; silicon sets HTIF at half transfer and TEIF, DMEIF, FEIF on errors, none modeled", 659),
-            R("DMA_LISR", 0x00, "§15.5.1", "TEIF0", 3, 3, Any, "read-only", "read-only (silicon ignores a write): the stock model never sets it; silicon sets HTIF at half transfer and TEIF, DMEIF, FEIF on errors, none modeled", 659),
-            R("DMA_LISR", 0x00, "§15.5.1", "DMEIF0", 2, 2, Any, "read-only", "read-only (silicon ignores a write): the stock model never sets it; silicon sets HTIF at half transfer and TEIF, DMEIF, FEIF on errors, none modeled", 659),
+            R("DMA_LISR", 0x00, "§15.5.1", "FEIF1", 6, 6, Any, "read-only", "read-only (silicon ignores a write): the stock model never sets it; silicon sets TEIF, DMEIF and FEIF on errors, none modeled", 659),
+            R("DMA_LISR", 0x00, "§15.5.1", "TCIF0", 5, 5, Any, "read-only", "read-only (silicon ignores a write; so does the guard's stock model): set when the stock model completes a transfer (probed, TVI-WO-1303.measure.md D2), at each wrap of a circular stream (p657; each wrap is inferred from p654 against p665), and by the guard when software clears EN while the stream runs (p654; TVI-WO-1305, ruled 2026-11-24T18:55Z Q6)", 659),
+            R("DMA_LISR", 0x00, "§15.5.1", "HTIF0", 4, 4, Any, "read-only", "read-only (silicon ignores a write): set by the guard once half of a circular stream's NDT has been transferred in each cycle (p657), served on read and cleared by CHTIFx; never set on a non-circular stream, where HTIE = 1 refuses (TVI-DMA-HALF; ruled 2026-11-25T18:49Z Q3); the stock model never sets it", 659),
+            R("DMA_LISR", 0x00, "§15.5.1", "TEIF0", 3, 3, Any, "read-only", "read-only (silicon ignores a write): the stock model never sets it; silicon sets TEIF, DMEIF and FEIF on errors, none modeled", 659),
+            R("DMA_LISR", 0x00, "§15.5.1", "DMEIF0", 2, 2, Any, "read-only", "read-only (silicon ignores a write): the stock model never sets it; silicon sets TEIF, DMEIF and FEIF on errors, none modeled", 659),
             R("DMA_LISR", 0x00, "§15.5.1", "Res1", 1, 1, Zero, "reserved", "reserved: must be kept at reset value", 659),
-            R("DMA_LISR", 0x00, "§15.5.1", "FEIF0", 0, 0, Any, "read-only", "read-only (silicon ignores a write): the stock model never sets it; silicon sets HTIF at half transfer and TEIF, DMEIF, FEIF on errors, none modeled", 659),
+            R("DMA_LISR", 0x00, "§15.5.1", "FEIF0", 0, 0, Any, "read-only", "read-only (silicon ignores a write): the stock model never sets it; silicon sets TEIF, DMEIF and FEIF on errors, none modeled", 659),
             R("DMA_HISR", 0x04, "§15.5.2", "Res31_28", 31, 28, Zero, "reserved", "reserved: must be kept at reset value", 660),
-            R("DMA_HISR", 0x04, "§15.5.2", "TCIF7", 27, 27, Any, "read-only", "read-only (silicon ignores a write; so does the guard's stock model): set when the stock model completes a transfer (probed, TVI-WO-1303.measure.md D2), and by the guard when software clears EN while the stream runs (p654; TVI-WO-1305, ruled 2026-11-24T18:55Z Q6)", 660),
-            R("DMA_HISR", 0x04, "§15.5.2", "HTIF7", 26, 26, Any, "read-only", "read-only (silicon ignores a write): the stock model never sets it; silicon sets HTIF at half transfer and TEIF, DMEIF, FEIF on errors, none modeled", 660),
-            R("DMA_HISR", 0x04, "§15.5.2", "TEIF7", 25, 25, Any, "read-only", "read-only (silicon ignores a write): the stock model never sets it; silicon sets HTIF at half transfer and TEIF, DMEIF, FEIF on errors, none modeled", 660),
-            R("DMA_HISR", 0x04, "§15.5.2", "DMEIF7", 24, 24, Any, "read-only", "read-only (silicon ignores a write): the stock model never sets it; silicon sets HTIF at half transfer and TEIF, DMEIF, FEIF on errors, none modeled", 660),
+            R("DMA_HISR", 0x04, "§15.5.2", "TCIF7", 27, 27, Any, "read-only", "read-only (silicon ignores a write; so does the guard's stock model): set when the stock model completes a transfer (probed, TVI-WO-1303.measure.md D2), at each wrap of a circular stream (p657; each wrap is inferred from p654 against p665), and by the guard when software clears EN while the stream runs (p654; TVI-WO-1305, ruled 2026-11-24T18:55Z Q6)", 660),
+            R("DMA_HISR", 0x04, "§15.5.2", "HTIF7", 26, 26, Any, "read-only", "read-only (silicon ignores a write): set by the guard once half of a circular stream's NDT has been transferred in each cycle (p657), served on read and cleared by CHTIFx; never set on a non-circular stream, where HTIE = 1 refuses (TVI-DMA-HALF; ruled 2026-11-25T18:49Z Q3); the stock model never sets it", 660),
+            R("DMA_HISR", 0x04, "§15.5.2", "TEIF7", 25, 25, Any, "read-only", "read-only (silicon ignores a write): the stock model never sets it; silicon sets TEIF, DMEIF and FEIF on errors, none modeled", 660),
+            R("DMA_HISR", 0x04, "§15.5.2", "DMEIF7", 24, 24, Any, "read-only", "read-only (silicon ignores a write): the stock model never sets it; silicon sets TEIF, DMEIF and FEIF on errors, none modeled", 660),
             R("DMA_HISR", 0x04, "§15.5.2", "Res23", 23, 23, Zero, "reserved", "reserved: must be kept at reset value", 660),
-            R("DMA_HISR", 0x04, "§15.5.2", "FEIF7", 22, 22, Any, "read-only", "read-only (silicon ignores a write): the stock model never sets it; silicon sets HTIF at half transfer and TEIF, DMEIF, FEIF on errors, none modeled", 660),
-            R("DMA_HISR", 0x04, "§15.5.2", "TCIF6", 21, 21, Any, "read-only", "read-only (silicon ignores a write; so does the guard's stock model): set when the stock model completes a transfer (probed, TVI-WO-1303.measure.md D2), and by the guard when software clears EN while the stream runs (p654; TVI-WO-1305, ruled 2026-11-24T18:55Z Q6)", 660),
-            R("DMA_HISR", 0x04, "§15.5.2", "HTIF6", 20, 20, Any, "read-only", "read-only (silicon ignores a write): the stock model never sets it; silicon sets HTIF at half transfer and TEIF, DMEIF, FEIF on errors, none modeled", 660),
-            R("DMA_HISR", 0x04, "§15.5.2", "TEIF6", 19, 19, Any, "read-only", "read-only (silicon ignores a write): the stock model never sets it; silicon sets HTIF at half transfer and TEIF, DMEIF, FEIF on errors, none modeled", 660),
-            R("DMA_HISR", 0x04, "§15.5.2", "DMEIF6", 18, 18, Any, "read-only", "read-only (silicon ignores a write): the stock model never sets it; silicon sets HTIF at half transfer and TEIF, DMEIF, FEIF on errors, none modeled", 660),
+            R("DMA_HISR", 0x04, "§15.5.2", "FEIF7", 22, 22, Any, "read-only", "read-only (silicon ignores a write): the stock model never sets it; silicon sets TEIF, DMEIF and FEIF on errors, none modeled", 660),
+            R("DMA_HISR", 0x04, "§15.5.2", "TCIF6", 21, 21, Any, "read-only", "read-only (silicon ignores a write; so does the guard's stock model): set when the stock model completes a transfer (probed, TVI-WO-1303.measure.md D2), at each wrap of a circular stream (p657; each wrap is inferred from p654 against p665), and by the guard when software clears EN while the stream runs (p654; TVI-WO-1305, ruled 2026-11-24T18:55Z Q6)", 660),
+            R("DMA_HISR", 0x04, "§15.5.2", "HTIF6", 20, 20, Any, "read-only", "read-only (silicon ignores a write): set by the guard once half of a circular stream's NDT has been transferred in each cycle (p657), served on read and cleared by CHTIFx; never set on a non-circular stream, where HTIE = 1 refuses (TVI-DMA-HALF; ruled 2026-11-25T18:49Z Q3); the stock model never sets it", 660),
+            R("DMA_HISR", 0x04, "§15.5.2", "TEIF6", 19, 19, Any, "read-only", "read-only (silicon ignores a write): the stock model never sets it; silicon sets TEIF, DMEIF and FEIF on errors, none modeled", 660),
+            R("DMA_HISR", 0x04, "§15.5.2", "DMEIF6", 18, 18, Any, "read-only", "read-only (silicon ignores a write): the stock model never sets it; silicon sets TEIF, DMEIF and FEIF on errors, none modeled", 660),
             R("DMA_HISR", 0x04, "§15.5.2", "Res17", 17, 17, Zero, "reserved", "reserved: must be kept at reset value", 660),
-            R("DMA_HISR", 0x04, "§15.5.2", "FEIF6", 16, 16, Any, "read-only", "read-only (silicon ignores a write): the stock model never sets it; silicon sets HTIF at half transfer and TEIF, DMEIF, FEIF on errors, none modeled", 660),
+            R("DMA_HISR", 0x04, "§15.5.2", "FEIF6", 16, 16, Any, "read-only", "read-only (silicon ignores a write): the stock model never sets it; silicon sets TEIF, DMEIF and FEIF on errors, none modeled", 660),
             R("DMA_HISR", 0x04, "§15.5.2", "Res15_12", 15, 12, Zero, "reserved", "reserved: must be kept at reset value", 660),
-            R("DMA_HISR", 0x04, "§15.5.2", "TCIF5", 11, 11, Any, "read-only", "read-only (silicon ignores a write; so does the guard's stock model): set when the stock model completes a transfer (probed, TVI-WO-1303.measure.md D2), and by the guard when software clears EN while the stream runs (p654; TVI-WO-1305, ruled 2026-11-24T18:55Z Q6)", 660),
-            R("DMA_HISR", 0x04, "§15.5.2", "HTIF5", 10, 10, Any, "read-only", "read-only (silicon ignores a write): the stock model never sets it; silicon sets HTIF at half transfer and TEIF, DMEIF, FEIF on errors, none modeled", 660),
-            R("DMA_HISR", 0x04, "§15.5.2", "TEIF5", 9, 9, Any, "read-only", "read-only (silicon ignores a write): the stock model never sets it; silicon sets HTIF at half transfer and TEIF, DMEIF, FEIF on errors, none modeled", 660),
-            R("DMA_HISR", 0x04, "§15.5.2", "DMEIF5", 8, 8, Any, "read-only", "read-only (silicon ignores a write): the stock model never sets it; silicon sets HTIF at half transfer and TEIF, DMEIF, FEIF on errors, none modeled", 660),
+            R("DMA_HISR", 0x04, "§15.5.2", "TCIF5", 11, 11, Any, "read-only", "read-only (silicon ignores a write; so does the guard's stock model): set when the stock model completes a transfer (probed, TVI-WO-1303.measure.md D2), at each wrap of a circular stream (p657; each wrap is inferred from p654 against p665), and by the guard when software clears EN while the stream runs (p654; TVI-WO-1305, ruled 2026-11-24T18:55Z Q6)", 660),
+            R("DMA_HISR", 0x04, "§15.5.2", "HTIF5", 10, 10, Any, "read-only", "read-only (silicon ignores a write): set by the guard once half of a circular stream's NDT has been transferred in each cycle (p657), served on read and cleared by CHTIFx; never set on a non-circular stream, where HTIE = 1 refuses (TVI-DMA-HALF; ruled 2026-11-25T18:49Z Q3); the stock model never sets it", 660),
+            R("DMA_HISR", 0x04, "§15.5.2", "TEIF5", 9, 9, Any, "read-only", "read-only (silicon ignores a write): the stock model never sets it; silicon sets TEIF, DMEIF and FEIF on errors, none modeled", 660),
+            R("DMA_HISR", 0x04, "§15.5.2", "DMEIF5", 8, 8, Any, "read-only", "read-only (silicon ignores a write): the stock model never sets it; silicon sets TEIF, DMEIF and FEIF on errors, none modeled", 660),
             R("DMA_HISR", 0x04, "§15.5.2", "Res7", 7, 7, Zero, "reserved", "reserved: must be kept at reset value", 660),
-            R("DMA_HISR", 0x04, "§15.5.2", "FEIF5", 6, 6, Any, "read-only", "read-only (silicon ignores a write): the stock model never sets it; silicon sets HTIF at half transfer and TEIF, DMEIF, FEIF on errors, none modeled", 660),
-            R("DMA_HISR", 0x04, "§15.5.2", "TCIF4", 5, 5, Any, "read-only", "read-only (silicon ignores a write; so does the guard's stock model): set when the stock model completes a transfer (probed, TVI-WO-1303.measure.md D2), and by the guard when software clears EN while the stream runs (p654; TVI-WO-1305, ruled 2026-11-24T18:55Z Q6)", 660),
-            R("DMA_HISR", 0x04, "§15.5.2", "HTIF4", 4, 4, Any, "read-only", "read-only (silicon ignores a write): the stock model never sets it; silicon sets HTIF at half transfer and TEIF, DMEIF, FEIF on errors, none modeled", 660),
-            R("DMA_HISR", 0x04, "§15.5.2", "TEIF4", 3, 3, Any, "read-only", "read-only (silicon ignores a write): the stock model never sets it; silicon sets HTIF at half transfer and TEIF, DMEIF, FEIF on errors, none modeled", 660),
-            R("DMA_HISR", 0x04, "§15.5.2", "DMEIF4", 2, 2, Any, "read-only", "read-only (silicon ignores a write): the stock model never sets it; silicon sets HTIF at half transfer and TEIF, DMEIF, FEIF on errors, none modeled", 660),
+            R("DMA_HISR", 0x04, "§15.5.2", "FEIF5", 6, 6, Any, "read-only", "read-only (silicon ignores a write): the stock model never sets it; silicon sets TEIF, DMEIF and FEIF on errors, none modeled", 660),
+            R("DMA_HISR", 0x04, "§15.5.2", "TCIF4", 5, 5, Any, "read-only", "read-only (silicon ignores a write; so does the guard's stock model): set when the stock model completes a transfer (probed, TVI-WO-1303.measure.md D2), at each wrap of a circular stream (p657; each wrap is inferred from p654 against p665), and by the guard when software clears EN while the stream runs (p654; TVI-WO-1305, ruled 2026-11-24T18:55Z Q6)", 660),
+            R("DMA_HISR", 0x04, "§15.5.2", "HTIF4", 4, 4, Any, "read-only", "read-only (silicon ignores a write): set by the guard once half of a circular stream's NDT has been transferred in each cycle (p657), served on read and cleared by CHTIFx; never set on a non-circular stream, where HTIE = 1 refuses (TVI-DMA-HALF; ruled 2026-11-25T18:49Z Q3); the stock model never sets it", 660),
+            R("DMA_HISR", 0x04, "§15.5.2", "TEIF4", 3, 3, Any, "read-only", "read-only (silicon ignores a write): the stock model never sets it; silicon sets TEIF, DMEIF and FEIF on errors, none modeled", 660),
+            R("DMA_HISR", 0x04, "§15.5.2", "DMEIF4", 2, 2, Any, "read-only", "read-only (silicon ignores a write): the stock model never sets it; silicon sets TEIF, DMEIF and FEIF on errors, none modeled", 660),
             R("DMA_HISR", 0x04, "§15.5.2", "Res1", 1, 1, Zero, "reserved", "reserved: must be kept at reset value", 660),
-            R("DMA_HISR", 0x04, "§15.5.2", "FEIF4", 0, 0, Any, "read-only", "read-only (silicon ignores a write): the stock model never sets it; silicon sets HTIF at half transfer and TEIF, DMEIF, FEIF on errors, none modeled", 660),
+            R("DMA_HISR", 0x04, "§15.5.2", "FEIF4", 0, 0, Any, "read-only", "read-only (silicon ignores a write): the stock model never sets it; silicon sets TEIF, DMEIF and FEIF on errors, none modeled", 660),
             R("DMA_LIFCR", 0x08, "§15.5.3", "Res31_28", 31, 28, Zero, "reserved", "reserved: must be kept at reset value", 660),
             R("DMA_LIFCR", 0x08, "§15.5.3", "CTCIF3", 27, 27, Any, "inherited, unaudited (acknowledged by name)", "the stock model: writing 1 clears TCIFx and its interrupt (probed, TVI-WO-1303.measure.md D2; ArduPilot writes it)", 660),
-            R("DMA_LIFCR", 0x08, "§15.5.3", "CHTIF3", 26, 26, Any, "stock, wrong (the stock model never sets HTIF, TEIF, DMEIF or FEIF, so clearing one changes nothing, where silicon sets HTIF at half transfer and the others on errors; acknowledged by name, ruled 2026-11-24T14:10Z Q6; ArduPilot writes them)", "a stock tag: dropped; the flag it clears never sets in the twin", 660),
-            R("DMA_LIFCR", 0x08, "§15.5.3", "CTEIF3", 25, 25, Any, "stock, wrong (the stock model never sets HTIF, TEIF, DMEIF or FEIF, so clearing one changes nothing, where silicon sets HTIF at half transfer and the others on errors; acknowledged by name, ruled 2026-11-24T14:10Z Q6; ArduPilot writes them)", "a stock tag: dropped; the flag it clears never sets in the twin", 660),
-            R("DMA_LIFCR", 0x08, "§15.5.3", "CDMEIF3", 24, 24, Any, "stock, wrong (the stock model never sets HTIF, TEIF, DMEIF or FEIF, so clearing one changes nothing, where silicon sets HTIF at half transfer and the others on errors; acknowledged by name, ruled 2026-11-24T14:10Z Q6; ArduPilot writes them)", "a stock tag: dropped; the flag it clears never sets in the twin", 660),
+            R("DMA_LIFCR", 0x08, "§15.5.3", "CHTIF3", 26, 26, Any, "modeled by the guard", "writing 1 clears the guard's HTIFx and its interrupt (p660-661); HTIF sets on circular streams only (ruled 2026-11-25T18:49Z Q3)", 660),
+            R("DMA_LIFCR", 0x08, "§15.5.3", "CTEIF3", 25, 25, Any, "stock, wrong (the stock model never sets TEIF, DMEIF or FEIF, so clearing one changes nothing, where silicon sets them on errors; acknowledged by name, ruled 2026-11-24T14:10Z Q6; ArduPilot writes them)", "a stock tag: dropped; the flag it clears never sets in the twin", 660),
+            R("DMA_LIFCR", 0x08, "§15.5.3", "CDMEIF3", 24, 24, Any, "stock, wrong (the stock model never sets TEIF, DMEIF or FEIF, so clearing one changes nothing, where silicon sets them on errors; acknowledged by name, ruled 2026-11-24T14:10Z Q6; ArduPilot writes them)", "a stock tag: dropped; the flag it clears never sets in the twin", 660),
             R("DMA_LIFCR", 0x08, "§15.5.3", "Res23", 23, 23, Zero, "reserved", "reserved: must be kept at reset value", 660),
-            R("DMA_LIFCR", 0x08, "§15.5.3", "CFEIF3", 22, 22, Any, "stock, wrong (the stock model never sets HTIF, TEIF, DMEIF or FEIF, so clearing one changes nothing, where silicon sets HTIF at half transfer and the others on errors; acknowledged by name, ruled 2026-11-24T14:10Z Q6; ArduPilot writes them)", "a stock tag: dropped; the flag it clears never sets in the twin", 660),
+            R("DMA_LIFCR", 0x08, "§15.5.3", "CFEIF3", 22, 22, Any, "stock, wrong (the stock model never sets TEIF, DMEIF or FEIF, so clearing one changes nothing, where silicon sets them on errors; acknowledged by name, ruled 2026-11-24T14:10Z Q6; ArduPilot writes them)", "a stock tag: dropped; the flag it clears never sets in the twin", 660),
             R("DMA_LIFCR", 0x08, "§15.5.3", "CTCIF2", 21, 21, Any, "inherited, unaudited (acknowledged by name)", "the stock model: writing 1 clears TCIFx and its interrupt (probed, TVI-WO-1303.measure.md D2; ArduPilot writes it)", 660),
-            R("DMA_LIFCR", 0x08, "§15.5.3", "CHTIF2", 20, 20, Any, "stock, wrong (the stock model never sets HTIF, TEIF, DMEIF or FEIF, so clearing one changes nothing, where silicon sets HTIF at half transfer and the others on errors; acknowledged by name, ruled 2026-11-24T14:10Z Q6; ArduPilot writes them)", "a stock tag: dropped; the flag it clears never sets in the twin", 660),
-            R("DMA_LIFCR", 0x08, "§15.5.3", "CTEIF2", 19, 19, Any, "stock, wrong (the stock model never sets HTIF, TEIF, DMEIF or FEIF, so clearing one changes nothing, where silicon sets HTIF at half transfer and the others on errors; acknowledged by name, ruled 2026-11-24T14:10Z Q6; ArduPilot writes them)", "a stock tag: dropped; the flag it clears never sets in the twin", 660),
-            R("DMA_LIFCR", 0x08, "§15.5.3", "CDMEIF2", 18, 18, Any, "stock, wrong (the stock model never sets HTIF, TEIF, DMEIF or FEIF, so clearing one changes nothing, where silicon sets HTIF at half transfer and the others on errors; acknowledged by name, ruled 2026-11-24T14:10Z Q6; ArduPilot writes them)", "a stock tag: dropped; the flag it clears never sets in the twin", 660),
+            R("DMA_LIFCR", 0x08, "§15.5.3", "CHTIF2", 20, 20, Any, "modeled by the guard", "writing 1 clears the guard's HTIFx and its interrupt (p660-661); HTIF sets on circular streams only (ruled 2026-11-25T18:49Z Q3)", 660),
+            R("DMA_LIFCR", 0x08, "§15.5.3", "CTEIF2", 19, 19, Any, "stock, wrong (the stock model never sets TEIF, DMEIF or FEIF, so clearing one changes nothing, where silicon sets them on errors; acknowledged by name, ruled 2026-11-24T14:10Z Q6; ArduPilot writes them)", "a stock tag: dropped; the flag it clears never sets in the twin", 660),
+            R("DMA_LIFCR", 0x08, "§15.5.3", "CDMEIF2", 18, 18, Any, "stock, wrong (the stock model never sets TEIF, DMEIF or FEIF, so clearing one changes nothing, where silicon sets them on errors; acknowledged by name, ruled 2026-11-24T14:10Z Q6; ArduPilot writes them)", "a stock tag: dropped; the flag it clears never sets in the twin", 660),
             R("DMA_LIFCR", 0x08, "§15.5.3", "Res17", 17, 17, Zero, "reserved", "reserved: must be kept at reset value", 660),
-            R("DMA_LIFCR", 0x08, "§15.5.3", "CFEIF2", 16, 16, Any, "stock, wrong (the stock model never sets HTIF, TEIF, DMEIF or FEIF, so clearing one changes nothing, where silicon sets HTIF at half transfer and the others on errors; acknowledged by name, ruled 2026-11-24T14:10Z Q6; ArduPilot writes them)", "a stock tag: dropped; the flag it clears never sets in the twin", 660),
+            R("DMA_LIFCR", 0x08, "§15.5.3", "CFEIF2", 16, 16, Any, "stock, wrong (the stock model never sets TEIF, DMEIF or FEIF, so clearing one changes nothing, where silicon sets them on errors; acknowledged by name, ruled 2026-11-24T14:10Z Q6; ArduPilot writes them)", "a stock tag: dropped; the flag it clears never sets in the twin", 660),
             R("DMA_LIFCR", 0x08, "§15.5.3", "Res15_12", 15, 12, Zero, "reserved", "reserved: must be kept at reset value", 660),
             R("DMA_LIFCR", 0x08, "§15.5.3", "CTCIF1", 11, 11, Any, "inherited, unaudited (acknowledged by name)", "the stock model: writing 1 clears TCIFx and its interrupt (probed, TVI-WO-1303.measure.md D2; ArduPilot writes it)", 660),
-            R("DMA_LIFCR", 0x08, "§15.5.3", "CHTIF1", 10, 10, Any, "stock, wrong (the stock model never sets HTIF, TEIF, DMEIF or FEIF, so clearing one changes nothing, where silicon sets HTIF at half transfer and the others on errors; acknowledged by name, ruled 2026-11-24T14:10Z Q6; ArduPilot writes them)", "a stock tag: dropped; the flag it clears never sets in the twin", 660),
-            R("DMA_LIFCR", 0x08, "§15.5.3", "CTEIF1", 9, 9, Any, "stock, wrong (the stock model never sets HTIF, TEIF, DMEIF or FEIF, so clearing one changes nothing, where silicon sets HTIF at half transfer and the others on errors; acknowledged by name, ruled 2026-11-24T14:10Z Q6; ArduPilot writes them)", "a stock tag: dropped; the flag it clears never sets in the twin", 660),
-            R("DMA_LIFCR", 0x08, "§15.5.3", "CDMEIF1", 8, 8, Any, "stock, wrong (the stock model never sets HTIF, TEIF, DMEIF or FEIF, so clearing one changes nothing, where silicon sets HTIF at half transfer and the others on errors; acknowledged by name, ruled 2026-11-24T14:10Z Q6; ArduPilot writes them)", "a stock tag: dropped; the flag it clears never sets in the twin", 660),
+            R("DMA_LIFCR", 0x08, "§15.5.3", "CHTIF1", 10, 10, Any, "modeled by the guard", "writing 1 clears the guard's HTIFx and its interrupt (p660-661); HTIF sets on circular streams only (ruled 2026-11-25T18:49Z Q3)", 660),
+            R("DMA_LIFCR", 0x08, "§15.5.3", "CTEIF1", 9, 9, Any, "stock, wrong (the stock model never sets TEIF, DMEIF or FEIF, so clearing one changes nothing, where silicon sets them on errors; acknowledged by name, ruled 2026-11-24T14:10Z Q6; ArduPilot writes them)", "a stock tag: dropped; the flag it clears never sets in the twin", 660),
+            R("DMA_LIFCR", 0x08, "§15.5.3", "CDMEIF1", 8, 8, Any, "stock, wrong (the stock model never sets TEIF, DMEIF or FEIF, so clearing one changes nothing, where silicon sets them on errors; acknowledged by name, ruled 2026-11-24T14:10Z Q6; ArduPilot writes them)", "a stock tag: dropped; the flag it clears never sets in the twin", 660),
             R("DMA_LIFCR", 0x08, "§15.5.3", "Res7", 7, 7, Zero, "reserved", "reserved: must be kept at reset value", 660),
-            R("DMA_LIFCR", 0x08, "§15.5.3", "CFEIF1", 6, 6, Any, "stock, wrong (the stock model never sets HTIF, TEIF, DMEIF or FEIF, so clearing one changes nothing, where silicon sets HTIF at half transfer and the others on errors; acknowledged by name, ruled 2026-11-24T14:10Z Q6; ArduPilot writes them)", "a stock tag: dropped; the flag it clears never sets in the twin", 660),
+            R("DMA_LIFCR", 0x08, "§15.5.3", "CFEIF1", 6, 6, Any, "stock, wrong (the stock model never sets TEIF, DMEIF or FEIF, so clearing one changes nothing, where silicon sets them on errors; acknowledged by name, ruled 2026-11-24T14:10Z Q6; ArduPilot writes them)", "a stock tag: dropped; the flag it clears never sets in the twin", 660),
             R("DMA_LIFCR", 0x08, "§15.5.3", "CTCIF0", 5, 5, Any, "inherited, unaudited (acknowledged by name)", "the stock model: writing 1 clears TCIFx and its interrupt (probed, TVI-WO-1303.measure.md D2; ArduPilot writes it)", 660),
-            R("DMA_LIFCR", 0x08, "§15.5.3", "CHTIF0", 4, 4, Any, "stock, wrong (the stock model never sets HTIF, TEIF, DMEIF or FEIF, so clearing one changes nothing, where silicon sets HTIF at half transfer and the others on errors; acknowledged by name, ruled 2026-11-24T14:10Z Q6; ArduPilot writes them)", "a stock tag: dropped; the flag it clears never sets in the twin", 660),
-            R("DMA_LIFCR", 0x08, "§15.5.3", "CTEIF0", 3, 3, Any, "stock, wrong (the stock model never sets HTIF, TEIF, DMEIF or FEIF, so clearing one changes nothing, where silicon sets HTIF at half transfer and the others on errors; acknowledged by name, ruled 2026-11-24T14:10Z Q6; ArduPilot writes them)", "a stock tag: dropped; the flag it clears never sets in the twin", 660),
-            R("DMA_LIFCR", 0x08, "§15.5.3", "CDMEIF0", 2, 2, Any, "stock, wrong (the stock model never sets HTIF, TEIF, DMEIF or FEIF, so clearing one changes nothing, where silicon sets HTIF at half transfer and the others on errors; acknowledged by name, ruled 2026-11-24T14:10Z Q6; ArduPilot writes them)", "a stock tag: dropped; the flag it clears never sets in the twin", 660),
+            R("DMA_LIFCR", 0x08, "§15.5.3", "CHTIF0", 4, 4, Any, "modeled by the guard", "writing 1 clears the guard's HTIFx and its interrupt (p660-661); HTIF sets on circular streams only (ruled 2026-11-25T18:49Z Q3)", 660),
+            R("DMA_LIFCR", 0x08, "§15.5.3", "CTEIF0", 3, 3, Any, "stock, wrong (the stock model never sets TEIF, DMEIF or FEIF, so clearing one changes nothing, where silicon sets them on errors; acknowledged by name, ruled 2026-11-24T14:10Z Q6; ArduPilot writes them)", "a stock tag: dropped; the flag it clears never sets in the twin", 660),
+            R("DMA_LIFCR", 0x08, "§15.5.3", "CDMEIF0", 2, 2, Any, "stock, wrong (the stock model never sets TEIF, DMEIF or FEIF, so clearing one changes nothing, where silicon sets them on errors; acknowledged by name, ruled 2026-11-24T14:10Z Q6; ArduPilot writes them)", "a stock tag: dropped; the flag it clears never sets in the twin", 660),
             R("DMA_LIFCR", 0x08, "§15.5.3", "Res1", 1, 1, Zero, "reserved", "reserved: must be kept at reset value", 660),
-            R("DMA_LIFCR", 0x08, "§15.5.3", "CFEIF0", 0, 0, Any, "stock, wrong (the stock model never sets HTIF, TEIF, DMEIF or FEIF, so clearing one changes nothing, where silicon sets HTIF at half transfer and the others on errors; acknowledged by name, ruled 2026-11-24T14:10Z Q6; ArduPilot writes them)", "a stock tag: dropped; the flag it clears never sets in the twin", 660),
+            R("DMA_LIFCR", 0x08, "§15.5.3", "CFEIF0", 0, 0, Any, "stock, wrong (the stock model never sets TEIF, DMEIF or FEIF, so clearing one changes nothing, where silicon sets them on errors; acknowledged by name, ruled 2026-11-24T14:10Z Q6; ArduPilot writes them)", "a stock tag: dropped; the flag it clears never sets in the twin", 660),
             R("DMA_HIFCR", 0x0C, "§15.5.4", "Res31_28", 31, 28, Zero, "reserved", "reserved: must be kept at reset value", 661),
             R("DMA_HIFCR", 0x0C, "§15.5.4", "CTCIF7", 27, 27, Any, "inherited, unaudited (acknowledged by name)", "the stock model: writing 1 clears TCIFx and its interrupt (probed, TVI-WO-1303.measure.md D2; ArduPilot writes it)", 661),
-            R("DMA_HIFCR", 0x0C, "§15.5.4", "CHTIF7", 26, 26, Any, "stock, wrong (the stock model never sets HTIF, TEIF, DMEIF or FEIF, so clearing one changes nothing, where silicon sets HTIF at half transfer and the others on errors; acknowledged by name, ruled 2026-11-24T14:10Z Q6; ArduPilot writes them)", "a stock tag: dropped; the flag it clears never sets in the twin", 661),
-            R("DMA_HIFCR", 0x0C, "§15.5.4", "CTEIF7", 25, 25, Any, "stock, wrong (the stock model never sets HTIF, TEIF, DMEIF or FEIF, so clearing one changes nothing, where silicon sets HTIF at half transfer and the others on errors; acknowledged by name, ruled 2026-11-24T14:10Z Q6; ArduPilot writes them)", "a stock tag: dropped; the flag it clears never sets in the twin", 661),
-            R("DMA_HIFCR", 0x0C, "§15.5.4", "CDMEIF7", 24, 24, Any, "stock, wrong (the stock model never sets HTIF, TEIF, DMEIF or FEIF, so clearing one changes nothing, where silicon sets HTIF at half transfer and the others on errors; acknowledged by name, ruled 2026-11-24T14:10Z Q6; ArduPilot writes them)", "a stock tag: dropped; the flag it clears never sets in the twin", 661),
+            R("DMA_HIFCR", 0x0C, "§15.5.4", "CHTIF7", 26, 26, Any, "modeled by the guard", "writing 1 clears the guard's HTIFx and its interrupt (p660-661); HTIF sets on circular streams only (ruled 2026-11-25T18:49Z Q3)", 661),
+            R("DMA_HIFCR", 0x0C, "§15.5.4", "CTEIF7", 25, 25, Any, "stock, wrong (the stock model never sets TEIF, DMEIF or FEIF, so clearing one changes nothing, where silicon sets them on errors; acknowledged by name, ruled 2026-11-24T14:10Z Q6; ArduPilot writes them)", "a stock tag: dropped; the flag it clears never sets in the twin", 661),
+            R("DMA_HIFCR", 0x0C, "§15.5.4", "CDMEIF7", 24, 24, Any, "stock, wrong (the stock model never sets TEIF, DMEIF or FEIF, so clearing one changes nothing, where silicon sets them on errors; acknowledged by name, ruled 2026-11-24T14:10Z Q6; ArduPilot writes them)", "a stock tag: dropped; the flag it clears never sets in the twin", 661),
             R("DMA_HIFCR", 0x0C, "§15.5.4", "Res23", 23, 23, Zero, "reserved", "reserved: must be kept at reset value", 661),
-            R("DMA_HIFCR", 0x0C, "§15.5.4", "CFEIF7", 22, 22, Any, "stock, wrong (the stock model never sets HTIF, TEIF, DMEIF or FEIF, so clearing one changes nothing, where silicon sets HTIF at half transfer and the others on errors; acknowledged by name, ruled 2026-11-24T14:10Z Q6; ArduPilot writes them)", "a stock tag: dropped; the flag it clears never sets in the twin", 661),
+            R("DMA_HIFCR", 0x0C, "§15.5.4", "CFEIF7", 22, 22, Any, "stock, wrong (the stock model never sets TEIF, DMEIF or FEIF, so clearing one changes nothing, where silicon sets them on errors; acknowledged by name, ruled 2026-11-24T14:10Z Q6; ArduPilot writes them)", "a stock tag: dropped; the flag it clears never sets in the twin", 661),
             R("DMA_HIFCR", 0x0C, "§15.5.4", "CTCIF6", 21, 21, Any, "inherited, unaudited (acknowledged by name)", "the stock model: writing 1 clears TCIFx and its interrupt (probed, TVI-WO-1303.measure.md D2; ArduPilot writes it)", 661),
-            R("DMA_HIFCR", 0x0C, "§15.5.4", "CHTIF6", 20, 20, Any, "stock, wrong (the stock model never sets HTIF, TEIF, DMEIF or FEIF, so clearing one changes nothing, where silicon sets HTIF at half transfer and the others on errors; acknowledged by name, ruled 2026-11-24T14:10Z Q6; ArduPilot writes them)", "a stock tag: dropped; the flag it clears never sets in the twin", 661),
-            R("DMA_HIFCR", 0x0C, "§15.5.4", "CTEIF6", 19, 19, Any, "stock, wrong (the stock model never sets HTIF, TEIF, DMEIF or FEIF, so clearing one changes nothing, where silicon sets HTIF at half transfer and the others on errors; acknowledged by name, ruled 2026-11-24T14:10Z Q6; ArduPilot writes them)", "a stock tag: dropped; the flag it clears never sets in the twin", 661),
-            R("DMA_HIFCR", 0x0C, "§15.5.4", "CDMEIF6", 18, 18, Any, "stock, wrong (the stock model never sets HTIF, TEIF, DMEIF or FEIF, so clearing one changes nothing, where silicon sets HTIF at half transfer and the others on errors; acknowledged by name, ruled 2026-11-24T14:10Z Q6; ArduPilot writes them)", "a stock tag: dropped; the flag it clears never sets in the twin", 661),
+            R("DMA_HIFCR", 0x0C, "§15.5.4", "CHTIF6", 20, 20, Any, "modeled by the guard", "writing 1 clears the guard's HTIFx and its interrupt (p660-661); HTIF sets on circular streams only (ruled 2026-11-25T18:49Z Q3)", 661),
+            R("DMA_HIFCR", 0x0C, "§15.5.4", "CTEIF6", 19, 19, Any, "stock, wrong (the stock model never sets TEIF, DMEIF or FEIF, so clearing one changes nothing, where silicon sets them on errors; acknowledged by name, ruled 2026-11-24T14:10Z Q6; ArduPilot writes them)", "a stock tag: dropped; the flag it clears never sets in the twin", 661),
+            R("DMA_HIFCR", 0x0C, "§15.5.4", "CDMEIF6", 18, 18, Any, "stock, wrong (the stock model never sets TEIF, DMEIF or FEIF, so clearing one changes nothing, where silicon sets them on errors; acknowledged by name, ruled 2026-11-24T14:10Z Q6; ArduPilot writes them)", "a stock tag: dropped; the flag it clears never sets in the twin", 661),
             R("DMA_HIFCR", 0x0C, "§15.5.4", "Res17", 17, 17, Zero, "reserved", "reserved: must be kept at reset value", 661),
-            R("DMA_HIFCR", 0x0C, "§15.5.4", "CFEIF6", 16, 16, Any, "stock, wrong (the stock model never sets HTIF, TEIF, DMEIF or FEIF, so clearing one changes nothing, where silicon sets HTIF at half transfer and the others on errors; acknowledged by name, ruled 2026-11-24T14:10Z Q6; ArduPilot writes them)", "a stock tag: dropped; the flag it clears never sets in the twin", 661),
+            R("DMA_HIFCR", 0x0C, "§15.5.4", "CFEIF6", 16, 16, Any, "stock, wrong (the stock model never sets TEIF, DMEIF or FEIF, so clearing one changes nothing, where silicon sets them on errors; acknowledged by name, ruled 2026-11-24T14:10Z Q6; ArduPilot writes them)", "a stock tag: dropped; the flag it clears never sets in the twin", 661),
             R("DMA_HIFCR", 0x0C, "§15.5.4", "Res15_12", 15, 12, Zero, "reserved", "reserved: must be kept at reset value", 661),
             R("DMA_HIFCR", 0x0C, "§15.5.4", "CTCIF5", 11, 11, Any, "inherited, unaudited (acknowledged by name)", "the stock model: writing 1 clears TCIFx and its interrupt (probed, TVI-WO-1303.measure.md D2; ArduPilot writes it)", 661),
-            R("DMA_HIFCR", 0x0C, "§15.5.4", "CHTIF5", 10, 10, Any, "stock, wrong (the stock model never sets HTIF, TEIF, DMEIF or FEIF, so clearing one changes nothing, where silicon sets HTIF at half transfer and the others on errors; acknowledged by name, ruled 2026-11-24T14:10Z Q6; ArduPilot writes them)", "a stock tag: dropped; the flag it clears never sets in the twin", 661),
-            R("DMA_HIFCR", 0x0C, "§15.5.4", "CTEIF5", 9, 9, Any, "stock, wrong (the stock model never sets HTIF, TEIF, DMEIF or FEIF, so clearing one changes nothing, where silicon sets HTIF at half transfer and the others on errors; acknowledged by name, ruled 2026-11-24T14:10Z Q6; ArduPilot writes them)", "a stock tag: dropped; the flag it clears never sets in the twin", 661),
-            R("DMA_HIFCR", 0x0C, "§15.5.4", "CDMEIF5", 8, 8, Any, "stock, wrong (the stock model never sets HTIF, TEIF, DMEIF or FEIF, so clearing one changes nothing, where silicon sets HTIF at half transfer and the others on errors; acknowledged by name, ruled 2026-11-24T14:10Z Q6; ArduPilot writes them)", "a stock tag: dropped; the flag it clears never sets in the twin", 661),
+            R("DMA_HIFCR", 0x0C, "§15.5.4", "CHTIF5", 10, 10, Any, "modeled by the guard", "writing 1 clears the guard's HTIFx and its interrupt (p660-661); HTIF sets on circular streams only (ruled 2026-11-25T18:49Z Q3)", 661),
+            R("DMA_HIFCR", 0x0C, "§15.5.4", "CTEIF5", 9, 9, Any, "stock, wrong (the stock model never sets TEIF, DMEIF or FEIF, so clearing one changes nothing, where silicon sets them on errors; acknowledged by name, ruled 2026-11-24T14:10Z Q6; ArduPilot writes them)", "a stock tag: dropped; the flag it clears never sets in the twin", 661),
+            R("DMA_HIFCR", 0x0C, "§15.5.4", "CDMEIF5", 8, 8, Any, "stock, wrong (the stock model never sets TEIF, DMEIF or FEIF, so clearing one changes nothing, where silicon sets them on errors; acknowledged by name, ruled 2026-11-24T14:10Z Q6; ArduPilot writes them)", "a stock tag: dropped; the flag it clears never sets in the twin", 661),
             R("DMA_HIFCR", 0x0C, "§15.5.4", "Res7", 7, 7, Zero, "reserved", "reserved: must be kept at reset value", 661),
-            R("DMA_HIFCR", 0x0C, "§15.5.4", "CFEIF5", 6, 6, Any, "stock, wrong (the stock model never sets HTIF, TEIF, DMEIF or FEIF, so clearing one changes nothing, where silicon sets HTIF at half transfer and the others on errors; acknowledged by name, ruled 2026-11-24T14:10Z Q6; ArduPilot writes them)", "a stock tag: dropped; the flag it clears never sets in the twin", 661),
+            R("DMA_HIFCR", 0x0C, "§15.5.4", "CFEIF5", 6, 6, Any, "stock, wrong (the stock model never sets TEIF, DMEIF or FEIF, so clearing one changes nothing, where silicon sets them on errors; acknowledged by name, ruled 2026-11-24T14:10Z Q6; ArduPilot writes them)", "a stock tag: dropped; the flag it clears never sets in the twin", 661),
             R("DMA_HIFCR", 0x0C, "§15.5.4", "CTCIF4", 5, 5, Any, "inherited, unaudited (acknowledged by name)", "the stock model: writing 1 clears TCIFx and its interrupt (probed, TVI-WO-1303.measure.md D2; ArduPilot writes it)", 661),
-            R("DMA_HIFCR", 0x0C, "§15.5.4", "CHTIF4", 4, 4, Any, "stock, wrong (the stock model never sets HTIF, TEIF, DMEIF or FEIF, so clearing one changes nothing, where silicon sets HTIF at half transfer and the others on errors; acknowledged by name, ruled 2026-11-24T14:10Z Q6; ArduPilot writes them)", "a stock tag: dropped; the flag it clears never sets in the twin", 661),
-            R("DMA_HIFCR", 0x0C, "§15.5.4", "CTEIF4", 3, 3, Any, "stock, wrong (the stock model never sets HTIF, TEIF, DMEIF or FEIF, so clearing one changes nothing, where silicon sets HTIF at half transfer and the others on errors; acknowledged by name, ruled 2026-11-24T14:10Z Q6; ArduPilot writes them)", "a stock tag: dropped; the flag it clears never sets in the twin", 661),
-            R("DMA_HIFCR", 0x0C, "§15.5.4", "CDMEIF4", 2, 2, Any, "stock, wrong (the stock model never sets HTIF, TEIF, DMEIF or FEIF, so clearing one changes nothing, where silicon sets HTIF at half transfer and the others on errors; acknowledged by name, ruled 2026-11-24T14:10Z Q6; ArduPilot writes them)", "a stock tag: dropped; the flag it clears never sets in the twin", 661),
+            R("DMA_HIFCR", 0x0C, "§15.5.4", "CHTIF4", 4, 4, Any, "modeled by the guard", "writing 1 clears the guard's HTIFx and its interrupt (p660-661); HTIF sets on circular streams only (ruled 2026-11-25T18:49Z Q3)", 661),
+            R("DMA_HIFCR", 0x0C, "§15.5.4", "CTEIF4", 3, 3, Any, "stock, wrong (the stock model never sets TEIF, DMEIF or FEIF, so clearing one changes nothing, where silicon sets them on errors; acknowledged by name, ruled 2026-11-24T14:10Z Q6; ArduPilot writes them)", "a stock tag: dropped; the flag it clears never sets in the twin", 661),
+            R("DMA_HIFCR", 0x0C, "§15.5.4", "CDMEIF4", 2, 2, Any, "stock, wrong (the stock model never sets TEIF, DMEIF or FEIF, so clearing one changes nothing, where silicon sets them on errors; acknowledged by name, ruled 2026-11-24T14:10Z Q6; ArduPilot writes them)", "a stock tag: dropped; the flag it clears never sets in the twin", 661),
             R("DMA_HIFCR", 0x0C, "§15.5.4", "Res1", 1, 1, Zero, "reserved", "reserved: must be kept at reset value", 661),
-            R("DMA_HIFCR", 0x0C, "§15.5.4", "CFEIF4", 0, 0, Any, "stock, wrong (the stock model never sets HTIF, TEIF, DMEIF or FEIF, so clearing one changes nothing, where silicon sets HTIF at half transfer and the others on errors; acknowledged by name, ruled 2026-11-24T14:10Z Q6; ArduPilot writes them)", "a stock tag: dropped; the flag it clears never sets in the twin", 661),
+            R("DMA_HIFCR", 0x0C, "§15.5.4", "CFEIF4", 0, 0, Any, "stock, wrong (the stock model never sets TEIF, DMEIF or FEIF, so clearing one changes nothing, where silicon sets them on errors; acknowledged by name, ruled 2026-11-24T14:10Z Q6; ArduPilot writes them)", "a stock tag: dropped; the flag it clears never sets in the twin", 661),
             R("DMA_SxCR", 0x10, "§15.5.5", "Res31_25", 31, 25, Zero, "reserved", "reserved: must be kept at reset value", 662),
             R("DMA_SxCR", 0x10, "§15.5.5", "MBURST[1:0]", 24, 23, Zero, "tag", "00 only: a stock tag; burst transfers are not modeled", 662),
             R("DMA_SxCR", 0x10, "§15.5.5", "PBURST[1:0]", 22, 21, Zero, "tag", "00 only: a stock tag; burst transfers are not modeled", 662),
@@ -957,16 +1144,16 @@ namespace Antmicro.Renode.Peripherals.Tviburi
             R("DMA_SxCR", 0x10, "§15.5.5", "PSIZE[1:0]", 12, 11, Sizes, "inherited, unaudited (acknowledged by name)", "the stock model: the peripheral data size, byte, half-word or word (probed: word D2, half-word msize16, byte ArduPilot); 11 is reserved; protected under EN", 663),
             R("DMA_SxCR", 0x10, "§15.5.5", "MINC", 10, 10, Any, "inherited, unaudited (acknowledged by name)", "the stock model: memory address increment (probed, D2); protected under EN", 663),
             R("DMA_SxCR", 0x10, "§15.5.5", "PINC", 9, 9, Any, "inherited, unaudited (acknowledged by name)", "the stock model: peripheral address increment (probed, D2); protected under EN", 663),
-            R("DMA_SxCR", 0x10, "§15.5.5", "CIRC", 8, 8, Zero, "tag", "0 only: a stock tag; circular mode is not modeled", 664),
+            R("DMA_SxCR", 0x10, "§15.5.5", "CIRC", 8, 8, Any, "modeled by the guard", "the guard (the stock model drops it): on a peripheral-to-memory stream, at the request that leaves NDT = 0, the programmed NDT is reloaded and requests go on being served (§15.3.10 p647; NDT p665); EN stays 1 and TCIF is set at each wrap (both inferred from p654 against p665: RM0433 states neither), HTIF at half (p657); at EN, refused on memory-to-peripheral (the twin moves it unpaced) and memory-to-memory (p645) (TVI-DMA-CIRC) and with an odd NDT (TVI-DMA-HALF); changed while the stream is enabled, TVI-DMA-CIRC (p664 states no rule; p665); ruled 2026-11-25T18:49Z Q1-Q5", 664),
             R("DMA_SxCR", 0x10, "§15.5.5", "DIR[1:0]", 7, 6, Directions, "stock, wrong (a memory-to-peripheral transfer completes at the EN write, unpaced by any request, where silicon moves one item per request: acknowledged for requests 38 spi1_tx_dma, 40 spi2_tx_dma, 42 usart1_tx_dma and 46 usart3_tx_dma, as ArduPilot's recorded boot and armed run use them; a peripheral-to-memory stream on request 41 usart1_rx_dma, 43 usart2_rx_dma or 45 usart3_rx_dma moves the bytes the USART guard's ReceiveDmaRequest raises where the platform wires it, and nothing where it does not: acknowledged by name; any other request no model raises refuses TVI-DMA-REQUEST; ruled 2026-11-24T14:10Z Q5 (c); 43, 45, 46 ruled 2026-11-24T18:55Z Q6)", "the stock model: 00 peripheral-to-memory, 01 memory-to-peripheral, 10 memory-to-memory (probed, D2, D9, D11); 11 is reserved; protected under EN", 664),
             R("DMA_SxCR", 0x10, "§15.5.5", "PFCTRL", 5, 5, Zero, "tag", "0 only: a stock tag; the peripheral as flow controller is not modeled", 664),
             R("DMA_SxCR", 0x10, "§15.5.5", "TCIE", 4, 4, Any, "inherited, unaudited (acknowledged by name)", "the stock model: the transfer-complete interrupt (probed, D2; ArduPilot's streams take it)", 664),
-            R("DMA_SxCR", 0x10, "§15.5.5", "HTIE", 3, 3, Zero, "tag", "0 only: a stock tag; the half-transfer flag never sets in the twin", 664),
+            R("DMA_SxCR", 0x10, "§15.5.5", "HTIE", 3, 3, Any, "modeled by the guard", "the guard (the stock model drops it): the half-transfer interrupt of a circular stream, on the stream's line with the stock model's TCIE and TCIF (p657; Table 116 p658); 1 on a non-circular stream refuses at EN (TVI-DMA-HALF): HTIF is modeled on circular streams only (ruled 2026-11-25T18:49Z Q3)", 664),
             R("DMA_SxCR", 0x10, "§15.5.5", "TEIE", 2, 2, Any, "stock, wrong (TEIE is a stock tag: no transfer error is modeled, so its interrupt never fires; its value is kept by the guard and served on read; acknowledged by name, ruled 2026-11-24T14:10Z Q6; ArduPilot writes it)", "kept by the guard and served on read; no transfer error is modeled", 664),
             R("DMA_SxCR", 0x10, "§15.5.5", "DMEIE", 1, 1, Any, "stock, wrong (DMEIE is a stock tag: no direct-mode error is modeled, so its interrupt never fires; its value is kept by the guard and served on read; acknowledged by name, ruled 2026-11-24T14:10Z Q6; ArduPilot writes it)", "kept by the guard and served on read; no direct-mode error is modeled", 664),
-            R("DMA_SxCR", 0x10, "§15.5.5", "EN", 0, 0, Any, "modeled by the guard", "the stock model starts the stream; at its rise the guard checks its sizes (TVI-DMA-SIZE, p663), its addresses (TVI-DMA-TCM, TVI-DMA-ADDRESS, p108, Table 7 p131), a reload (TVI-DMA-RELOAD, p665) and its DMAMUX1 request (TVI-DMA-ROUTE, TVI-DMA-SHARED, TVI-DMA-REQUEST, TVI-DMA-MUX); while it is set, a changed protected field refuses (TVI-DMA-EN running, TVI-DMA-DONE once the twin completed the transfer); the stock model never clears it at the end of a transfer (stock-wrong, p665); cleared by software while the stream runs, the guard sets TCIF and restarts the stream's next transfer at its programmed addresses, as silicon's suspension does (p654, p666; TVI-WO-1305, ruled 2026-11-24T18:55Z Q6)", 665),
+            R("DMA_SxCR", 0x10, "§15.5.5", "EN", 0, 0, Any, "modeled by the guard", "the stock model starts the stream; at its rise the guard checks its sizes (TVI-DMA-SIZE, p663), its addresses (TVI-DMA-TCM, TVI-DMA-ADDRESS, p108, Table 7 p131), a reload (TVI-DMA-RELOAD, p665), its circular mode and half-transfer flag (TVI-DMA-CIRC, TVI-DMA-HALF) and its DMAMUX1 request (TVI-DMA-ROUTE, TVI-DMA-SHARED, TVI-DMA-REQUEST, TVI-DMA-MUX); while it is set, a changed protected field refuses (TVI-DMA-EN running, TVI-DMA-DONE once the twin completed the transfer); the guard clears it at the end of a non-circular peripheral-to-memory transfer, which requests pace (p654, p665; ruled 2026-11-25T18:49Z Q4), and it stays 1 at a circular wrap (inferred from p654 against p665); the stock model never clears it at the end of a memory-to-peripheral or memory-to-memory transfer, which it completes at the EN write (stock-wrong, p665); cleared by software while the stream runs, the guard sets TCIF and restarts the stream's next transfer at its programmed addresses, as silicon's suspension does (p654, p666; TVI-WO-1305, ruled 2026-11-24T18:55Z Q6)", 665),
             R("DMA_SxNDTR", 0x14, "§15.5.6", "Res31_16", 31, 16, Zero, "reserved", "reserved: must be kept at reset value", 665),
-            R("DMA_SxNDTR", 0x14, "§15.5.6", "NDT[15:0]", 15, 0, Any, "inherited, unaudited (acknowledged by name)", "the stock model: the number of items, counted down by its transfers and never reloaded (probed, D2); protected under EN", 665),
+            R("DMA_SxNDTR", 0x14, "§15.5.6", "NDT[15:0]", 15, 0, Any, "inherited, unaudited (acknowledged by name)", "the stock model: the number of items, counted down by its transfers (probed, D2); reloaded with the programmed value by the guard at each wrap of a circular stream (p647, p665), otherwise never reloaded; protected under EN", 665),
             R("DMA_SxPAR", 0x18, "§15.5.7", "PAR[31:0]", 31, 0, Any, "modeled by the guard", "the stock model's peripheral address (probed, D2, D9); at EN the guard refuses a span in ITCM or DTCM (p108) and one in no mapped region (Table 7 p131); protected under EN", 666),
             R("DMA_SxM0AR", 0x1C, "§15.5.8", "M0A[31:0]", 31, 0, Any, "modeled by the guard", "the stock model's memory address (probed, D2); at EN the guard refuses a span in ITCM or DTCM (p108) and one in no mapped region (Table 7 p131); protected under EN", 666),
             R("DMA_SxM1AR", 0x20, "§15.5.9", "M1A[31:0]", 31, 0, Zero, "tag", "0 only: a stock tag that reads 0; double-buffer mode is not modeled", 666),
