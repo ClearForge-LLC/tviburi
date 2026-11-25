@@ -264,7 +264,7 @@ DM24-request	model/GuardedSTM32DMA.cs	if(!raised.Contains(id))	if(false)	dma-req
 DM25-txAck	model/GuardedSTM32DMA.cs	private static readonly uint[] RaisedFromMemory = { 38, 40, 42, 46 };	private static readonly uint[] RaisedFromMemory = { 38, 40, 42, 44, 46 };	dma-txother
 DM26-bench	model/bench-checks.tsv	DMA_S0M0AR = 0x20000400 (DTCM (0x20000000-0x2001FFFF))	DMA_S0M0AR = 0x20000401 (DTCM (0x20000000-0x2001FFFF))	dma-ledger
 DM27-route	model/stm32h7-dma-restate.repl	    [0-7] -> tviburiDma1@[0-7]\n	(empty)	dma-registrations
-DM28-irq	model/GuardedSTM32DMA.cs	public IReadOnlyDictionary<int, IGPIO> Connections => inner.Connections;	public IReadOnlyDictionary<int, IGPIO> Connections => Enumerable.Range(0, Streams).ToDictionary(i => i, i => (IGPIO)new GPIO());	dma-irq
+DM28-irq	model/GuardedSTM32DMA.cs	public IReadOnlyDictionary<int, IGPIO> Connections => connections;	public IReadOnlyDictionary<int, IGPIO> Connections => Enumerable.Range(0, Streams).ToDictionary(i => i, i => (IGPIO)new GPIO());	dma-irq
 DM29-config	model/GuardedSTM32DMA.cs	if(dmamux == null)	if(false)	dma-config
 DM30-recordedKeep	model/GuardedSTM32DMA.cs	            word = (word & ~mask) | (old & mask);\n	(empty)	dma-recorded
 DM31-reset	model/GuardedSTM32DMA.cs	            inner.Reset();\n            ResetCopies();	            inner.Reset();	dma-reset
