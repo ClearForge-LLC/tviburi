@@ -36,7 +36,7 @@
 
 ## 3. Observers, by board (the replays)
 
-`main` (R1, `1cfe182`'s tree, which is `main` `808f4e4`) against the branch (R5, `9aab1bf`). The harness is the committed `tests/1301/replay-1301.sh` plus the measurement's logging (`TVI-WO-1303a.measure.md` §1). Every guard is recorded, and the armed run is injected as `1300b` ran it.
+`main` (R1, `1cfe182`'s tree, which is `main` `808f4e4`) against the branch: R5 (`9aab1bf`, as built), R6 (`78f766e`, after the adversarial pass's fixes) and R7 (`cd597ca`, after the reduction). **R5, R6 and R7 are identical to each other on all 16 runs** (every access, the boot block, the records), so the results below hold for each. The harness is the committed `tests/1301/replay-1301.sh` plus the measurement's logging (`TVI-WO-1303a.measure.md` §1). Every guard is recorded, and the armed run is injected as `1300b` ran it.
 
 - **The 14 generated boots** (Aethelgard `fa12abf4`): every access, the boot block and the records are identical. None makes a DMA access.
 - **ArduPilot's fixture** (5 s): the boot block and every access are identical, except the value of 2,373 of ArduPilot's `CR` reads on its SPI receive streams (DMA1 `S2CR` 2,354, DMA2 `S1CR` 19). These now read `EN` = 0 after the transfer's last request, as silicon (p654, p665; ruled Q4), where `main` read 1 (`0x10417` → `0x10416`). The count of reads is unchanged.
@@ -139,4 +139,12 @@ I checked each of its findings in the code and the source before acting on it.
 
 ## 7. Suites, mutants, memory and CI
 
-(pending)
+All on Furnace, in the pinned image (`aethelgard-tools@sha256:1e0ab105…`), one capped container at a time, `--network none`.
+- **The DMA suite** (`tests/1303/dma.sh`, every case):
+  - on `9aab1bf`: 53 of 53;
+  - on the reduced tree `cd597ca`: 55 of 57 pass. The two failures, `same` and `disable`, lost every guard's `end` record at teardown with no refusal recorded: the teardown race (`1303` FEEDBACK §8), at load about 11. Both pass on three reruns each, at load about 8.
+- **Mutants DM50–DM71:** 22 of 22 killed on `cd597ca`, the reduced tree (`ALL MUTANTS KILLED`). DM57 survived its first named case, `irq` (§4, finding 3), and is killed by `circoff`.
+- **The route and inventory** (`tests/ci/route.sh origin/main`): pass. A citation row the reduction made stale was removed (`39fb572`).
+- **The replays:** §3.
+- **Memory:** the measurement's prototype gave −0.2 MiB at the median, five boots a side, PASS (measure.md §4). CI's budget judges the built guard (below).
+- **CI:** below.
