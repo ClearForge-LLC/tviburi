@@ -6,8 +6,9 @@
 What it cannot check (whether a quote covers the value written, whether a line is this register's) is the builder's own pass.
 
 Usage: python3 -I spike/1206/check-reads.py ITEMS RM_TXT STOCK_ROOT MODEL_DIR READS.jsonl...
+STOCK_ROOT is the tree's src/; a cited stock file resolves to the one file under it whose path ends with the cited path.
 Prints one line per failed check, and a total; exit 1 if any failed."""
-import json, re, sys
+import json, os, re, sys
 
 items, rm_txt, stock_root, model_dir, *reads = sys.argv[1:]
 work = {}
@@ -34,6 +35,13 @@ def lines_of(path, spec):
     return '\n'.join(rng)
 
 
+ALL = [os.path.join(d, f) for d, _, fs in os.walk(stock_root) for f in fs if f.endswith('.cs')]
+def resolve(rel):
+    hits = [p for p in ALL if p.endswith('/' + rel.lstrip('/'))]
+    if len(hits) != 1: raise OSError('%d files end with %s' % (len(hits), rel))
+    return hits[0]
+
+
 def guard_file(field):
     return model_dir.rstrip('/') + '/' + work[field]['model'].split(':')[0].split('/', 1)[1]
 
@@ -51,8 +59,8 @@ for path in reads:
             if squash(q['quote']) not in squash(pages.get(int(q['page']), '')):
                 fail(f, 'rm quote not on p%s: %.80s' % (q['page'], q['quote']))
         for q in r.get('stock', []):
-            src = stock_root.rstrip('/') + '/' + q['file']
             try:
+                src = resolve(q['file'])
                 if squash(q['quote']) not in squash(lines_of(src, q['lines'])):
                     fail(f, 'stock quote not at %s %s: %.80s' % (q['file'], q['lines'], q['quote']))
             except OSError as e:
