@@ -241,7 +241,7 @@ t_stock-modf() {
   # write to its end (the after-the-last-write marker, Renode exit 0), and the run fails only because no guard witnessed it.
   check "stock Renode passes the MODF path: its two writes are the MODF firmware's (CFG2 = MASTER|SSM, then CR1 = SPE with SSI = 0, p2184's trigger), the firmware reaches its end marker 0xAF7E0002 with Renode exit 0, and the run's only problems are spi1's missing witness and end (gate clause 4)" \
     "grep -qx 'VERDICT FAIL (check exit 1, renode exit 0, after-marker=0xAF7E0002)' '$work/stock-modf.stdout' \
-     && [ \"\$(grep '^PROBLEM' '$work/stock-modf.stdout' | cut -d: -f1-2 | paste -sd'|')\" = 'PROBLEM spi1| no load witness|PROBLEM spi1| no end record' ] \
+     && [ \"\$(grep '^PROBLEM' '$work/stock-modf.stdout' | cut -d: -f1-2 | paste -sd'|')\" = 'PROBLEM spi1: no load witness|PROBLEM spi1: no end record' ] \
      && [ \"\$(grep -a 'spi1: \[cpu: [^]]*\] Write' '$work/stock-modf/renode-log.txt' | sed 's/.*Write[A-Za-z0-9]* to \(0x[0-9A-F]*\) .*value \(0x[0-9A-F]*\)\$/\1=\2/' | paste -sd' ')\" = '0xC=0x4400000 0x0=0x1' ]"
 }
 
