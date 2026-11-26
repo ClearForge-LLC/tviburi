@@ -11,9 +11,9 @@ set -euo pipefail
 
 here=$(cd "$(dirname "$0")/../.." && pwd)
 IMAGE=$(sed -n 's/^IMAGE=//p' "$here/tests/spike.sh")
-CASES="start res12 kernel clocklost ckmode deeppwd vreg calen cfgr undeclared early res boost boostack pcsel field width half read dfsdm oneshotnone oneshot oneshotcirc internal internalok ccrack ccrother rate rate2 sar rccchange rccboost revy overrun overwrite setvoltage norevision badlevels registrations recorded rccreset unheld query fields ledger regen fieldsmon"
+CASES="start res12 kernel clocklost ckmode deeppwd vreg calen cfgr undeclared early res boost boostack pcsel field width half read dfsdm oneshotnone oneshot oneshotcirc internal internalok ccrack ccrother rate rate2 sar rccchange rccboost revy overrun overwrite setvoltage norevision badlevels registrations recorded rccreset unheld query fields ledger regen fieldsmonwrite"
 GUARDS="spi1 rcc gpioPortA gpioPortB gpioPortC gpioPortD gpioPortE gpioPortF gpioPortG gpioPortH gpioPortI gpioPortJ gpioPortK timer1 timer8 dma1 dma2 flashController usart1 usart2 usart3 uart4 uart5 usart6 uart7 uart8 i2c1 i2c2 i2c3 adcM1S2 adc3"
-MONITOR="rate rate2 sar rccchange rccboost revy overrun overwrite setvoltage norevision badlevels registrations recorded rccreset unheld query fields ledger regen fieldsmon"
+MONITOR="rate rate2 sar rccchange rccboost revy overrun overwrite setvoltage norevision badlevels registrations recorded rccreset unheld query fields ledger regen fieldsmonwrite"
 PATHS=$(for c in $CASES; do case " $MONITOR " in *" $c "*) ;; *) printf '"%s",' "$c" ;; esac; done | sed 's/,$//')
 scratch=${TVIBURI_SCRATCH:-$HOME/.cache/tviburi}
 mkdir -p "$scratch"
@@ -290,7 +290,7 @@ EOF
     n=$(( ${#lines[@]} / 2 ))
     check "fields: every field allowed only at 0 ($n), written its widest value with the ADC disabled, records one TVI-ADC-FIELD naming it, unmodeled; nothing else is recorded" \
       "[ \$rc = 1 ] && [ $n -ge 60 ] && logged fields 'len(recs) == $n and all(r[\"rule\"] == \"TVI-ADC-FIELD\" and r[\"kind\"] == \"unmodeled\" for r in recs) and len({(r[\"register\"], r[\"bit\"].split(\" \")[0]) for r in recs}) == $n'" ;;
-  fieldsmon)
+  fieldsmonwrite)
     # Gate clause 6's 18 ADC rows that the fields sweep leaves out, because it takes only rows allowed only at 0 (TVI-WO-1203 (4)):
     # every row of the guard's Fields table whose allowed set is a named array (SQ1-SQ16 and AWD1CH: a channel 0-19, p1012,
     # p1023-1026; PRESC: 0000-1011, p1039). Each is given its smallest disallowed value by a monitor write (pc none), with the ADC
@@ -317,10 +317,10 @@ EOF
 )
     lines=(); want=()
     for x in "${fm[@]}"; do set -- $x; want+=("$1:$3"); lines+=("sysbus WriteDoubleWord $2 $3" "sysbus WriteDoubleWord $2 $4"); done
-    printf '%s\n' "${want[@]}" > "$work/fieldsmon.want"
-    PLATFORM_SED=$rec run_case fieldsmon - "$clk" "${lines[@]}"
-    check "fieldsmon: each of the ${#want[@]} array-restricted ADC rows (SQ1-SQ16, AWD1CH, PRESC), given its smallest disallowed value by a monitor write with the ADC disabled, records one TVI-ADC-FIELD, unmodeled, naming that field, in order; nothing else is recorded (TVI-WO-1203 (4))" \
-      "[ ${#want[@]} = 18 ] && logged fieldsmon '[(r[\"rule\"], r[\"kind\"], r[\"register\"] + \".\" + r[\"bit\"].split(\" \")[0] + \":\" + \"0x%X\" % int(r[\"access\"][\"value\"], 16), r[\"access\"][\"pc\"]) for r in recs] == [(\"TVI-ADC-FIELD\", \"unmodeled\", w, \"none\") for w in open(\"$work/fieldsmon.want\").read().split()]'" ;;
+    printf '%s\n' "${want[@]}" > "$work/fieldsmonwrite.want"
+    PLATFORM_SED=$rec run_case fieldsmonwrite - "$clk" "${lines[@]}"
+    check "fieldsmonwrite: each of the ${#want[@]} array-restricted ADC rows (SQ1-SQ16, AWD1CH, PRESC), given its smallest disallowed value by a monitor write with the ADC disabled, records one TVI-ADC-FIELD, unmodeled, naming that field, in order; nothing else is recorded (TVI-WO-1203 (4))" \
+      "[ ${#want[@]} = 18 ] && logged fieldsmonwrite '[(r[\"rule\"], r[\"kind\"], r[\"register\"] + \".\" + r[\"bit\"].split(\" \")[0] + \":\" + \"0x%X\" % int(r[\"access\"][\"value\"], 16), r[\"access\"][\"pc\"]) for r in recs] == [(\"TVI-ADC-FIELD\", \"unmodeled\", w, \"none\") for w in open(\"$work/fieldsmonwrite.want\").read().split()]'" ;;
   ledger)
     mkdir -p "$work/ledger"
     rc=0; container -v "$src:/repo:ro,Z" -v "$work/ledger:/out:Z" "$IMAGE" sh -c '/repo/scripts/build-release /repo /out/release >/dev/null' </dev/null >"$work/ledger.stdout" 2>&1 || rc=$?

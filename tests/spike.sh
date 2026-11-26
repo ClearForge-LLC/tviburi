@@ -285,6 +285,9 @@ aet_console() { # aet_console <name> <tree> <variant> [kill]: kill: SIGKILL Reno
     sed -i "s|^history-path = .*|history-path = /tmp/aet/history|" /tmp/aet/renode.config
     printf "include @/repo/scripts/prelude.resc\nsysbus LoadELF @/out/fw.elf\ncpu VectorTableOffset 0x08000000\nemulation RunFor \"0.001\"\necho \"TVIBURI-END\"\nquit\n" >/out/run.resc
     if [ -n "$KILL" ]; then
+      # R3 (ruled 10:15Z): the killed run never reaches quit first. The firmware spins after its last write (firmware/spi1.rs
+      # ends in a loop), and 100 s of virtual time takes far longer than the 0.1 s the poll needs to see the witness.
+      printf "include @/repo/scripts/prelude.resc\nsysbus LoadELF @/out/fw.elf\ncpu VectorTableOffset 0x08000000\nemulation RunFor \"100\"\n" >/out/run.resc
       renode --config /tmp/aet/renode.config --disable-gui --console --plain /out/run.resc </dev/null >/out/renode.out 2>&1 & pid=$!
       for i in $(seq 1200); do grep -aq "^.\?\[[0-9:.]*\] \[INFO\] spi1: {\"tviburi\":\"witness\".*}.\?$" /out/renode.out && { echo witness-seen-before-kill; break; }; sleep 0.1; done
       kill -9 $pid; wait $pid; echo "renode-exit=$?"
@@ -305,9 +308,9 @@ t_removed-console() {
   check "removed guard, at Tviburi's runner: the modeled path does not PASS (1), no load witness for spi1" \
     "[ \$rc -eq 1 ] && grep -q '^PROBLEM spi1: no load witness' '$work/removed-runner.stdout'"
   aet_console removed-console "$work/stock.tree" modeled
-  check "removed guard, at the records-only check on Aethelgard's console (virtual stamp, one space; the other guards' witnesses read from it): CHECK FAIL, no load witness for spi1, Renode exit 0 (gate clause 3)" \
+  check "removed guard, at the records-only check on Aethelgard's console (virtual stamp, one space): CHECK FAIL, and its only problems are spi1's missing witness and end, so every other guard's witness and end were read from that framing; Renode exit 0 (gate clause 3)" \
     "grep -qx 'renode-exit=0' '$work/removed-console.stdout' && grep -qx 'CHECK FAIL' '$work/removed-console.stdout' \
-     && grep -q '^PROBLEM spi1: no load witness' '$work/removed-console.stdout' && ! grep -q '^PROBLEM rcc:' '$work/removed-console.stdout' \
+     && [ \"\$(grep '^PROBLEM' '$work/removed-console.stdout' | cut -d: -f1-2 | paste -sd'|')\" = 'PROBLEM spi1: no load witness|PROBLEM spi1: no end record' ] \
      && aet_framed removed-console rcc && ! grep -aq 'spi1: {\"tviburi\"' '$work/removed-console/renode.out'"
 }
 
@@ -553,56 +556,24 @@ t_verify() {
      && grep -qx F=1 '$work/verify.stdout' && grep -q \"FAIL LEDGER.jsonl's rows are not the manifest's\" '$work/verify/F.txt'"
 }
 
-t_manifest() { # TVI-WO-1203 (1): the MANIFEST restates onto a guard only an instance a committed replay has run under that guard
+t_manifest() { # TVI-WO-1203 (1): the MANIFEST restates or retypes onto a guard only an instance a committed replay runs under it
+  # The release program is the check (RUL-14; R1, ruled 2026-11-26T10:15Z): it refuses a restated instance no committed
+  # model/stm32h7-*-restate.repl declares under its guard, a restatement the committed replay does not load, and a retyped
+  # instance the consumer's committed platform does not declare or the replay does not re-type. Here: it passes on this tree,
+  # and refuses each planted break by name.
   pod manifest "$src" -- sh -c '/repo/scripts/build-release >/dev/null'
-  # belt-and-suspenders: re-derived here, not taken from the release program, so that a bug in either parser shows in the
-  # other. Each `restate T i` line's class guard G must be declared `as "i"` (or by its variable) by a top-level `<var>: G @`
-  # entry of a model/stm32h7-*-restate.repl, read with `//` comments removed and not cancelled by a later `<var>: @none`.
-  check "the release builds; each instance it restates is declared under its class's guard by a committed model/stm32h7-*-restate.repl; the timers restate only timer1 and timer8, SPI restates none and retypes the consumer's spi1 and spi2" \
-    "[ \$rc = 0 ] && python3 -I - '$work/manifest/release/MANIFEST' '$src' <<'EOF'
-import glob, re, sys
-m = [l.split(' ') for l in open(sys.argv[1]).read().splitlines()]
-guard = {f[1]: f[2] for f in m if f[0] == 'class'}
-restates = [(f[1], f[2]) for f in m if f[0] == 'restate']
-retypes = [(f[1], f[2]) for f in m if f[0] == 'retype']
-declared = set()
-for p in sorted(glob.glob(sys.argv[2] + '/model/stm32h7-*-restate.repl')):
-    text = open(p).read()
-    assert '/*' not in text, p
-    lines = [l.split('//')[0].rstrip() for l in text.splitlines()]
-    entries = []
-    for i, l in enumerate(lines):
-        e = re.fullmatch(r'(\w+): (Tviburi\.\w+) @ (.*)', l)
-        c = re.fullmatch(r'(\w+): @none', l)
-        if c:
-            entries = [x for x in entries if x[0] != c.group(1)]
-            continue
-        if not e:
-            continue
-        name = re.search(r' as \"(\w+)\"$', l)
-        j = i + 1
-        while not name and e.group(3) == '{' and j < len(lines) and (lines[j][:1].isspace() or lines[j].startswith('}')):
-            if lines[j].lstrip().startswith('}'):
-                name = re.search(r' as \"(\w+)\"$', lines[j])
-                break
-            j += 1
-        entries.append((e.group(1), e.group(2), name.group(1) if name else e.group(1)))
-    declared |= {(t, n) for _, t, n in entries}
-bad = [r for r in restates if (guard[r[0]], r[1]) not in declared]
-timers = sorted(i for t, i in restates if t == 'Timers.STM32_Timer')
-print('manifest:', len(restates), 'restated,', len(retypes), 'retyped; not run guarded:', bad)
-sys.exit(0 if not bad and restates and timers == ['timer1', 'timer8'] and not [r for r in restates if r[0] == 'SPI.STM32H7_SPI']
-         and retypes == [('SPI.STM32H7_SPI', 'spi1'), ('SPI.STM32H7_SPI', 'spi2')] else 1)
-EOF"
-  local row=$'Tviburi.GuardedSTM32_Timer\ttimer1 timer8\t-'
-  # Planted: timer5, a stock timer, named; no restatement runs it guarded.
-  fixture manifest-timer5 tools/tviburi-release/pins.tsv "$row" $'Tviburi.GuardedSTM32_Timer\ttimer1 timer5 timer8\t-'
-  pod manifest-timer5 "$work/manifest-timer5.tree" -- sh -c '/repo/scripts/build-release'
+  check "the release builds, restating and retyping onto guards (each instance checked by the release program itself)" \
+    "[ \$rc = 0 ] && grep -q '^restate ' '$work/manifest/release/MANIFEST' && grep -q '^retype ' '$work/manifest/release/MANIFEST'"
+  local row=$'Tviburi.GuardedSTM32_Timer\ttimer1 timer8\t-' spi=$'Tviburi.GuardedSTM32H7_SPI\t-\tspi1 spi2'
+  planted() { # planted <name> <file> <old> <new> <expected message>: a tree with one edit, whose release must refuse by that message
+    fixture "manifest-$1" "$2" "$3" "$4"
+    pod "manifest-$1" "$work/manifest-$1.tree" -- sh -c '/repo/scripts/build-release'
+    [ "$rc" != 0 ] && grep -qF -- "$5" "$work/manifest-$1.stdout"
+  }
   check "planted: the class row names timer5, which no committed restatement runs guarded: the release refuses, naming it" \
-    "[ \$rc != 0 ] && grep -q 'restates timer5, which no committed restatement' '$work/manifest-timer5.stdout'"
-  # Planted: timer5 again, with every form of a restatement that Renode would not load as the guard: commented out (block and
-  # one line), its `as` in a trailing comment, an entry cancelled after, and a variable that is not one identifier
-  # (adversarial pass, 2a).
+    "planted timer5 tools/tviburi-release/pins.tsv \"\$row\" $'Tviburi.GuardedSTM32_Timer\ttimer1 timer5 timer8\t-' 'restates timer5, which no committed restatement'"
+  # timer5 again, with every form of a restatement that Renode would not load as the guard: commented out (block and one line), its
+  # `as` in a trailing comment, an entry cancelled after, and a variable that is not one identifier (adversarial pass, 2a).
   fixture manifest-commented tools/tviburi-release/pins.tsv "$row" $'Tviburi.GuardedSTM32_Timer\ttimer1 timer5 timer8\t-'
   printf '%s\n' '' '// tviburiTimer5: Tviburi.GuardedSTM32_Timer @ {' '//         sysbus 0x40000C00;' '//     } as "timer5"' \
     '// tviburiTimer5: Tviburi.GuardedSTM32_Timer @ sysbus 0x40000C00 as "timer5"' \
@@ -613,66 +584,30 @@ EOF"
   pod manifest-commented "$work/manifest-commented.tree" -- sh -c '/repo/scripts/build-release'
   check "planted: a restatement of timer5 commented out (block, one line), with its name only in a comment, cancelled after, or under a variable that is not one identifier, does not qualify it: the release refuses, naming it" \
     "[ \$rc != 0 ] && grep -q 'restates timer5, which no committed restatement' '$work/manifest-commented.stdout'"
-  # Planted: a restatement inside a block comment, which cannot be read line by line: the release refuses the file.
   fixture manifest-block tools/tviburi-release/pins.tsv "$row" $'Tviburi.GuardedSTM32_Timer\ttimer1 timer5 timer8\t-'
   printf '%s\n' '/*' 'tviburiTimer5: Tviburi.GuardedSTM32_Timer @ sysbus 0x40000C00 as "timer5"' '*/' \
     >>"$work/manifest-block.tree/model/stm32h7-timer-restate.repl"
   pod manifest-block "$work/manifest-block.tree" -- sh -c '/repo/scripts/build-release'
   check "planted: a restatement inside a block comment: the release refuses the file by name" \
     "[ \$rc != 0 ] && grep -q 'stm32h7-timer-restate.repl: a block comment' '$work/manifest-block.stdout'"
-  # Planted: a typo in the stock column (timer05), which the chain does not declare: the release refuses it, never retypes it.
-  fixture manifest-typo tools/tviburi-release/pins.tsv "$row" $'Tviburi.GuardedSTM32_Timer\ttimer1 timer05 timer8\t-'
-  pod manifest-typo "$work/manifest-typo.tree" -- sh -c '/repo/scripts/build-release'
   check "planted: a name the pinned chain does not declare (timer05) in the stock column: the release refuses it (adversarial pass, 2d)" \
-    "[ \$rc != 0 ] && grep -q 'names timer05, which the pinned stock chain does not declare' '$work/manifest-typo.stdout'"
-  # Planted: one name twice in a class row: the release refuses the row.
-  fixture manifest-dup tools/tviburi-release/pins.tsv "$row" $'Tviburi.GuardedSTM32_Timer\ttimer1 timer8 timer1\t-'
-  pod manifest-dup "$work/manifest-dup.tree" -- sh -c '/repo/scripts/build-release'
+    "planted typo tools/tviburi-release/pins.tsv \"\$row\" $'Tviburi.GuardedSTM32_Timer\ttimer1 timer05 timer8\t-' 'names timer05, which the pinned stock chain does not declare'"
   check "planted: a class row naming timer1 twice: the release refuses it" \
-    "[ \$rc != 0 ] && grep -q 'class row names timer1 twice' '$work/manifest-dup.stdout'"
+    "planted dup tools/tviburi-release/pins.tsv \"\$row\" $'Tviburi.GuardedSTM32_Timer\ttimer1 timer8 timer1\t-' 'class row names timer1 twice'"
+  # R1: a consumer instance qualifies by the consumer's committed platform and the replay's re-typing rule, case-sensitively.
+  check "planted: spi3 as the consumer's, which the committed fixture does not declare: the release refuses, naming it (R1)" \
+    "planted spi3 tools/tviburi-release/pins.tsv \"\$spi\" $'Tviburi.GuardedSTM32H7_SPI\t-\tspi1 spi2 spi3' 'retypes spi3, which no committed replay runs'"
+  check "planted: Spi1 as the consumer's, which differs from the fixture's spi1 only by case: the release refuses, naming it (R1)" \
+    "planted Spi1 tools/tviburi-release/pins.tsv \"\$spi\" $'Tviburi.GuardedSTM32H7_SPI\t-\tspi1 spi2 Spi1' 'retypes Spi1, which no committed replay runs'"
+  # A restatement the committed replay does not load: the DMA guard's `cat`, commented out.
+  check "planted: the replay's cat of model/stm32h7-dma-restate.repl commented out: the release refuses the restatement by name" \
+    "planted unloaded tests/1301/replay-1301.sh '    { echo; cat /repo/model/stm32h7-dma-restate.repl; echo' '#    { echo; cat /repo/model/stm32h7-dma-restate.repl; echo' 'model/stm32h7-dma-restate.repl: no committed replay loads it'"
   # Every restatement is its generator's output from the pinned stm32h7.repl, byte for byte: so its addresses, registrations
   # and names are the stock entry's, not a hand edit's (adversarial pass, 2b).
   pod manifest-regen "$src" -- sh -c 'f=/opt/renode/platforms/cpus/stm32h7.repl; for g in /repo/model/stm32h7-*-restate.awk; do
       n=${g##*/}; awk -v sha=$(sha256sum $f | cut -c1-64) -f "$g" $f > "/out/${n%.awk}.repl" || exit 1; done'
   check "every model/stm32h7-*-restate.repl regenerates from its model/stm32h7-*-restate.awk and the pinned stm32h7.repl, byte for byte, and none lacks a generator" \
     '[ $rc = 0 ] && ( for f in "$src"/model/stm32h7-*-restate.repl; do cmp -s "$f" "$work/manifest-regen/${f##*/}" || exit 1; done )'
-  # A restatement qualifies only because the replay loads it: an uncommented `cat` of the file in tests/1301/replay-1301.sh,
-  # unconditional or under an `if [ -f … ]` naming that same file (adversarial pass, 2c).
-  check "every model/stm32h7-*-restate.repl is loaded by the committed replay, tests/1301/replay-1301.sh: catted, unconditionally or under a test of that same file" \
-    "python3 -I - '$src' <<'EOF'
-import glob, re, sys
-lines = [l for l in open(sys.argv[1] + '/tests/1301/replay-1301.sh').read().splitlines() if not l.lstrip().startswith('#')]
-def loaded(name):
-    for i, l in enumerate(lines):
-        if re.search(r'\bcat /repo/model/' + re.escape(name) + r'\b', l):
-            tests = [t for t in lines[max(0, i - 8):i] if re.search(r'if \[ -f /repo/model/', t)]
-            if not tests or re.search(r'if \[ -f /repo/model/' + re.escape(name) + r' \]', tests[-1]):
-                return True
-    return False
-missing = [p for p in glob.glob(sys.argv[1] + '/model/stm32h7-*-restate.repl') if not loaded(p.rsplit('/', 1)[1])]
-print('not loaded:', missing)
-sys.exit(1 if missing else 0)
-EOF"
-  # SPI's instances are the consumer's (TVI-WO-1203 (1)): each `retype T i` qualifies when the consumer's committed platform
-  # (the ArduPilot fixture CI boots) declares `i: T @ {`, and the replay's own re-typing (its uncommented `sed -i 's/^…/…/'`
-  # lines, applied here to that platform) turns it into `i: G @ {`, G the class's guard.
-  check "each retyped instance is declared by the consumer's committed fixture platform and re-typed onto its guard by the replay's own rule" \
-    "python3 -I - '$work/manifest/release/MANIFEST' $src/tests/1301/fixtures/aet-1c32c8ea-ardupilot/varlib/*/tool/platform-booted.repl '$src/tests/1301/replay-1301.sh' <<'EOF'
-import re, sys
-m = [l.split(' ') for l in open(sys.argv[1]).read().splitlines()]
-guard = {f[1]: f[2] for f in m if f[0] == 'class'}
-retypes = [(f[1], f[2]) for f in m if f[0] == 'retype']
-plat = open(sys.argv[2]).read().splitlines()
-code = '\n'.join(l for l in open(sys.argv[3]).read().splitlines() if not l.lstrip().startswith('#'))
-seds = re.findall(r\"sed -i 's/(\\^[^/]*)/([^/]*)/' \", code)
-py = lambda e: e.replace('\\\\(', '(').replace('\\\\)', ')')
-out = plat
-for a, b in seds:
-    out = [re.sub(py(a), b.replace('\\\\1', r'\\g<1>'), l) for l in out]
-ok = bool(retypes) and all(('%s: %s @ {' % (i, t)) in plat and ('%s: %s @ {' % (i, guard[t])) in out for t, i in retypes)
-print('retypes', retypes, 'replay re-typing rules', len(seds), 'ok', ok)
-sys.exit(0 if ok else 1)
-EOF"
 }
 
 t_lognames() {

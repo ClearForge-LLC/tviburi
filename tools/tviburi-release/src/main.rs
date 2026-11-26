@@ -47,6 +47,12 @@ const TARBALL: &str = "tviburi-release.tar";
 const TOOL: &str = "tools/tviburi-release";
 const BENCH: &str = "model/bench-checks.tsv";
 const MANIFEST_FORMAT: &str = "tviburi-release-manifest 1";
+/// The committed replay (TVI-WO-1203 (1)): it loads every restatement and re-types the consumer's instances; a release
+/// source, since the release reads it.
+const REPLAY: &str = "tests/1301/replay-1301.sh";
+/// The consumer's committed platform the replay boots in CI (ArduPilot's fixture): its one capture directory's
+/// `tool/platform-booted.repl`; a release source, since the release reads it.
+const FIXTURE: &str = "tests/1301/fixtures/aet-1c32c8ea-ardupilot/varlib";
 
 struct Pins {
     builds: Vec<(String, String)>,
@@ -339,6 +345,71 @@ fn declared_guarded(files: &[Source]) -> Result<BTreeSet<(String, String)>, Stri
     Ok(out)
 }
 
+/// The replay's lines that run: every line but a `#` comment.
+fn replay_code(replay: &str) -> Vec<&str> {
+    replay.lines().filter(|l| !l.trim_start().starts_with('#')).collect()
+}
+
+/// Does the committed replay load this restatement (TVI-WO-1203 (1))? An uncommented `cat /repo/model/<file>` either
+/// unconditionally, or under the nearest `if [ -f /repo/model/… ]` of the eight lines before it, naming that same file.
+fn loaded_by_replay(replay: &str, file: &str) -> bool {
+    let code = replay_code(replay);
+    let cat = format!("cat /repo/model/{file}");
+    let test = format!("if [ -f /repo/model/{file} ]");
+    code.iter().enumerate().any(|(i, l)| {
+        let whole = l.match_indices(&cat).any(|(j, _)| !l[j + cat.len()..].starts_with(|c: char| c.is_ascii_alphanumeric() || "._-".contains(c)));
+        whole && code[i.saturating_sub(8)..i].iter().rev().find(|t| t.contains("if [ -f /repo/model/")).map_or(true, |t| t.contains(&test))
+    })
+}
+
+/// The replay's re-typing rules: `sed -i 's/^\(<name pattern>\): <stock type, `.` escaped> @ {/\1: <guard> @ {/'`, as
+/// (name pattern, stock type, guard type). Any other substitution is not a re-typing rule.
+fn retype_rules(replay: &str) -> Vec<(String, String, String)> {
+    let mut out = Vec::new();
+    for l in replay_code(replay) {
+        let Some(at) = l.find("sed -i 's/^\\(") else { continue };
+        let rest = &l[at + "sed -i 's/^\\(".len()..];
+        let Some((pat, rest)) = rest.split_once("\\): ") else { continue };
+        let Some((stock, rest)) = rest.split_once(" @ {/\\1: ") else { continue };
+        let Some((guard, _)) = rest.split_once(" @ {/'") else { continue };
+        out.push((pat.to_string(), stock.replace("\\.", "."), guard.to_string()));
+    }
+    out
+}
+
+/// Does a re-typing rule's name pattern match this name, whole and case-sensitively? The patterns the replay uses are
+/// literal characters and `[0-9]*`; any other construct matches nothing, so an unread pattern never qualifies a name.
+fn name_matches(pat: &str, name: &str) -> bool {
+    let (p, n) = (pat.as_bytes(), name.as_bytes());
+    let (mut i, mut j) = (0, 0);
+    while i < p.len() {
+        if p[i..].starts_with(b"[0-9]*") {
+            while j < n.len() && n[j].is_ascii_digit() {
+                j += 1;
+            }
+            i += 6;
+        } else if p[i].is_ascii_alphanumeric() || p[i] == b'_' {
+            if j >= n.len() || n[j] != p[i] {
+                return false;
+            }
+            i += 1;
+            j += 1;
+        } else {
+            return false;
+        }
+    }
+    j == n.len()
+}
+
+/// Does a committed replay run this consumer instance under the guard (TVI-WO-1203 (1), R1)? The consumer's committed
+/// platform declares it, `<name>: <stock type> @ {` at the top level, and one of the replay's re-typing rules turns that
+/// line into `<name>: <guard> @ {`. Names compare case-sensitively.
+fn consumer_run_guarded(platform: &str, replay: &str, stock_ty: &str, guard: &str, name: &str) -> bool {
+    let decl = format!("{name}: {stock_ty} @ {{");
+    platform.lines().any(|l| l.trim_end() == decl)
+        && retype_rules(replay).iter().any(|(pat, st, g)| st == stock_ty && g == guard && name_matches(pat, name))
+}
+
 /// Every instance a model row with `guarded_by` lists is one the manifest restates for that stock type (ruled
 /// 2026-11-24T19:57Z): a row that would name an unguarded instance as guarded refuses the release, by name.
 fn check_guarded(rows: &[Row], restates: &[(String, String)]) -> Result<(), String> {
@@ -392,8 +463,23 @@ fn build(repo: &Path, renode: &Path, out: &Path) -> Result<(String, String), Str
     overlay::check_template(&template)?;
     let body = overlay::body(&models)?;
 
-    // What the committed restatements run guarded, read before the model files become sources (TVI-WO-1203 (1)).
+    // What the committed restatements run guarded, read before the model files become sources (TVI-WO-1203 (1)), and the
+    // committed replay that loads them and the consumer's platform it re-types (R1); both are sources.
     let guarded = declared_guarded(&model_files)?;
+    let replay = Source { path: REPLAY.into(), bytes: fs::read(repo.join(REPLAY)).map_err(|e| format!("{REPLAY}: {e}"))? };
+    let mut caps: Vec<String> = Vec::new();
+    for e in fs::read_dir(repo.join(FIXTURE)).map_err(|e| format!("{FIXTURE}: {e}"))? {
+        caps.push(e.map_err(|e| format!("{FIXTURE}: {e}"))?.file_name().into_string().map_err(|n| format!("{FIXTURE}/{n:?}: not UTF-8"))?);
+    }
+    let [cap] = caps.as_slice() else { return Err(format!("{FIXTURE}: holds {} captures, not one", caps.len())) };
+    let fixture_path = format!("{FIXTURE}/{cap}/tool/platform-booted.repl");
+    let fixture = Source { bytes: fs::read(repo.join(&fixture_path)).map_err(|e| format!("{fixture_path}: {e}"))?, path: fixture_path };
+    for f in model_files.iter().filter(|f| f.path.starts_with("model/stm32h7-") && f.path.ends_with("-restate.repl")) {
+        let name = f.path.trim_start_matches("model/");
+        if !loaded_by_replay(overlay::text(&replay)?, name) {
+            return Err(format!("{}: no committed replay loads it ({REPLAY} has no `cat /repo/model/{name}` under a test of that file)", f.path));
+        }
+    }
     // The class map: each guard declared in exactly one model file, with a table the ledger can read.
     let mut rows = Vec::new();
     for (_, guard) in &pins.classes {
@@ -419,6 +505,9 @@ fn build(repo: &Path, renode: &Path, out: &Path) -> Result<(String, String), Str
         sources.push(Source { bytes: fs::read(repo.join(&path)).map_err(|e| format!("{path}: {e}"))?, path });
     }
     sources.extend(overlay::regular_files(repo, &format!("{TOOL}/src"))?);
+    for read in [&replay, &fixture] {
+        sources.push(Source { path: read.path.clone(), bytes: read.bytes.clone() });
+    }
     let json_rs = "tools/tviburi-check/src/json.rs";
     sources.push(Source { path: json_rs.into(), bytes: fs::read(repo.join(json_rs)).map_err(|e| format!("{json_rs}: {e}"))? });
 
@@ -443,6 +532,11 @@ fn build(repo: &Path, renode: &Path, out: &Path) -> Result<(String, String), Str
             m += &format!("restate {stock_ty} {inst} {file}\n");
         }
         for inst in retypes {
+            // R1: retyped onto a guard only where a committed replay runs it so: the consumer's committed platform declares it,
+            // and the replay re-types it.
+            if !consumer_run_guarded(overlay::text(&fixture)?, overlay::text(&replay)?, stock_ty, guard, inst) {
+                return Err(format!("the class row for {guard} retypes {inst}, which no committed replay runs under {guard} ({} does not declare `{inst}: {stock_ty} @ {{`, or {REPLAY} does not re-type it)", fixture.path));
+            }
             m += &format!("retype {stock_ty} {inst}\n");
         }
     }
@@ -800,6 +894,25 @@ mod tests {
         assert_eq!(g.len(), 4);
         let block = vec![f("model/stm32h7-timer-restate.repl", "/*\ntviburiTimer5: Tviburi.GuardedSTM32_Timer @ sysbus 0x40000C00 as \"timer5\"\n*/\n")];
         assert!(declared_guarded(&block).unwrap_err().contains("a block comment"));
+    }
+
+    #[test]
+    fn a_consumer_instance_qualifies_only_by_the_committed_platform_and_the_replays_rule_and_each_restatement_must_be_loaded() {
+        let replay = "#!/bin/bash\n# sed -i 's/^\\(spi[0-9]*\\): SPI\\.STM32H7_SPI @ {/\\1: Tviburi.Spoof @ {/' \"$plat\"\n  sed -i 's/^\\(spi[0-9]*\\): SPI\\.STM32H7_SPI @ {/\\1: Tviburi.GuardedSTM32H7_SPI @ {/' \"$plat\"\n  cat /repo/model/stm32h7-rcc-restate.repl\n  if [ -f /repo/model/stm32h7-dma-restate.repl ]; then\n    { echo; cat /repo/model/stm32h7-dma-restate.repl; echo; }\n  fi\n  if [ -f /repo/model/stm32h7-adc-restate.repl ]; then\n    { echo; cat /repo/model/stm32h7-usart-restate.repl; }\n  fi\n# cat /repo/model/stm32h7-flash-restate.repl\n";
+        let rules = retype_rules(replay);
+        assert_eq!(rules, vec![("spi[0-9]*".to_string(), "SPI.STM32H7_SPI".to_string(), "Tviburi.GuardedSTM32H7_SPI".to_string())], "a commented rule is not one");
+        assert!(name_matches("spi[0-9]*", "spi1") && name_matches("spi[0-9]*", "spi") && !name_matches("spi[0-9]*", "Spi1") && !name_matches("spi[0-9]*", "spi1x"));
+        assert!(!name_matches("spi[1-3]", "spi1"), "a construct the matcher does not read matches nothing");
+        let platform = "spi1: SPI.STM32H7_SPI @ {\n    sysbus 0x40013000\n}\nspi2: SPI.STM32H7_SPI @ {\n}\n";
+        let run = |n: &str, g: &str| consumer_run_guarded(platform, replay, "SPI.STM32H7_SPI", g, n);
+        assert!(run("spi1", "Tviburi.GuardedSTM32H7_SPI") && run("spi2", "Tviburi.GuardedSTM32H7_SPI"));
+        assert!(!run("spi3", "Tviburi.GuardedSTM32H7_SPI"), "the platform does not declare spi3");
+        assert!(!run("Spi1", "Tviburi.GuardedSTM32H7_SPI"), "case-sensitive");
+        assert!(!run("spi1", "Tviburi.Spoof"), "only a rule that runs re-types");
+        assert!(loaded_by_replay(replay, "stm32h7-rcc-restate.repl") && loaded_by_replay(replay, "stm32h7-dma-restate.repl"));
+        assert!(!loaded_by_replay(replay, "stm32h7-usart-restate.repl"), "under a test of another file");
+        assert!(!loaded_by_replay(replay, "stm32h7-flash-restate.repl"), "commented out");
+        assert!(!loaded_by_replay(replay, "stm32h7-rcc-restate.re"), "a prefix of a loaded name");
     }
 
     #[test]

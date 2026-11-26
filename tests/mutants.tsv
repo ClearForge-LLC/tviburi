@@ -554,3 +554,5 @@ MF05-cancel	tools/tviburi-release/src/main.rs	                entries.retain(|e|
 MF06-blockComment	tools/tviburi-release/src/main.rs	        if text.contains("/*") {	        if false {	manifest
 MF07-consumerStock	tools/tviburi-release/src/main.rs	        if let Some(d) = declared.iter().find(|d| &d.1 == n) {	        if let Some(d) = declared.iter().find(|d| &d.1 == n).filter(|_| false) {	unit
 MF08-twice	tools/tviburi-release/src/main.rs	                if let Some(d) = all.iter().find(|n| all.iter().filter(|m| m == n).count() > 1) {	                if let Some(d) = all.iter().find(|_| false) {	manifest
+MF09-consumerRun	tools/tviburi-release/src/main.rs	if !consumer_run_guarded(	if false && !consumer_run_guarded(	manifest
+MF10-loaded	tools/tviburi-release/src/main.rs	if !loaded_by_replay(	if false && !loaded_by_replay(	manifest

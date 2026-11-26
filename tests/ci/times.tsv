@@ -894,8 +894,8 @@ case	modf-page	6.7
 case	removed-console	13.0
 case	crash-console	5.5
 case	crash-runner	7.3
-case	i2c-isrmon	6.0
-case	adc-fieldsmon	6.0
+case	i2c-isrmonwrite	6.0
+case	adc-fieldsmonwrite	6.0
 mutant	MF01-restated	7.6
 mutant	MF02-bareVar	7.2
 mutant	MF03-stockTypo	7.2
