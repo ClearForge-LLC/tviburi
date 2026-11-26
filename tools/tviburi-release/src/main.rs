@@ -284,14 +284,14 @@ fn restated<'a>(declared: &'a [(String, String, String)], stock_ty: &str, names:
 /// Every (guard type, instance) that a committed restatement runs guarded (TVI-WO-1203 (1)): the files
 /// `model/stm32h7-*-restate.repl`, which every replay loads (tests/1301/replay-1301.sh; `tests/spike.sh manifest` checks
 /// that it loads each). An entry is a top-level line `<var>: Tviburi.<Type> @ …`, named by its `as "<name>"`, on that line or on
-/// the `}` line that closes it, else by `<var>`. Comment lines (`//`) are never entries, so a commented-out restatement does
-/// not qualify an instance.
+/// the `}` line that closes it, else by `<var>`. `<var>` must be a bare identifier, so a commented-out restatement
+/// (`// tviburiTimer5: …`) is never an entry and does not qualify an instance.
 fn declared_guarded(files: &[Source]) -> Result<BTreeSet<(String, String)>, String> {
     let mut out = BTreeSet::new();
     for f in files.iter().filter(|f| f.path.starts_with("model/stm32h7-") && f.path.ends_with("-restate.repl")) {
         let lines: Vec<&str> = overlay::text(f)?.lines().collect();
         for (i, l) in lines.iter().enumerate() {
-            if l.starts_with(char::is_whitespace) || l.starts_with("//") {
+            if l.starts_with(char::is_whitespace) {
                 continue;
             }
             let Some((var, rest)) = l.split_once(": ") else { continue };

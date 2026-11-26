@@ -547,3 +547,4 @@ HZ22-flashBus	model/GuardedSTM32H7_Flash.cs	var hz = rcc.BusHz("rcc_hclk", out v
 HZ23-cfgOn	model/GuardedSTM32H7_RCC.cs	cfgUnknown[n] |= src || (PllOn(n) && ((old ^ value) & mask) != 0);	cfgUnknown[n] |= src;	usart-hzcfgon
 HZ24-cfgUse	model/GuardedSTM32H7_RCC.cs	if(cfgUnknown[n])	if(false)	usart-hzcfgon
 MF01-restated	tools/tviburi-release/src/main.rs	if !guarded.contains(&(guard.clone(), inst.to_string())) {	if false {	manifest
+MF02-bareVar	tools/tviburi-release/src/main.rs	 || var.is_empty() || !var.bytes().all(|b| b.is_ascii_alphanumeric() || b == b'_')	(empty)	manifest
