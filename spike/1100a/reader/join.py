@@ -124,7 +124,6 @@ def state_of(inst, off, lsb, width):
     lo, note = ledger_offset(ty, inst, off)
     hit = [(r, msb, l) for (r, msb, l) in fields.get((ty, lo), []) if not (msb < lsb or l > lsb + width - 1)]
     if not hit:
-        c = [v for k, v in refuse[ty].items() if k == 'none'] if ty in refuse else []
         return 'FINDING', '-', 'no ledger field at %s offset 0x%X' % (ty, lo), '-', '-'
     parts, worst, evs, scopes = [], 'guarded', [], set()
     rank = {'guarded': 2, 'acknowledged': 1, 'FINDING': 0}
@@ -178,7 +177,7 @@ def fvals(f, lsb, width):
     vals = f[15]
     mask = (1 << width) - 1
     if vals.startswith('many'):
-        o, a = int(f[9], 16), (int(f[10], 16) if f[10] != '-' else 0)
+        o = int(f[9], 16)
         return '%s; bits ever 1: 0x%X' % (vals, (o >> lsb) & mask)
     s = sorted({(int(v, 16) >> lsb) & mask for v in vals.split(',')})
     return ','.join('0x%X' % v for v in s) if len(s) <= 8 else '%d values' % len(s)

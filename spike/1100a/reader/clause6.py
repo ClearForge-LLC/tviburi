@@ -6,7 +6,6 @@ Usage: python3 -I clause6.py REPO LEDGER CASES PERIPH OUT
   armed run bound to that guard (its `peripherals` listing); and how the sweep writes (monitor writes, pc none)."""
 import sys, os, json, collections
 repo, ledger, cases_dir, pf, out = sys.argv[1:6]
-sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 bound = collections.defaultdict(list)
 for l in open(pf):
     if l.startswith('#'): continue
