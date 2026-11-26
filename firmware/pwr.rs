@@ -28,6 +28,10 @@
 //!   path="apbvos3"   - CR3, VOS3, D3PPRE /2 (APB4, where RTCAPBEN is enabled from reset, p471, to 32 MHz), then USART3EN with
 //!                      APB1 at 64 MHz: VOS3's APB limit (50 MHz) holds "when at least one peripheral is enabled" (DS12117 p210
 //!                      note 6), judged per APB bus: TVI-RCC-VOS, predicted-fault, at the RCC_APB1LENR write, not before it.
+//!   path="vos0"      - CR3, VOS1, LATENCY 4, then 480 MHz (a 960 MHz VCO /2), AHB 240, every APB 120: above VOS1's limits, within
+//!                      VOS0's, which needs SYSCFG_PWRCR.ODEN (p280-281), which the twin cannot read: TVI-RCC-VOS, unmodeled, at CFGR.
+//!   path="revy200"   - (revision Y) CR3, VOS3, LATENCY 4, then 200 MHz with every prescaler /1 (AHB and APB 200 MHz): rev Y's
+//!                      datasheet states only a CPU limit (DS12117 Rev 10 p129-130), which 200 MHz meets: passes. MARK_READ = CFGR.
 //!   path="notjudged" - (a platform with no PWR guard, ruled Q20 (A)) sys_ck to 400 MHz, AHB 200, every APB 200 MHz, above every
 //!                      scale's limit, LATENCY 2: no TVI-RCC-VOS, passes. MARK_READ = CFGR (SWS = PLL1), MARK_READ2 = D1CFGR.
 #![no_std]
@@ -46,7 +50,6 @@ const D3CR: usize = PWR + 0x18;
 const RCC: usize = 0x5802_4400;
 const BDCR: usize = RCC + 0x70;
 const APB1LENR: usize = RCC + 0xE8;
-const APB4ENR: usize = RCC + 0xF4;
 const ACR: usize = 0x5200_2000;
 const MARK_AFTER: *mut u32 = 0x2000_0104 as *mut u32;
 const MARK_READ: *mut u32 = 0x2000_0108 as *mut u32;
@@ -228,6 +231,24 @@ pub unsafe extern "C" fn reset() -> ! {
         supply(0x02);
         w(RCC + 0x20, 0x40);   // D3CFGR: D3PPRE /2 (p397)
         w(APB1LENR, 1 << 18);
+    }
+    #[cfg(path = "vos0")]
+    {
+        supply(0x02);
+        vos(3);
+        w(ACR, 0x34);
+        while r(ACR) & 0xF != 4 {}
+        pll(60, 0x48, 0x440, 0x40);   // 480 MHz; AHB 240; every APB 120
+        switch(3);
+    }
+    #[cfg(path = "revy200")]
+    {
+        supply(0x02);
+        w(ACR, 0x34);
+        while r(ACR) & 0xF != 4 {}
+        pll(25, 0, 0, 0);   // 200 MHz; AHB 200; every APB 200
+        switch(3);
+        write_volatile(MARK_READ, r(RCC + 0x10));
     }
     #[cfg(path = "notjudged")]
     {

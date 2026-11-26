@@ -615,3 +615,5 @@ PW25-rccDbp	model/GuardedSTM32H7_RCC.cs	if(p == null || p.Dbp || value == Served
 PW26-flashAsksPwr	model/GuardedSTM32H7_Flash.cs	if(guard != null)	if(false)	pwr-flashvos3
 MF11-cannedNamed	tools/tviburi-release/src/main.rs	c.2 == stock_ty && names.contains(&c.0) &&	c.2 == stock_ty &&	unit
 MF12-cannedRow	tools/tviburi-release/src/main.rs	let (restates, retypes) = restated(&declared, stock_ty, names, consumer)?;	let (restates, retypes) = restated(&chain.declared, stock_ty, names, consumer)?;	manifest pwr-ledger
+PW27-vos0Kind	model/GuardedSTM32H7_PWR.cs	kind = vos0 ? Unmodeled : PredictedFault;	kind = PredictedFault;	pwr-vos0
+PW28-revYTable	model/GuardedSTM32H7_PWR.cs	var table = revision == "V" ? LimitsV : revision == "Y" ? LimitsY : null;	var table = revision == "V" || revision == "Y" ? LimitsV : null;	pwr-revy200

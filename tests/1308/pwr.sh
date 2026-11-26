@@ -12,7 +12,7 @@ set -euo pipefail
 
 here=$(cd "$(dirname "$0")/../.." && pwd)
 IMAGE=$(sed -n 's/^IMAGE=//p' "$here/tests/spike.sh")
-CASES="second same ap gen order clockfirst invalid vosearly voslow cr2dbp bdcr bdcrok flashvos3 apbvos3 notjudged reset recorded locked nibble norev revy byte misaligned read registrations fields ledger regen"
+CASES="second same ap gen order clockfirst invalid vosearly voslow cr2dbp bdcr bdcrok flashvos3 apbvos3 vos0 revy200 notjudged reset recorded locked nibble norev revy byte misaligned read registrations fields ledger regen"
 BOARD_GUARDS="spi1 rcc gpioPortA gpioPortB gpioPortC gpioPortD gpioPortE gpioPortF gpioPortG gpioPortH gpioPortI gpioPortJ gpioPortK timer1 timer8 dma1 dma2 flashController usart1 usart2 usart3 uart4 uart5 usart6 uart7 uart8 i2c1 i2c2 i2c3 adcM1S2 adc3 dmamux1"
 MONITOR="reset recorded locked nibble norev revy byte misaligned read registrations fields ledger regen"
 PATHS=$(for c in $CASES; do case " $MONITOR " in *" $c "*) ;; *) printf '"%s",' "$c" ;; esac; done | sed 's/,$//')
@@ -108,6 +108,8 @@ for t in ${TVIBURI_TESTS:-$CASES}; do
   if [ $mon = 0 ]; then
     if [ "$t" = gen ]; then
       PLATFORM_SED=$hse16 run_case gen gen 'emulation RunFor "0.01"' "${marks[@]}"
+    elif [ "$t" = revy200 ]; then
+      PLATFORM_SED='/^tviburiPwr:$/,${s/^    revision: "V"$/    revision: "Y"/}' run_case revy200 revy200 'emulation RunFor "0.01"' "${marks[@]}"
     elif [ "$t" = notjudged ]; then
       NOPWR=1 run_case notjudged notjudged 'emulation RunFor "0.01"' "${marks[@]}"
     else
@@ -143,6 +145,10 @@ for t in ${TVIBURI_TESTS:-$CASES}; do
       "refuses flashvos3 TVI-FLASH-WAIT predicted-fault '\"100000000 Hz at VOS3: Table 17 needs 2\" in r[\"condition\"] and r[\"access\"][\"offset\"] == \"0x58024410\"' flashController" ;;
   apbvos3) check "apbvos3: at Scale 3, APB4 (RTCAPBEN enabled from reset, p471) brought to 32 MHz by D3PPRE (passes), APB1 at 64 MHz with no APB1 peripheral enabled (not judged), then USART3EN refuses TVI-RCC-VOS, predicted-fault, at RCC_APB1LENR: VOS3's 50 MHz holds \"when at least one peripheral is enabled\" (DS12117 p210 note 6)" \
       "refuses apbvos3 TVI-RCC-VOS predicted-fault 'r[\"register\"] == \"RCC_APB1LENR\" and r[\"bit\"] == \"APB1 (rcc_pclk1) above VOS3\"' rcc" ;;
+  vos0) check "vos0: at Scale 1, 480 MHz, AHB 240 and every APB 120 (above VOS1's limits, within VOS0's, p210) refuse TVI-RCC-VOS, unmodeled, at RCC_CFGR: VOS0 is VOS1 with SYSCFG_PWRCR.ODEN (p280-281, p561), which the twin cannot read" \
+      "refuses vos0 TVI-RCC-VOS unmodeled 'r[\"register\"] == \"RCC_CFGR\" and \"480000000 Hz, above 400 MHz at VOS1\" in r[\"condition\"] and \"within VOS0\" in r[\"condition\"]' rcc" ;;
+  revy200) check "revy200: on revision Y at Scale 3, 200 MHz with AHB and every APB at 200 MHz passes: rev Y's datasheet states only a CPU limit per scale (DS12117 Rev 10 p129-130), so AHB and APB are not judged; CFGR reads SWS = PLL1 (0x1B)" \
+      "passes revy200 && [ \"\$(readout revy200 READ)\" = 0x0000001B ]" ;;
   notjudged) check "notjudged (ruled Q20 (A)): on the board with no PWR guard, sys_ck 400 MHz, AHB 200 and every APB 200 MHz (above every scale's limit, p210) are not judged: no TVI-RCC-VOS, no record; CFGR reads SWS = PLL1 (0x1B), D1CFGR 0x08 (read by the firmware, not a record)" \
       "passes notjudged && logged notjudged 'len(recs) == 0' rcc && [ \"\$(readout notjudged READ)\" = 0x0000001B ] && [ \"\$(readout notjudged READ2)\" = 0x00000008 ]" ;;
   reset)
@@ -167,7 +173,7 @@ for t in ${TVIBURI_TESTS:-$CASES}; do
     check "norev (ruled Q7): a PWR guard with no revision refuses at load, TVI-PWR-CONFIG, unmodeled, by name, and every access after" \
       "[ \$rc = 3 ] && records norev 'len(recs) == 2 and all(r[\"rule\"] == \"TVI-PWR-CONFIG\" for r in recs) and recs[0][\"bit\"] == \"revision\" and \"no revision declared\" in recs[0][\"condition\"]'" ;;
   revy)
-    PLATFORM_SED='s/^    revision: "V"$/    revision: "Y"/' run_case revy - 'echo "R-CR3"' 'sysbus ReadDoubleWord 0x5802480C' 'sysbus WriteDoubleWord 0x5802480C 0x42'
+    PLATFORM_SED='/^tviburiPwr:$/,${s/^    revision: "V"$/    revision: "Y"/}' run_case revy - 'echo "R-CR3"' 'sysbus ReadDoubleWord 0x5802480C' 'sysbus WriteDoubleWord 0x5802480C 0x42'
     check "revy: on revision Y CR3 reads 0x06 from reset (p307); bit 6 written 1 refuses TVI-PWR-FIELD, unmodeled (reserved, reset 0 on rev Y)" \
       "[ \$rc = 3 ] && [ \"\$(readout revy CR3)\" = 0x00000006 ] && records revy 'len(recs) == 1 and recs[0][\"rule\"] == \"TVI-PWR-FIELD\" and recs[0][\"bit\"] == \"Res6 (bit 6) = 1\"'" ;;
   byte)
