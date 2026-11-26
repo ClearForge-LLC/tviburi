@@ -981,3 +981,20 @@ mutant	AD44-fieldsClass	0.2
 mutant	AD45-rateStale	13.1
 mutant	AD46-internal	6.9
 mutant	AD47-oneshotCirc	6.9
+# Rows TVI-WO-1203 added on main (its own weights), kept by the merge of d6e88c9:
+case	manifest	8.8
+case	lognames	7.1
+case	modf-page	6.7
+case	removed-console	13.0
+case	crash-console	5.5
+case	crash-runner	7.3
+case	i2c-isrmonwrite	6.0
+case	adc-fieldsmonwrite	6.0
+mutant	MF01-restated	7.6
+mutant	MF02-bareVar	7.2
+mutant	MF03-stockTypo	7.2
+mutant	MF04-lineComment	7.9
+mutant	MF05-cancel	7.3
+mutant	MF06-blockComment	6.8
+mutant	MF07-consumerStock	1.5
+mutant	MF08-twice	7.2
