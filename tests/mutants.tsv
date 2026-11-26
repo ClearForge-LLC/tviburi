@@ -548,3 +548,9 @@ HZ23-cfgOn	model/GuardedSTM32H7_RCC.cs	cfgUnknown[n] |= src || (PllOn(n) && ((ol
 HZ24-cfgUse	model/GuardedSTM32H7_RCC.cs	if(cfgUnknown[n])	if(false)	usart-hzcfgon
 MF01-restated	tools/tviburi-release/src/main.rs	if !guarded.contains(&(guard.clone(), inst.to_string())) {	if false {	manifest
 MF02-bareVar	tools/tviburi-release/src/main.rs	 || var.is_empty() || !var.bytes().all(|b| b.is_ascii_alphanumeric() || b == b'_')	(empty)	manifest
+MF03-stockTypo	tools/tviburi-release/src/main.rs	        if !declared.iter().any(|d| &d.1 == n && d.0 == stock_ty) {	        if false {	manifest
+MF04-lineComment	tools/tviburi-release/src/main.rs	.map(|l| l.split("//").next().unwrap_or("").trim_end())	.map(|l| l.trim_end())	manifest
+MF05-cancel	tools/tviburi-release/src/main.rs	                entries.retain(|e| e.0 != var);\n	(empty)	manifest
+MF06-blockComment	tools/tviburi-release/src/main.rs	        if text.contains("/*") {	        if false {	manifest
+MF07-consumerStock	tools/tviburi-release/src/main.rs	        if let Some(d) = declared.iter().find(|d| &d.1 == n) {	        if let Some(d) = declared.iter().find(|d| &d.1 == n).filter(|_| false) {	unit
+MF08-twice	tools/tviburi-release/src/main.rs	                if let Some(d) = all.iter().find(|n| all.iter().filter(|m| m == n).count() > 1) {	                if let Some(d) = all.iter().find(|_| false) {	manifest

@@ -53,9 +53,11 @@ struct Pins {
     stock: Vec<stock::Pin>,
     /// (stock type, guard type)
     classes: Vec<(String, String)>,
-    /// A class row's fourth column: the instances its guard takes over, by name (TVI-WO-1303 Q9 (c); required on every
-    /// class row since TVI-WO-1203 (1), so no guard is ever restated onto an instance by default).
+    /// A class row's fourth column: the stock instances its guard restates, by name (TVI-WO-1303 Q9 (c); required on every
+    /// class row since TVI-WO-1203 (1), so no guard is ever restated onto an instance by default; `-` for none).
     instances: BTreeMap<String, Vec<String>>,
+    /// A class row's fifth column: the consumer's own instances it retypes (TVI-WO-1203 (1); `-` for none).
+    consumer: BTreeMap<String, Vec<String>>,
 }
 
 /// Tab-separated rows of `min` to `max` non-empty fields; `#` lines are comments.
@@ -78,10 +80,10 @@ fn tsv<'a>(path: &str, text: &'a str, min: usize, max: usize) -> Result<Vec<Vec<
 fn pins(repo: &Path) -> Result<Pins, String> {
     let path = format!("{TOOL}/pins.tsv");
     let src = Source { path: path.clone(), bytes: fs::read(repo.join(&path)).map_err(|e| format!("{path}: {e}"))? };
-    let mut p = Pins { builds: vec![], stock: vec![], classes: vec![], instances: BTreeMap::new() };
-    for f in tsv(&path, overlay::text(&src)?, 3, 4)? {
-        if f.len() == 4 && f[0] != "class" {
-            return Err(format!("{path}: only a class row takes a fourth column (its instances): {}", f.join(" ")));
+    let mut p = Pins { builds: vec![], stock: vec![], classes: vec![], instances: BTreeMap::new(), consumer: BTreeMap::new() };
+    for f in tsv(&path, overlay::text(&src)?, 3, 5)? {
+        if f.len() > 3 && f[0] != "class" {
+            return Err(format!("{path}: only a class row takes a fourth and fifth column (its instances): {}", f.join(" ")));
         }
         match f[0] {
             "build" => p.builds.push((f[1].into(), f[2].into())),
@@ -89,19 +91,25 @@ fn pins(repo: &Path) -> Result<Pins, String> {
                 p.stock.push(stock::Pin { sha256: f[1].into(), path: f[2].into() })
             }
             "class" => {
-                if f.len() != 4 {
-                    return Err(format!("{path}: the class row for {} names no instances: every class row names those its guard takes over (TVI-WO-1203)", f[2]));
+                if f.len() != 5 {
+                    return Err(format!("{path}: the class row for {} does not name its instances: every class row names the stock instances it restates and the consumer's it retypes, `-` for none (TVI-WO-1203)", f[2]));
                 }
                 if p.classes.iter().any(|c| c.0 == f[1] || c.1 == f[2]) {
                     return Err(format!("{path}: the class map names {} or {} twice", f[1], f[2]));
                 }
                 p.classes.push((f[1].into(), f[2].into()));
-                if let Some(list) = f.get(3) {
-                    let names: Vec<String> = list.split(' ').map(String::from).collect();
-                    if names.iter().any(String::is_empty) {
+                let mut all: Vec<&str> = Vec::new();
+                for (col, map) in [(3, &mut p.instances), (4, &mut p.consumer)] {
+                    let list = f[col];
+                    let names: Vec<String> = if list == "-" { vec![] } else { list.split(' ').map(String::from).collect() };
+                    if names.iter().any(|n| n.is_empty() || n == "-") {
                         return Err(format!("{path}: {}'s instances are not names separated by one space: {list:?}", f[2]));
                     }
-                    p.instances.insert(f[2].into(), names);
+                    all.extend(f[col].split(' ').filter(|n| *n != "-"));
+                    map.insert(f[2].into(), names);
+                }
+                if let Some(d) = all.iter().find(|n| all.iter().filter(|m| m == n).count() > 1) {
+                    return Err(format!("{path}: {}'s class row names {d} twice", f[2]));
                 }
             }
             _ => return Err(format!("{path}: a row this release cannot read: {}", f.join(" "))),
@@ -263,35 +271,50 @@ fn stock_rows(chain: &stock::Chain, pins: &Pins) -> Vec<Row> {
     rows
 }
 
-/// What a class row's guard takes over (TVI-WO-1203 (1)), from the instances the row names:
-/// - `restate`: each named instance the pinned stock chain declares with the row's stock type, in the chain's order, with its
-///   file. The consumer cancels the stock entry and restates it onto the guard (RUL-09 (b)).
-/// - `retype`: each named instance the chain does not declare at all, in the row's order. The consumer declares it itself and
-///   changes its type (RUL-09 (b)'s other case); `tests/spike.sh manifest` checks each against the consumer's committed
-///   platform and the replay that re-types it.
-/// A name the chain declares with another stock type refuses.
-fn restated<'a>(declared: &'a [(String, String, String)], stock_ty: &str, names: &'a [String]) -> Result<(Vec<(&'a str, &'a str)>, Vec<&'a str>), String> {
+/// What a class row's guard takes over (TVI-WO-1203 (1)):
+/// - `restate`, from its fourth column: each a stock instance the pinned chain declares with the row's stock type (a name it
+///   does not declare so refuses, as a typo would), in the chain's order, with its file. The consumer cancels the stock entry
+///   and restates it onto the guard (RUL-09 (b)).
+/// - `retype`, from its fifth column: each the consumer's own instance, which the chain must not declare at all, in the row's
+///   order. The consumer declares it and changes its type (RUL-09 (b)'s other case); `tests/spike.sh manifest` checks each
+///   against the consumer's committed platform and the replay that re-types it.
+fn restated<'a>(declared: &'a [(String, String, String)], stock_ty: &str, names: &[String], consumer: &'a [String]) -> Result<(Vec<(&'a str, &'a str)>, Vec<&'a str>), String> {
     for n in names {
-        if let Some(d) = declared.iter().find(|d| &d.1 == n && d.0 != stock_ty) {
-            return Err(format!("the class row for {stock_ty} names {n}, which the pinned stock chain declares as {}", d.0));
+        if !declared.iter().any(|d| &d.1 == n && d.0 == stock_ty) {
+            return Err(format!("the class row for {stock_ty} names {n}, which the pinned stock chain does not declare as {stock_ty}"));
+        }
+    }
+    for n in consumer {
+        if let Some(d) = declared.iter().find(|d| &d.1 == n) {
+            return Err(format!("the class row for {stock_ty} names {n} as the consumer's, which the pinned stock chain declares as {}", d.0));
         }
     }
     let restates = declared.iter().filter(|d| d.0 == stock_ty && names.contains(&d.1)).map(|d| (d.1.as_str(), d.2.as_str())).collect();
-    let retypes = names.iter().filter(|n| !declared.iter().any(|d| &d.1 == *n)).map(String::as_str).collect();
-    Ok((restates, retypes))
+    Ok((restates, consumer.iter().map(String::as_str).collect()))
 }
 
 /// Every (guard type, instance) that a committed restatement runs guarded (TVI-WO-1203 (1)): the files
 /// `model/stm32h7-*-restate.repl`, which every replay loads (tests/1301/replay-1301.sh; `tests/spike.sh manifest` checks
 /// that it loads each). An entry is a top-level line `<var>: Tviburi.<Type> @ …`, named by its `as "<name>"`, on that line or on
-/// the `}` line that closes it, else by `<var>`. `<var>` must be a bare identifier, so a commented-out restatement
-/// (`// tviburiTimer5: …`) is never an entry and does not qualify an instance.
+/// the `}` line that closes it, else by `<var>`, which must be a bare identifier. Each line is read with its `//` comment
+/// removed, so neither a commented-out entry nor a commented `as "…"` counts; a file holding a block comment (`/*`) refuses,
+/// because it cannot be read line by line; and a later top-level `<var>: @none` cancels that entry (adversarial pass, 2a).
+/// The restate files are also regenerated from their generators and compared, byte for byte, by `tests/spike.sh manifest`.
 fn declared_guarded(files: &[Source]) -> Result<BTreeSet<(String, String)>, String> {
     let mut out = BTreeSet::new();
     for f in files.iter().filter(|f| f.path.starts_with("model/stm32h7-") && f.path.ends_with("-restate.repl")) {
-        let lines: Vec<&str> = overlay::text(f)?.lines().collect();
+        let text = overlay::text(f)?;
+        if text.contains("/*") {
+            return Err(format!("{}: a block comment: a restatement is read line by line, and this one cannot be", f.path));
+        }
+        let lines: Vec<&str> = text.lines().map(|l| l.split("//").next().unwrap_or("").trim_end()).collect();
+        let mut entries: Vec<(String, String, String)> = Vec::new();
         for (i, l) in lines.iter().enumerate() {
             if l.starts_with(char::is_whitespace) {
+                continue;
+            }
+            if let Some(var) = l.strip_suffix(": @none") {
+                entries.retain(|e| e.0 != var);
                 continue;
             }
             let Some((var, rest)) = l.split_once(": ") else { continue };
@@ -309,8 +332,9 @@ fn declared_guarded(files: &[Source]) -> Result<BTreeSet<(String, String)>, Stri
                     name = quoted(m);
                 }
             }
-            out.insert((ty.to_string(), name.unwrap_or_else(|| var.to_string())));
+            entries.push((var.to_string(), ty.to_string(), name.unwrap_or_else(|| var.to_string())));
         }
+        out.extend(entries.into_iter().map(|(_, ty, name)| (ty, name)));
     }
     Ok(out)
 }
@@ -409,7 +433,8 @@ fn build(repo: &Path, renode: &Path, out: &Path) -> Result<(String, String), Str
     for (stock_ty, guard) in &pins.classes {
         m += &format!("class {stock_ty} {guard}\n");
         let names = pins.instances.get(guard).ok_or(format!("the class row for {guard} names no instances"))?;
-        let (restates, retypes) = restated(&chain.declared, stock_ty, names)?;
+        let consumer = pins.consumer.get(guard).ok_or(format!("the class row for {guard} names no instances"))?;
+        let (restates, retypes) = restated(&chain.declared, stock_ty, names, consumer)?;
         for (inst, file) in restates {
             // TVI-WO-1203 (1): restated onto a guard only where a committed restatement runs it under that guard.
             if !guarded.contains(&(guard.clone(), inst.to_string())) {
@@ -742,24 +767,24 @@ mod tests {
         let d = |t: &str, i: &str| (t.to_string(), i.to_string(), "platforms/cpus/stm32h7.repl".to_string());
         let declared = vec![d("DMA.STM32DMA", "dma2"), d("DMA.STM32DMA", "dma1"), d("Timers.STM32_Timer", "timer1")];
         let names = |v: &[&str]| v.iter().map(|x| x.to_string()).collect::<Vec<_>>();
-        let both = names(&["dma1", "dma2"]);
-        let (r, t) = restated(&declared, "DMA.STM32DMA", &both).unwrap();
+        let (r, t) = restated(&declared, "DMA.STM32DMA", &names(&["dma1", "dma2"]), &[]).unwrap();
         assert_eq!((r.iter().map(|x| x.0).collect::<Vec<_>>(), t), (vec!["dma2", "dma1"], vec![]));
-        let one = names(&["dma1"]);
-        assert_eq!(restated(&declared, "DMA.STM32DMA", &one).unwrap().0.iter().map(|x| x.0).collect::<Vec<_>>(), ["dma1"]);
-        // A name the chain does not declare is the consumer's own instance: retyped, never restated.
-        let consumer = names(&["spi1", "dma1"]);
-        let (r, t) = restated(&declared, "DMA.STM32DMA", &consumer).unwrap();
+        assert_eq!(restated(&declared, "DMA.STM32DMA", &names(&["dma1"]), &[]).unwrap().0.iter().map(|x| x.0).collect::<Vec<_>>(), ["dma1"]);
+        // The consumer's own instance is retyped, never restated; a stock name in that column, or a typo in the stock
+        // column, refuses (adversarial pass, 2d).
+        let consumer = names(&["spi1"]);
+        let (r, t) = restated(&declared, "DMA.STM32DMA", &names(&["dma1"]), &consumer).unwrap();
         assert_eq!((r.len(), t), (1, vec!["spi1"]));
-        let other = names(&["timer1"]);
-        assert!(restated(&declared, "DMA.STM32DMA", &other).unwrap_err().contains("declares as Timers.STM32_Timer"));
+        assert!(restated(&declared, "DMA.STM32DMA", &names(&["dma01"]), &[]).unwrap_err().contains("does not declare as DMA.STM32DMA"));
+        assert!(restated(&declared, "DMA.STM32DMA", &names(&["timer1"]), &[]).unwrap_err().contains("does not declare as DMA.STM32DMA"));
+        assert!(restated(&declared, "DMA.STM32DMA", &[], &names(&["dma1"])).unwrap_err().contains("as the consumer's"));
     }
 
     #[test]
-    fn a_committed_restatement_is_read_by_its_as_name_and_a_comment_or_another_file_never_qualifies() {
+    fn a_committed_restatement_is_read_by_its_as_name_and_a_comment_a_cancel_or_another_file_never_qualifies() {
         let f = |path: &str, text: &str| Source { path: path.into(), bytes: text.as_bytes().to_vec() };
         let files = vec![
-            f("model/stm32h7-timer-restate.repl", "timer1: @none\ntviburiTimer1: Tviburi.GuardedSTM32_Timer @ {\n        sysbus 0x40010000;\n    } as \"timer1\"\n\n// tviburiTimer5: Tviburi.GuardedSTM32_Timer @ {\n//    } as \"timer5\"\n"),
+            f("model/stm32h7-timer-restate.repl", "timer1: @none\ntviburiTimer1: Tviburi.GuardedSTM32_Timer @ {\n        sysbus 0x40010000;\n    } as \"timer1\"\n\n// tviburiTimer5: Tviburi.GuardedSTM32_Timer @ sysbus 0x40000C00 as \"timer5\"\ntviburiTimer2: Tviburi.GuardedSTM32_Timer @ sysbus 0x40000000 // as \"timer2\"\ntviburiTimer3: Tviburi.GuardedSTM32_Timer @ sysbus 0x40000400 as \"timer3\"\ntviburiTimer3: @none\n"),
             f("model/stm32h7-rcc-restate.repl", "tviburiRcc: Tviburi.GuardedSTM32H7_RCC @ sysbus 0x58024400 as \"rcc\"\nadc3: @ {\n    tviburiRcc RegistrationPeripheralAlias.ADC3\n}\n"),
             f("model/tviburi-nucleo-h753zi.repl", "spi4: Tviburi.GuardedSTM32H7_SPI @ {\n    sysbus 0x40013400\n}\n"),
             f("model/stm32h7-x-restate.repl", "tviburiSpi2: Tviburi.GuardedSTM32H7_SPI @ {\n    sysbus 0x40003800\n}\n"),
@@ -769,8 +794,12 @@ mod tests {
         assert!(has("Tviburi.GuardedSTM32_Timer", "timer1") && has("Tviburi.GuardedSTM32H7_RCC", "rcc"));
         assert!(has("Tviburi.GuardedSTM32H7_SPI", "tviburiSpi2"), "no `as`: named by its variable");
         assert!(!has("Tviburi.GuardedSTM32_Timer", "timer5"), "a commented-out restatement");
+        assert!(!has("Tviburi.GuardedSTM32_Timer", "timer2") && has("Tviburi.GuardedSTM32_Timer", "tviburiTimer2"), "a commented `as`");
+        assert!(!has("Tviburi.GuardedSTM32_Timer", "timer3"), "an entry cancelled after");
         assert!(!has("Tviburi.GuardedSTM32H7_SPI", "spi4"), "a platform that is not a restatement");
-        assert_eq!(g.len(), 3);
+        assert_eq!(g.len(), 4);
+        let block = vec![f("model/stm32h7-timer-restate.repl", "/*\ntviburiTimer5: Tviburi.GuardedSTM32_Timer @ sysbus 0x40000C00 as \"timer5\"\n*/\n")];
+        assert!(declared_guarded(&block).unwrap_err().contains("a block comment"));
     }
 
     #[test]
