@@ -151,7 +151,7 @@ As amended and ratified 2026-11-26: a planted monitor write proves a path whose 
 - **Per cell** (granted 18:56Z), each naming exactly one cell it kills:
   - `R20`, `R21`, `R22`: R06 on `crash`, `crash-console`, `crash-runner`;
   - `R24`, `R25`: R07 on `removed-console`, `stock-forge`.
-  - **`adv-removed` has none:** it rests on two independent lines in two files, the check's witness and end requirement and the runner's after-marker. Each line has its own mutant (R06/R07; `S05` by `nomark`). [the architect's ruling]
+  - **`adv-removed` has none:** it rests on two independent lines in two files, the check's witness and end requirement and the runner's after-marker. Each line has its own mutant (R06/R07; `S05` by `nomark`). Ruled at 19:10Z: `adv-removed` is held by two independent lines (the check's R06/R07 and the runner's S05), each mutant-proven; by design, no single mutant passes it.
 - **The skeptic:**
   - **A timeout passed off as a crash.** `crash-console` requires the witness to be seen before the kill, and the exit to be 137, not a timeout.
   - **A check that reads only the log file.** `removed-console` and `crash-console` read the console in Aethelgard's framing.

@@ -12,7 +12,7 @@
 |---|---|---|
 | **1.** Every path up to your cut refuses by name | [held] | The armed run's flight paths: 653 queue rows (412 guarded, 241 acknowledged) and 97 armed registers outside them (71, 26). 0 open; DMAMUX1 and PWR (`1308`) closed the last two families. The armed run arms at 9.3 s with no record |
 | **2.** Same build, same ledger; any file changes the hash | **Met** | `reproducible`, `identity`, `verify`, `adv-cache` |
-| **3.** A removed guard, a crash or a refusal fails at both checks, in both framings | **Met** | Nine cells, each a case named by a mutant it kills (R20–R22, R24, R25, …), but `adv-removed`, which rests on two lines [ruling]. The teardown race is fixed at its cause (`1204`) |
+| **3.** A removed guard, a crash or a refusal fails at both checks, in both framings | **Met** | Nine cells, each a case named by a mutant it kills (R20–R22, R24, R25, …). `adv-removed` is held by two independent lines (the check's R06/R07 and the runner's S05), each mutant-proven; by design, no single mutant passes it (architect, 19:10Z). The teardown race is fixed at its cause (`1204`) |
 | **4.** The MODF scar refuses where stock passes; its text matches the manual | **Met** | `modf`, `stock-modf`, `modf-page` |
 | **5.** A forged record is not a record | **Met** | `forge`, `stock-forge`, `adv-spray`, `adv-hook` (R26, R25, R28, R33) |
 | **6.** Every field outside its allow-list refuses `unmodeled` | **Met** | All eleven guards' sweeps, each named alone by a mutant |

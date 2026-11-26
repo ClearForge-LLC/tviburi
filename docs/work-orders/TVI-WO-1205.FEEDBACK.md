@@ -8,6 +8,7 @@
 - **18:02Z:** step (2) on post-`1308` `main`.
 - **18:38Z:** DX34 and PW39; reading R3 in the architect's wording.
 - **18:56Z:** per-case mutants; point 1 put to Scotty.
+- **19:10Z:** `adv-removed`, by its two independent lines; the four removed copies accepted.
 - [Scotty's ruling on 18:49Z point 1]
 
 **The deliverables:**
@@ -52,7 +53,7 @@
   - **This PR's CI** runs the post-`1308` tree and the 21 new mutants: [result].
   - **The 18:56Z mutants, locally:** 19 built, 14 killed by their one cell or sweep.
     - **Removed, because their cells rest on other lines:** R27 and R29–R31. `forge` and `adv-spray` rest on the source filter (R26, R28), `stock-forge` on witness-required (R25).
-    - **`adv-removed`:** R23 tried two lines and survived each. The cell rests on two independent lines in two files: the check's witness and end requirement, and the runner's after-marker. Each has its own mutant (R06/R07; S05 by `nomark`). [the architect's ruling]
+    - **`adv-removed`:** R23 tried two lines and survived each. The cell rests on two independent lines in two files: the check's witness and end requirement, and the runner's after-marker. Each has its own mutant (R06/R07; S05 by `nomark`). Ruled at 19:10Z: `adv-removed` is held by two independent lines (the check's R06/R07 and the runner's S05), each mutant-proven; by design, no single mutant passes it.
 - **The armed run and the 16 replays on post-`1308` `main`:** 0 records, and the armed run arms (9.332 s, 34 witnesses, 34 ends).
 - **The checklist's coverage check:** 0 uncovered of 55.
 - **The verdict:** one page.
