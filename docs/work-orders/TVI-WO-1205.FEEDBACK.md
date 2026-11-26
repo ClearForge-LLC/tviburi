@@ -34,7 +34,7 @@
 
 **(3) The consumer's checklist,** 37 items in six groups plus five carried over.
 - Each cites its source and says how the release lets the consumer check it, or "no check" (a row).
-- `spike/1205/consumer-coverage.sh`: all 55 roadmap lines naming the consumer are cited or excused, with 0 uncovered.
+- `docs/work-orders/TVI-WO-1205.coverage.sh`: all 55 roadmap lines naming the consumer are cited or excused, with 0 uncovered.
 
 **(4) The verdict:** one page.
 

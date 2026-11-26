@@ -1,5 +1,5 @@
 #!/bin/bash
-# spike/1205/consumer-coverage.sh — TVI-WO-1205 (3)'s acceptance: every roadmap line that names Aethelgard, the consumer or
+# docs/work-orders/TVI-WO-1205.coverage.sh — TVI-WO-1205 (3)'s acceptance: every roadmap line that names Aethelgard, the consumer or
 # a Phase 2 seam is either cited by docs/work-orders/TVI-WO-1205.consumer.md (as R:<line>, or inside an R:<a>–<b> range) or
 # listed in spike/1205/data/consumer-not.tsv with the reason it is not a consumer obligation. Prints each line neither does
 # and exits 1 if any. Run from the repository root on the tree whose roadmap the checklist cites.
