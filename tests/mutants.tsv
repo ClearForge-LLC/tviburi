@@ -556,3 +556,4 @@ MF07-consumerStock	tools/tviburi-release/src/main.rs	        if let Some(d) = de
 MF08-twice	tools/tviburi-release/src/main.rs	                if let Some(d) = all.iter().find(|n| all.iter().filter(|m| m == n).count() > 1) {	                if let Some(d) = all.iter().find(|_| false) {	manifest
 MF09-consumerRun	tools/tviburi-release/src/main.rs	if !consumer_run_guarded(	if false && !consumer_run_guarded(	manifest
 MF10-loaded	tools/tviburi-release/src/main.rs	if !loaded_by_replay(	if false && !loaded_by_replay(	manifest
+TD01-endFlush	model/Refusal.cs	                Logger.Flush();\n	(empty)	teardown

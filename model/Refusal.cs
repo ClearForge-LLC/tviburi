@@ -13,6 +13,7 @@
 //   end     - from Dispose, when Renode tears the machine down cleanly. A crash (an unhandled
 //             exception, SIGKILL) leaves none (measured). SIGTERM still disposes, so an end record
 //             shows a clean teardown, not that the consumer's script completed.
+//             The logger is flushed after it, so a clean quit never loses it (TVI-WO-1204 (2)).
 // Each record carries a per-peripheral `seq` from 0. Renode collapses identical consecutive messages
 // into "msg (2)" (measured), so the sequence also keeps every record distinct.
 //
@@ -104,6 +105,12 @@ namespace Antmicro.Renode.Peripherals.Tviburi
             if(named)
             {
                 Emit(LogLevel.Info, "end", ",\"guard\":" + Json(guard) + ",\"model_version\":" + Json(version));
+                // The teardown race (TVI-WO-1204 (1), (2)): under asynchronous logging, Renode's default, Emit only enqueues, and
+                // a clean quit disposes the machines, then this emulation's logger, whose writer thread is cancelled with its
+                // queue undrained, so a queued end record is never written. Flushing here writes every queued entry before this
+                // Dispose returns, so before the logger can be torn down: deterministic, not a delay. Measured: 16 of 50 loaded
+                // quits lost an end record without it, 0 of 50 with it. Under synchronous logging it only flushes the backends.
+                Logger.Flush();
             }
         }
 

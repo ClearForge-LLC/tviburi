@@ -15,7 +15,7 @@
 set -euo pipefail
 
 IMAGE=ghcr.io/clearforge-llc/aethelgard-tools@sha256:1e0ab105ec42bdba66b773464f0b6679d622e4afdafef30ec4931e4326f49c63
-ACCEPTANCE="unit modf modeled ardupilot generated field stable cfg2first iolock rmw forge stock-forge stock-modf modf-page removed-console crash-console crash-runner nomark conditions fields load crash identity verify reproducible manifest lognames guards recorded allowlist"
+ACCEPTANCE="unit modf modeled ardupilot generated field stable cfg2first iolock rmw forge stock-forge stock-modf modf-page removed-console crash-console crash-runner nomark conditions fields load crash identity verify reproducible manifest lognames guards teardown recorded allowlist"
 ADVERSARIAL="adv-removed adv-extra-arg adv-bad-variant adv-hook adv-loglevel adv-spray adv-noend adv-version adv-recorded adv-noname adv-release adv-cache"
 # TVI-WO-1300: the RCC guard's cases live in tests/1300/rcc.sh; each is a test here, rcc-<case>, run as part of the
 # acceptance group, so CI and tests/mutants.sh reach them.
@@ -666,6 +666,15 @@ t_guards() { # TVI-WO-1204 (6): scripts/guards is the one list, held to the comm
     '! grep -rIlE "($(scripts_guards_alt))( [A-Za-z0-9]+)*( ($(scripts_guards_alt))){9}" "$src/scripts" "$src/tests" "$src/.github" 2>/dev/null | grep -v "^$src/scripts/guards\$" | grep -q .'
 }
 scripts_guards_alt() { "$src/scripts/guards" | tr ' ' '|'; }
+
+t_teardown() {
+  # TVI-WO-1204 (2): the teardown race, fixed at its cause (measure §1: a clean quit tears down the old emulation's asynchronous
+  # logger with its queue undrained). 15 clean quits of the runner's own script under load, each required to write every
+  # guard's end record (tests/1204/teardown.sh). Without the flush in Records.End() a loaded quit lost one about 1 in 3 times.
+  pod teardown "$src" -- bash /repo/tests/1204/teardown.sh
+  check "15 clean quits under load each write every guard's witness and end record, in the log file and on the console (TVI-WO-1204 (2))" \
+    "[ \$rc -eq 0 ] && grep -q '^teardown: 0 of 15 clean quits lost' '$work/teardown.stdout' && [ \"\$(awk 'NR > 1' '$work/teardown/teardown.tsv' | wc -l)\" = 15 ]"
+}
 
 t_reproducible() {
   # Two release builds from one commit, in two checkouts with different mtimes and umasks: byte-identical.
