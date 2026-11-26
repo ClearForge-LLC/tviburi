@@ -544,3 +544,5 @@ HZ19-adcSclkHpre	model/GuardedSTM32H7_ADC.cs	bus = (rcc.ReadDoubleWord(0x18) & 8
 HZ20-adcHclk	model/GuardedSTM32H7_ADC.cs	bus = rcc.BusHz("rcc_hclk", out why);	bus = rcc.BusHz("sys_ck", out why);	adc-rccchange
 HZ21-flashJudged	model/GuardedSTM32H7_Flash.cs	var now = c.Hz + " " + c.Note;	var now = "";	flash-clockfirst
 HZ22-flashBus	model/GuardedSTM32H7_Flash.cs	var hz = rcc.BusHz("rcc_hclk", out var why);	var hz = rcc.BusHz("sys_ck", out var why);	flash-prescaler
+HZ23-cfgOn	model/GuardedSTM32H7_RCC.cs	cfgUnknown[n] |= src || (PllOn(n) && ((old ^ value) & mask) != 0);	cfgUnknown[n] |= src;	usart-hzcfgon
+HZ24-cfgUse	model/GuardedSTM32H7_RCC.cs	if(cfgUnknown[n])	if(false)	usart-hzcfgon

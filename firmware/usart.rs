@@ -50,6 +50,9 @@
 //!                       (Q2): TVI-USART-IDLE at the start.
 //!   path="hzpllon"    - (the RCC recorded) PLL2 on, then PLL2DIVR changed while it runs (TVI-RCC-PLL, a would-refuse; silicon
 //!                       ignores the write): no rule (Q2): TVI-USART-IDLE at the start.
+//!   path="hzcfgon"    - PLL2 from an 8 MHz reference (PLL2RGE 11) running, then PLLCFGR written with PLL2VCOSEL = 1: a change
+//!                       p347 forbids once the PLL is on (TVI-RCC-PLL does not judge it), silicon keeps VCOH: no rule (the adversarial
+//!                       pass): TVI-USART-IDLE at the start.
 //!   path="hzvcoh"     - HSIDIV /2, PLL2 from 32 MHz / DIVM2 32 = a 1 MHz reference on VCOH: no rule (p346, p347; Q1).
 //!   path="hzrge"      - PLL2 from an 8 MHz reference with PLL2RGE left at 00 (1-2 MHz): no rule (pp. 401-402; Q3).
 //!   path="hzpll3q"    - PLL3 on, USART16SEL = 010 (pll3_q_ck, running): no rule on a USART (the WO's NOT list; Q10).
@@ -138,13 +141,13 @@ pub unsafe extern "C" fn reset() -> ! {
     }
     #[cfg(path = "hzvcoh")]
     write_volatile(RCC_CR, read_volatile(RCC_CR) | 1 << 3);   // HSIDIV = 01: hsi_ck 32 MHz (p385)
-    #[cfg(any(path = "hzvcol", path = "hzrge", path = "hzpllon"))]
+    #[cfg(any(path = "hzvcol", path = "hzrge", path = "hzpllon", path = "hzcfgon"))]
     write_volatile(RCC_PLLCKSELR, 0x0040_8040);               // ArduPilot's: HSI, DIVM2 = 8 (an 8 MHz reference)
     #[cfg(path = "hzvcol")]
     write_volatile(RCC_PLLCFGR, 0x01BF_0FFD);                 // ArduPilot's: PLLxRGE 11, PLL2VCOSEL = PLL3VCOSEL = 1
-    #[cfg(path = "hzpllon")]
+    #[cfg(any(path = "hzpllon", path = "hzcfgon"))]
     write_volatile(RCC_PLLCFGR, 0x01FF_00C0);                 // PLL2RGE = 11
-    #[cfg(any(path = "hzvcol", path = "hzrge", path = "hzpllon"))]
+    #[cfg(any(path = "hzvcol", path = "hzrge", path = "hzpllon", path = "hzcfgon"))]
     write_volatile(RCC_PLL2DIVR, 0x0704_022C);                // ArduPilot's: x45 = 360 MHz, DIVQ2 /5
     #[cfg(any(path = "hzwide", path = "hzdivr"))]
     write_volatile(RCC_PLL2DIVR, 0x0109_0367);                // DIVN2 = 359 (x360 = 720 MHz), DIVQ2 /10 (p407)
@@ -154,20 +157,22 @@ pub unsafe extern "C" fn reset() -> ! {
     write_volatile(RCC_PLL2DIVR, 0x0101_00C7);                // x200 = 200 MHz on VCOH, DIVQ2 /2
     #[cfg(path = "idlenorule")]
     write_volatile(RCC_PLL2DIVR, 0x0101_0002);                // DIVN2 = 2 (x3): a 6 MHz VCO
-    #[cfg(any(path = "hzvcol", path = "hzrge", path = "hzpllon", path = "hzwide", path = "hzdivr", path = "hzvcoh", path = "idlenorule", path = "hzcsiref"))]
+    #[cfg(any(path = "hzvcol", path = "hzrge", path = "hzpllon", path = "hzwide", path = "hzdivr", path = "hzvcoh", path = "idlenorule", path = "hzcsiref", path = "hzcfgon"))]
     {
         on(26);                                               // PLL2ON
         write_volatile(RCC_D2CCIP2R, 1 << 3);                 // USART16SEL = 001, pll2_q_ck
     }
     #[cfg(path = "hzpllon")]
     write_volatile(RCC_PLL2DIVR, 0x0704_022D);                // DIVN2 changed while PLL2 runs
+    #[cfg(path = "hzcfgon")]
+    write_volatile(RCC_PLLCFGR, 0x01FF_00E0);                 // PLL2VCOSEL = 1 while PLL2 runs (p347)
     #[cfg(path = "hzpll3q")]
     {
         on(28);                                               // PLL3ON, its reset dividers: 2 MHz x 129, DIVQ3 /2
         write_volatile(RCC_D2CCIP2R, 2 << 3);                 // USART16SEL = 010, pll3_q_ck
     }
     write_volatile(RCC_APB2ENR, 1 << 4);
-    #[cfg(any(path = "config", path = "kernel", path = "idlenorule", path = "hzcsi", path = "hzsyscsi", path = "hzsyshse", path = "hzvcol", path = "hzcsiref",
+    #[cfg(any(path = "config", path = "kernel", path = "idlenorule", path = "hzcsi", path = "hzsyscsi", path = "hzsyshse", path = "hzvcol", path = "hzcsiref", path = "hzcfgon",
               path = "hzwide", path = "hzdivr", path = "hzpllon", path = "hzvcoh", path = "hzrge", path = "hzpll3q"))]
     {
         config();

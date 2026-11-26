@@ -11,7 +11,7 @@ set -euo pipefail
 
 here=$(cd "$(dirname "$0")/../.." && pwd)
 IMAGE=$(sed -n 's/^IMAGE=//p' "$here/tests/spike.sh")
-CASES="config m1ue over8ue psue psoff stopue reinit reinitstop disable same ap width tdrbyte read field nine kernel clock rxoff idle idleframe idlere dmarx fields ledger registrations recorded reset config2 regen brr0 brr8 brrheld overrun idlekernel idlenorule idlenone idlehse hzcsi hzsyscsi hzsyshse hzvcol hzwide hzdivr hzpllon hzvcoh hzrge hzpll3q hzport hzcsiref"
+CASES="config m1ue over8ue psue psoff stopue reinit reinitstop disable same ap width tdrbyte read field nine kernel clock rxoff idle idleframe idlere dmarx fields ledger registrations recorded reset config2 regen brr0 brr8 brrheld overrun idlekernel idlenorule idlenone idlehse hzcsi hzsyscsi hzsyshse hzvcol hzwide hzdivr hzpllon hzvcoh hzrge hzpll3q hzport hzcsiref hzcfgon"
 GUARDS="spi1 rcc gpioPortA gpioPortB gpioPortC gpioPortD gpioPortE gpioPortF gpioPortG gpioPortH gpioPortI gpioPortJ gpioPortK timer1 timer8 dma1 dma2 flashController usart1 usart2 usart3 uart4 uart5 usart6 uart7 uart8 i2c1 i2c2 i2c3 adcM1S2 adc3"
 MONITOR="clock rxoff idle idleframe idlere dmarx fields ledger registrations recorded reset config2 regen brrheld overrun idlekernel idlenone idlehse hzcsi hzsyscsi hzsyshse hzvcol hzwide hzport hzpllon hzcsiref"
 PATHS=$(for c in $CASES; do case " $MONITOR " in *" $c "*) ;; *) printf '"%s",' "$c" ;; esac; done | sed 's/,$//')
@@ -365,7 +365,7 @@ sys.exit(0 if ok else 1)
       'echo "R-T1"' 'sysbus ReadDoubleWord 0x4001101C' 'emulation RunFor "0.000002"' 'echo "R-T2"' 'sysbus ReadDoubleWord 0x4001101C'
     check "$t: $(case $t in hzcsi) echo 'csi_ker_ck (USART16SEL = 100)';; hzsyscsi) echo 'rcc_pclk2 with sys_ck on the CSI';; hzsyshse) echo 'rcc_pclk2 with sys_ck on the HSE';; hzvcol) echo "pll2_q_ck from ArduPilot's PLL2, VCOL on an 8 MHz reference (acknowledged by name, Q1), its PLLCFGR read back as written (0x01BF0FFD: the RCC guard's copy, (4))";; hzwide) echo 'pll2_q_ck after one PLL2DIVR write the stock model narrowed (silicon holds DIVN2 = 359, Q2)';; hzcsiref) echo 'pll2_q_ck from a CSI reference (PLLSRC = 01), 100 MHz';; esac): the RCC guard's KernelHz gives the frequency, and IDLE is clear $((us - 1)) us after a byte and set at $((us + 1)) (TVI-WO-1300c, the union)" \
       "passes $t && bit \"\$(readout $t T1)\" 4 0 && bit \"\$(readout $t T2)\" 4 1 && { [ $t != hzvcol ] || [ \"\$(readout hzvcol READ2)\" = 0x01BF0FFD ]; }" ;;
-  hzvcoh|hzrge|hzdivr|hzpllon|hzpll3q)
+  hzvcoh|hzrge|hzdivr|hzpllon|hzpll3q|hzcfgon)
     if [ $t = hzpllon ]; then
       PLATFORM_SED='/^tviburiRcc:$/,/mode:/s/enforcing/recorded/' run_case "$t" "$t" 'emulation RunFor "0.001"' "${marks[@]}"
     fi
@@ -374,6 +374,7 @@ sys.exit(0 if ok else 1)
       hzrge) w='PLL2RGE = 00 (1 to 2 MHz) with ref2_ck at 8000000 Hz' ;;
       hzdivr|hzpllon) w='RCC_PLL2DIVR written after a write the stock model did not keep, or while PLL2 ran' ;;
       hzpll3q) w='USART16SEL = 010 (pll3_q_ck): no rule for its frequency on a USART' ;;
+      hzcfgon) w='PLL2RGE or PLL2VCOSEL written while it ran, which silicon does not take (p347' ;;
     esac
     check "$t: the RCC guard's KernelHz has no rule ($w), so USART1's start refuses TVI-USART-IDLE, unmodeled (TVI-WO-1300c Q1, Q2, Q3, Q10)$([ $t = hzpllon ] && echo '; the RCC, recorded, records TVI-RCC-PLL for the change')" \
       "$([ $t = hzpllon ] && echo "grep -q '\"tviburi\":\"would-refuse\".*TVI-RCC-PLL' '$work/hzpllon/renode-log.txt' && [ \$rc = 1 -o \$rc = 3 ] && logged hzpllon" || echo "refuses $t") $([ $t = hzpllon ] && echo "'len(recs) >= 1 and recs[0][\"rule\"] == \"TVI-USART-IDLE\" and \"$w\" in recs[0][\"bit\"]'" || echo "TVI-USART-IDLE unmodeled '\"$w\" in r[\"bit\"]'")" ;;

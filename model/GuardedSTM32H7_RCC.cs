@@ -322,6 +322,7 @@ namespace Antmicro.Renode.Peripherals.Tviburi
         // FRACN 0 (this guard's allow-list). No rule (null, with the page) unless every one of these holds (ruled 2026-11-26T04:03Z):
         //   refN_ck within 1-16 MHz and the VCO within its PLLNVCOSEL's range, 192-960 MHz or 150-420 MHz (p404, p407, p410);
         //   RCC_PLLNDIVR known as silicon holds it (Q2): not written after a write the stock model did not keep, nor while PLLN ran;
+        //   nor DIVMN, PLLSRC, PLLNRGE or PLLNVCOSEL written while PLLN ran (p347; this WO's adversarial pass);
         //   PLLNRGE's range holds refN_ck, its edges inclusive (pp. 401-402, p347; Q3);
         //   the VCO choice: VCOH takes 2-16 MHz (p346; p347); VCOL takes 1-2 MHz, and VCOL above 2 MHz with its VCO in VCOL's range
         //     is acknowledged by name: ChibiOS chooses VCOL for any VCO at most 420 MHz, whatever its reference (hal_lld_type1.h
@@ -341,6 +342,11 @@ namespace Antmicro.Renode.Peripherals.Tviburi
             if(refHz < 1e6 || refHz > 16e6 || vco < (wide ? 192e6 : 150e6) || vco > (wide ? 960e6 : 420e6))
             {
                 why += ": PLL" + n + " outside the ranges p404 gives, or with no reference (ref " + refHz + " Hz, VCO " + vco + " Hz): no rule for its frequency";
+                return null;
+            }
+            if(cfgUnknown[n])
+            {
+                why += ": PLL" + n + "'s DIVM" + n + ", PLLSRC, PLL" + n + "RGE or PLL" + n + "VCOSEL written while it ran, which silicon does not take (p347, p398-399): no rule for its frequency";
                 return null;
             }
             if(divrUnknown[n])
@@ -579,6 +585,20 @@ namespace Antmicro.Renode.Peripherals.Tviburi
             {
                 rtcen = value & BdcrRtcen;   // the copy; the stock model's RTCEN is kept at 1, so `rtc` stays unlocked (p471)
                 value |= BdcrRtcen;
+            }
+            if(b == PllckselrOffset || b == PllcfgrOffset)
+            {
+                // TVI-WO-1300c adversarial pass: "The following PLL parameters cannot be changed once the PLL is enabled: DIVNx, PLLxRGE,
+                // PLLxVCOSEL, ..." (p347), nor DIVMx and PLLSRC (p398-399). A write that changes one under a running PLL passes TVI-RCC-PLL
+                // for RGE and VCOSEL (and reaches here after it, recorded, for DIVM and PLLSRC); silicon keeps the old value, so that
+                // PLL's frequency is no longer known (as Q2's PLL-on write), until a machine reset.
+                var old = Copy(b);
+                var src = b == PllckselrOffset && ((old ^ value) & 0x3) != 0 && AnyPllOn();   // PLLSRC, "only when all PLLs are disabled" (p399)
+                for(var n = 1; n <= 3; n++)
+                {
+                    var mask = b == PllckselrOffset ? 0x3Fu << DivmShift[n] : 0xEu << 4 * (n - 1);   // DIVMn; PLLnRGE, PLLnVCOSEL
+                    cfgUnknown[n] |= src || (PllOn(n) && ((old ^ value) & mask) != 0);
+                }
             }
             if(copies.ContainsKey(b))
             {
@@ -1014,6 +1034,7 @@ namespace Antmicro.Renode.Peripherals.Tviburi
             }
             divrUnkept = new bool[4];
             divrUnknown = new bool[4];
+            cfgUnknown = new bool[4];
             foreach(var off in divr.Keys.ToArray())
             {
                 divr[off] = DivrReset;
@@ -1204,6 +1225,8 @@ namespace Antmicro.Renode.Peripherals.Tviburi
         // Per PLL (1-3): a write to RCC_PLLnDIVR the stock model did not keep; and divr no longer silicon's value (ruled Q2).
         private bool[] divrUnkept = new bool[4];
         private bool[] divrUnknown = new bool[4];
+        // Per PLL (1-3): DIVMn, PLLSRC, PLLnRGE or PLLnVCOSEL written while it ran (p347): its frequency no longer known.
+        private bool[] cfgUnknown = new bool[4];
         private uint? crAfter;
         private readonly Records records;
         private readonly MuxState[] muxes;
