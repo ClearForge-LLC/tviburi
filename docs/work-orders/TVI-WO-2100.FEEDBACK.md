@@ -118,4 +118,15 @@ An independent Opus reviewer worked on `afd88a4` from the code, the WO's three a
 
 ## 7. CI and the release
 
-⟨CI on the head; the dispatch run on the release commit: its hashes; the budget run id and figure⟩
+**Stopped (WO §7, the fourth condition), 2026-11-26T22:53Z.** Scotty ruled `TVI-WO-1205`'s clause 1 (b): Phase 1's gate is not met until `TVI-WO-1206` reads the 129 unaudited items. As §7 says, this work order stops after (1)–(3), with (4) in draft.
+
+- **Done and green:**
+  - (3) the pins;
+  - (1) the release job, proven on #69 in its pull-request mode (run 45893960672: the base commit built and verified; the PR's own tree built twice, compared and verified; the planted failures; the consumer's binding check and its plants, and in the image against `/opt/renode`);
+  - Q23–Q26;
+  - (2) the rehearsal;
+  - the adversarial and reduction passes.
+- **CI on #69's head `7b559e2`:** `ci` 45893960810 green (eleven shards, the budget, the aggregate); `release` 45893960672 green.
+- **(4), `docs/releases/v0.1.0.md`:** a draft. It cites `TVI-WO-1205.consumer.md`'s items A1–G by id, from #68's head. Its hashes, its memory figure and the id check against the merged checklist are placeholders.
+- **The release hash on this branch's head:** `sha256:f5210aac…538b`. It will move again: `1206` edits the guards' field-table rows.
+- **When `1206` merges** (ruled 22:53Z): merge `main`, ask the architect to dispatch `release` on the release commit, fill (4) from that run, then READY.
