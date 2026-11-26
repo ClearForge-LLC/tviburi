@@ -35,6 +35,7 @@
 //!                        port's reset cancels it too (MARK_READ2, 0x1): passes.
 //!   path="nacktransfer" - config, a write START to 0x31, then a START to the BME280 while the NACK's STOP is pending:
 //!                        TVI-I2C-TRANSFER, unmodeled (Q4).
+//!   path="nacktxdr"    - config, a write START to 0x31, then a TXDR write before the NACK's STOPF: TVI-I2C-TRANSFER, unmodeled.
 //!   path="nackclock"   - I2C123SEL = 01 with PLL3's VCO at 20 MHz (outside p404's ranges), config, a write START to 0x31:
 //!                        TVI-I2C-NACK, unmodeled (no frequency to time it by, Q2).
 //!   path="icrres"      - config, then ICR = 0x80 (bit 7, reserved, not ChibiOS's): TVI-I2C-FIELD, unmodeled.
@@ -293,6 +294,12 @@ pub unsafe extern "C" fn reset() -> ! {
         config();
         w(CR2, 1 << 16 | START | ABSENT);
         w(CR2, 1 << 16 | START | BME);
+    }
+    #[cfg(path = "nacktxdr")]
+    {
+        config();
+        w(CR2, 1 << 16 | START | ABSENT);
+        w(TXDR, 0xD0);
     }
     #[cfg(path = "nackclock")]
     {

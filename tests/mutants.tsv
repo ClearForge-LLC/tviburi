@@ -452,7 +452,7 @@ I241-stopIdle	model/GuardedSTM32F7_I2C.cs	else if(stop && !Controller())	else if
 I242-staleStopf	model/GuardedSTM32F7_I2C.cs	staleStopf = stopf;	staleStopf = false;	i2c-stalestop
 I243-resetTxis	model/GuardedSTM32F7_I2C.cs	                inner.WriteDoubleWord(Cr1Offset, 0);   // the stock Reset leaves TXIS	                // the stock Reset leaves TXIS	i2c-rccreset
 I244-emptyEveryPath	model/GuardedSTM32F7_I2C.cs	var empty = offset == Cr2Offset && (value & StartBit) != 0 && ((value >> 16) & 0xFF) == 0;	var empty = false;	i2c-recorded
-I245-absentEndsData	model/GuardedSTM32F7_I2C.cs	                        open = false;\n                        if(tick != null)	                        if(tick != null)	i2c-absentnext
+I245-absentEndsData	model/GuardedSTM32F7_I2C.cs	                        open = false;\n                        if(tick != null)	                        if(tick != null)	i2c-nacktxdr
 # TVI-WO-1303a: the DMA guard's circular mode (ruled 2026-11-25T18:49Z), one mutant per change, killed by its case.
 DM50-circReload	model/GuardedSTM32DMA.cs	                inner.WriteDoubleWord(b + NdtrOffset, n);   // the wrap	                // the wrap	dma-circ dma-adc
 DM51-enClear	model/GuardedSTM32DMA.cs	                    inner.WriteDoubleWord(b + CrOffset, inner.ReadDoubleWord(b + CrOffset) & ~EnBit);   // p654, p665	                    // p654, p665	dma-circoff dma-adcoff

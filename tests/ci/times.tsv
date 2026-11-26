@@ -835,7 +835,7 @@ mutant	DM68-flagShift	6.1
 mutant	DM69-hifcrClear	6.0
 mutant	DM70-clearLine	5.8
 mutant	DM71-circRecorded	6.0
-# TVI-WO-1306a: the NACK's 8 cases at the I2C cases' mean (6.1 s) and 19 mutants at the I2C mutants' mean (6.8 s), unmeasured; I220 and I238 withdrawn with the Absent table.
+# TVI-WO-1306a: the NACK's 9 cases at the I2C cases' mean (6.1 s) and 19 mutants at the I2C mutants' mean (6.8 s), unmeasured; I220 and I238 withdrawn with the Absent table.
 case	i2c-nack	6.1
 case	i2c-nacktime	6.1
 case	i2c-nackpll	6.1
@@ -843,6 +843,7 @@ case	i2c-nackirq	6.1
 case	i2c-nackstop	6.1
 case	i2c-nackpe	6.1
 case	i2c-nacktransfer	6.1
+case	i2c-nacktxdr	6.1
 case	i2c-nackclock	6.1
 mutant	I246-nackNinePeriods	6.8
 mutant	I247-nackStopGap	6.8
