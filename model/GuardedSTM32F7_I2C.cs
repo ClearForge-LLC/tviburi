@@ -45,8 +45,8 @@
 //                     recorded or not: recorded, the write goes on with START cleared. A transfer is open from a START this guard
 //                     passes until the stock model shows TC, TCR or a STOPF that was not already set at that START, a STOP is
 //                     written, or PE is cleared.
-//                     During a NACKed address's pending automatic STOP (below), a START, a TXDR write or a change to those CR2
-//                     fields (TVI-WO-1306a, ruled 2026-11-26T00:22Z Q4).
+//                     During a NACKed address's pending automatic STOP (below), a START or a change to those CR2 fields
+//                     (TVI-WO-1306a, ruled 2026-11-26T00:22Z Q4); a TXDR write then is the rule above (no data phase).
 //   TVI-I2C-ABSENT    a read START to an address with no device: RM0433 states the automatic STOP after a NACK only for the
 //                     controller transmitter (§47.4.9 p1975), and no measured firmware reads an absent address (TVI-WO-1306a.measure.md
 //                     §2.1). unmodeled (ruled 2026-11-26T00:22Z Q6). A write is NACKed (below).
@@ -66,7 +66,8 @@
 //   PE = 1 is this port running, for the RCC guard's TVI-RCC-CLOCK (IRccWatched; ruled Q4).
 //   The NACK (TVI-WO-1306a.measure.md; ruled 2026-11-26T00:22Z): a write START to a 7-bit address with no device on the port's bus
 //     sets NACKF nine SCL periods later (p1955, the period by p1971 from TIMINGR, DNF and the RCC guard's KernelHz, each tSYNC at its
-//     stated floor: a lower bound), and STOPF one SCL period after NACKF (inferred: RM0433 gives no figure), whatever AUTOEND
+//     stated floor; inferred: the START's hold, tHD:STA, which SCLH sets (p1973), is not added, so it may be early by about that),
+//     and STOPF one SCL period after NACKF (inferred: RM0433 gives no figure), whatever AUTOEND
 //     ("a STOP condition is automatically sent", p1975). NACKIE raises the event interrupt; NACKCF and STOPCF clear the flags
 //     (p2012); PE = 0 and a reset clear them and cancel what is pending (p1959, p2011). A firmware STOP while the automatic STOP is
 //     pending is absorbed: silicon clears the bit "when a STOP condition is detected" (p2005; ChibiOS writes one at every NACK).
@@ -130,9 +131,9 @@ namespace Antmicro.Renode.Peripherals.Tviburi
             {
                 inner.Reset();
                 inner.WriteDoubleWord(Cr1Offset, 0);   // the stock Reset leaves TXIS; its PE = 0 callback clears it (ISR 0x1, p2009)
+                CancelNack();
                 cr1 = timingr = 0;
                 open = controller = staleStopf = clearedLast = false;
-                CancelNack();
             }
         }
 
@@ -326,7 +327,7 @@ namespace Antmicro.Renode.Peripherals.Tviburi
             case IcrOffset:
                 nackf &= (word & NackcfBit) == 0;      // NACKCF clears NACKF (p2012)
                 nackStopf &= (word & StopfBit) == 0;   // STOPCF clears STOPF (p2012)
-                inner.WriteDoubleWord(offset, word);
+                inner.WriteDoubleWord(offset, word & ~NackcfBit);   // NACKCF is a stock tag: it would log the clear as unhandled
                 return;
             case TimeoutrOffset:  // 0 only (Fields); the stock model has no register 0x14
             case PecrOffset:      // read-only
@@ -345,6 +346,7 @@ namespace Antmicro.Renode.Peripherals.Tviburi
             var cr2 = inner.ReadDoubleWord(Cr2Offset) & ~(StartBit | StopBit);
             var oar1 = inner.ReadDoubleWord(Oar1Offset);
             var oar2 = inner.ReadDoubleWord(Oar2Offset);
+            CancelNack();   // NACKF and STOPF are reset by PE = 0, and a pending NACK or STOP with them (p1959, p2011)
             inner.Reset();
             if(oar1 != 0)
             {
@@ -357,7 +359,6 @@ namespace Antmicro.Renode.Peripherals.Tviburi
             inner.WriteDoubleWord(Cr2Offset, cr2);
             inner.WriteDoubleWord(Cr1Offset, word);
             open = controller = staleStopf = false;
-            CancelNack();   // NACKF and STOPF are reset by PE = 0, and a pending NACK or STOP with them (p1959, p2011)
         }
 
         // ---- the NACK (TVI-WO-1306a; ruled 2026-11-26T00:22Z) ------------------------------------------------------------------
@@ -365,7 +366,7 @@ namespace Antmicro.Renode.Peripherals.Tviburi
         // A write START to an address with no device on this port's bus: "When a NACK is received, the TXIS flag is not set and a STOP
         // condition is automatically sent. The NACKF flag of the I2C_ISR register is set. An interrupt is generated if the NACKIE bit is
         // set" (§47.4.9 p1975), whatever AUTOEND (Figure 556 p1976; ruled Q1). NACKF at the ninth SCL pulse of the address (p1955):
-        // nine SCL periods after the START. STOPF one SCL period after NACKF: inferred: RM0433 gives no figure (ruled Q3). From the
+        // nine SCL periods after the START (inferred). STOPF one SCL period after NACKF: inferred: RM0433 gives no figure (ruled Q3). From the
         // START to that STOPF the automatic STOP is pending.
         private void Nack(double tick)
         {
@@ -413,13 +414,14 @@ namespace Antmicro.Renode.Peripherals.Tviburi
         // A START this guard would NACK: a write, with PE = 1, to a 7-bit address with no device on this port.
         private bool Nacked(long offset, uint word)
         {
-            return offset == Cr2Offset && (word & StartBit) != 0 && (word & StopBit) == 0 && (word & RdWrnBit) == 0 && IsRunning
+            return offset == Cr2Offset && (word & StartBit) != 0 && (word & StopBit) == 0 && (word & (RdWrnBit | Add10Bit)) == 0 && IsRunning
                 && !TryGetByAddress(Address(word), out var _);
         }
 
         // The controller's SCL period (§47.4.9 p1971): tSCL = tSYNC1 + tSYNC2 + [(SCLH+1) + (SCLL+1)] x (PRESC+1) x tI2CCLK, each tSYNC
         // at the floor p1971 states, two i2c_ker_ck periods plus DNF x tI2CCLK; the slope and the analog filter add more, with no figure
-        // here, so the NACK's times are lower bounds. tI2CCLK from the RCC guard's KernelHz (ruled Q2); null, with the reason, without one.
+        // here, and nine periods from the START leave out the START's hold (tHD:STA, set by SCLH, p1973): inferred, not cited. tI2CCLK
+        // from the RCC guard's KernelHz (ruled Q2); null, with the reason, without one.
         private double? SclPeriod(out string why)
         {
             why = null;
@@ -583,9 +585,9 @@ namespace Antmicro.Renode.Peripherals.Tviburi
                 what = "START while a transfer is open (silicon queues a repeated START after the NBYTES transfer, where the stock model starts at once and abandons the open transfer)";
                 page = "§47.9.2 p2005 (START: \"generates a repeated START condition ... after the end of the NBYTES transfer\")";
             }
-            else if(nackStopPending && (start || offset == TxdrOffset || (offset == Cr2Offset && ((inner.ReadDoubleWord(Cr2Offset) ^ word) & Cr2Held) != 0)))
+            else if(nackStopPending && (start || (offset == Cr2Offset && ((inner.ReadDoubleWord(Cr2Offset) ^ word) & Cr2Held) != 0)))
             {
-                what = "START, TXDR or CR2's NBYTES, HEAD10R, ADD10, RD_WRN or SADD written while a NACKed address's automatic STOP is pending";
+                what = "START or CR2's NBYTES, HEAD10R, ADD10, RD_WRN or SADD written while a NACKed address's automatic STOP is pending";
                 page = "§47.4.9 p1975 (the automatic STOP), §47.9.2 p2005 (START); ruled 2026-11-26T00:22Z Q4";
             }
             else if(stop && !Controller())
@@ -741,6 +743,7 @@ namespace Antmicro.Renode.Peripherals.Tviburi
         private const uint StopBit = 1u << 14;
         private const uint ReloadBit = 1u << 24;
         private const uint RdWrnBit = 1u << 10;
+        private const uint Add10Bit = 1u << 11;
         private const uint Cr2Held = 0x00FF1FFF;        // NBYTES, HEAD10R, ADD10, RD_WRN, SADD (p2004-2006)
         private const uint TcBit = 1u << 6;
         private const uint TcrBit = 1u << 7;
@@ -835,23 +838,23 @@ namespace Antmicro.Renode.Peripherals.Tviburi
             R("I2C_CR1", 0x000, "§47.9.1", "TXDMAEN", 14, 14, Zero, "tag", "0 only: a stock tag; the DMA side of I2C is not modeled (TVI-WO-1306 NOT)", 2002),
             R("I2C_CR1", 0x000, "§47.9.1", "Res13", 13, 13, Zero, "reserved", "reserved: must be kept at reset value", 2002),
             R("I2C_CR1", 0x000, "§47.9.1", "ANFOFF", 12, 12, Any, "modeled by the guard", "kept by the guard and served on read (a stock tag; ruled 2026-11-25T05:06Z Q5); the twin's bus carries no noise to filter; protected under PE (p2002): changed with PE = 1 it is TVI-I2C-PE, unmodeled: RM0433 says it can be programmed only with PE = 0 and not what silicon does with such a write (ruled 2026-11-25T05:06Z Q2)", 2002),
-            R("I2C_CR1", 0x000, "§47.9.1", "DNF", 11, 8, Any, "modeled by the guard", "kept by the guard and served on read (a stock tag; ruled 2026-11-25T05:06Z Q5); the twin's bus carries no noise to filter; protected under PE (p2003): changed with PE = 1 it is TVI-I2C-PE, unmodeled: RM0433 says it can be programmed only with PE = 0 and not what silicon does with such a write (ruled 2026-11-25T05:06Z Q2)", 2003),
+            R("I2C_CR1", 0x000, "§47.9.1", "DNF", 11, 8, Any, "modeled by the guard", "kept by the guard and served on read (a stock tag; ruled 2026-11-25T05:06Z Q5); the twin's bus carries no noise to filter, but DNF x tI2CCLK adds to each tSYNC of the NACK's SCL period (p1971; TVI-WO-1306a); protected under PE (p2003): changed with PE = 1 it is TVI-I2C-PE, unmodeled: RM0433 says it can be programmed only with PE = 0 and not what silicon does with such a write (ruled 2026-11-25T05:06Z Q2)", 2003),
             R("I2C_CR1", 0x000, "§47.9.1", "ERRIE", 7, 7, Any, "inherited, unaudited (acknowledged by name)", "the stock model keeps it; no bus error (BERR, ARLO, OVR, TIMEOUT, PECERR, ALERT) is ever raised, so it never fires (ArduPilot sets it; ruled 2026-11-25T05:06Z Q11)", 2003),
             R("I2C_CR1", 0x000, "§47.9.1", "TCIE", 6, 6, Any, "inherited, unaudited (acknowledged by name)", "the stock model: TC and TCR raise the event interrupt", 2003),
-            R("I2C_CR1", 0x000, "§47.9.1", "STOPIE", 5, 5, Any, "inherited, unaudited (acknowledged by name)", "the stock model: STOPF raises the event interrupt", 2003),
-            R("I2C_CR1", 0x000, "§47.9.1", "NACKIE", 4, 4, Any, "modeled by the guard", "the guard: NACKF raises the event interrupt (Table 400 p1999; the stock model has NACKIE && false); a write START to an address with no device is NACKed by the guard: NACKF nine SCL periods after the START (p1955; the period by p1971 from TIMINGR, DNF and the RCC guard's KernelHz, each tSYNC at its stated floor: a lower bound), STOPF one SCL period after NACKF (inferred: RM0433 gives no figure), whatever AUTOEND (\"a STOP condition is automatically sent\", p1975), the guard writing the stock line \"Unknown slave at address N.\" under its own name (TVI-WO-1306a.measure.md; ruled 2026-11-26T00:22Z Q1-Q3, Q5, Q8); with no kernel-clock frequency it is TVI-I2C-NACK, unmodeled (Q2); a read START to an address with no device is TVI-I2C-ABSENT, unmodeled: RM0433 states the automatic STOP only for a write (Q6)", 2003),
+            R("I2C_CR1", 0x000, "§47.9.1", "STOPIE", 5, 5, Any, "inherited, unaudited (acknowledged by name)", "the stock model: STOPF raises the event interrupt; and the guard's STOPF after a NACK (TVI-WO-1306a)", 2003),
+            R("I2C_CR1", 0x000, "§47.9.1", "NACKIE", 4, 4, Any, "modeled by the guard", "the guard: NACKF raises the event interrupt (Table 400 p1999; the stock model has NACKIE && false); a write START to an address with no device is NACKed by the guard: NACKF nine SCL periods after the START (p1955; the period by p1971 from TIMINGR, DNF and the RCC guard's KernelHz, each tSYNC at its stated floor; inferred: the START's hold, tHD:STA, which SCLH sets (p1973), is not added), STOPF one SCL period after NACKF (inferred: RM0433 gives no figure), whatever AUTOEND (\"a STOP condition is automatically sent\", p1975), the guard writing the stock line \"Unknown slave at address N.\" under its own name (TVI-WO-1306a.measure.md; ruled 2026-11-26T00:22Z Q1-Q3, Q5, Q8); with no kernel-clock frequency it is TVI-I2C-NACK, unmodeled (Q2); a read START to an address with no device is TVI-I2C-ABSENT, unmodeled: RM0433 states the automatic STOP only for a write (Q6)", 2003),
             R("I2C_CR1", 0x000, "§47.9.1", "ADDRIE", 3, 3, Zero, "inherited, unaudited (acknowledged by name)", "0 only: the stock model stores it; target (slave) mode is not modeled", 2003),
             R("I2C_CR1", 0x000, "§47.9.1", "RXIE", 2, 2, Any, "inherited, unaudited (acknowledged by name)", "the stock model: RXNE on a read raises the event interrupt", 2003),
             R("I2C_CR1", 0x000, "§47.9.1", "TXIE", 1, 1, Any, "inherited, unaudited (acknowledged by name)", "the stock model: TXIS raises the event interrupt", 2003),
             R("I2C_CR1", 0x000, "§47.9.1", "PE", 0, 0, Any, "modeled by the guard", "the stock model; set (0 -> 1), the RCC guard's kernel-clock query (TVI-I2C-KERNEL; ruled 2026-11-25T05:06Z Q3), and set as the very next access after the one that cleared it is TVI-I2C-RESET, unmodeled (p1960: write 0, check, write 1; Q6); cleared (1 -> 0), the software reset (p1959): the guard resets the owned stock instance (every ISR flag, TXE = 1, its byte queues) and restores the configuration (CR1, OAR1, OAR2, CR2 but START and STOP; TIMINGR is its own) (Q6); a write that clears it is judged as written with PE = 0 (Q2)", 2003),
             R("I2C_CR2", 0x004, "§47.9.2", "Reserved", 31, 27, Zero, "reserved", "reserved: must be kept at reset value", 2004),
             R("I2C_CR2", 0x004, "§47.9.2", "PECBYTE", 26, 26, Zero, "tag", "0 only: a stock tag; SMBus is not modeled", 2004),
-            R("I2C_CR2", 0x004, "§47.9.2", "AUTOEND", 25, 25, Any, "inherited, unaudited (acknowledged by name)", "the stock model: a STOP after NBYTES (STOPF)", 2004),
+            R("I2C_CR2", 0x004, "§47.9.2", "AUTOEND", 25, 25, Any, "inherited, unaudited (acknowledged by name)", "the stock model: a STOP after NBYTES (STOPF); a NACKed address's STOP comes whatever AUTOEND (p1975; TVI-WO-1306a)", 2004),
             R("I2C_CR2", 0x004, "§47.9.2", "RELOAD", 24, 24, Zero, "inherited, unaudited (acknowledged by name)", "0 only: the stock model stores it and extends a transfer, used by no firmware (TVI-WO-1306.measure.md §2.1), so held at 0, not audited (ruled 2026-11-25T05:06Z Q11)", 2004),
             R("I2C_CR2", 0x004, "§47.9.2", "NBYTES", 23, 16, Any, "inherited, unaudited (acknowledged by name)", "the stock model; a START with NBYTES = 0 and RELOAD = 0 is TVI-I2C-TRANSFER, unmodeled, never passed on: the stock model hands the device an empty write and Renode aborts (measure.md §2.3 I8b; ruled 2026-11-25T05:06Z Q8); changed while a transfer is open (START passed, no TC, TCR or STOPF since, no STOP or PE clear) it is TVI-I2C-TRANSFER, unmodeled (\"Changing these bits when the START bit is set is not allowed\", p2004-2006; ruled 2026-11-25T05:06Z Q8)", 2004),
             R("I2C_CR2", 0x004, "§47.9.2", "NACK", 15, 15, Zero, "tag", "0 only: a stock tag; target (slave) mode is not modeled", 2005),
             R("I2C_CR2", 0x004, "§47.9.2", "STOP", 14, 14, Any, "modeled by the guard", "the stock model: STOPF; it closes an open transfer; written while a NACKed address's automatic STOP is pending, absorbed by the guard: silicon clears it \"when a STOP condition is detected\" (p2005; ruled 2026-11-26T00:22Z Q4)", 2005),
-            R("I2C_CR2", 0x004, "§47.9.2", "START", 13, 13, Any, "modeled by the guard", "the stock model starts the transfer; with PE = 0, or while a transfer is open, it is TVI-I2C-TRANSFER, unmodeled (p2003 \"Peripheral disabled\"; ruled 2026-11-25T05:06Z Q8); while a NACKed address's automatic STOP is pending it is TVI-I2C-TRANSFER, unmodeled (ruled 2026-11-26T00:22Z Q4); a write START to an address with no device is NACKed by the guard: NACKF nine SCL periods after the START (p1955; the period by p1971 from TIMINGR, DNF and the RCC guard's KernelHz, each tSYNC at its stated floor: a lower bound), STOPF one SCL period after NACKF (inferred: RM0433 gives no figure), whatever AUTOEND (\"a STOP condition is automatically sent\", p1975), the guard writing the stock line \"Unknown slave at address N.\" under its own name (TVI-WO-1306a.measure.md; ruled 2026-11-26T00:22Z Q1-Q3, Q5, Q8); with no kernel-clock frequency it is TVI-I2C-NACK, unmodeled (Q2); a read START to an address with no device is TVI-I2C-ABSENT, unmodeled: RM0433 states the automatic STOP only for a write (Q6)", 2005),
+            R("I2C_CR2", 0x004, "§47.9.2", "START", 13, 13, Any, "modeled by the guard", "the stock model starts the transfer; with PE = 0, or while a transfer is open, it is TVI-I2C-TRANSFER, unmodeled (p2003 \"Peripheral disabled\"; ruled 2026-11-25T05:06Z Q8); while a NACKed address's automatic STOP is pending it is TVI-I2C-TRANSFER, unmodeled (ruled 2026-11-26T00:22Z Q4); a write START to an address with no device is NACKed by the guard: NACKF nine SCL periods after the START (p1955; the period by p1971 from TIMINGR, DNF and the RCC guard's KernelHz, each tSYNC at its stated floor; inferred: the START's hold, tHD:STA, which SCLH sets (p1973), is not added), STOPF one SCL period after NACKF (inferred: RM0433 gives no figure), whatever AUTOEND (\"a STOP condition is automatically sent\", p1975), the guard writing the stock line \"Unknown slave at address N.\" under its own name (TVI-WO-1306a.measure.md; ruled 2026-11-26T00:22Z Q1-Q3, Q5, Q8); with no kernel-clock frequency it is TVI-I2C-NACK, unmodeled (Q2); a read START to an address with no device is TVI-I2C-ABSENT, unmodeled: RM0433 states the automatic STOP only for a write (Q6)", 2005),
             R("I2C_CR2", 0x004, "§47.9.2", "HEAD10R", 12, 12, Zero, "tag", "0 only: a stock tag; 10-bit addressing is not modeled", 2005),
             R("I2C_CR2", 0x004, "§47.9.2", "ADD10", 11, 11, Zero, "inherited, unaudited (acknowledged by name)", "0 only: the stock model stores it; 10-bit addressing is not modeled", 2005),
             R("I2C_CR2", 0x004, "§47.9.2", "RD_WRN", 10, 10, Any, "inherited, unaudited (acknowledged by name)", "the stock model; changed while a transfer is open (START passed, no TC, TCR or STOPF since, no STOP or PE clear) it is TVI-I2C-TRANSFER, unmodeled (\"Changing these bits when the START bit is set is not allowed\", p2004-2006; ruled 2026-11-25T05:06Z Q8)", 2005),
@@ -867,12 +870,12 @@ namespace Antmicro.Renode.Peripherals.Tviburi
             R("I2C_OAR2", 0x00C, "§47.9.4", "OA2MSK", 10, 8, Zero, "inherited, unaudited (acknowledged by name)", "0 only: the stock model stores it; target (slave) mode is not modeled", 2007),
             R("I2C_OAR2", 0x00C, "§47.9.4", "OA2", 7, 1, Zero, "inherited, unaudited (acknowledged by name)", "0 only: the stock model stores it; target (slave) mode is not modeled", 2007),
             R("I2C_OAR2", 0x00C, "§47.9.4", "Res0", 0, 0, Zero, "reserved", "reserved: must be kept at reset value", 2007),
-            R("I2C_TIMINGR", 0x010, "§47.9.5", "PRESC", 31, 28, Any, "modeled by the guard", "kept by the guard and served on read: the stock model has every TIMINGR field as a tag that reads 0 (measure.md §2.3 I2; ruled 2026-11-25T05:06Z Q5); the twin times nothing by it; protected under PE (p2008): changed with PE = 1 it is TVI-I2C-PE, unmodeled: RM0433 says it can be programmed only with PE = 0 and not what silicon does with such a write (ruled 2026-11-25T05:06Z Q2)", 2008),
+            R("I2C_TIMINGR", 0x010, "§47.9.5", "PRESC", 31, 28, Any, "modeled by the guard", "kept by the guard and served on read: the stock model has every TIMINGR field as a tag that reads 0 (measure.md §2.3 I2; ruled 2026-11-25T05:06Z Q5); the guard times a NACK by it (p1971; TVI-WO-1306a), and nothing else; protected under PE (p2008): changed with PE = 1 it is TVI-I2C-PE, unmodeled: RM0433 says it can be programmed only with PE = 0 and not what silicon does with such a write (ruled 2026-11-25T05:06Z Q2)", 2008),
             R("I2C_TIMINGR", 0x010, "§47.9.5", "Reserved", 27, 24, Zero, "reserved", "reserved: must be kept at reset value", 2008),
-            R("I2C_TIMINGR", 0x010, "§47.9.5", "SCLDEL", 23, 20, Any, "modeled by the guard", "kept by the guard and served on read: the stock model has every TIMINGR field as a tag that reads 0 (measure.md §2.3 I2; ruled 2026-11-25T05:06Z Q5); the twin times nothing by it; protected under PE (p2008): changed with PE = 1 it is TVI-I2C-PE, unmodeled: RM0433 says it can be programmed only with PE = 0 and not what silicon does with such a write (ruled 2026-11-25T05:06Z Q2)", 2008),
-            R("I2C_TIMINGR", 0x010, "§47.9.5", "SDADEL", 19, 16, Any, "modeled by the guard", "kept by the guard and served on read: the stock model has every TIMINGR field as a tag that reads 0 (measure.md §2.3 I2; ruled 2026-11-25T05:06Z Q5); the twin times nothing by it; protected under PE (p2008): changed with PE = 1 it is TVI-I2C-PE, unmodeled: RM0433 says it can be programmed only with PE = 0 and not what silicon does with such a write (ruled 2026-11-25T05:06Z Q2)", 2008),
-            R("I2C_TIMINGR", 0x010, "§47.9.5", "SCLH", 15, 8, Any, "modeled by the guard", "kept by the guard and served on read: the stock model has every TIMINGR field as a tag that reads 0 (measure.md §2.3 I2; ruled 2026-11-25T05:06Z Q5); the twin times nothing by it; protected under PE (p2008): changed with PE = 1 it is TVI-I2C-PE, unmodeled: RM0433 says it can be programmed only with PE = 0 and not what silicon does with such a write (ruled 2026-11-25T05:06Z Q2)", 2008),
-            R("I2C_TIMINGR", 0x010, "§47.9.5", "SCLL", 7, 0, Any, "modeled by the guard", "kept by the guard and served on read: the stock model has every TIMINGR field as a tag that reads 0 (measure.md §2.3 I2; ruled 2026-11-25T05:06Z Q5); the twin times nothing by it; protected under PE (p2008): changed with PE = 1 it is TVI-I2C-PE, unmodeled: RM0433 says it can be programmed only with PE = 0 and not what silicon does with such a write (ruled 2026-11-25T05:06Z Q2)", 2008),
+            R("I2C_TIMINGR", 0x010, "§47.9.5", "SCLDEL", 23, 20, Any, "modeled by the guard", "kept by the guard and served on read: the stock model has every TIMINGR field as a tag that reads 0 (measure.md §2.3 I2; ruled 2026-11-25T05:06Z Q5); the guard times a NACK by it (p1971; TVI-WO-1306a), and nothing else; protected under PE (p2008): changed with PE = 1 it is TVI-I2C-PE, unmodeled: RM0433 says it can be programmed only with PE = 0 and not what silicon does with such a write (ruled 2026-11-25T05:06Z Q2)", 2008),
+            R("I2C_TIMINGR", 0x010, "§47.9.5", "SDADEL", 19, 16, Any, "modeled by the guard", "kept by the guard and served on read: the stock model has every TIMINGR field as a tag that reads 0 (measure.md §2.3 I2; ruled 2026-11-25T05:06Z Q5); the guard times a NACK by it (p1971; TVI-WO-1306a), and nothing else; protected under PE (p2008): changed with PE = 1 it is TVI-I2C-PE, unmodeled: RM0433 says it can be programmed only with PE = 0 and not what silicon does with such a write (ruled 2026-11-25T05:06Z Q2)", 2008),
+            R("I2C_TIMINGR", 0x010, "§47.9.5", "SCLH", 15, 8, Any, "modeled by the guard", "kept by the guard and served on read: the stock model has every TIMINGR field as a tag that reads 0 (measure.md §2.3 I2; ruled 2026-11-25T05:06Z Q5); the guard times a NACK by it (p1971; TVI-WO-1306a), and nothing else; protected under PE (p2008): changed with PE = 1 it is TVI-I2C-PE, unmodeled: RM0433 says it can be programmed only with PE = 0 and not what silicon does with such a write (ruled 2026-11-25T05:06Z Q2)", 2008),
+            R("I2C_TIMINGR", 0x010, "§47.9.5", "SCLL", 7, 0, Any, "modeled by the guard", "kept by the guard and served on read: the stock model has every TIMINGR field as a tag that reads 0 (measure.md §2.3 I2; ruled 2026-11-25T05:06Z Q5); the guard times a NACK by it (p1971; TVI-WO-1306a), and nothing else; protected under PE (p2008): changed with PE = 1 it is TVI-I2C-PE, unmodeled: RM0433 says it can be programmed only with PE = 0 and not what silicon does with such a write (ruled 2026-11-25T05:06Z Q2)", 2008),
             R("I2C_TIMEOUTR", 0x014, "§47.9.6", "TEXTEN", 31, 31, Zero, "undefined in the stock model", "0 only: the stock model has no register 0x14; SMBus timeouts are not modeled; reads 0", 2009),
             R("I2C_TIMEOUTR", 0x014, "§47.9.6", "Res30_28", 30, 28, Zero, "reserved", "reserved: must be kept at reset value", 2009),
             R("I2C_TIMEOUTR", 0x014, "§47.9.6", "TIMEOUTB", 27, 16, Zero, "undefined in the stock model", "0 only: the stock model has no register 0x14; SMBus timeouts are not modeled; reads 0", 2009),
@@ -894,7 +897,7 @@ namespace Antmicro.Renode.Peripherals.Tviburi
             R("I2C_ISR", 0x018, "§47.9.7", "TCR", 7, 7, Any, "read-only", "read-only: a write is ignored and changes nothing (no record, RUL-18 as amended)", 2010),
             R("I2C_ISR", 0x018, "§47.9.7", "TC", 6, 6, Any, "read-only", "read-only: a write is ignored and changes nothing (no record, RUL-18 as amended)", 2011),
             R("I2C_ISR", 0x018, "§47.9.7", "STOPF", 5, 5, Any, "read-only", "read-only: a write is ignored; the stock model's, and the guard's one SCL period after a NACK's NACKF (inferred: RM0433 gives no figure; ruled 2026-11-26T00:22Z Q3)", 2011),
-            R("I2C_ISR", 0x018, "§47.9.7", "NACKF", 4, 4, Any, "modeled by the guard", "read-only (a write is ignored), set and served by the guard: a write START to an address with no device is NACKed by the guard: NACKF nine SCL periods after the START (p1955; the period by p1971 from TIMINGR, DNF and the RCC guard's KernelHz, each tSYNC at its stated floor: a lower bound), STOPF one SCL period after NACKF (inferred: RM0433 gives no figure), whatever AUTOEND (\"a STOP condition is automatically sent\", p1975), the guard writing the stock line \"Unknown slave at address N.\" under its own name (TVI-WO-1306a.measure.md; ruled 2026-11-26T00:22Z Q1-Q3, Q5, Q8); with no kernel-clock frequency it is TVI-I2C-NACK, unmodeled (Q2); a read START to an address with no device is TVI-I2C-ABSENT, unmodeled: RM0433 states the automatic STOP only for a write (Q6); cleared by NACKCF (p2012) and at PE = 0 (p2011); a NACK in the data phase is not modeled: no device model in Renode NACKs a byte (ruled 2026-11-26T00:22Z Q7)", 2011),
+            R("I2C_ISR", 0x018, "§47.9.7", "NACKF", 4, 4, Any, "modeled by the guard", "read-only (a write is ignored), set and served by the guard: a write START to an address with no device is NACKed by the guard: NACKF nine SCL periods after the START (p1955; the period by p1971 from TIMINGR, DNF and the RCC guard's KernelHz, each tSYNC at its stated floor; inferred: the START's hold, tHD:STA, which SCLH sets (p1973), is not added), STOPF one SCL period after NACKF (inferred: RM0433 gives no figure), whatever AUTOEND (\"a STOP condition is automatically sent\", p1975), the guard writing the stock line \"Unknown slave at address N.\" under its own name (TVI-WO-1306a.measure.md; ruled 2026-11-26T00:22Z Q1-Q3, Q5, Q8); with no kernel-clock frequency it is TVI-I2C-NACK, unmodeled (Q2); a read START to an address with no device is TVI-I2C-ABSENT, unmodeled: RM0433 states the automatic STOP only for a write (Q6); cleared by NACKCF (p2012) and at PE = 0 (p2011); a NACK in the data phase is not modeled: no device model in Renode NACKs a byte (ruled 2026-11-26T00:22Z Q7)", 2011),
             R("I2C_ISR", 0x018, "§47.9.7", "ADDR", 3, 3, Any, "read-only", "read-only: a write is ignored and changes nothing (no record, RUL-18 as amended)", 2011),
             R("I2C_ISR", 0x018, "§47.9.7", "RXNE", 2, 2, Any, "read-only", "read-only: a write is ignored and changes nothing (no record, RUL-18 as amended)", 2011),
             R("I2C_ISR", 0x018, "§47.9.7", "TXIS", 1, 1, Zero, "inherited, unaudited (acknowledged by name)", "0 only: writing 1 generates TXIS with NOSTRETCH = 1 only, target (slave) mode is not modeled", 2011),
@@ -908,8 +911,8 @@ namespace Antmicro.Renode.Peripherals.Tviburi
             R("I2C_ICR", 0x01C, "§47.9.8", "BERRCF", 8, 8, Zero, "tag", "0 only: a stock tag; no bus error is modeled", 2012),
             R("I2C_ICR", 0x01C, "§47.9.8", "Res7", 7, 7, Zero, "reserved", "reserved: must be kept at reset value", 2012),
             R("I2C_ICR", 0x01C, "§47.9.8", "Res6", 6, 6, Any, "inherited, unaudited (acknowledged by name)", "ChibiOS writes 1 here (ICR = 0x2, 0x4 or 0x40, the TXIS, RXNE and TC positions of ISR, at every ICR write it makes, TVI-WO-1306.measure.md §2.1); RM0433 marks the bits reserved, \"must be kept at reset value\" (p2012); a clear register: the write clears nothing (ruled 2026-11-25T05:06Z Q10)", 2012),
-            R("I2C_ICR", 0x01C, "§47.9.8", "STOPCF", 5, 5, Any, "inherited, unaudited (acknowledged by name)", "the stock model clears STOPF; the guard clears the NACK's own STOPF (p2012)", 2012),
-            R("I2C_ICR", 0x01C, "§47.9.8", "NACKCF", 4, 4, Any, "modeled by the guard", "the guard clears NACKF (p2012); a write START to an address with no device is NACKed by the guard: NACKF nine SCL periods after the START (p1955; the period by p1971 from TIMINGR, DNF and the RCC guard's KernelHz, each tSYNC at its stated floor: a lower bound), STOPF one SCL period after NACKF (inferred: RM0433 gives no figure), whatever AUTOEND (\"a STOP condition is automatically sent\", p1975), the guard writing the stock line \"Unknown slave at address N.\" under its own name (TVI-WO-1306a.measure.md; ruled 2026-11-26T00:22Z Q1-Q3, Q5, Q8); with no kernel-clock frequency it is TVI-I2C-NACK, unmodeled (Q2); a read START to an address with no device is TVI-I2C-ABSENT, unmodeled: RM0433 states the automatic STOP only for a write (Q6)", 2012),
+            R("I2C_ICR", 0x01C, "§47.9.8", "STOPCF", 5, 5, Any, "modeled by the guard", "the stock model clears STOPF; the guard clears the NACK's own STOPF (p2012)", 2012),
+            R("I2C_ICR", 0x01C, "§47.9.8", "NACKCF", 4, 4, Any, "modeled by the guard", "the guard clears NACKF (p2012); a write START to an address with no device is NACKed by the guard: NACKF nine SCL periods after the START (p1955; the period by p1971 from TIMINGR, DNF and the RCC guard's KernelHz, each tSYNC at its stated floor; inferred: the START's hold, tHD:STA, which SCLH sets (p1973), is not added), STOPF one SCL period after NACKF (inferred: RM0433 gives no figure), whatever AUTOEND (\"a STOP condition is automatically sent\", p1975), the guard writing the stock line \"Unknown slave at address N.\" under its own name (TVI-WO-1306a.measure.md; ruled 2026-11-26T00:22Z Q1-Q3, Q5, Q8); with no kernel-clock frequency it is TVI-I2C-NACK, unmodeled (Q2); a read START to an address with no device is TVI-I2C-ABSENT, unmodeled: RM0433 states the automatic STOP only for a write (Q6)", 2012),
             R("I2C_ICR", 0x01C, "§47.9.8", "ADDRCF", 3, 3, Zero, "inherited, unaudited (acknowledged by name)", "0 only: target (slave) mode is not modeled (in controller mode the stock model clears TXIS, where silicon clears ADDR and a pending START, p2012)", 2012),
             R("I2C_ICR", 0x01C, "§47.9.8", "Res2_1", 2, 1, Any, "inherited, unaudited (acknowledged by name)", "ChibiOS writes 1 here (ICR = 0x2, 0x4 or 0x40, the TXIS, RXNE and TC positions of ISR, at every ICR write it makes, TVI-WO-1306.measure.md §2.1); RM0433 marks the bits reserved, \"must be kept at reset value\" (p2012); a clear register: the write clears nothing (ruled 2026-11-25T05:06Z Q10)", 2012),
             R("I2C_ICR", 0x01C, "§47.9.8", "Res0", 0, 0, Zero, "reserved", "reserved: must be kept at reset value", 2012),

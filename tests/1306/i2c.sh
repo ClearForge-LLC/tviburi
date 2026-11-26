@@ -267,8 +267,8 @@ sys.exit(0 if ok else 1)
       -f /repo/model/stm32h7-i2c-restate.awk /opt/renode/platforms/cpus/stm32h7.repl > /out/restate.repl' </dev/null >"$work/regen.stdout" 2>&1 || rc=$?
     check "regen: the guard's Fields table regenerates from tests/1306/data by tests/1306/fields.py, and the restatement from the pinned stm32h7.repl, byte for byte (RUL-16)" \
       "[ \$rc = 0 ] && sed -n '/^        private static readonly Row\[\] Fields =$/,/^        };$/p' '$src/model/GuardedSTM32F7_I2C.cs' | sed '1,2d;\$d' | cmp -s - '$work/fields.cs' && cmp -s '$work/regen/restate.repl' '$src/model/stm32h7-i2c-restate.repl'" ;;
-  nack) check "nack (TVI-WO-1306a acceptance, the planted firmware): a write START with AUTOEND = 1 to 0x31, no device: ISR 0x1 at the START, polled to NACKF (0x11: STOPF not yet), to STOPF (0x31), and ICR = 0x30 clears both (0x1); no record (p1975, p2011, p2012). Its timing: nacktime" \
-    "passes nack && [ \"\$(readout nack READ)\" = 0x00000001 ] && [ \"\$(readout nack READ2)\" = 0x00000011 ] && [ \"\$(readout nack READ3)\" = 0x00000031 ] && [ \"\$(readout nack READ4)\" = 0x00000001 ]" ;;
+  nack) check "nack (TVI-WO-1306a acceptance, the planted firmware): a write START with AUTOEND = 1 to 0x31, no device: ISR 0x1 at the START, polled to NACKF (0x11: STOPF not yet), to STOPF (0x31), and ICR = 0x30 clears both (0x1), the guard's NACKCF not handed to the stock tag (no 'Unhandled write ... NACKCF'); no record (p1975, p2011, p2012). Its timing: nacktime" \
+    "passes nack && [ \"\$(readout nack READ)\" = 0x00000001 ] && [ \"\$(readout nack READ2)\" = 0x00000011 ] && [ \"\$(readout nack READ3)\" = 0x00000031 ] && [ \"\$(readout nack READ4)\" = 0x00000001 ] && ! grep -q 'NACKCF' '$work/nack/renode.out'" ;;
   nacktime)
     # nack's configuration from the monitor: rcc_pclk1 = 32 MHz (HSI 64 MHz, D2PPRE1 = 100: /2, p396), DNF = 15, TIMINGR 0x10C7123C:
     # tSCL = ((0x12 + 1) + (0x3C + 1)) x 2 + 2 x (2 + 15) = 194 kernel clocks = 6.0625 us; the address phase 54.5625 us.
@@ -281,13 +281,14 @@ sys.exit(0 if ok else 1)
       "nackat nackpll 23.1 2.566667 'sysbus WriteDoubleWord 0x58024440 0x1301032B' 'sysbus WriteDoubleWord 0x58024400 0x10000025' 'sysbus WriteDoubleWord 0x58024454 0x1000' 'sysbus WriteDoubleWord 0x40005400 0x90' 'sysbus WriteDoubleWord 0x40005410 0x00300F38' 'sysbus WriteDoubleWord 0x40005400 0x91' 'sysbus WriteDoubleWord 0x40005404 0x00012060' && passed nackpll" ;;
   nackirq)
     run_case nackirq nackirq 'emulation RunFor "0.00001"' 'echo "R-PRE"' 'sysbus.i2c1 EventInterrupt' 'emulation RunFor "0.0001"' 'echo "R-IRQ"' 'sysbus.i2c1 EventInterrupt' \
-      'echo "R-ISPR"' 'sysbus ReadDoubleWord 0xE000E200' 'sysbus WriteDoubleWord 0x4000541C 0x10' 'echo "R-CLR"' 'sysbus.i2c1 EventInterrupt' 'echo "TVIBURI-MARK-AFTER"' 'sysbus ReadDoubleWord 0x20000104'
-    check "nackirq: with NACKIE, a NACK raises I2C1's event line (unset 10 us after the START, set at 110 us; I2C1_EV pending in the NVIC, ISPR0 bit 31; p1999 Table 400), and NACKCF drops it (p2012)" \
-      "passed nackirq && [ \"\$(readout nackirq PRE)\" = 'GPIO: unset' ] && [ \"\$(readout nackirq IRQ)\" = 'GPIO: set' ] && [ \"\$(readout nackirq ISPR)\" = 0x80000000 ] && [ \"\$(readout nackirq CLR)\" = 'GPIO: unset' ]" ;;
+      'echo "R-ISPR"' 'sysbus ReadDoubleWord 0xE000E200' 'sysbus WriteDoubleWord 0x4000541C 0x10' 'echo "R-CLR"' 'sysbus.i2c1 EventInterrupt' \
+      'sysbus WriteDoubleWord 0x4000541C 0x20' 'echo "R-CLR2"' 'sysbus.i2c1 EventInterrupt' 'echo "TVIBURI-MARK-AFTER"' 'sysbus ReadDoubleWord 0x20000104'
+    check "nackirq: with NACKIE and STOPIE, a NACK raises I2C1's event line (unset 10 us after the START, set at 110 us; I2C1_EV pending in the NVIC, ISPR0 bit 31; p1999 Table 400); NACKCF leaves it set by the NACK's STOPF, and STOPCF drops it (p2012)" \
+      "passed nackirq && [ \"\$(readout nackirq PRE)\" = 'GPIO: unset' ] && [ \"\$(readout nackirq IRQ)\" = 'GPIO: set' ] && [ \"\$(readout nackirq ISPR)\" = 0x80000000 ] && [ \"\$(readout nackirq CLR)\" = 'GPIO: set' ] && [ \"\$(readout nackirq CLR2)\" = 'GPIO: unset' ]" ;;
   nackstop) check "nackstop: ChibiOS's NACK: ISR 0x11 at NACKF, ICR = ISR & 0xFE, CR2 |= STOP while the NACK's STOP is pending: absorbed (ISR 0x1, no STOPF yet: p2005), STOPF at its time (0x21), the driver restarted and the chip id read (0x60): passes (ruled Q4)" \
     "passes nackstop && [ \"\$(readout nackstop READ)\" = 0x00000011 ] && [ \"\$(readout nackstop READ2)\" = 0x00000001 ] && [ \"\$(readout nackstop READ3)\" = 0x00000021 ] && [ \"\$(readout nackstop READ4)\" = 0x00000060 ]" ;;
-  nackpe) check "nackpe: PE cleared, checked and set while a NACK is pending cancels it (p1959: the state machines reset): no NACKF comes (ISR 0x1); passes" \
-    "passes nackpe && [ \"\$(readout nackpe READ)\" = 0x00000001 ]" ;;
+  nackpe) check "nackpe: PE cleared, checked and set while a NACK is pending cancels it (p1959: the state machines reset), and so does an I2C1RST pulse (p438, the guard's Reset): no NACKF comes either time (ISR 0x1, 0x1); passes" \
+    "passes nackpe && [ \"\$(readout nackpe READ)\" = 0x00000001 ] && [ \"\$(readout nackpe READ2)\" = 0x00000001 ]" ;;
   nacktransfer) check "nacktransfer: a START to the BME280 while a NACKed address's automatic STOP is pending refuses TVI-I2C-TRANSFER, unmodeled (ruled Q4)" \
     "refuses nacktransfer TVI-I2C-TRANSFER unmodeled 'r[\"access\"][\"value\"] == \"0x120EC\" and \"automatic STOP is pending\" in r[\"condition\"]'" ;;
   nackclock) check "nackclock: a write START to 0x31 with I2C123SEL = 01 and PLL3's VCO at 20 MHz (outside p404's ranges: KernelHz has no frequency) refuses TVI-I2C-NACK, unmodeled (ruled Q2)" \

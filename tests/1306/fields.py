@@ -14,7 +14,8 @@ TARGET = 'target (slave) mode is not modeled'
 SMBUS = 'SMBus is not modeled'
 RULED2 = 'ruled 2026-11-26T00:22Z'
 NACK = ('a write START to an address with no device is NACKed by the guard: NACKF nine SCL periods after the START (p1955; the period '
-        'by p1971 from TIMINGR, DNF and the RCC guard\'s KernelHz, each tSYNC at its stated floor: a lower bound), STOPF one SCL period '
+        'by p1971 from TIMINGR, DNF and the RCC guard\'s KernelHz, each tSYNC at its stated floor; inferred: the START\'s hold, tHD:STA, '
+        'which SCLH sets (p1973), is not added), STOPF one SCL period '
         'after NACKF (inferred: RM0433 gives no figure), whatever AUTOEND ("a STOP condition is automatically sent", p1975), the guard '
         'writing the stock line "Unknown slave at address N." under its own name (TVI-WO-1306a.measure.md; ' + RULED2 + ' Q1-Q3, Q5, Q8); '
         'with no kernel-clock frequency it is TVI-I2C-NACK, unmodeled (Q2); a read START to an address with no device is TVI-I2C-ABSENT, '
@@ -44,12 +45,12 @@ def cls(reg, f, msb, lsb, page):
             'TXDMAEN': ('Zero', T, '0 only: a stock tag; the DMA side of I2C is not modeled (TVI-WO-1306 NOT)'),
             'ANFOFF': ('Any', G, 'kept by the guard and served on read (a stock tag; ' + RULED + ' Q5); the twin\'s bus carries no noise to filter; '
                        + PE % page),
-            'DNF': ('Any', G, 'kept by the guard and served on read (a stock tag; ' + RULED + ' Q5); the twin\'s bus carries no noise to filter; '
-                    + PE % page),
+            'DNF': ('Any', G, 'kept by the guard and served on read (a stock tag; ' + RULED + ' Q5); the twin\'s bus carries no noise to filter, '
+                    'but DNF x tI2CCLK adds to each tSYNC of the NACK\'s SCL period (p1971; TVI-WO-1306a); ' + PE % page),
             'ERRIE': ('Any', I, 'the stock model keeps it; no bus error (BERR, ARLO, OVR, TIMEOUT, PECERR, ALERT) is ever raised, so it never fires '
                       '(ArduPilot sets it; ' + RULED + ' Q11)'),
             'TCIE': ('Any', I, 'the stock model: TC and TCR raise the event interrupt'),
-            'STOPIE': ('Any', I, 'the stock model: STOPF raises the event interrupt'),
+            'STOPIE': ('Any', I, 'the stock model: STOPF raises the event interrupt; and the guard\'s STOPF after a NACK (TVI-WO-1306a)'),
             'NACKIE': ('Any', G, 'the guard: NACKF raises the event interrupt (Table 400 p1999; the stock model has NACKIE && false); ' + NACK),
             'ADDRIE': ('Zero', I, '0 only: the stock model stores it; ' + TARGET),
             'RXIE': ('Any', I, 'the stock model: RXNE on a read raises the event interrupt'),
@@ -63,7 +64,7 @@ def cls(reg, f, msb, lsb, page):
     if r == 'CR2':
         return {
             'PECBYTE': ('Zero', T, '0 only: a stock tag; ' + SMBUS),
-            'AUTOEND': ('Any', I, 'the stock model: a STOP after NBYTES (STOPF)'),
+            'AUTOEND': ('Any', I, 'the stock model: a STOP after NBYTES (STOPF); a NACKed address\'s STOP comes whatever AUTOEND (p1975; TVI-WO-1306a)'),
             'RELOAD': ('Zero', I, '0 only: the stock model stores it and extends a transfer, used by no firmware (TVI-WO-1306.measure.md §2.1), '
                        'so held at 0, not audited (' + RULED + ' Q11)'),
             'NBYTES': ('Any', I, 'the stock model; a START with NBYTES = 0 and RELOAD = 0 is TVI-I2C-TRANSFER, unmodeled, never passed on: the '
@@ -83,7 +84,7 @@ def cls(reg, f, msb, lsb, page):
         return ('Zero', I, '0 only: the stock model stores it; ' + TARGET)
     if r == 'TIMINGR':
         return ('Any', G, 'kept by the guard and served on read: the stock model has every TIMINGR field as a tag that reads 0 (measure.md '
-                '§2.3 I2; ' + RULED + ' Q5); the twin times nothing by it; ' + PE % page)
+                '§2.3 I2; ' + RULED + ' Q5); the guard times a NACK by it (p1971; TVI-WO-1306a), and nothing else; ' + PE % page)
     if r == 'TIMEOUTR':
         return ('Zero', U, '0 only: the stock model has no register 0x14; SMBus timeouts are not modeled; reads 0')
     if r == 'ISR':
@@ -106,7 +107,7 @@ def cls(reg, f, msb, lsb, page):
             'OVRCF': ('Zero', T, '0 only: a stock tag; no bus error is modeled'),
             'ARLOCF': ('Zero', T, '0 only: a stock tag; no bus error is modeled'),
             'BERRCF': ('Zero', T, '0 only: a stock tag; no bus error is modeled'),
-            'STOPCF': ('Any', I, 'the stock model clears STOPF; the guard clears the NACK\'s own STOPF (p2012)'),
+            'STOPCF': ('Any', G, 'the stock model clears STOPF; the guard clears the NACK\'s own STOPF (p2012)'),
             'NACKCF': ('Any', G, 'the guard clears NACKF (p2012); ' + NACK),
             'ADDRCF': ('Zero', I, '0 only: ' + TARGET + ' (in controller mode the stock model clears TXIS, where silicon clears ADDR and a pending START, p2012)'),
         }[f]

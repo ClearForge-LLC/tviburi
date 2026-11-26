@@ -537,3 +537,8 @@ I256-absentReadOnly	model/GuardedSTM32F7_I2C.cs	(word & StartBit) == 0 || (word 
 I257-kernelHzApb1	model/GuardedSTM32H7_RCC.cs	/ ((ppre & 4) == 0 ? 1 : 2 << (int)(ppre & 3));	/ 1;	i2c-nacktime
 I258-kernelHzPllR	model/GuardedSTM32H7_RCC.cs	(output == 'p' ? 9 : output == 'q' ? 16 : 24)	(output == 'p' ? 9 : output == 'q' ? 16 : 16)	i2c-nackpll
 I259-kernelHzVcoRange	model/GuardedSTM32H7_RCC.cs	vco < (wide ? 192e6 : 150e6) || 	(empty)	i2c-nackclock
+I260-nackStopcfClears	model/GuardedSTM32F7_I2C.cs	nackStopf &= (word & StopfBit) == 0;	nackStopf &= true;	i2c-nack
+I261-nackResetCancels	model/GuardedSTM32F7_I2C.cs	                CancelNack();\n                cr1 = timingr = 0;	                cr1 = timingr = 0;	i2c-nackpe
+I262-nackEpoch	model/GuardedSTM32F7_I2C.cs	                    if(e != nackEpoch)\n                    {\n                        return;\n                    }\n                    nackf = true;	                    nackf = true;	i2c-nackpe
+I263-nackStopInterrupt	model/GuardedSTM32F7_I2C.cs	(nackStopf && (cr1 & StopieBit) != 0)	false	i2c-nackirq
+I264-nackcfNotForwarded	model/GuardedSTM32F7_I2C.cs	inner.WriteDoubleWord(offset, word & ~NackcfBit);	inner.WriteDoubleWord(offset, word);	i2c-nack

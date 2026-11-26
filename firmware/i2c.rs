@@ -24,13 +24,15 @@
 //!   path="nack"        - rcc_pclk1 / 2 (D2PPRE1 = 100, p396), CR1.DNF = 15, config, a write START to 0x31 with AUTOEND = 1: ISR at
 //!                        once (MARK_READ, 0x1), polled to NACKF (MARK_READ2, 0x11), to STOPF (MARK_READ3, 0x31), ICR = 0x30
 //!                        (MARK_READ4, 0x1). Its timing is tests/1306/i2c.sh `nacktime`, from the monitor.
-//!   path="nackirq"     - CR1.NACKIE, config, a write START to 0x31; then idle: tests/1306/i2c.sh reads the event line and the NVIC.
+//!   path="nackirq"     - CR1.NACKIE and STOPIE, config, a write START to 0x31; then idle: tests/1306/i2c.sh reads the event line
+//!                        and the NVIC.
 //!   path="nackstop"    - ChibiOS's NACK (TVI-WO-1306a.measure.md §2.1): CR1 0x90/0x91, a write START to 0x30, polled to NACKF
 //!                        (MARK_READ, 0x11), ICR = ISR & 0xFE, CR2 |= STOP while the NACK's STOP is pending (absorbed: MARK_READ2,
 //!                        0x1), polled to STOPF (MARK_READ3, 0x21), then PE cleared, checked, the driver started again and the chip
 //!                        id read (MARK_READ4, 0x60): passes.
 //!   path="nackpe"      - config, a write START to 0x31, then PE cleared, checked and set at once: the pending NACK is cancelled (p1959);
-//!                        ISR polled (MARK_READ, 0x1): passes.
+//!                        ISR polled (MARK_READ, 0x1); again with an I2C1RST pulse (RCC_APB1LRSTR bit 21, p438) for the clear: the
+//!                        port's reset cancels it too (MARK_READ2, 0x1): passes.
 //!   path="nacktransfer" - config, a write START to 0x31, then a START to the BME280 while the NACK's STOP is pending:
 //!                        TVI-I2C-TRANSFER, unmodeled (Q4).
 //!   path="nackclock"   - I2C123SEL = 01 with PLL3's VCO at 20 MHz (outside p404's ranges), config, a write START to 0x31:
@@ -80,6 +82,7 @@ const MARK_READ3: *mut u32 = 0x2000_0110 as *mut u32;
 const MARK_READ4: *mut u32 = 0x2000_0114 as *mut u32;
 const RCC_CR: *mut u32 = 0x5802_4400 as *mut u32;
 const RCC_D2CFGR: *mut u32 = 0x5802_441C as *mut u32;
+const RCC_APB1LRSTR: *mut u32 = 0x5802_4490 as *mut u32;
 const RCC_PLL3DIVR: *mut u32 = 0x5802_4440 as *mut u32;
 const ABSENT: u32 = 0x31 << 1;
 const TIMING: u32 = 0x10C7_123C;
@@ -240,9 +243,9 @@ pub unsafe extern "C" fn reset() -> ! {
     }
     #[cfg(path = "nackirq")]
     {
-        w(CR1, 1 << 4);
+        w(CR1, 3 << 4);
         w(TIMINGR, TIMING);
-        w(CR1, 1 << 4 | 1);
+        w(CR1, 3 << 4 | 1);
         w(CR2, 1 << 16 | START | ABSENT);
     }
     #[cfg(path = "nackstop")]
@@ -278,6 +281,12 @@ pub unsafe extern "C" fn reset() -> ! {
         }
         until(1 << 4);
         write_volatile(MARK_READ, r(ISR));
+        w(CR2, 1 << 16 | START | ABSENT);
+        write_volatile(RCC_APB1LRSTR, 1 << 21);
+        write_volatile(RCC_APB1LRSTR, 0);
+        config();
+        until(1 << 4);
+        write_volatile(MARK_READ2, r(ISR));
     }
     #[cfg(path = "nacktransfer")]
     {
