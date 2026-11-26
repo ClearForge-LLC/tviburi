@@ -1,6 +1,6 @@
 # TVI-WO-1205 — FEEDBACK
 
-**Builder:** Claude (Opus 5.5), Furnace, 2026-11-26. **Branch:** `wo/tvi-1205-gate-judged`, from `main` `63fe557`, with `main` `5d4a61a` (#64, `1308`) and `cd235c7` (#67) merged.
+**Builder:** Claude (Opus 5.5), Furnace, 2026-11-26. **Branch:** `wo/tvi-1205-gate-judged`, from `main` `63fe557`, with `main` `5d4a61a` (#64, `1308`), `cd235c7` (#67) and `af1e15b` (#70) merged.
 
 **Rulings followed** (architect, 2026-11-26):
 - **17:02Z:** TIMx_SR read; grants 1 (its rows' text) and 2 (clause 6's five mutants).
@@ -111,7 +111,7 @@ Reduction pass (diff): −32 net · 1 duplicate removed · 0 dead paths removed 
 
 - **R1. `join.py`'s R3 regex** matches any "ruled <timestamp>" text. Today it moves one row (`PWR_CR3.Res6`). A later ledger row that quotes a ruling while describing a refusal could be promoted; the rule applies only where a row would otherwise count for nothing.
 - **R2. `spike/1205/coverage.sh` matches by line.** A roadmap line carrying several obligations passes with one citation (R:172 did, A8).
-- **R3. The checklist cites roadmap lines by number.** A roadmap edit shifts them: #67 shifted all of them, remapped here by exact text.
+- **R3. The checklist cites roadmap lines by number.** A roadmap edit shifts them: #67 and #70 shifted them, and each time they were remapped here by exact text (every cited line's text identical before and after).
 - **R4. CC5IF/CC6IF on silicon** (setting at a compare with CCR5/CCR6 at 0) is inferred from p1597, not run.
 - **R5. 1305a FEEDBACK's "hseFrequency defaults to 8 MHz"** is stale: superseded by 1300b (4). For the architect's docs PR.
 - **R6. Clause 4's page check** runs in CI against the committed excerpt. Only a Furnace run checks the excerpt against the held manual (`1203` §5).
