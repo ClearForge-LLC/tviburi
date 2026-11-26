@@ -121,3 +121,8 @@ model/stm32h7-dmamux-restate.awk	TVI-WO-1308.measure.md
 firmware/dmamux.rs	TVI-WO-1308.measure.md
 tests/1308/dmamux.sh	TVI-WO-1308.measure.md
 tests/1308/dmamux.sh	docs/
+# TVI-WO-1308: the PWR guard's citations of its measurement and of 1300's and 1304's, each a comment or a record string, checked by hand 2026-11-26.
+model/GuardedSTM32H7_PWR.cs	TVI-WO-1308.measure.md
+model/GuardedSTM32H7_PWR.cs	docs/
+firmware/pwr.rs	TVI-WO-1300.rm0433.md
+firmware/pwr.rs	TVI-WO-1304.measure.md
