@@ -72,7 +72,41 @@ As amended and ratified 2026-11-26: a planted monitor write proves a path whose 
 
 ### 1.3 On `main` after `1308`
 
-[after #64 merges: the 16 replays, the armed run, the join, and DMAMUX1's and PWR's clause-6 sweeps]
+**On:** `9864bce`, this branch with `main` `5d4a61a` (#64, `TVI-WO-1308`) merged. This branch adds only ledger text and mutants. The data is in `spike/1205/data/main-5d4a61a/`.
+
+**The 16 replays,** every guard recorded, each the committed `tests/1301/replay-1301.sh` (harness `~/.cache/tvi-1205/h/loop.sh`):
+- **The 14 generated boots and ArduPilot's fixture:** 0 records.
+  - Every boot block's hash is identical to the runs before `1308`.
+  - Witnesses rise by up to two, `dmamux1` and `pwr`: 32–34 per board, 34 on the fixture.
+- **The armed run:** arms from 9.332 s, with 34 witnesses, 34 ends and 0 records.
+
+**The join:** 935 rows: guarded 612, acknowledged 254, inherited 69, findings 0.
+
+**Above the cut, nothing is open:** 412 rows and armed registers guarded, 241 acknowledged.
+
+| Family | Rows + armed registers | Guarded | Acknowledged | Open |
+|---|---|---|---|---|
+| **DMAMUX1** | 0 + 10 | **10** | 0 | **0** |
+| **PWR** | 3 + 2 | **4** | **1** | **0** |
+| every other family | as §1.1, with TIM1's 19 acknowledged | | | 0 |
+
+- **DMAMUX1** (`GuardedSTM32H7_DMAMUX`, bound at `dmamux1` in the run): C0's `CxCR` by its own sweep, and C1–C7, C10 and C11 by C0's rows and sweep. The guard judges every `CxCR` by C0's rows (`GuardedSTM32H7_DMAMUX.cs` L375), so their evidence is C0's case, as with the DMA streams.
+- **PWR:** judged against **the platform the armed run boots**, not the board's.
+  - That platform is Aethelgard 4400h's Sentinel-03, as rewritten by `replay-1301.sh`: the stock `pwr` cancelled (`pwr: @none`), and `tviburiPwr: Tviburi.GuardedSTM32H7_PWR @ sysbus 0x58024800 as "pwr"` with `revision: "V"`.
+  - The board itself keeps the stock stub (`1308` Q17 (a)), so `pwr` is not in `scripts/guards`.
+  - **The rows:** `CR1`, `CR2`, `CPUCR` and `D3CR` are guarded. `CR3` is guarded, but for `Res6`, which is acknowledged by name: rev V's reset sets it, and ArduPilot's `0x02` clears it (`1308` Q7). That counts by reading R3 (below).
+- **Reading R3** (accepted by the architect 18:38Z, in his wording; set after this data, as `1100a`'s R2 was after its own): "a row of any state whose text quotes an architect's or Scotty's ruling by its timestamp is acknowledged by that ruling". It applies only where a row would otherwise count for nothing.
+  - **It moves exactly one row,** `PWR_CR3.Res6`, from a form finding to acknowledged.
+  - **Checked by diffing** every row's state, with R3 and without it, on both `main-5d4a61a` and `main-63fe557+a10`.
+
+**Clause 6 for the two new guards:**
+- **The sweeps:** `dmamux-fields` and `pwr-fields` are ledger-driven, like the five above.
+- **Mutants** (granted 18:38Z): `DX34-fieldsSweep` and `PW39-fieldsSweep`, each the guard's `RefusedField` returning false, killed by `dmamux-fields` and `pwr-fields`. Before the grant, a scratch mutant failed both sweeps (`~/.cache/tvi-1205/h/c6mut-1308.sh`).
+- **So clause 6 is met for all eleven guards.**
+
+**Clause 1: met on post-`1308` `main`.**
+- **Guarded:** 412 rows and armed registers above the cut. 97 of them rest on a sibling instance's sweep, plus DMAMUX1's C1–C11 on C0's. Those are guarded by type, with the evidence from a sibling's case.
+- **Acknowledged by name:** 241, `TIMx_SR` included in full.
 
 ## 2. Clause 2: same build, byte-identical ledgers; any overlay file changes the hash
 
