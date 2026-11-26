@@ -163,12 +163,12 @@
 - **Consumer side, from `1300` §5.3** (Aethelgard Phase 2): every RCC property goes on the guard's entry (the `hse16-trap`); the consumer's own `spi1`/`spi2` registrations name the guard; `sysbus.rcc`'s access log loses register names; the stock RCC's warnings become sourceless; ArduPilot's `AHB2ENR` boot value changes to silicon's.
 
 **Exit gate.** Each clause is checkable in CI on a pull request, in the pinned image:
-1. Every path in the queue (`1100`, joined with `1150` (v)) up to the cut ruled under `OQ-03` refuses by name with a complete record (northstar invariants 1 and 5). A planted firmware that hits each path shows it, or a planted monitor write for a path whose rule reads only the value written. A path whose rule depends on CPU state, order or timing keeps a planted firmware (an enable sequence, a refusal by history, a NACK's time). *(Amended 2026-11-26 from `1203` FEEDBACK §4.)*
+1. Every path in the queue (`1100`, joined with `1150` (v)) up to the cut ruled under `OQ-03` refuses by name with a complete record (northstar invariants 1 and 5). A planted firmware that hits each path shows it, or a planted monitor write for a path whose rule reads only the value written. A path whose rule depends on CPU state, order or timing keeps a planted firmware (an enable sequence, a refusal by history, a NACK's time). *(Amended 2026-11-26 from `1203` FEEDBACK §4. Ratified by Scotty, 2026-11-26.)*
 2. Two runs of the same overlay build emit byte-identical ledgers, and changing any overlay file changes the model hash (invariant 3).
 3. Removing a guarded model, crashing the simulator, or hitting a refusal each produces a non-pass at Tviburi's runner **and** from a consumer-side check that reads only the records (invariant 8), in both of `RUL-11`'s framings, the committed console fixture included.
 4. The SPI1 `MODF` scar firmware refuses where stock Renode passes, and the condition text matches RM0433 Rev 9 by page.
 5. A firmware line that imitates a record is not accepted as one (`RUL-11`).
-6. For each guarded peripheral, a planted write that gives each field outside its allow-list a value the model does not implement refuses with `kind: unmodeled`, naming that field, or records that refusal as `would-refuse` in a recorded-mode sweep (`RUL-17`). A planted write is a store by planted firmware, or a monitor write where the rule reads only the value written; the record's `pc` says which. *(Amended 2026-11-26 from `1203` FEEDBACK §4–§5: no guard's rule reads the PC, only `model/Refusal.cs` does, to put it in the record.)*
+6. For each guarded peripheral, a planted write that gives each field outside its allow-list a value the model does not implement refuses with `kind: unmodeled`, naming that field, or records that refusal as `would-refuse` in a recorded-mode sweep (`RUL-17`). A planted write is a store by planted firmware, or a monitor write where the rule reads only the value written; the record's `pc` says which. *(Amended 2026-11-26 from `1203` FEEDBACK §4–§5: no guard's rule reads the PC, only `model/Refusal.cs` does, to put it in the record. Ratified by Scotty, 2026-11-26.)*
 7. A recorded-mode run is not a pass at the reference check, whatever else its log holds (`RUL-19`).
 
 ## Phase 2 — consumer integration
@@ -247,7 +247,7 @@ Not planned until Phase 4 has run once. *(Amended 2026-11-23: was "until Phase 2
   - `1200` after `0100b`, which touches the same files. It runs beside `1300` only while `1300` keeps out of `model/Refusal.cs`, `tools/` and the release;
   - after `1300` and `1200`, the `13NN` guarded-path work orders are disjoint by peripheral family. They can run two at a time.
 - **Human track:**
-  - Scotty rules the `OQ-03` cut. `1150` (v) has joined ArduPilot's 5 s log to `1100`'s queue; a longer or armed window comes first (`OQ-03`);
+  - ~~Scotty rules the `OQ-03` cut~~ ruled 2026-11-26: the recommended cut (`TVI-WO-1100a.cut.md`; architecture `OQ-03`);
   - ~~Scotty rules the replacement for northstar invariant 6~~ ruled 2026-11-23, as the review response proposed;
   - Phase 4's input is a bench session at the Nucleo, which only Scotty can run;
   - Aethelgard's Phase 2 work orders queue behind its own package queue.
@@ -290,6 +290,7 @@ Not planned until Phase 4 has run once. *(Amended 2026-11-23: was "until Phase 2
 | 2026-11-26 | Phase 1 | `TVI-WO-1100a` merged as the record (#59): the `OQ-03` cut proposed from data and the gate audited, for Scotty's ruling. `TVI-WO-1308` (DMAMUX1 and PWR guards) and `TVI-WO-1203` (the gate proofs) written; both are needed whatever the ruling, which decides only TIM5 | `1100a`'s cut page and audit |
 | 2026-11-26 | Phase 1, exit gate clauses 1 and 6 | `TVI-WO-1203` merged (#61), its rows recorded; `TVI-WO-1204` (the records' owner and the harness) written, taking nine rows; clauses 1 and 6 read "a planted write" where the rule reads only the value written, and clause 6 counts a recorded-mode `would-refuse` | the merge; `1203` FEEDBACK §4: every clause-6 sweep writes by the monitor, no guard's rule reads the PC, and the wording keeps a planted firmware where a rule depends on the CPU |
 | 2026-11-26 | Phase 1 | `TVI-WO-1204` merged (#63): nine rows done, the teardown race among them; the floating-input row stays (a grammar work order); its rows recorded | the merge; `1204` FEEDBACK |
+| 2026-11-26 | Phase 1, exit gate, human track | `OQ-03` ruled by Scotty: the recommended cut, so clause 1's line is the four flight paths, with DMAMUX1 and PWR (`TVI-WO-1308`) the last two families; the amended wording of clauses 1 and 6 ratified by Scotty | Scotty, 2026-11-26 |
 
 ## Provenance
 
