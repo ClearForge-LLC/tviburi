@@ -9,7 +9,7 @@ Usage: python3 -I spike/1206/items.py STATES REACH MODEL_DIR QUEUE OUT
   QUEUE      1100's queue (spike/1100/data/queue.tsv): column 10 is each generated board's value for a row
   OUT        one line per ledger field: field, model file:line, bits, allowed, page, the items (rows and registers) it is
              behind, and the values written in the armed run (a row's arm_field_values; a register's values, cut to the
-             field's bits), and the generated boards' values for its rows (1100's queue)
+             field's bits; a register the join lists only as many:N distinct values is carried as `<instance> many:N`), and the generated boards' values for its rows (1100's queue)
 
 Above the cut, as 1205: a row whose reach names `arm`, and a register, each off path `other`."""
 import glob, os, re, sys
@@ -64,6 +64,7 @@ for r in rd(reach):
                 e['items'].append('reg %s.%s@%s' % (r['instance'], r['register'], r['offset']))
                 e['paths'].add(r['path'].split(' (')[0])
                 e.setdefault('regvals', set()).update(v for v in r['values'].split(',') if v.startswith('0x'))
+                e.setdefault('many', set()).update('%s %s' % (r['instance'], v) for v in r['values'].split(',') if v.startswith('many'))
 
 bad = 0
 with open(out, 'w') as o:
@@ -79,7 +80,7 @@ with open(out, 'w') as o:
         for v in e.get('regvals', ()):
             vals.add(hex((int(v, 16) >> m['lo']) & ((1 << width) - 1)))
         o.write('\t'.join([name, m['src'], '%d:%d' % (m['hi'], m['lo']), m['allowed'], m['page'], ','.join(sorted(e['paths'])),
-                           ','.join(sorted(vals, key=lambda x: int(x, 16))) or '-',
+                           ','.join(sorted(vals, key=lambda x: int(x, 16)) + sorted(e.get('many', ()))) or '-',
                            ','.join(sorted(e.get('gen', ()), key=lambda x: (not x.startswith('0x') and not x.isdigit(), int(x, 0) if x[:1].isdigit() else 0))) or '-', ' | '.join(e['items']), m['text']]) + '\n')
 print('%d fields, %d items (%d rows, %d registers) written to %s; %d without a unique model row' % (
     len(need) - bad, len({i for e in need.values() for i in e['items']}),
