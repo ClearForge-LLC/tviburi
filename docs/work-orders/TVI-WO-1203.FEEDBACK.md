@@ -98,9 +98,9 @@
 | Criterion | Where |
 |---|---|
 | The manifest check refuses a planted restatement; `main`'s manifest passes after (1) | `manifest` (§1 (1)); `MF01`–`MF08` killed |
-| Every clause-3 cell, the clause-4 halves and the 20 clause-6 rows are CI cases, run in a shard and named in the aggregate | `removed-console`, `crash-console`, `crash-runner`, `stock-modf`, `modf-page`, `i2c-isrmon`, `adc-fieldsmon`; CI_AGGREGATE |
+| Every clause-3 cell, the clause-4 halves and the 20 clause-6 rows are CI cases, run in a shard and named in the aggregate | `removed-console`, `crash-console`, `crash-runner`, `stock-modf`, `modf-page`, `i2c-isrmon`, `adc-fieldsmon`. Each ran in a shard of CI run 45792417151 and is in `times.tsv` |
 | The 14 boots, the fixture and the armed run: no new record, and the armed run arms | §1.1 below |
-| CI green, the budget judged; rows re-weighed from this run | CI_RUN |
+| CI green, the budget judged; rows re-weighed from this run | See §7, CI |
 
 ### 1.1 The replays
 
@@ -167,6 +167,7 @@ A fresh subagent (Opus) took the three attacks, read-only. It found real breaks;
 3. **No CI check asserts a witness per restated instance.** The budget counts at least one per boot. The replays here show 30–32, which fits every restated instance witnessing (30 plus the SPI ports each platform declares), but nothing pins it. A row: a per-instance witness check over the fixture boot.
 4. **The held RM0433 text cannot reach CI.** `modf-page` checks the committed excerpt, and only `tests/1203/rm0433-p2184.sh`, run where the text is held, ties the excerpt to it. A row if the architect wants it run on a schedule.
 5. **`crash-runner`'s first form showed the teardown race at a clean quit:** 29 of 31 end records lost. It failed closed. The existing row stands.
+7. **`1303`'s mutant `DM35-instances` was re-anchored** to `restated()`'s new filter (§7): an edit to a row outside this WO's own, made because (1) moved its text.
 6. **The DMA guard's access-log names for streams 1–7 differ from stock's** (`Stream1Configuration` where stock said `StreamFIFOControl+0x4`). No Tviburi test or replay read them. A consumer that compares stock and guarded access logs line for line would see it.
 
 ## 6. Reduction pass
@@ -187,4 +188,12 @@ Run twice, before and after the adversarial corrections:
   - `manifest`, `unit`, `stock-modf`, `modf-page`, `removed-console`, `crash-console`, `crash-runner`, `lognames`, `i2c-isrmon` and `adc-fieldsmon` pass;
   - `MF01`–`MF08` killed.
 - **Route:** `tests/ci/route.sh origin/main` passes (inventory 0 failures, `class=code`, `budget=yes`). Re-run after this file is committed.
-- **CI:** CI_RUN.
+- **CI, run 45792417151 at `97acfe4`:**
+  - route, budget, budget-tests and nine shards green;
+  - **the budget:** `MEDIANS main 821324 KiB, branch 812120 KiB, difference -9204 KiB (-9.0 MiB)`;
+  - **shard 7 failed** on `DM35-instances` (`1303`'s row): its text was `restated()`'s old body, which (1) rewrote. Re-anchored at `dc805ea` to the same guard in the new code, its id and test kept;
+  - **every row of `tests/mutants.tsv`** was checked: each old text occurs exactly once at the head;
+  - `tests/ci/shard.sh 7 10` was then run locally on `dc805ea`: 98 of 98 planned, every mutant killed, `DM35` by `unit`;
+  - every other mutant on code this branch moved was killed in that CI run's other shards.
+- **`times.tsv`:** this WO's eight new cases and eight mutants added, and `stock-modf` re-weighed, from run 45792417151 by `1202a`'s method.
+- **CI on the final head:** reported on the bus, as `1306a`'s §8 was.

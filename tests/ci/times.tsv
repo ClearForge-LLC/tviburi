@@ -19,7 +19,7 @@ case	iolock	6.7
 case	rmw	7.2
 case	forge	6.7
 case	stock-forge	6.7
-case	stock-modf	7.4
+case	stock-modf	6.4
 case	nomark	6.5
 case	conditions	6.1
 case	fields	8.3
@@ -886,3 +886,21 @@ mutant	HZ21-flashJudged	6.6
 mutant	HZ22-flashBus	6.6
 mutant	HZ23-cfgOn	6.6
 mutant	HZ24-cfgUse	6.6
+# TVI-WO-1203: its new cases and mutants, and stock-modf re-weighed, from its CI run 45792417151 by 1202a's method (each
+# item's gap, divided by its shard's median actual/weight over the items already weighed).
+case	manifest	8.8
+case	lognames	7.1
+case	modf-page	6.7
+case	removed-console	13.0
+case	crash-console	5.5
+case	crash-runner	7.3
+case	i2c-isrmon	6.0
+case	adc-fieldsmon	6.0
+mutant	MF01-restated	7.6
+mutant	MF02-bareVar	7.2
+mutant	MF03-stockTypo	7.2
+mutant	MF04-lineComment	7.9
+mutant	MF05-cancel	7.3
+mutant	MF06-blockComment	6.8
+mutant	MF07-consumerStock	1.5
+mutant	MF08-twice	7.2
