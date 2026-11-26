@@ -586,7 +586,7 @@ fn build(repo: &Path, renode: &Path, out: &Path) -> Result<(String, String), Str
 
     let mut m = format!("{MANIFEST_FORMAT}\n");
     m += "sources every file the release reads is a source line, its generator included, so that one release hash names one overlay and one ledger (northstar invariant 3)\n";
-    m += "properties each property line is one public constructor parameter of a guard, in pins.tsv's order, which the consumer's platform declares by that name on the guard's entry: required, without it the guard refuses or the platform does not load; optional, its meaning says what absence does (Renode supplies the first parameter, machine, itself)\n";
+    m += "properties each property line is one public constructor parameter of a guard, in pins.tsv's order, which the consumer's platform declares by that name on the guard's entry: required, without it the guard refuses or the platform does not load; optional, its meaning says what absence does (Renode supplies the first parameter, machine, itself); a stock entry's property that no line names for the guard is not the guard's, and the restated entry drops it (the canned pwr's size, initable and script)\n";
     for (asm, b, sha) in &pins.builds {
         m += &format!("build {asm} {b} {sha}\n");
     }
