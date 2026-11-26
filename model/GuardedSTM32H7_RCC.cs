@@ -64,8 +64,10 @@
 //                   APB enable) after which the CPU, AHB or an APB clock is above DS12117 Rev 10 Table 111 p210's limit for the
 //                   scale the PWR guard holds ("the voltage scaling shall be changed before increasing the system frequency",
 //                   p310; "otherwise the system might be unreliable", p286). predicted-fault; unmodeled where only VOS0 (VOS1 with
-//                   SYSCFG_PWRCR.ODEN, p280-281, which the twin cannot read) would hold the clocks. Judged only on a platform
-//                   with a PWR guard: with none, not judged at all.
+//                   SYSCFG_PWRCR.ODEN, p280-281, which the twin cannot read) would hold the clocks and the LDO is on (VOS0 "is
+//                   available only when the LDO regulator is ON", DS12117 p210 note 4). Also unmodeled: a write that changes sys_ck
+//                   while the PWR guard's ACTVOSRDY = 0 (CR3 "shall be written before changing ... ck_sys clock frequency", p308;
+//                   Run*, p262). Judged only on a platform with a PWR guard: with none, not judged at all.
 //   TVI-RCC-CLOCK   (TVI-WO-1300a (3); 1300b (2)) a write after which a guarded peripheral that runs (an SPI with SPE = 1, or a
 //                   USART guard with UE = 1, ruled 2026-11-25T03:03Z Q2) loses the
 //                   kernel clock it had, by the query on the state the write leaves: a source oscillator or PLLxON cleared,
@@ -394,13 +396,13 @@ namespace Antmicro.Renode.Peripherals.Tviburi
         // APB1HENR, APB2ENR, APB3ENR, APB4ENR, p462-471). Null, with the reason, where sys_ck has no frequency rule. It changes nothing.
         public double[] BusClocks(out bool[] apbEnabled, out string why)
         {
-            return Clocks(-1, 0, out apbEnabled, out why);
+            return Clocks(-1, 0, out apbEnabled, out why, out var _);
         }
 
         // The bus clocks as BusClocks gives them, after a write of `value` at `b` (none for b = -1): the write's copy, RCC_PLLxDIVR
         // and RCC_CR (as the stock model keeps it) taken for the trial and restored, as TVI-RCC-CLOCK's trial does; CFGR's SW as the
         // new SWS (TVI-RCC-SW has passed: its target runs); D1CFGR, D2CFGR and D3CFGR as written.
-        private double[] Clocks(long b, uint value, out bool[] apbEnabled, out string why)
+        private double[] Clocks(long b, uint value, out bool[] apbEnabled, out string why, out double? sysHz)
         {
             var savedCopy = b >= 0 && copies.TryGetValue(b, out var c) ? c : (uint?)null;
             var savedDivr = b >= 0 && divr.TryGetValue(b, out var d) ? d : (uint?)null;
@@ -414,13 +416,11 @@ namespace Antmicro.Renode.Peripherals.Tviburi
                 {
                     divr[b] = value;
                 }
-                if(b == CrOffset)
-                {
-                    crAfter = KeptCr(value);
-                }
+                crAfter = b == CrOffset ? KeptCr(value) : (uint?)null;
                 apbEnabled = new[] { Copy(0x0E8) != 0 || Copy(0x0EC) != 0, Copy(0x0F0) != 0, Copy(0x0E4) != 0, Copy(0x0F4) != 0 };
                 why = "sys_ck";
                 var sys = SysHz(b == CfgrOffset ? value & 7 : inner.ReadDoubleWord(CfgrOffset) >> 3 & 7, ref why);
+                sysHz = sys;
                 if(sys == null)
                 {
                     return null;
@@ -430,20 +430,20 @@ namespace Antmicro.Renode.Peripherals.Tviburi
                 var d3 = b == 0x020 ? value : inner.ReadDoubleWord(0x020);
                 var cpu = sys.Value / Prescaler(d1 >> 8 & 0xF);
                 var ahb = cpu / Prescaler(d1 & 0xF);
-                Func<uint, double> apb = ppre => ahb / ((ppre & 4) == 0 ? 1 : 2 << (int)(ppre & 3));   // 0xx /1; 100-111 /2-/16
+                Func<uint, double> apb = x => ahb / ((x & 4) == 0 ? 1 : 2 << (int)(x & 3));   // 0xx /1; 100-111 /2-/16
                 return new[] { cpu, ahb, apb(d2 >> 4 & 7), apb(d2 >> 8 & 7), apb(d1 >> 4 & 7), apb(d3 >> 4 & 7) };
             }
             finally
             {
-                if(savedCopy != null)
+                if(savedCopy is uint sc)
                 {
-                    copies[b] = savedCopy.Value;
+                    copies[b] = sc;
                 }
-                if(savedDivr != null)
+                if(savedDivr is uint sd)
                 {
-                    divr[b] = savedDivr.Value;
+                    divr[b] = sd;
                 }
-                crAfter = null;
+                crAfter = default(uint?);
             }
         }
 
@@ -921,8 +921,19 @@ namespace Antmicro.Renode.Peripherals.Tviburi
             var revision = p.Revision;
             var scale = p.Scale;
             var held = p.ScaleCitation;
-            var before = GuardedSTM32H7_PWR.Exceeds(revision, Clocks(-1, 0, out var apb0, out var _), apb0, scale, out var _);
-            var after = GuardedSTM32H7_PWR.Exceeds(revision, Clocks(b, value, out var apb1, out var _), apb1, scale, out var kind);
+            var c0 = Clocks(-1, 0, out var apb0, out var _, out var sys0);
+            var c1 = Clocks(b, value, out var apb1, out var _, out var sys1);
+            if(!p.ActvosReady && sys1 != sys0)
+            {
+                // TVI-WO-1308 adversarial pass: sys_ck changed in Run* mode, before a valid supply configuration (p308, p262).
+                records.Refuse("TVI-RCC-VOS", Unmodeled, RegisterAt(offset), "sys_ck before the supply configuration",
+                    "sys_ck changed from " + (sys0?.ToString() ?? "no known frequency") + " to " + (sys1?.ToString() ?? "no known frequency") + " Hz while PWR_CSR1.ACTVOSRDY = 0 (no valid supply configuration written): "
+                        + "PWR_CR3's lower byte \"shall be written before changing VOS level or ck_sys clock frequency\" (p308), and until ACTVOSRDY the system is in Run* mode (p262); no page says what silicon does with the change",
+                    "RM0433 Rev 9 §6.8.4 p308; §6.4.1 p262; TVI-WO-1308 adversarial pass", State(), offset, value, 32);
+                return true;
+            }
+            var before = GuardedSTM32H7_PWR.Exceeds(revision, c0, apb0, scale, p.LdoOn, out var _);
+            var after = GuardedSTM32H7_PWR.Exceeds(revision, c1, apb1, scale, p.LdoOn, out var kind);
             if(after == null || after == before)
             {
                 return false;

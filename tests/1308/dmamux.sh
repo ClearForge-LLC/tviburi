@@ -11,9 +11,9 @@ set -euo pipefail
 
 here=$(cd "$(dirname "$0")/../.." && pwd)
 IMAGE=$(sed -n 's/^IMAGE=//p' "$here/tests/spike.sh")
-CASES="pair pairrec pairtx parmem routes fixture live livedone livesame reserved se ge byte misaligned read clock clockone rst rstroute reset recorded norcc registrations fields pairs ledger regen"
+CASES="pair pairrec pairtx parmem routes fixture live livedone livesame reserved se ge byte misaligned read clock clockone rst rstroute reset recorded norcc addr registrations fields pairs ledger regen"
 GUARDS="spi1 rcc gpioPortA gpioPortB gpioPortC gpioPortD gpioPortE gpioPortF gpioPortG gpioPortH gpioPortI gpioPortJ gpioPortK timer1 timer8 dma1 dma2 flashController usart1 usart2 usart3 uart4 uart5 usart6 uart7 uart8 i2c1 i2c2 i2c3 adcM1S2 adc3 dmamux1"
-MONITOR="misaligned read clock clockone rst rstroute reset recorded norcc registrations fields pairs ledger regen"
+MONITOR="misaligned read clock clockone rst rstroute reset recorded norcc addr registrations fields pairs ledger regen"
 PATHS=$(for c in $CASES; do case " $MONITOR " in *" $c "*) ;; *) printf '"%s",' "$c" ;; esac; done | sed 's/,$//')
 scratch=${TVIBURI_SCRATCH:-$HOME/.cache/tviburi}
 mkdir -p "$scratch"
@@ -123,8 +123,8 @@ for t in ${TVIBURI_TESTS:-$CASES}; do
     fi
   fi
   case $t in
-  pair) check "pair (WO acceptance): a stream started on a channel whose route names another request (C0 = 41 usart1_rx_dma, PAR = SPI1_RXDR) refuses at its EN, TVI-DMAMUX-PAIR, unmodeled, located (a PC), naming USART1_RDR and PAR (Table 124 p698; Table 8 p134; p2098, p2228)" \
-      "refuses pair TVI-DMAMUX-PAIR unmodeled 'r[\"register\"] == \"DMAMUX1_C0CR\" and r[\"bit\"] == \"DMAREQ_ID = 41 (usart1_rx_dma) with DMA1_S0PAR = 0x40013030\" and \"USART1_RDR at 0x40011024\" in r[\"condition\"] and \"p2098\" in r[\"citation\"]' && records pair 'len(recs) == 1'" ;;
+  pair) check "pair (WO acceptance): a stream started on a channel whose route names another request (C0 = 41 usart1_rx_dma, PAR = SPI1_RXDR) refuses at its EN, TVI-DMAMUX-PAIR, unmodeled, located (a PC), naming USART1_RDR and PAR (Table 124 p698; Table 8 p134; p2098, p2228), the access located at DMA1_S0CR's EN write (offset 0x10, value 0x401)" \
+      "refuses pair TVI-DMAMUX-PAIR unmodeled 'r[\"register\"] == \"DMAMUX1_C0CR\" and r[\"bit\"] == \"DMAREQ_ID = 41 (usart1_rx_dma) with DMA1_S0PAR = 0x40013030\" and \"USART1_RDR at 0x40011024\" in r[\"condition\"] and \"p2098\" in r[\"citation\"] and r[\"access\"][\"offset\"] == \"0x10\" and r[\"access\"][\"value\"] == \"0x401\"' && records pair 'len(recs) == 1'" ;;
   pairrec) check "pairrec: dmamux1 recorded, dma1 enforcing: the same stream records one would-refuse (TVI-DMAMUX-PAIR) and starts, as if no rule had fired (RUL-19): S0CR reads EN = 1; never a pass at the check" \
       "[ \$rc = 1 ] && logged pairrec 'len(recs) == 1 and recs[0][\"tviburi\"] == \"would-refuse\" and recs[0][\"rule\"] == \"TVI-DMAMUX-PAIR\"' && after pairrec && [ \"\$(readout pairrec READ)\" = 0x00000401 ]" ;;
   parmem) check "parmem (ruled Q18 (b)): a stream on 41 (usart1_rx_dma) with PAR in AXI SRAM (0x24000000), paced by the request, passes: EN reads 1, and a request on input 41 moves the byte at 0x24000000 into SRAM4 (NDTR 4 -> 3)" \
@@ -198,6 +198,14 @@ for t in ${TVIBURI_TESTS:-$CASES}; do
     PLATFORM=/repo/tests/1308/norcc.repl run_case norcc - "$clk" 'sysbus WriteDoubleWord 0x40020800 0x29'
     check "norcc: a DMAMUX1 guard on a machine with no RCC guard refuses its access, TVI-DMAMUX-CONFIG, unmodeled: its clock and reset cannot be watched" \
       "[ \$rc = 3 ] && records norcc 'len(recs) == 1 and recs[0][\"rule\"] == \"TVI-DMAMUX-CONFIG\" and \"no RCC guard\" in recs[0][\"condition\"]'" ;;
+  addr)
+    # TVI-WO-1308 adversarial pass: the restatement moved to 0x40020C00 (the board's own `using` of it and its mode block dropped).
+    sed 's/^tviburiDmamux1: Tviburi.GuardedSTM32H7_DMAMUX @ sysbus 0x40020800 as/tviburiDmamux1: Tviburi.GuardedSTM32H7_DMAMUX @ sysbus 0x40020C00 as/' \
+      "$src/model/stm32h7-dmamux-restate.repl" > "$work/addr.repl"
+    PLATFORM_SED='$r '"$work/addr.repl"$'\n''/^using "\/repo\/model\/stm32h7-dmamux-restate.repl"$/d;/^tviburiDmamux1:$/,/^    mode: "enforcing"$/d' \
+      run_case addr - "$clk" 'sysbus ReadDoubleWord 0x40020C00'
+    check "addr: a DMAMUX1 guard declared at 0x40020C00, not DMAMUX1's 0x40020800 (Table 8 p134), refuses its access, TVI-DMAMUX-CONFIG, unmodeled" \
+      "[ \$rc = 3 ] && records addr 'len(recs) == 1 and recs[0][\"rule\"] == \"TVI-DMAMUX-CONFIG\" and \"bus address 0x40020C00\" in recs[0][\"condition\"]'" ;;
   registrations)
     # Ruled Q1: every reference to the variable dmamux1 is restated onto the guard, read back by reflection (the DMA guards'
     # `dmamux`, the ADC guards' `dma`) and from the connections (spi4's DMARecieve, crypto's OutDMA); a request on input 41

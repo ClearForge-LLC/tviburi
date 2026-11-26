@@ -186,9 +186,10 @@ namespace Antmicro.Renode.Peripherals.Tviburi
         // ---- the DMA guard's one call (ruled Q3) ---------------------------------------------------------------
 
         // TVI-DMAMUX-PAIR: asked by the DMA guard at a stream's EN, for a stream whose request it raises or acknowledges, with
-        // the stream's PAR and its direction. True when it refused, so that the DMA guard does not start the stream; false after
-        // a would-refuse (recorded mode, RUL-19: the access goes on as if no rule had fired).
-        public bool RefusedPair(int channel, uint par, bool toMemory)
+        // the stream's PAR and its direction, and the access being judged: the DMA_SxCR write that sets EN (its offset in the DMA
+        // controller and the value written), which the record locates. True when it refused, so that the DMA guard does not start the
+        // stream; false after a would-refuse (recorded mode, RUL-19: the access goes on as if no rule had fired).
+        public bool RefusedPair(int channel, uint par, bool toMemory, long crOffset, uint crValue)
         {
             lock(sync)
             {
@@ -215,11 +216,12 @@ namespace Antmicro.Renode.Peripherals.Tviburi
                         + "), whose data register is " + p.Register + " at 0x" + p.Address.ToString("X8") + ", with PAR = 0x" + par.ToString("X8")
                         + ": silicon paces the stream by that request and moves " + (toMemory ? "from" : "to") + " PAR as written, which no page calls a fault, "
                         + "but the twin pairs each request only with its own peripheral's data register and cannot say what this stream moves when";
+                condition += " (at DMA" + (channel / 8 + 1) + "_S" + channel % 8 + "CR's EN write)";
                 records.Refuse("TVI-DMAMUX-PAIR", Unmodeled, "DMAMUX1_C" + channel + "CR",
                     "DMAREQ_ID = " + id + (p == null ? "" : " (" + p.Request + ")") + " with DMA" + (channel / 8 + 1) + "_S" + channel % 8 + "PAR = 0x" + par.ToString("X8"),
                     condition,
                     "RM0433 Rev 9 §17.3.2 Table 124 p697-698" + (p == null ? "" : "; " + p.Citation) + "; Table 7 p130 (the peripherals' region); ruled 2026-11-26T09:31Z Q3, 10:43Z Q18 (b)",
-                    State(), 4 * channel, id, 32);
+                    State(), crOffset, crValue, 32);
                 return !records.Recorded;
             }
         }

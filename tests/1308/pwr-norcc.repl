@@ -1,0 +1,8 @@
+// TVI-WO-1308 adversarial pass: a PWR guard on a machine with no RCC guard (the stock board, the stock rcc). Its VOS-lowering rule
+// (TVI-PWR-VOS, p310) needs the running clocks, which only the RCC guard computes: a lowering refuses, unmodeled.
+using "platforms/boards/nucleo_h753zi.repl"
+using "./stm32h7-pwr-restate.repl"
+
+tviburiPwr:
+    mode: "enforcing"
+    revision: "V"

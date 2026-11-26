@@ -21,6 +21,7 @@
 //   The ready flags (ruled Q5): ACTVOSRDY rises at the valid supply configuration write, VOSRDY reads 1 from reset ("Following
 //   reset VOSRDY will be read 1", p310) and at once at a VOS write, USB33RDY follows USB33DEN at once: "no figure in RM0433 Rev 9
 //   or DS12117 Rev 10", acknowledged by name (bench rows P1, P3).
+//   Its `Written` event (after every write it takes) lets the flash guard re-judge its wait states at a VOS change (p160, p310).
 //   DBP (PWR_CR1 bit 8, p305): kept and served; it write-protects PWR_CR2 here (p306) and RCC_BDCR in the RCC guard (p427; `Dbp`).
 //
 // Rules, in the order they are evaluated. A refused access changes nothing.
@@ -100,6 +101,34 @@ namespace Antmicro.Renode.Peripherals.Tviburi
             }
         }
 
+        // PWR_CSR1.ACTVOSRDY (p306): 0 until a valid supply configuration is written (Run* mode, p262; p308).
+        public bool ActvosReady
+        {
+            get
+            {
+                lock(sync)
+                {
+                    return ActvosRdy;
+                }
+            }
+        }
+
+        // The LDO on: PWR_CR3.LDOEN as the supply configuration holds it (1 from reset, p308; an invalid pair keeps the default).
+        public bool LdoOn
+        {
+            get
+            {
+                lock(sync)
+                {
+                    return (cr3 & LdoenBit) != 0;
+                }
+            }
+        }
+
+        // TVI-WO-1308 adversarial pass: raised after every write this guard takes, with its offset and value, so that the flash guard
+        // re-judges its wait states at a VOS change (RM0433 Rev 9 Table 17 p160; p310), as it does at the RCC guard's `Written`.
+        public event Action<long, uint> Written;
+
         // PWR_CR1.DBP (p305): 0 write-protects RCC_BDCR (p427), the RTC and PWR_CR2's BREN and MONEN.
         public bool Dbp
         {
@@ -116,8 +145,10 @@ namespace Antmicro.Renode.Peripherals.Tviburi
         // (rcc_hclk), APB1-APB4 (rcc_pclk1-4); `apbEnabled`, per APB bus, whether a peripheral on it is enabled (VOS3's APB limit
         // holds "when at least one peripheral is enabled", footnote 6, on VOS3's APB cell only, read on the rendered page). Null
         // when every clock is within `scale`'s limits; otherwise the first one above, with its kind: unmodeled when VOS0 (rev V,
-        // scale 1 with ODEN, which the twin cannot read) would hold every clock, else predicted-fault. Changes nothing.
-        public static string Exceeds(string revision, double[] clocks, bool[] apbEnabled, int scale, out string kind)
+        // scale 1 with ODEN, which the twin cannot read) would hold every clock and `ldo` (the LDO on, PWR_CR3.LDOEN) says VOS0 is
+        // available, else predicted-fault: "VOS0 is available only when the LDO regulator is ON" (Table 111 note 4 p210; Table 112
+        // p210 gives the LDO as its only source). Changes nothing.
+        public static string Exceeds(string revision, double[] clocks, bool[] apbEnabled, int scale, bool ldo, out string kind)
         {
             kind = null;
             var table = revision == "V" ? LimitsV : revision == "Y" ? LimitsY : null;
@@ -132,10 +163,12 @@ namespace Antmicro.Renode.Peripherals.Tviburi
                 {
                     continue;
                 }
-                var vos0 = revision == "V" && scale == 1 && clocks.Select((c, j) => c <= LimitsV[0][j] * 1e6).All(x => x);
+                var within0 = revision == "V" && scale == 1 && clocks.Select((c, j) => c <= LimitsV[0][j] * 1e6).All(x => x);
+                var vos0 = within0 && ldo;
                 kind = vos0 ? Unmodeled : PredictedFault;
                 return BusNames[i] + " at " + clocks[i] + " Hz, above " + max + " MHz at VOS" + scale + " (revision " + revision + ")"
-                    + (vos0 ? ": within VOS0's limits, which need SYSCFG_PWRCR.ODEN (RM0433 Rev 9 p280-281, p561), which the twin cannot read" : "");
+                    + (vos0 ? ": within VOS0's limits, which need SYSCFG_PWRCR.ODEN (RM0433 Rev 9 p280-281, p561), which the twin cannot read"
+                        : within0 ? ": within VOS0's limits, but the LDO is off (PWR_CR3.LDOEN = 0): \"VOS0 is available only when the LDO regulator is ON\" (DS12117 Rev 10 Table 111 note 4 p210; Table 112 p210)" : "");
             }
             return null;
         }
@@ -263,6 +296,7 @@ namespace Antmicro.Renode.Peripherals.Tviburi
                     return;
                 }
                 Pass(b, word);
+                Written?.Invoke(b, word);   // the flash guard re-judges (its Scale read re-enters this lock, on this thread)
             }
         }
 
@@ -465,7 +499,7 @@ namespace Antmicro.Renode.Peripherals.Tviburi
             else
             {
                 var clocks = rcc.BusClocks(out var apb, out var none);
-                why = clocks == null ? "the running clocks cannot be computed (" + none + ")" : Exceeds(Revision, clocks, apb, ScaleOf(next), out kind);
+                why = clocks == null ? "the running clocks cannot be computed (" + none + ")" : Exceeds(Revision, clocks, apb, ScaleOf(next), LdoOn, out kind);
                 if(why == null)
                 {
                     return false;

@@ -12,9 +12,9 @@ set -euo pipefail
 
 here=$(cd "$(dirname "$0")/../.." && pwd)
 IMAGE=$(sed -n 's/^IMAGE=//p' "$here/tests/spike.sh")
-CASES="second same ap gen order clockfirst invalid vosearly voslow cr2dbp bdcr bdcrok flashvos3 apbvos3 vos0 revy200 notjudged reset recorded locked nibble norev revy byte misaligned read registrations fields ledger regen"
+CASES="second same ap gen order clockfirst invalid vosearly voslow cr2dbp bdcr bdcrok flashvos3 apbvos3 vos0 revy200 flashlow clockearly vos0byp bdcrbyte noclock nopwr notjudged reset recorded locked nibble norev revy byte misaligned read addr norcc registrations fields ledger regen"
 BOARD_GUARDS="spi1 rcc gpioPortA gpioPortB gpioPortC gpioPortD gpioPortE gpioPortF gpioPortG gpioPortH gpioPortI gpioPortJ gpioPortK timer1 timer8 dma1 dma2 flashController usart1 usart2 usart3 uart4 uart5 usart6 uart7 uart8 i2c1 i2c2 i2c3 adcM1S2 adc3 dmamux1"
-MONITOR="reset recorded locked nibble norev revy byte misaligned read registrations fields ledger regen"
+MONITOR="reset recorded locked nibble norev revy byte misaligned read addr norcc registrations fields ledger regen"
 PATHS=$(for c in $CASES; do case " $MONITOR " in *" $c "*) ;; *) printf '"%s",' "$c" ;; esac; done | sed 's/,$//')
 scratch=${TVIBURI_SCRATCH:-$HOME/.cache/tviburi}
 mkdir -p "$scratch"
@@ -40,17 +40,23 @@ check() { if eval "$2"; then echo "ok   $1"; else echo "FAIL $1"; fails=$((fails
 
 # One container: build the check and (for a firmware case) the planted firmware, run Renode on the case's monitor script, then the
 # check on the log, naming every guarded source. Outputs in $work/<name>. The platform: the board, PLATFORM_SED applied to it, then
-# (unless NOPWR=1) the PWR restatement and `tviburiPwr` (enforcing, revision "V").
+# (unless NOPWR=1) the PWR restatement and `tviburiPwr` (enforcing, revision "V"); PLATFORM, another platform file instead, whose
+# guards are PLATFORM_GUARDS.
 run_case() { # run_case <name> <firmware path or -> <monitor lines...>
   local name=$1 fw=$2 guards="$BOARD_GUARDS pwr"; shift 2
   mkdir -p "$work/$name"
-  {
-    sed -e 's#^using "\./#using "/repo/model/#' "$src/model/tviburi-nucleo-h753zi.repl"
-    if [ -z "${NOPWR:-}" ]; then
-      echo; cat "$src/model/stm32h7-pwr-restate.repl"; printf '\ntviburiPwr:\n    mode: "enforcing"\n    revision: "V"\n'
-    fi
-  } | sed -e "${PLATFORM_SED:-}" > "$work/$name/platform.repl"
-  [ -z "${NOPWR:-}" ] || guards=$BOARD_GUARDS
+  if [ -n "${PLATFORM:-}" ]; then
+    sed 's#^using "\./#using "/repo/model/#' "$src/${PLATFORM#/repo/}" > "$work/$name/platform.repl"
+    guards=$PLATFORM_GUARDS
+  else
+    {
+      sed -e 's#^using "\./#using "/repo/model/#' "$src/model/tviburi-nucleo-h753zi.repl"
+      if [ -z "${NOPWR:-}" ]; then
+        echo; cat "$src/model/stm32h7-pwr-restate.repl"; printf '\ntviburiPwr:\n    mode: "enforcing"\n    revision: "V"\n'
+      fi
+    } | sed -e "${PLATFORM_SED:-}" > "$work/$name/platform.repl"
+    [ -z "${NOPWR:-}" ] || guards=$BOARD_GUARDS
+  fi
   {
     sed "s#^machine LoadPlatformDescription .*#machine LoadPlatformDescription @/out/platform.repl#" "$src/scripts/prelude.resc"
     [ "$fw" = - ] || { echo "sysbus LoadELF @/out/fw.elf"; echo "cpu VectorTableOffset 0x08000000"; }
@@ -110,6 +116,10 @@ for t in ${TVIBURI_TESTS:-$CASES}; do
       PLATFORM_SED=$hse16 run_case gen gen 'emulation RunFor "0.01"' "${marks[@]}"
     elif [ "$t" = revy200 ]; then
       PLATFORM_SED='/^tviburiPwr:$/,${s/^    revision: "V"$/    revision: "Y"/}' run_case revy200 revy200 'emulation RunFor "0.01"' "${marks[@]}"
+    elif [ "$t" = noclock ]; then
+      PLATFORM_SED='/^tviburiFlash:$/{n;s/enforcing/recorded/}' run_case noclock noclock 'emulation RunFor "0.01"' "${marks[@]}" "${reads[@]}"
+    elif [ "$t" = nopwr ]; then
+      NOPWR=1 PLATFORM_SED='$a pwr: @none' run_case nopwr nopwr 'emulation RunFor "0.01"' "${marks[@]}"
     elif [ "$t" = notjudged ]; then
       NOPWR=1 run_case notjudged notjudged 'emulation RunFor "0.01"' "${marks[@]}"
     else
@@ -149,6 +159,18 @@ for t in ${TVIBURI_TESTS:-$CASES}; do
       "refuses vos0 TVI-RCC-VOS unmodeled 'r[\"register\"] == \"RCC_CFGR\" and \"480000000 Hz, above 400 MHz at VOS1\" in r[\"condition\"] and \"within VOS0\" in r[\"condition\"]' rcc" ;;
   revy200) check "revy200: on revision Y at Scale 3, 200 MHz with AHB and every APB at 200 MHz passes: rev Y's datasheet states only a CPU limit per scale (DS12117 Rev 10 p129-130), so AHB and APB are not judged; CFGR reads SWS = PLL1 (0x1B)" \
       "passes revy200 && [ \"\$(readout revy200 READ)\" = 0x0000001B ]" ;;
+  flashlow) check "flashlow: VOS lowered from Scale 1 to Scale 2 with LATENCY 0 at 64 MHz (Table 17 p160 needs 1 at VOS2) refuses TVI-FLASH-WAIT, predicted-fault, located at the PWR_D3CR write (p310), not at a later write" \
+      "refuses flashlow TVI-FLASH-WAIT predicted-fault 'r[\"access\"][\"offset\"] == \"0x58024818\" and \"64000000 Hz at VOS2: Table 17 needs 1\" in r[\"condition\"] and \"at the PWR_D3CR write\" in r[\"condition\"] and \"p310\" in r[\"citation\"]' flashController" ;;
+  clockearly) check "clockearly: sys_ck changed to 160 MHz before any supply configuration (ACTVOSRDY 0) refuses TVI-RCC-VOS, unmodeled, at RCC_CFGR, citing p308 and p262" \
+      "refuses clockearly TVI-RCC-VOS unmodeled 'r[\"register\"] == \"RCC_CFGR\" and r[\"bit\"] == \"sys_ck before the supply configuration\" and \"p308\" in r[\"citation\"] and \"p262\" in r[\"citation\"]' rcc" ;;
+  vos0byp) check "vos0byp: the LDO bypassed (CR3 0x01), Scale 1, 480/240/120 MHz refuse TVI-RCC-VOS, predicted-fault: VOS0 needs the LDO (DS12117 Rev 10 p210 note 4)" \
+      "refuses vos0byp TVI-RCC-VOS predicted-fault '\"VOS0 is available only when the LDO regulator is ON\" in r[\"condition\"] and \"480000000 Hz, above 400 MHz at VOS1\" in r[\"condition\"]' rcc" ;;
+  bdcrbyte) check "bdcrbyte: a byte write of RCC_BDCR's RTCEN byte with DBP = 0 refuses TVI-RCC-DBP, unmodeled, an 8-bit access" \
+      "refuses bdcrbyte TVI-RCC-DBP unmodeled 'r[\"access\"][\"width\"] == 8 and r[\"access\"][\"offset\"] == \"0x71\"' rcc" ;;
+  noclock) check "noclock: (flash recorded) VOS lowered under a sys_ck the twin cannot compute (DIVP1 /3, p404) refuses TVI-PWR-VOS, unmodeled; D3CR keeps 0xE000" \
+      "[ \$rc = 3 ] && logged noclock 'len(recs) == 1 and recs[0][\"rule\"] == \"TVI-PWR-VOS\" and recs[0][\"kind\"] == \"unmodeled\" and \"cannot be computed\" in recs[0][\"condition\"] and recs[0][\"access\"][\"pc\"] != \"none\"' && [ \"\$(readout noclock D3CR)\" = 0x0000E000 ]" ;;
+  nopwr) check "nopwr: with nothing at PWR_D3CR (no pwr at all), LATENCY 1 at 200 MHz refuses TVI-FLASH-WAIT, decided at VOS1, its record saying no peripheral is at PWR_D3CR (not that it reads VOS 00)" \
+      "refuses nopwr TVI-FLASH-WAIT predicted-fault '\"no peripheral at PWR_D3CR\" in r[\"condition\"] and \"reads VOS 00\" not in r[\"condition\"]' flashController" ;;
   notjudged) check "notjudged (ruled Q20 (A)): on the board with no PWR guard, sys_ck 400 MHz, AHB 200 and every APB 200 MHz (above every scale's limit, p210) are not judged: no TVI-RCC-VOS, no record; CFGR reads SWS = PLL1 (0x1B), D1CFGR 0x08 (read by the firmware, not a record)" \
       "passes notjudged && logged notjudged 'len(recs) == 0' rcc && [ \"\$(readout notjudged READ)\" = 0x0000001B ] && [ \"\$(readout notjudged READ2)\" = 0x00000008 ]" ;;
   reset)
@@ -188,6 +210,14 @@ for t in ${TVIBURI_TESTS:-$CASES}; do
     run_case read - 'sysbus ReadDoubleWord 0x58024814'
     check "read: a read of 0x14 (Reserved, Table 49 p313) refuses TVI-PWR-READ, unmodeled" \
       "[ \$rc = 3 ] && records read 'len(recs) == 1 and recs[0][\"rule\"] == \"TVI-PWR-READ\" and recs[0][\"access\"][\"offset\"] == \"0x14\"'" ;;
+  addr)
+    PLATFORM_SED='s/^tviburiPwr: Tviburi.GuardedSTM32H7_PWR @ sysbus 0x58024800 /tviburiPwr: Tviburi.GuardedSTM32H7_PWR @ sysbus 0x58025800 /' run_case addr - 'sysbus ReadDoubleWord 0x58025804'
+    check "addr: a PWR guard declared at 0x58025800, not PWR's 0x58024800 (Table 8 p132), refuses its access, TVI-PWR-CONFIG, unmodeled" \
+      "[ \$rc = 3 ] && records addr 'len(recs) == 1 and recs[0][\"rule\"] == \"TVI-PWR-CONFIG\" and \"bus address 0x58025800\" in recs[0][\"condition\"]'" ;;
+  norcc)
+    PLATFORM=/repo/tests/1308/pwr-norcc.repl PLATFORM_GUARDS=pwr run_case norcc - 'sysbus WriteDoubleWord 0x5802480C 0x2' 'sysbus WriteDoubleWord 0x58024818 0xC000' 'sysbus WriteDoubleWord 0x58024818 0x4000'
+    check "norcc: a PWR guard with no RCC guard on the machine: VOS lowered from Scale 1 to Scale 3 refuses TVI-PWR-VOS, unmodeled: the clocks cannot be read" \
+      "[ \$rc = 3 ] && records norcc 'len(recs) == 1 and recs[0][\"rule\"] == \"TVI-PWR-VOS\" and recs[0][\"kind\"] == \"unmodeled\" and \"no RCC guard\" in recs[0][\"condition\"]'" ;;
   registrations)
     run_case registrations - 'peripherals'
     check "registrations (ruled Q13): peripherals lists pwr once, as the guard; its witness names revision V" \

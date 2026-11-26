@@ -279,7 +279,7 @@ DM39-fthProtected	model/GuardedSTM32DMA.cs	case FcrOffset: return DmdisBit | Fth
 DM40-fthAny	tests/1303/fields.py	"FTH[1:0]", 1, 0, A,	"FTH[1:0]", 1, 0, Z,	dma-regen
 DM42-reloadSpan	model/GuardedSTM32DMA.cs	var items = (ulong)(reload ? programmed[s] : Items(s));	var items = (ulong)Items(s);	dma-reloadtcm
 FL01-waitShort	model/GuardedSTM32H7_Flash.cs	                if(latency < need)	                if(false)	flash-clockfirst
-FL03-vosUnknownAtVos1	model/GuardedSTM32H7_Flash.cs	var row = table[c.Vos == 0 ? 1 : c.Vos];	var row = table[c.Vos == 0 ? 3 : c.Vos];	flash-vosunknown
+FL03-vosUnknownAtVos1	model/GuardedSTM32H7_Flash.cs	var row = table[c.Vos <= 0 ? 1 : c.Vos];	var row = table[c.Vos <= 0 ? 3 : c.Vos];	flash-vosunknown
 FL04-over225	model/GuardedSTM32H7_Flash.cs	            if(clock.Hz == null || clock.Hz > MaxAclk)\n            {\n                kind = Unmodeled;\n                why = clock.Hz == null ? "the AXI clock cannot be computed (" + clock.Note + ")"\n                    :	            if(clock.Hz == null)\n            {\n                kind = Unmodeled;\n                why = clock.Hz == null ? "the AXI clock cannot be computed (" + clock.Note + ")"\n                    :	flash-over225
 FL08-rccEvent	model/GuardedSTM32H7_RCC.cs	            Written?.Invoke(b, value);\n	(empty)	flash-clockfirst
 FL09-subscribe	model/GuardedSTM32H7_Flash.cs	                    rcc.Written += OnRccWritten;\n	(empty)	flash-clockfirst
@@ -617,3 +617,13 @@ MF11-cannedNamed	tools/tviburi-release/src/main.rs	c.2 == stock_ty && names.cont
 MF12-cannedRow	tools/tviburi-release/src/main.rs	let (restates, retypes) = restated(&declared, stock_ty, names, consumer)?;	let (restates, retypes) = restated(&chain.declared, stock_ty, names, consumer)?;	manifest pwr-ledger
 PW27-vos0Kind	model/GuardedSTM32H7_PWR.cs	kind = vos0 ? Unmodeled : PredictedFault;	kind = PredictedFault;	pwr-vos0
 PW28-revYTable	model/GuardedSTM32H7_PWR.cs	var table = revision == "V" ? LimitsV : revision == "Y" ? LimitsY : null;	var table = revision == "V" || revision == "Y" ? LimitsV : null;	pwr-revy200
+PW29-flashPwrEvent	model/GuardedSTM32H7_Flash.cs	                    pwrGuard.Written += OnPwrWritten;\n	(empty)	pwr-flashlow
+PW30-sysBeforeSupply	model/GuardedSTM32H7_RCC.cs	if(!p.ActvosReady && sys1 != sys0)	if(false)	pwr-clockearly
+PW31-vos0Ldo	model/GuardedSTM32H7_PWR.cs	var vos0 = within0 && ldo;	var vos0 = within0;	pwr-vos0byp
+PW32-bdcrSubword	model/GuardedSTM32H7_RCC.cs	(RefusedField(b, b, word) || RefusedDbp(offset, b, word, width))	(RefusedField(b, b, word))	pwr-bdcrbyte
+PW33-vosNoRcc	model/GuardedSTM32H7_PWR.cs	if(rcc == null)	if(false)	pwr-norcc
+PW34-vosNoClocks	model/GuardedSTM32H7_PWR.cs	why = clocks == null ? "the running clocks cannot be computed (" + none + ")" :	why = clocks == null ? null :	pwr-noclock
+PW35-pwrAddr	model/GuardedSTM32H7_PWR.cs	if(start != PwrBase)	if(false)	pwr-addr
+PW36-noPwrNamed	model/GuardedSTM32H7_Flash.cs	return -1;   // nothing at PWR_D3CR: unknown, and named so	return 0;	pwr-nopwr
+DX31-dmamuxAddr	model/GuardedSTM32H7_DMAMUX.cs	if(start != Dmamux1Base)	if(false)	dmamux-addr
+DX32-pairAccess	model/GuardedSTM32H7_DMAMUX.cs	State(), crOffset, crValue, 32);	State(), 4 * channel, id, 32);	dmamux-pair

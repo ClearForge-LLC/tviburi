@@ -32,6 +32,17 @@
 //!                      VOS0's, which needs SYSCFG_PWRCR.ODEN (p280-281), which the twin cannot read: TVI-RCC-VOS, unmodeled, at CFGR.
 //!   path="revy200"   - (revision Y) CR3, VOS3, LATENCY 4, then 200 MHz with every prescaler /1 (AHB and APB 200 MHz): rev Y's
 //!                      datasheet states only a CPU limit (DS12117 Rev 10 p129-130), which 200 MHz meets: passes. MARK_READ = CFGR.
+//!   path="flashlow"  - CR3, VOS1, LATENCY 0 at HSI 64 MHz (enough at VOS1), then VOS lowered to Scale 2 (64 MHz needs 1 WS there,
+//!                      Table 17 p160): TVI-FLASH-WAIT, predicted-fault, at the PWR_D3CR write (p310).
+//!   path="clockearly"- no supply configuration (ACTVOSRDY 0), then sys_ck to 160 MHz on PLL1 (AHB 80, APB 40: within VOS3):
+//!                      TVI-RCC-VOS, unmodeled, at CFGR (p308: CR3 "shall be written before changing ... ck_sys"; p262).
+//!   path="vos0byp"   - CR3 = 0x01 (LDO bypassed, Table 34 p261), VOS1, then 480/240/120 MHz: within VOS0's limits, but "VOS0 is
+//!                      available only when the LDO regulator is ON" (DS12117 Rev 10 p210 note 4): TVI-RCC-VOS, predicted-fault.
+//!   path="bdcrbyte"  - a byte write of RCC_BDCR's byte 1 (RTCEN) with DBP = 0: TVI-RCC-DBP, unmodeled (p427; a byte access, p427).
+//!   path="noclock"   - (flash recorded) CR3, VOS1, PLL1 with DIVP1 = 2 (/3, "odd division factors are not allowed", p404: no
+//!                      frequency rule) switched in, then VOS lowered to Scale 3: TVI-PWR-VOS, unmodeled (the clocks cannot be computed).
+//!   path="nopwr"     - (no pwr at all on the platform) LATENCY 1, then an AXI clock of 200 MHz: TVI-FLASH-WAIT, decided at VOS1, its
+//!                      record naming no peripheral at PWR_D3CR.
 //!   path="notjudged" - (a platform with no PWR guard, ruled Q20 (A)) sys_ck to 400 MHz, AHB 200, every APB 200 MHz, above every
 //!                      scale's limit, LATENCY 2: no TVI-RCC-VOS, passes. MARK_READ = CFGR (SWS = PLL1), MARK_READ2 = D1CFGR.
 #![no_std]
@@ -74,12 +85,17 @@ unsafe fn vos(v: u32) {
 }
 
 unsafe fn pll(divn: u32, d1: u32, d2: u32, d3: u32) {
+    pllp(divn, 1, d1, d2, d3);
+}
+
+// The same with DIVP1 = divp (pll1_p_ck = vco1_ck / (divp + 1), p404).
+unsafe fn pllp(divn: u32, divp: u32, d1: u32, d2: u32, d3: u32) {
     w(RCC + 0x18, d1);                                     // D1CFGR: D1CPRE, D1PPRE, HPRE (p394-395)
     w(RCC + 0x1C, d2);                                     // D2CFGR: D2PPRE2, D2PPRE1 (p396)
     w(RCC + 0x20, d3);                                     // D3CFGR: D3PPRE (p397)
     w(RCC + 0x28, (r(RCC + 0x28) & !0x3F3) | (4 << 4));   // PLLCKSELR: PLLSRC = HSI, DIVM1 = 4 (p398-399)
     w(RCC + 0x2C, 0x01FF_000C);                           // PLLCFGR: PLL1RGE = 11, 8-16 MHz (p400-402)
-    w(RCC + 0x30, 0x0101_0200 | (divn - 1));              // PLL1DIVR: DIVP1 = 1 (/2), DIVN1 (p403-404)
+    w(RCC + 0x30, 0x0101_0000 | (divp << 9) | (divn - 1)); // PLL1DIVR: DIVP1, DIVN1 (p403-404)
     w(RCC, r(RCC) | 1 << 24);                             // PLL1ON (p385)
     while r(RCC) >> 25 & 1 == 0 {}
 }
@@ -249,6 +265,49 @@ pub unsafe extern "C" fn reset() -> ! {
         pll(25, 0, 0, 0);   // 200 MHz; AHB 200; every APB 200
         switch(3);
         write_volatile(MARK_READ, r(RCC + 0x10));
+    }
+    #[cfg(path = "flashlow")]
+    {
+        supply(0x02);
+        vos(3);
+        w(ACR, 0x00);
+        while r(ACR) & 0xF != 0 {}
+        w(D3CR, 2 << 14);
+    }
+    #[cfg(path = "clockearly")]
+    {
+        pll(20, 0x48, 0x440, 0x40);   // 160 MHz; AHB 80; every APB 40
+        switch(3);
+    }
+    #[cfg(path = "vos0byp")]
+    {
+        supply(0x01);
+        vos(3);
+        w(ACR, 0x34);
+        while r(ACR) & 0xF != 4 {}
+        pll(60, 0x48, 0x440, 0x40);   // 480 MHz; AHB 240; every APB 120
+        switch(3);
+    }
+    #[cfg(path = "bdcrbyte")]
+    {
+        write_volatile((BDCR + 1) as *mut u8, 0x80);
+    }
+    #[cfg(path = "noclock")]
+    {
+        supply(0x02);
+        vos(3);
+        w(ACR, 0x34);
+        while r(ACR) & 0xF != 4 {}
+        pllp(25, 2, 0x48, 0x440, 0x40);   // a 400 MHz VCO, DIVP1 = 2 (/3): no frequency rule
+        switch(3);
+        w(D3CR, 1 << 14);
+    }
+    #[cfg(path = "nopwr")]
+    {
+        w(ACR, 0x01);
+        while r(ACR) & 0xF != 1 {}
+        pll(50, 0x08, 0x440, 0x40);   // 400 MHz; AXI 200
+        switch(3);
     }
     #[cfg(path = "notjudged")]
     {
