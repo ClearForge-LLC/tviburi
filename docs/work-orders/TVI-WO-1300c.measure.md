@@ -59,12 +59,12 @@ The build deletes two copies and their subscriptions, and adds one public `sys_c
 | Run | What | How |
 |---|---|---|
 | **M1** | The shadow: at each use of a kernel-clock frequency, one log line under no peripheral's name carrying four answers, and the work order's (2) and (3) verdicts on each PLL the source reaches. The four answers: the copy the guard uses today; the other two copies' arithmetic applied to the same source (marked "applied" where that copy has no such source); the RCC guard's `KernelHz` (gated, what the build would use); and its arithmetic ungated. A line is printed only when its payload changes, with the count of the last. | `h/Meas1300c.cs` and `h/instrument.py`, applied to a scratch export of `main` `189214b` (`src-meas`), never to the branch. The USART and ADC copies are ported verbatim and checked against the guard's own answer at every use (`PORT-MISMATCH`: never seen). The I2C use is wrapped at its one `KernelHz` call. |
-| **C** | Every case of `tests/1300/rcc.sh` (68), `tests/1305/usart.sh` (38), `tests/1306/i2c.sh` (47) and `tests/1307/adc.sh` (46) | each suite's `SRC` argument on `src-meas` (`h/suites.sh`); `h/analyse.py` |
+| **C** | **Every committed case** (378), in two passes. **First:** `tests/1300/rcc.sh` (68), `tests/1305/usart.sh` (38), `tests/1306/i2c.sh` (47), `tests/1307/adc.sh` (46). **Second,** with the flash guard shadowed too (the fourth copy, §2.1): those four again, `tests/1301/gpio.sh` (51), `tests/1302/timer.sh` (37), `tests/1303/dma.sh` (57), `tests/1304/flash.sh` (37), and `tests/spike.sh`'s own and adversarial cases (36) | each suite's `SRC` argument on `src-meas` (`h/suites.sh`, `h/suites2.sh`); `h/analyse.py` |
 | **R** | The 14 generated boots, ArduPilot's fixture (5 s) and the armed run (13 s), on `main` and on `src-meas`, every guard recorded | `h/loop.sh`, `h/replay-m.sh` (the committed `tests/1301/replay-1301.sh` plus `1305a`'s `LOGP`/`RUNFOR`/`EXTRA` knobs) over `1305`'s captures (read-only). The armed run: `1305`'s capture with its injection (`EXTRA='include @/inj/inject.resc;'`), `ACCEPT_USART_DMA="usart1:41"` (p604) and `ACCEPT_EXTERNAL="PB6:up PB7:up"`, as `1305`/`1306a` ran it. `h/ident.py` compares the two trees' consoles with the shadow's lines removed; `h/mav.py` (`1305`'s, also reading DMA-written `TDR` bytes) reads the arming. |
 | **RM** | RM0433 Rev 9 pp. 346–347, 401–404, 406–407 and 409–410; DS12117 Rev 10 Tables 39, 40, 136 and 137 | `tests/1300/rmpage.sh` on the held text; p346–347 rendered (`gs` in the image, `rm/p001.png`) for Figure 47's footnote, which the text layer garbles |
 | **S** | The shard projection | `tools/tviburi-route plan` built from this tree, on `main`'s `times.tsv`, cases and mutants; then with this WO's projected items added at their family's median weight (`h/proj.sh`) |
 
-**The shadow changes nothing:** all 16 replays (and the armed run without the receive DMA) are line-for-line identical on `main` and `src-meas` once the shadow's lines are removed. The armed run arms at 9.332 s on both, as `1306a` measured. 197 of the 199 cases passed on `src-meas`. The other two, `rcc-adc3` and `adc-overwrite`, lost their end records to the teardown race at load 12; each passed twice more on each tree.
+**The shadow changes nothing:** all 16 replays (and, in the first pass, the armed run without the receive DMA) are line-for-line identical on `main` and `src-meas` once the shadow's lines are removed. The armed run arms at 9.332 s on both, as `1306a` measured. Every case passed on `src-meas` except five that lost their end records to the teardown race at load 10–19: `rcc-adc3` and `adc-overwrite` (first pass), `dma-offset`, `gpio-packageinput` and `gpio-bsrr` (second). Each was rerun on both trees and passed.
 
 ## 2. Results
 
@@ -86,12 +86,23 @@ The build deletes two copies and their subscriptions, and adds one public `sys_c
 | **Ranges** | ref 1–16 MHz (integer `in / DIVM`), VCO by `VCOSEL` | ref 1–16 MHz, VCO by `VCOSEL` | the same, and `DIVN` ≥ 3, which is dead (ref ≤ 16 MHz × 3 < 150 MHz) |
 | **"No rule" reasons** | selector `pll3_q_ck`, `csi_ker_ck`, `lse_ck`; `sys_ck` not HSI/PLL1; reference not HSI/HSE or `DIVM` = 0; `pllUntrusted`; out of range | `ADCSEL` 11; `per_ck` with `CKPERSEL` 11; `PRESC` > 1011; `sys_ck` not HSI/PLL1; reference not HSI/HSE; `pllUntrusted`; out of range | the query (not enabled, mux waiting, source stopped, peripheral not in `Clocked`); `SWS` > 011; HSE with no `hseFrequency`; `lse_ck`, `I2S_CKIN`; no reference or out of range |
 
+**A fourth copy, found in this measurement:** the flash guard's `Clock()`/`Pll1` (`GuardedSTM32H7_Flash.cs` L474–531), for `rcc_aclk` against `FLASH_ACR` (`1304`).
+- integer Hz;
+- `sys_ck` from the HSI, CSI, HSE or PLL1's P;
+- PLL1 from the **stock read-back** of `PLL1DIVR`, with `FRACN1` when `PLL1FRACEN` reads 1 (a stock tag, so never);
+- **no reference range, no VCO range, no `pllUntrusted`**;
+- `DIVM1` = 0 or `PLLSRC` 11 gives none.
+
+It runs at every RCC write (`Written`) and every flash program. With none, it refuses: "the AXI clock cannot be computed" (L388–391, L430–433). The flash guard is outside this work order's fence ("every other guard"), but the acceptance says "no guard but the RCC guard reads an `RCC_PLL*` register or holds a PLL rule". Q9.
+
+**`pll3_q_ck` on a USART:** the USART copy refuses it; the RCC guard computes it; the allow-list permits `USART16SEL`/`USART234578SEL` = 010. No firmware or case selects it. The work order's NOT list keeps it "no rule", so the build carves it out of the RCC guard's answer for the USARTs (Q10).
+
 **A source one copy refused and another computed** (the union's names): the CSI as a kernel clock, as `sys_ck` and as a PLL reference (RCC only); the HSE as `sys_ck` (RCC only); PLL3 (ADC and RCC); `per_ck` (ADC and RCC, by different inputs); a `PLLnDIVR` write the stock model did not keep (RCC only); the ports `usart6`, `uart4`, `uart5`, `uart7`, `uart8` (USART only); a clock that is not running (USART and ADC only, ungated).
 
 ### 2.2 Every disagreement, by case
 
 **Frequencies the replays reach** (14 generated boots, the fixture, the armed run): **no disagreement.** Every use gives the same number from every copy that has the source, and the same frame time to the nanosecond:
-- generated: `usart1`–`3` on `rcc_pclk1`/`2` at 64 MHz (from the HSI, or PLL1 on the HSE on `hse-crystal-16`, `hse-external-8`, `sentinel-02-bench-hse8`); the `i2c1` NACKs at 64 MHz; `d1-drv8876`'s ADC3 on `CKMODE` = 11, `adc_sclk`, 8 MHz;
+- generated: `usart1`–`3` on `rcc_pclk1`/`2` at 64 MHz (from the HSI, or PLL1 on the HSE on `hse-crystal-16` and `hse-external-8`; `sentinel-02-bench` and `-bench-hse8` reach no frequency); the `i2c1` NACKs at 64 MHz; `d1-drv8876`'s ADC3 on `CKMODE` = 11, `adc_sclk`, 8 MHz;
 - ArduPilot: `usart1`–`3` on `pll2_q_ck` at 72 MHz; ADC1 and ADC3 on `pll3_r_ck` (30 MHz, f_ADC 15 MHz on rev V); the `i2c1`/`i2c2` NACKs on `pll3_r_ck` at 30 MHz.
 No use on a port outside `usart1`–`3`. No `PLLnDIVR` write the stock model did not keep. Every value is a whole number of Hz at every step, so the unit never shows.
 
@@ -105,15 +116,17 @@ No use on a port outside `usart1`–`3`. No `PLLnDIVR` write the stock model did
 | `usart-idlenone`, path 7 | PLL1 after `DIVP1` = 2 (÷3), which the stock model ignored | no rule (`pllUntrusted`) | 86 MHz (258 / 3) | none, if (3)'s `DIVP1` rule lands; the record's reason text changes |
 | `usart-idlenone`, path 4 | `pll2_q_ck` after `DIVN2` = 359, kept by the stock model as 103 | no rule (`pllUntrusted`) | 72 MHz, from the write (silicon's 9 bits hold 359) | by Q2 below |
 | `usart-idlenone`, paths 3, 5, 6 | a CSI reference (125 kHz); a 6 MHz VCO; a 500 MHz VCO on VCOL | no rule | no rule | **reason text only**, which the case checks word for word |
-| `i2c-nackpll` (`1306a`) | `i2c1` on `pll3_r_ck` after `DIVN3` = 811, kept by the stock model as 555 | ADC copy: no rule; **the I2C guard uses the RCC guard's: 30 MHz** | 30 MHz | **under (2) as written ("`pllUntrusted`'s rule, kept once"), this I2C case loses its NACK**: a `TVI-I2C-NACK` refusal where it now NACKs at 2.567 µs per SCL period. The I2C cases are fenced to pass unchanged. Q2. |
+| `i2c-nackpll` (`1306a`) | `i2c1` on `pll3_r_ck` after `DIVN3` = 299, kept by the stock model as 43 | ADC copy: no rule; **the I2C guard uses the RCC guard's: 30 MHz** | 30 MHz | **under (2) as written ("`pllUntrusted`'s rule, kept once"), this I2C case loses its NACK**: a `TVI-I2C-NACK` refusal where it now NACKs at 2.567 µs per SCL period. The I2C cases are fenced to pass unchanged. Q2. |
 | `adc-kernel`, `-fields`, `-read`, `-recorded`, `-width` (`1307`) | `State()` in a record's `state`, with PLL2 off (`ADCSEL` 00, reset values) | f_ADC 64.5 MHz (16.125 MHz in `kernel`, `PRESC` /4) | none: PLL2 is not running | **each record's `state` reads `f_ADC none`.** It is truer (silicon has no clock there). Whether the cases check that text is for the build to see. Q4 |
+| `rcc-gen-hc16` (`1300b`) | the flash guard's AXI clock, PLL1 from an 8 MHz HSE ÷ 5 at ×80: a 128 MHz VCO, outside every range | flash: 32 MHz | none | if the flash guard asked the RCC guard: "the AXI clock cannot be computed", a new record (Q9) |
+| `usart-idlenone`, paths 6 and 7 | the flash guard's AXI clock on the same PLL1 | flash: 125 MHz (the 500 MHz VCO on VCOL); 129 MHz (`DIVP1` read back as 1, the write ignored) | none; 86 MHz (none under (3)) | the same (Q9); `idlenone` runs recorded |
 
-No other use in any case disagrees. Every `ADCAL`, `ADEN`, `ADSTART` and rate-check use agrees, and so does every USART start and byte timed on a running clock.
+The second pass adds no other disagreement. GPIO and timer cases reach no frequency, and the DMA and `spike.sh` cases (`ardupilot`, `generated` among them) agree on every use. Every `ADCAL`, `ADEN`, `ADSTART` and rate-check use agrees, and so does every USART start and byte timed on a running clock. **No ADC case reads a record's `state`**, so the five `State()` cases keep passing; only their record text moves. On the 16 replays, the flash guard's AXI clock equals the RCC guard's at every use.
 
 ### 2.3 What RM0433 says for (3), and who sets it otherwise
 
 - **`PLLxRGE`** (pp. 401–402): 00 1–2 MHz, 01 2–4, 10 4–8, 11 8–16; "must be set according to the reference input frequency" (p347). The edges 2, 4 and 8 MHz sit in two ranges each; p347 says only "if the above rules are not respected, the PLL output frequency is not guaranteed".
-- **The VCO choice** (p346, and Figure 47 rendered): VCOH takes "2 to 16 MHz" and gives 192–960 MHz; VCOL takes "1 to 2 MHz" and gives 150–420 MHz. `PLLxVCOSEL` = 1 routes the reference into VCOL's "1 to 2 MHz" input. p347: "if the frequency of the reference clock is lower or equal to 2 MHz, then VCOL must be selected, otherwise VCOH must be chosen". DS12117 Rev 10 agrees on the input: medium VCO `fPLL_IN` 1–2 MHz (Table 40 p131, Table 137 p235), wide 2–16 MHz. It gives the wide VCO's output as 192–836 MHz in Table 39 (p130) and 192–960 MHz in Table 136 (p234), a revision split that no guard models today (a row, not this WO).
+- **The VCO choice** (p346, and Figure 47 rendered): VCOH takes "2 to 16 MHz" and gives 192–960 MHz; VCOL takes "1 to 2 MHz" and gives 150–420 MHz. `PLLxVCOSEL` = 1 routes the reference into VCOL's "1 to 2 MHz" input. p347: "if the frequency of the reference clock is lower or equal to 2 MHz, then VCOL must be selected, otherwise VCOH must be chosen". DS12117 Rev 10 agrees on the input: medium VCO `fPLL_IN` 1–2 MHz (Table 40, Table 137), wide 2–16 MHz. It gives the wide VCO's output as 192–836 MHz in Table 39 and 192–960 MHz in Table 136 (pages p130–131 and p234–235 from the text layer's footers, not rendered), a revision split that no guard models today (a row, not this WO).
 - **`DIVP1`** (p404): "odd division factors are not allowed"; `0000010` "Not allowed"; but `0000000`: "pll1_p_ck = vco1_ck". Figure 47's footnote (p346, rendered): "DIVPx = **2**,4,6,…128 when x = 1, and DIVPx = **1**,2,3,…128 for x = 2 or 3". Two statements to one: `DIVP1` = 0 is not allowed.
 - **`DIVR1`** = 0 is "Not allowed" (p403). No kernel-clock mux in the query takes `pll1_r_ck`, so it never reaches `KernelHz`: no rule is needed, and none is added.
 - **`DIVN`** < 3: "wrong configurations" (p404, p407); already unreachable through the VCO range.
@@ -125,10 +138,11 @@ No other use in any case disagrees. Every `ADCAL`, `ADEN`, `ADSTART` and rate-ch
 | **ArduPilot, fixture and armed run** (`PLLCFGR` = `0x01BF0FFD`, written once) | PLL2 (USARTs, 72 MHz) | 8 MHz | 11 | **1 (VCOL)** | **VCOL with an 8 MHz reference: against p346, p347 and DS12117.** The VCO (360 MHz) is inside VCOL's output range, so every copy computes today |
 | | PLL3 (ADCs, I2C, 30 MHz) | 16 MHz | 11 | **1 (VCOL)** | the same, VCO 240 MHz |
 | | PLL1 | 16 MHz | 11 | 0 | allowed; `DIVP1` = 1 (÷2) |
-| Generated, 11 boards (HSI ÷ 5) | PLL1 | 12.8 MHz | 11 | 0 | allowed |
+| Generated, 9 boards (HSI ÷ 5; `d1-drv8876` and `driver-judges-nothing` write no PLL register) | PLL1 | 12.8 MHz | 11 | 0 | allowed |
 | `hse-crystal-16` | PLL1 | 3.2 MHz | 01 | 0 | allowed |
 | `hse-external-8`, `sentinel-02-bench-hse8` | PLL1 | 1.6 MHz | 00 | 1 | allowed |
 | `usart-idlekernel` (`1305a`) | PLL2 (ArduPilot's 72 MHz) | 8 MHz | **00 (reset)** | 0 | **`RGE` wrong under any reading**: the case writes `PLLCKSELR` and `PLL2DIVR` but leaves `PLLCFGR` at reset |
+| 16 flash cases (`1304`: `alias`, `clockfirst`, `d1cpre`, `edge`, `lowerfast`, `order`, `over225`, `prescaler`, `vos2`, `vos3`, `vosunknown`, `vosunknownlow`, `worse`, `wrhlow`, `wrhpg`, `wrhrcc`) | PLL1 (the AXI clock) | 16 MHz | **00 (reset)** | 0 | **`RGE` wrong under any reading**, as `idlekernel`; reached only if the flash guard asks the RCC guard (Q9) |
 | 19 ADC uses (`1307`'s cases), `i2c-nackclock`, `i2c-nackpll`, `usart-idlenone` | PLL2 or PLL3 at reset `DIVM` = 32 | 2 MHz | 00 | 0 | allowed by p346 (VCOH from 2 MHz) and `RGE` 00 (1–2 MHz, inclusive); **forbidden by p347** (≤ 2 MHz must be VCOL) |
 | `usart-idlenone` path 7 | PLL1 | 2 MHz | 00 | 0 | `DIVP1` = 2, not allowed (already no rule today) |
 
@@ -136,11 +150,11 @@ No other use in any case disagrees. Every `ADCAL`, `ADEN`, `ADSTART` and rate-ch
 
 ### 2.4 Memory
 
-Not measured: the build does not exist yet. Prediction P5 stands: the build compiles fewer lines (two copies, two subscriptions and their constants go; a `sys_ck`/`rcc_hclk` answer and the (3) checks come into the RCC guard), so it should land within ±5 MiB of `main` at the median. It will be measured on the branch with `tests/1301/ci-memory.sh`, eleven boots a side, before READY, and judged in CI.
+**Predicted, not measured:** the build does not exist yet. Prediction P5 stands: the build compiles fewer lines (two copies, two subscriptions and their constants go; a `sys_ck`/`rcc_hclk` answer and the (3) checks come into the RCC guard), so it should land within ±5 MiB of `main` at the median. It will be measured on the branch with `tests/1301/ci-memory.sh`, eleven boots a side, before READY, and judged in CI.
 
 ### 2.5 The shard projection
 
-`main`'s ten shards, by `tools/tviburi-route plan` on `main`'s `times.tsv`: 620 s each at the reference, so **15.8 min at 1.53** for the longest. With this WO's projected items (10 cases and 14 mutants at their families' medians, 14 USART rows retired), each shard holds 625 s: **15.9 min at 1.53**. No eleventh shard.
+`main`'s ten shards, by `tools/tviburi-route plan` on `main`'s `times.tsv`: 620 s each at the reference, so **15.8 min at 1.53** for the longest (`1306a`'s CI observed 16.9 min for its longest shard, already over its plan). With this WO's projected items (10 cases and 14 mutants at their families' medians, 14 USART rows retired), each shard holds 625 s: **15.9 min at 1.53**. No eleventh shard.
 
 ### 2.6 Against the predictions
 
@@ -158,26 +172,36 @@ Not measured: the build does not exist yet. Prediction P5 stands: the build comp
 Each is a §7 condition or a choice the work order leaves open. My recommendation comes first.
 
 - **Q1, ArduPilot's VCO choice (§7: "a committed firmware sets one").** ArduPilot puts PLL2 and PLL3 on VCOL (`VCOSEL` = 1) with 8 and 16 MHz references. A (3) rule on the VCO choice would make its USARTs, ADCs and I2C NACKs "no rule": `TVI-USART-IDLE`, `TVI-ADC-RATE` and `TVI-I2C-NACK` records on the fixture and the armed run, and in enforcing mode a refusal at the first byte.
-  - **(a), recommended:** the VCO choice is checked by the VCO's output against `VCOSEL`'s range (today's rule, kept). The reference-input half (p346, p347, DS12117 Tables 40 and 137) becomes `acknowledged by name` with a bench row: ArduPilot's `PLLCFGR` on a NUCLEO-H753ZI, PLL2's Q output measured on MCO2.
+  - **(c), recommended, on the `1307` Q7 precedent (ArduPilot's BOOST):** enforce p346's input ranges (VCOH 2–16 MHz, VCOL 1–2 MHz), and acknowledge by name only VCOL above 2 MHz with the VCO inside VCOL's output range (ChibiOS's choice, below). A bench row goes with it: ArduPilot's `PLLCFGR` on a NUCLEO-H753ZI, PLL2's Q output measured on MCO2. Unlike (a), this still refuses VCOH below 2 MHz.
+  - (a): the VCO choice is checked only by the VCO's output against `VCOSEL`'s range (today's rule, kept). The reference-input half (p346, p347, DS12117 Tables 40 and 137) is acknowledged by name in full.
   - (b): the input half is enforced as written. The armed run stops being a pass on every guard that times from PLL2 or PLL3.
-  - A further point, from memory and not read: ChibiOS chooses `VCOSEL` by the VCO's output frequency, not its input.
-- **Q2, the divider rule against a fenced I2C case (§7: "a committed case's computed time would change").** `i2c-nackpll` writes `DIVN3` = 811 once; the stock model keeps 555. Silicon holds 811, and the RCC guard computes from it (30 MHz). `usart-idlenone` path 4 is the same input on PLL2, and the USART copy answers "no rule" there.
+  - **Why ArduPilot does it, read:** ChibiOS chooses `VCOSEL` by the VCO's output alone: `hal_lld_type1.h` L1834–1837 (and L1813, L1855 for PLL1 and PLL3), "`#if (STM32_PLL2_VCO_CK > STM32_PLLVCO_THRESHOLD)` → 0, else `RCC_PLLCFGR_PLL2VCOSEL`", with the threshold 420 MHz (L167). So every ChibiOS H7 build whose VCO is at most 420 MHz selects VCOL, whatever its reference. I read this in an image layer on Furnace with `/opt/ardupilot` (overlay `68211d1c…`, `hal_lld.h` sha256 `4bfcffc2…`) and have not tied that layer to the pinned digest `e1809b90…`.
+- **Q2, the divider rule against a fenced I2C case (§7: "a committed case's computed time would change").** `i2c-nackpll` writes `DIVN3` = 299 once (`PLL3DIVR` `0x1301032B`); the stock model keeps 43. Silicon holds 811, and the RCC guard computes from it (30 MHz). `usart-idlenone` path 4 is the same input on PLL2, and the USART copy answers "no rule" there.
   - **(B′), recommended:** the guard's `divr` (the write it passed) is silicon's value. "No rule" applies from the **next** `PLLnDIVR` write after one the stock model did not keep, until a machine reset, because that next write may carry the stock's narrowed bits back. That is `pllUntrusted`'s reason (`1305a` F2), applied where it bites. It also applies to a write passed in recorded mode after `TVI-RCC-PLL` fired, which silicon ignores. Changes: `idlenone` path 4 (no rule → 72 MHz; one record fewer); `nackpll` unchanged.
-  - (A), (2) as written: "no rule" from the unkept write itself. Changes `i2c-nackpll`, outside the fence.
+  - (A): "no rule" from the unkept write itself, as the USART and ADC copies do today. Changes `i2c-nackpll`, outside the fence. (The WO's "where that write's value cannot be known as silicon holds it" reads closer to B′.)
   - (C): B′, and the RCC guard serves `PLLnDIVR` reads from `divr`, so a read-modify-write is right. This is the roadmap's other half of the `1300a` row; it changes `rcc-divr2rmw` and is not in this work order.
 - **Q3, the reset edge and `RGE`.**
   - **Recommended:** the edges are inclusive. A reference on an edge is allowed in either range it touches (2 MHz with `RGE` 00 or 01; 8 MHz with 10 or 11). `VCOSEL` = 0 at exactly 2 MHz is allowed by p346; p347's "≤ 2 MHz must be VCOL" is not enforced at its edge. Otherwise every committed case that runs a PLL from reset values (the ADC cases, `i2c-nackclock`, `i2c-nackpll`) would lose its clock: the reset state would be illegal.
-  - **`usart-idlekernel` leaves `RGE` at 00 with an 8 MHz reference,** which no reading allows. I ask leave to add ArduPilot's own `PLLCFGR` (`0x01BF0FFD`) to that case's setup, before PLL2 starts. That is ArduPilot's value, so the case's computed time is unchanged. But under Q1 (b) it would not be.
+  - **`usart-idlekernel` leaves `RGE` at 00 with an 8 MHz reference,** which no reading allows. I ask leave to set `PLL2RGE` = 11 alone in that case's setup, before PLL2 starts (`PLLCFGR` `0x01FF00C0`). That is legal on every page and does not depend on Q1. The case's computed time is unchanged.
 - **Q4, the gate (the ADC `state` text).** With one rule, an ADC record's `state` says `f_ADC none` when the clock does not run.
   - **Recommended:** accept it: five `1307` cases' record text changes, and the build adapts any check that reads it.
   - The other option is an ungated answer for `State()` only, which would be a second rule.
 - **Q5, `CKMODE` ≠ 00** (`d1-drv8876`, generated, reaches it).
   - **Recommended:** the RCC guard gains one public read-only answer for a named bus clock, `BusHz("sys_ck" | "rcc_hclk")`, beside `KernelHz`, from the same `SourceHz`. That is a second public method on the RCC guard, so it needs the ruling.
 - **Q6, the union's two refusals:**
-  - **`usart-idlenorule`** plants `csi_ker_ck` as "no rule"; the union computes it (4 MHz). Recommended: re-plant it on a source that stays "no rule": a VCO outside its range from planted firmware. Its record and page are unchanged.
+  - **`usart-idlenorule`** plants `csi_ker_ck` as "no rule"; the union computes it (4 MHz). Recommended: re-plant it on a source that stays "no rule" (a VCO outside its range, from planted firmware), with its check's `bit` text moved to that source; the rule, kind and page are unchanged.
   - **The ports outside the query** (`usart6`, `uart4/5/7/8`): their enables already refuse at the RCC (`Zero` only), so only a recorded run reaches them. No firmware or case does. Recommended: they answer "no rule" (the RCC guard's), and the query is not widened.
 - **Q7, `DIVP1` = 0.** p404's table gives it a frequency; its note and Figure 47 forbid it. Recommended: not allowed, "no rule", citing both. No firmware sets it.
 - **Q8, the fence:**
   - **(i)** The 14 mutant rows `US52`–`US59` and `US63`–`US68` test the USART copy, which this WO deletes. Recommended: retire them, with their rules' rows re-made on the RCC guard.
   - **(ii)** The four `LPEN` rows' ledger `detail` resolves to `TVI-WO-1300.rm0433.md` §8 A6, which does not list them. Making it true needs one line in that document, or a second reference form in `tools/tviburi-release`. Both are outside the fence. Recommended: one line appended to §8 A6 naming the four bits and `1300b`.
   - **(iii)** "In `fields.py`'s words" for the RCC rows: the RCC's generator is `tests/1300/allowlist.py`, and I read the WO as meaning it.
+- **Q9, the fourth copy (the flash guard), against the fence.**
+  - **Recommended:** grant `model/GuardedSTM32H7_Flash.cs` and `tests/1304/` to this work order. The flash guard asks the RCC guard's bus-clock answer (Q5's `BusHz("rcc_hclk")`, which is `rcc_aclk`, p395), and its `Pll1` and `Div` are deleted.
+  - What that changes:
+    - `rcc-gen-hc16` gains a flash record, an out-of-range VCO now "cannot be computed";
+    - the 16 `1304` cases that leave `PLL1RGE` at reset need `RGE` set, as `idlekernel` (Q3);
+    - the replays are unchanged: the flash guard and the RCC guard agree on all 16.
+  - (b): leave the flash guard and narrow the acceptance grep to the USART and ADC guards. The fourth copy stays, with no range check: a row for the next RCC work order.
+- **Q10, `pll3_q_ck` for the USARTs.** The work order's NOT list keeps it "no rule"; the build carves it out of the RCC guard's answer for `USART16SEL`/`USART234578SEL` = 010, citing the NOT list. No question unless the ruling says otherwise.
+
