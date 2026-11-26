@@ -10,7 +10,7 @@ set -euo pipefail
 
 here=$(cd "$(dirname "$0")/../.." && pwd)
 IMAGE=$(sed -n 's/^IMAGE=//p' "$here/tests/spike.sh")
-CASES="order clockfirst lowerfast prescaler alias vosunknown vosunknownlow vos3 over225 edge vos2 d1cpre wrhrcc lockedcr lockedsame locking badkey keytwice keymid keyhalf wrhlow wrhpg worse ap gen optsr optsrnone optwrite bank1 readreg fields ledger registrations recorded reset config regen"
+CASES="order clockfirst lowerfast prescaler alias divp1zero divp1odd vosunknown vosunknownlow vos3 over225 edge vos2 d1cpre wrhrcc lockedcr lockedsame locking badkey keytwice keymid keyhalf wrhlow wrhpg worse ap gen optsr optsrnone optwrite bank1 readreg fields ledger registrations recorded reset config regen"
 GUARDS="spi1 rcc gpioPortA gpioPortB gpioPortC gpioPortD gpioPortE gpioPortF gpioPortG gpioPortH gpioPortI gpioPortJ gpioPortK timer1 timer8 dma1 dma2 flashController usart1 usart2 usart3 uart4 uart5 usart6 uart7 uart8 i2c1 i2c2 i2c3 adcM1S2 adc3"
 # The planted firmware's paths (firmware/flash.rs): every case but optsrnone (optsr's firmware) and the monitor-driven ones.
 PATHS=$(for c in $CASES; do case $c in optsrnone|fields|ledger|registrations|recorded|reset|config|regen) ;; *) printf '"%s",' "$c" ;; esac; done | sed 's/,$//')
@@ -86,7 +86,7 @@ hse16='s/^    hseFrequency: 8000000$/    hseFrequency: 16000000/'
 
 for t in ${TVIBURI_TESTS:-$CASES}; do
   case $t in
-  order|clockfirst|lowerfast|prescaler|alias|vos3|wrhlow|wrhpg|edge|vos2|d1cpre|wrhrcc)
+  order|clockfirst|lowerfast|prescaler|alias|vos3|wrhlow|wrhpg|edge|vos2|d1cpre|wrhrcc|divp1zero|divp1odd)
     PWR=1 run_case "$t" "$t" 'emulation RunFor "0.001"' "${marks[@]}"
     case $t in
     order) check "order: VOS1, LATENCY raised before the clock to 200 MHz, the clock lowered before LATENCY (p160-161): passes; ACR reads 0" \
@@ -96,7 +96,7 @@ for t in ${TVIBURI_TESTS:-$CASES}; do
     lowerfast) check "lowerfast: LATENCY lowered to 1 under 200 MHz at VOS1 refuses TVI-FLASH-WAIT at the ACR write" \
       "refuses lowerfast TVI-FLASH-WAIT predicted-fault 'r[\"access\"][\"offset\"] == \"0x0\" and r[\"bit\"] == \"LATENCY = 1\" and \"at the FLASH_ACR write\" in r[\"condition\"]'" ;;
     prescaler) check "prescaler: the clock raised from 100 to 200 MHz by HPRE alone, with LATENCY 1, refuses TVI-FLASH-WAIT at the RCC_D1CFGR write (p395)" \
-      "refuses prescaler TVI-FLASH-WAIT predicted-fault 'r[\"access\"][\"offset\"] == \"0x58024418\" and \"HPRE /2\" in r[\"condition\"]'" ;;
+      "refuses prescaler TVI-FLASH-WAIT predicted-fault 'r[\"access\"][\"offset\"] == \"0x58024418\" and \"HPRE = 1000\" in r[\"condition\"]'" ;;
     alias) check "alias: LATENCY lowered through ACR's bank 2 alias 0x100 (p201) refuses TVI-FLASH-WAIT there" \
       "refuses alias TVI-FLASH-WAIT predicted-fault 'r[\"access\"][\"offset\"] == \"0x100\" and r[\"bit\"] == \"LATENCY = 1\"'" ;;
     vos3) check "vos3: VOS left at Scale 3, LATENCY 2 at 200 MHz refuses TVI-FLASH-WAIT: Table 17 needs 4 at VOS3" \
@@ -110,7 +110,9 @@ for t in ${TVIBURI_TESTS:-$CASES}; do
     vos2) check "vos2: LATENCY 1 at 120 MHz at VOS2 refuses TVI-FLASH-WAIT: Table 17 needs 2 there (VOS1 would need 1)" \
       "refuses vos2 TVI-FLASH-WAIT predicted-fault '\"120000000 Hz at VOS2: Table 17 needs 2\" in r[\"condition\"]'" ;;
     d1cpre) check "d1cpre: the clock raised from 100 to 200 MHz by D1CPRE alone refuses TVI-FLASH-WAIT at the RCC_D1CFGR write (p394)" \
-      "refuses d1cpre TVI-FLASH-WAIT predicted-fault 'r[\"access\"][\"offset\"] == \"0x58024418\" and \"D1CPRE /1\" in r[\"condition\"]'" ;;
+      "refuses d1cpre TVI-FLASH-WAIT predicted-fault 'r[\"access\"][\"offset\"] == \"0x58024418\" and \"D1CPRE = 0000\" in r[\"condition\"]'" ;;
+    divp1zero|divp1odd) check "$t: sys_ck moved to PLL1 with DIVP1 = $([ $t = divp1zero ] && echo '0 (/1)' || echo '2 (/3)'): the RCC guard's BusHz has no frequency (\"DIVPx = 2,4,6,...128 when x = 1\", Figure 47 p346; p404; TVI-WO-1300c Q7), so TVI-FLASH-WAIT, unmodeled, at the RCC_CFGR write: the AXI clock cannot be computed" \
+      "refuses $t TVI-FLASH-WAIT unmodeled 'r[\"access\"][\"offset\"] == \"0x58024410\" and \"cannot be computed\" in r[\"condition\"] and \"DIVP1 = $([ $t = divp1zero ] && echo 0 || echo 2) \" in r[\"condition\"] and \"Figure 47 p346\" in r[\"condition\"]'" ;;
     wrhrcc) check "wrhrcc: with PG2 set and WRHIGHFREQ 01, the clock raised to 200 MHz refuses TVI-FLASH-PROG at the RCC_CFGR write" \
       "refuses wrhrcc TVI-FLASH-PROG predicted-fault 'r[\"access\"][\"offset\"] == \"0x58024410\" and \"while PG is set\" in r[\"condition\"]'" ;;
     esac ;;

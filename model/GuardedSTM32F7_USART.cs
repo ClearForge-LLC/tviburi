@@ -89,34 +89,6 @@ namespace Antmicro.Renode.Peripherals.Tviburi
             inner = new STM32F7_USART(machine, frequency, lowPowerMode);
             records = new Records(machine, this, nameof(GuardedSTM32F7_USART), mode);
             inner.IRQ.AddStateChangedHook(v => { innerIrq = v; UpdateIrq(); });
-            machine.PeripheralsChanged += FindRcc;
-            if(machine is Machine m)
-            {
-                // The PLL registers return to their reset values (pp. 400, 403, 406, all kept by the stock model) with the RCC,
-                // at a machine reset; never at this port's own reset, which the RCC's USARTxRST runs (ArduPilot resets usart1
-                // after setting PLL2 up).
-                m.MachineReset += _ => { pllUntrusted = new bool[3]; pllcfgr = PllcfgrReset; };
-            }
-        }
-
-        // The RCC guard's existing event `Written` (TVI-WO-1304), subscribed when the RCC guard appears at platform load, before
-        // any monitor or guest write. The stock model narrows PLL2DIVR (DIVN2 to 8 bits, DIVQ2 to 6; p407 has 9 and 7) and
-        // ignores some PLL1DIVR writes (an odd DIVP1, p404); after a write it does not keep, a read-modify-write writes the
-        // wrong bits back, and no copy here could say what silicon holds. `pllUntrusted` marks it, until the machine resets.
-        private void FindRcc(IMachine m, PeripheralsChangedEventArgs args)
-        {
-            if(rccSeen == null && args.Peripheral is GuardedSTM32H7_RCC r)
-            {
-                rccSeen = r;
-                r.Written += (offset, value) =>
-                {
-                    if(offset == Pll1divrOffset || offset == Pll2divrOffset)
-                    {
-                        pllUntrusted[(offset - Pll1divrOffset) / 8 + 1] |= r.ReadDoubleWord(offset) != value;
-                    }
-                    pllcfgr = offset == PllcfgrOffset ? value : pllcfgr;
-                };
-            }
         }
 
         public long Size => 0x400;
@@ -557,81 +529,17 @@ namespace Antmicro.Renode.Peripherals.Tviburi
             return true;
         }
 
-        // The port's kernel clock in Hz, from the RCC guard's registers (as the flash guard reads them); null, with the reason,
-        // where this guard has no rule. Called only while the RCC guard's query says the clock runs (the start's
-        // TVI-USART-KERNEL, and Clocked() for a byte).
-        // Rules (TVI-WO-1305a.measure.md §2; ruled 2026-11-25T00:00Z and 01:12Z):
-        //   hsi_ker_ck = 64 MHz >> HSIDIV (p341, p385);
-        //   rcc_pclk2 (USART1/6) or rcc_pclk1 = sys_ck / D1CPRE / HPRE / D2PPRE2 or D2PPRE1 (pp. 394-396), with sys_ck the HSI or
-        //     PLL1's P output (SWS, p393): vco1 / (DIVP1 + 1) (p404);
-        //   pll2_q_ck = vco2 / (DIVQ2 + 1) (p407);
-        //   a PLL's VCO (Vco): its reference, the HSI or the HSE at the RCC guard's HseFrequency (PLLSRC, p399, shared by the
-        //     three PLLs), over DIVMn, times DIVNn + 1 (p404, p407), FRACNn 0 (the RCC guard's allow-list).
-        // No rule: pll3_q_ck, csi_ker_ck, lse_ck, sys_ck from the CSI or the HSE directly, and a CSI reference.
-        private ulong? KernelHz(out string why)
+        // The port's kernel clock in Hz: the RCC guard's KernelHz, the overlay's one frequency rule (TVI-WO-1300c, ruled
+        // 2026-11-26T04:03Z), or null with its reason. Called while the RCC guard's query says the clock runs (the start's
+        // TVI-USART-KERNEL, and Clocked() for a byte), and at the receiver's start in recorded mode after TVI-USART-KERNEL.
+        private double? KernelHz(out string why)
         {
-            var rcc = rccSeen;
-            if(rcc == null || !host.TryGetLocalName(this, out var name))
+            if(!(host.TryGetLocalName(this, out var name) && host.TryGetByName<GuardedSTM32H7_RCC>(RccName, out var rcc)))
             {
                 why = "no RCC guard on this platform";
                 return null;
             }
-            uint R(long o) => rcc.ReadDoubleWord(o);
-            var usart16 = name == "usart1" || name == "usart6";
-            var hsi = 64000000ul >> (int)(R(0x00) >> 3 & 3);
-            var sel = R(0x54) >> (usart16 ? 3 : 0) & 7;
-            why = "RCC_D2CCIP2R." + (usart16 ? "USART16SEL" : "USART234578SEL") + " = " + Convert.ToString(sel, 2).PadLeft(3, '0') + " (" + new[] { usart16 ? "rcc_pclk2" : "rcc_pclk1", "pll2_q_ck", "pll3_q_ck", "hsi_ker_ck", "csi_ker_ck", "lse_ck", "disabled", "disabled" }[sel] + ")";
-            switch(sel)
-            {
-            case 0:
-                var sws = R(0x10) >> 3 & 7;
-                var sys = sws == 0 ? hsi : sws == 3 ? Vco(rcc, 1, hsi, ref why) / ((R(0x30) >> 9 & 0x7F) + 1) : null;
-                if(sys == null)
-                {
-                    why += sws == 3 ? "" : " with sys_ck not the HSI or PLL1 (RCC_CFGR.SWS = " + Convert.ToString(sws, 2).PadLeft(3, '0') + "): no rule";
-                    return null;
-                }
-                var d1 = R(0x18);
-                var d2 = R(0x1C);
-                var ppre = d2 >> (usart16 ? 8 : 4) & 7;   // D2PPRE2 or D2PPRE1 (p396): 0xx /1; 100-111 /2-/16
-                return sys / Div(d1 >> 8 & 0xF) / Div(d1 & 0xF) / ((ppre & 4) == 0 ? 1ul : 2ul << (int)(ppre & 3));
-            case 1:
-                return Vco(rcc, 2, hsi, ref why) / ((R(Pll2divrOffset) >> 16 & 0x7F) + 1);
-            case 3:
-                return hsi;
-            default:
-                why += ": no rule for its frequency";
-                return null;
-            }
-        }
-
-        // PLLn's VCO (n = 1, 2) in Hz, or null with the reason: its reference within 1-16 MHz and the VCO within PLLnVCOSEL's
-        // range (p404, p407: 192-960 MHz wide, 150-420 MHz medium), from the read-back while every write to RCC_PLLnDIVR read
-        // back as written (`pllUntrusted`). VCOSEL comes from the last RCC_PLLCFGR the RCC guard passed: the stock model drops
-        // PLL1VCOSEL (it reads 0; measured on hse-external-8, TVI-WO-1305a.measure.md §3).
-        private ulong? Vco(GuardedSTM32H7_RCC rcc, int n, ulong hsi, ref string why)
-        {
-            var ck = rcc.ReadDoubleWord(0x28);
-            var divm = ck >> (n == 1 ? 4 : 12) & 0x3F;
-            ulong? input = (ck & 3) == 0 ? hsi : (ck & 3) == 2 ? rcc.HseFrequency : (ulong?)null;
-            var refHz = input == null || divm == 0 ? 0 : input.Value / divm;
-            var vco = input == null || divm == 0 ? 0 : input.Value * ((rcc.ReadDoubleWord(Pll1divrOffset + 8 * (n - 1)) & 0x1FF) + 1) / divm;
-            var wide = (pllcfgr >> (n == 1 ? 1 : 5) & 1) == 0;
-            if(input != null && divm != 0 && !pllUntrusted[n] && refHz >= 1000000 && refHz <= 16000000
-                && vco >= (wide ? 192000000ul : 150000000ul) && vco <= (wide ? 960000000ul : 420000000ul))
-            {
-                return vco;
-            }
-            why += input == null || divm == 0 ? " with PLL" + n + "'s reference not the HSI or HSE through DIVM" + n + " (RCC_PLLCKSELR): no rule"
-                : pllUntrusted[n] ? " with RCC_PLL" + n + "DIVR once written with a value its read-back does not keep: no rule"
-                : " with PLL" + n + " outside its ranges (reference " + refHz + " Hz, VCO " + vco + " Hz): no rule";
-            return null;
-        }
-
-        // D1CPRE and HPRE (pp. 394-395): 0xxx /1; 1000-1011 /2-/16; 1100-1111 /64-/512.
-        private static ulong Div(uint v)
-        {
-            return (v & 8) == 0 ? 1 : (v & 7) < 4 ? 2ul << (int)(v & 7) : 64ul << (int)((v & 7) - 4);
+            return rcc.KernelHz(name, out why);
         }
 
         // Whether the port's bus and kernel clocks run now, by the RCC guard's query; true where the query has no rule (a port
@@ -820,14 +728,7 @@ namespace Antmicro.Renode.Peripherals.Tviburi
         private bool idle, innerIrq, pulsing, pulseAgain, repulse, brrHeld;
         private ulong idleGen;
         private string config;
-        private GuardedSTM32H7_RCC rccSeen;
-        private bool[] pllUntrusted = new bool[3];     // [1] PLL1DIVR, [2] PLL2DIVR: a write that did not read back as written
-        private uint pllcfgr = PllcfgrReset;
 
-        private const long PllcfgrOffset = 0x2C;       // RCC_PLLCFGR, §8.7.12 p400
-        private const uint PllcfgrReset = 0x01FF0000;  // its reset value (p400)
-        private const long Pll1divrOffset = 0x30;      // RCC_PLL1DIVR, §8.7.13 p403
-        private const long Pll2divrOffset = 0x38;      // RCC_PLL2DIVR, §8.7.15 p406
         private const uint UeRe = UeBit | ReBit;
         private const uint DmatBit = 1u << 7;
 

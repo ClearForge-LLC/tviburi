@@ -38,6 +38,9 @@
 //!                         not change").
 //!   path="worse"        - (recorded) LATENCY 1 at 200 MHz, then LATENCY 0: two would-refuses, the second a new mismatch.
 //!   path="optsr"        - OPTSR_CUR read, then its alias 0x11C: MARK_READ, MARK_READ2.
+//!   path="divp1zero"    - VOS1, LATENCY 4, PLL1 with DIVP1 = 0 (/1), then sys_ck to PLL1: the RCC guard has no frequency
+//!                         ("DIVPx = 2,4,6,...128 when x = 1", Figure 47 p346; p404): TVI-FLASH-WAIT, unmodeled, at CFGR.
+//!   path="divp1odd"     - the same with DIVP1 = 2 (/3: "odd division factors are not allowed", p404).
 //!   path="optwrite"     - FLASH_OPTKEYR written: TVI-FLASH-REG, unmodeled (option-byte programming; ruled Q3).
 //!   path="bank1"        - bank 1 unlocked, then PG1: TVI-FLASH-FIELD, unmodeled (bank 1 programming).
 //!   path="readreg"      - FLASH_PRAR_CUR1 read: TVI-FLASH-READ, unmodeled.
@@ -87,8 +90,15 @@ unsafe fn pll400(d1cfgr: u32) {
 
 // PLL1 from HSI / 4 (16 MHz) * DIVN1 / 2: sys_ck = 8 MHz * divn; then D1CFGR (D1CPRE, HPRE).
 unsafe fn pll(divn: u32, d1cfgr: u32) {
+    pll_p(divn, 1, d1cfgr);
+}
+
+// The same with DIVP1 = divp: pll1_p_ck = vco1_ck / (divp + 1) (p404). PLL1RGE = 11 for its 16 MHz reference (pp. 401-402):
+// the RCC guard has no frequency for a range left at reset (TVI-WO-1300c, ruled 2026-11-26T04:03Z Q3, Q9).
+unsafe fn pll_p(divn: u32, divp: u32, d1cfgr: u32) {
     w(RCC + 0x28, (r(RCC + 0x28) & !0x3F3) | (4 << 4));   // PLLCKSELR: PLLSRC = HSI, DIVM1 = 4 (p398-399)
-    w(RCC + 0x30, 0x0101_0000 | (1 << 9) | (divn - 1));   // PLL1DIVR: DIVP1 = 2, DIVN1 (p403)
+    w(RCC + 0x2C, 0x01FF_000C);                           // PLLCFGR: its reset value with PLL1RGE = 11, 8-16 MHz (p400-402)
+    w(RCC + 0x30, 0x0101_0000 | (divp << 9) | (divn - 1)); // PLL1DIVR: DIVP1, DIVN1 (p403-404)
     w(RCC, r(RCC) | 1 << 24);                             // PLL1ON (p385)
     while r(RCC) >> 25 & 1 == 0 {}
     w(RCC + 0x18, d1cfgr);                                // D1CFGR: D1CPRE, HPRE (p394-395)
@@ -283,6 +293,16 @@ pub unsafe extern "C" fn reset() -> ! {
         }
         #[cfg(path = "wrhpg")]
         w(CR2, 0x22);
+    }
+    #[cfg(any(path = "divp1zero", path = "divp1odd"))]
+    {
+        vos1();
+        w(ACR, 0x04);
+        #[cfg(path = "divp1zero")]
+        pll_p(25, 0, 0x8);   // a 400 MHz VCO, DIVP1 = 0 (/1), HPRE /2
+        #[cfg(path = "divp1odd")]
+        pll_p(25, 2, 0x8);   // DIVP1 = 2 (/3), a write the stock model ignores
+        switch(3);
     }
     #[cfg(path = "edge")]
     {

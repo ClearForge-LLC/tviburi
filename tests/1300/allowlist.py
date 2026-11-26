@@ -34,13 +34,7 @@ MUX_ALLOWED = {
     ('RCC_D2CCIP2R', 'USART234578SEL[2:0]'): [0, 1, 2, 3, 4, 6, 7], # F7; 101 lse_ck: not modeled
 }
 # The architect's acknowledgements (TVI-WO-1300.rm0433.md §6.1, ruled 14:35Z): field -> (allowed, A-number, behaves as)
-ACK_PLL = 'no PLL frequency is modeled beyond PLL1\'s integer one: the field sets range or mode, not whether an output runs'
 ACKED = {}
-for n in '123':
-    ACKED[('RCC_PLLCFGR', f'PLL{n}RGE[1:0]')] = (None, 1, ACK_PLL)
-    ACKED[('RCC_PLLCFGR', f'PLL{n}FRACEN')] = (None, 1, ACK_PLL)
-for f in ('PLL1VCOSEL', 'PLL3VCOSEL'):
-    ACKED[('RCC_PLLCFGR', f)] = (None, 1, ACK_PLL)
 for f in ('MCO1PRE[3:0]', 'MCO2PRE[3:0]', 'RTCPRE[5:0]'):
     ACKED[('RCC_CFGR', f)] = (None, 2, 'no MCO pin and no RTC clock are modeled; with MCOx at reset no pin is driven')
 ACKED[('RCC_CR', 'HSEBYP')] = (None, 3, 'the twin has no oscillator: bypass and crystal behave alike')
@@ -55,6 +49,42 @@ ACKED_1300B = {(reg, f): ([0, 1], 'the twin does not model CSleep: the clock run
                for reg, f in (('RCC_AHB1LPENR', 'ADC12LPEN'), ('RCC_AHB4LPENR', 'ADC3LPEN'), ('RCC_APB1LLPENR', 'USART2LPEN'), ('RCC_APB2LPENR', 'TIM1LPEN'))}
 GUARD_ANY = {('RCC_PLLCKSELR', f) for f in ('PLLSRC[1:0]', 'DIVM1[5:0]', 'DIVM2[5:0]', 'DIVM3[5:0]')} | \
     {('RCC_PLLCFGR', f'DIV{o}{n}EN') for o in 'PQR' for n in '123'}
+
+
+# TVI-WO-1300c (4), ruled 2026-11-26T04:03Z: the rows that feed the guard's KernelHz and BusHz (the overlay's one frequency rule),
+# restated with what the field does to the frequency and its page. Applied after the classification above; a row's class is kept,
+# but for RCC_PLLCFGR's RGE, VCOSEL and FRACEN, now the guard's copy served on read (they were tags reading 0, acknowledged as A1
+# "no PLL frequency is modeled beyond PLL1's integer one", no longer true).
+RULED_C = 'TVI-WO-1300c, ruled 2026-11-26T04:03Z'
+ONE_RULE = "the guard's KernelHz and BusHz (the overlay's one frequency rule; " + RULED_C + ')'
+FREQ = {
+    ('RCC_CR', 'HSIDIV[1:0]'): (None, 'the stock model (stored+callback): stored; a change reverted while PLLSRC = HSI with a PLL on; hsi_ck = 64 MHz / HSIDIV '
+        '(p385), for sys_ck, hsi_ker_ck and the PLL reference in ' + ONE_RULE),
+    ('RCC_CFGR', 'SWS[2:0]'): (None, 'ignored (read-only; stock computed-read); it selects sys_ck (the HSI, CSI, HSE or pll1_p_ck, p393) for ' + ONE_RULE),
+    ('RCC_D1CFGR', 'D1CPRE[3:0]'): (None, 'the stock model (stored+callback): stored; rcc_hclk = sys_ck / D1CPRE / HPRE (pp. 394-395) in ' + ONE_RULE),
+    ('RCC_D1CFGR', 'HPRE[3:0]'): (None, 'the stock model (stored+callback): stored; rcc_hclk = sys_ck / D1CPRE / HPRE (pp. 394-395) in ' + ONE_RULE),
+    ('RCC_D2CFGR', 'D2PPRE1[2:0]'): (None, 'the stock model (stored+callback): stored; rcc_pclk1 = rcc_hclk / D2PPRE1 (p396) in ' + ONE_RULE),
+    ('RCC_D2CFGR', 'D2PPRE2[2:0]'): (None, 'the stock model (stored+callback): stored; rcc_pclk2 = rcc_hclk / D2PPRE2 (p396) in ' + ONE_RULE),
+}
+for n in '123':
+    FREQ[('RCC_PLLCKSELR', f'DIVM{n}[5:0]')] = (None, "the guard's copy (the kernel clock query); ref" + n + '_ck = the PLLSRC source / DIVM' + n
+        + ', 0 "prescaler disabled" (pp. 398-399), in ' + ONE_RULE)
+    FREQ[('RCC_PLLCFGR', f'PLL{n}RGE[1:0]')] = ('guard', "the guard's copy, served on read (the stock model drops it): ref" + n + '_ck must lie in the range it '
+        'names, 1-2, 2-4, 4-8 or 8-16 MHz, edges inclusive, else ' + ONE_RULE + ' has no frequency ("must be set according to the reference input '
+        'frequency", p347; pp. 401-402; Q3)')
+    FREQ[('RCC_PLLCFGR', f'PLL{n}VCOSEL')] = ('guard', "the guard's copy, served on read: the VCO's output range, 192-960 MHz or 150-420 MHz (p404, "
+        'p407, p410), and its input: VCOH takes 2-16 MHz, VCOL 1-2 MHz (p346, p347), else ' + ONE_RULE + ' has no frequency; VCOL above 2 MHz with '
+        "its VCO in VCOL's range acknowledged by name, as ChibiOS chooses it (hal_lld_type1.h L1834-1837; bench row R11; Q1)")
+    FREQ[('RCC_PLLCFGR', f'PLL{n}FRACEN')] = ('guard', "the guard's copy, served on read; FRACN" + n + ' is 0 (its allow-list), so the PLL runs in '
+        'integer mode whatever this bit says (p349, p405) in ' + ONE_RULE)
+    page = {'1': 'pp. 403-404', '2': 'pp. 406-407', '3': 'pp. 409-410'}[n]
+    for o in 'NPQR':
+        # p410 prints DIVN3[7:0] over bits 8:0, and data/rm/fields.tsv keeps its spelling
+        FREQ[('RCC_PLL%sDIVR' % n, f'DIV{o}{n}[{(7 if n == "3" else 8) if o == "N" else 6}:0]')] = (None, '%s; the guard\'s copy of the write it passed, silicon\'s value, feeds '
+            % ('the stock model (%s)' % ('computed-read' if n == '1' and o in 'NP' else 'stored+callback' if n == '1' else 'stored, DIVN and DIVQ narrowed to 8 and 6 bits where silicon has 9 and 7, a row'))
+            + ONE_RULE + ' (' + page + '): none after a write the stock model did not keep, or one made while PLL' + n + ' ran (Q2)'
+            + ('; DIVP1 = 0 or an odd divisor gives none (p404; Figure 47 p346; Q7)' if (n, o) == ('1', 'P') else ''))
+FREQ[('RCC_PLLCKSELR', 'PLLSRC[1:0]')] = (None, "the guard's copy (the kernel clock query); the PLLs' reference, the HSI, CSI or HSE, 11 none (p399), in " + ONE_RULE)
 
 
 def tsv(path):
@@ -135,6 +165,10 @@ def build():
                 'ruled 2026-11-25T03:03Z Q4)')
         elif reg == 'RCC_BDCR' and acc not in ('r', '-') and field != 'Reserved':
             cls, allowed, behaves = 'inherited', [rv or 0], 'its reset value only: RCC_BDCR is write-protected after a system reset until PWR_CR1.DBP = 1 (p427), which the twin does not model, and the RTC\'s kernel clock (RTCSEL) is not modeled'
+        if (reg, field) in FREQ:
+            c, behaves = FREQ[(reg, field)]
+            if c:
+                cls, allowed = c, None   # any value: the guard's copy, served on read (was a tag acknowledged as A1)
         if (reg, field) in ACKED_1300B:
             allowed, why = ACKED_1300B[(reg, field)]
             cls, behaves = 'acknowledged', why

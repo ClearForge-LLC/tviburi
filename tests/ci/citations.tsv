@@ -112,3 +112,5 @@ firmware/i2c.rs	TVI-WO-1306a.measure.md
 model/GuardedSTM32F7_I2C.cs	TVI-WO-1306a.measure.md
 tests/1306/fields.py	TVI-WO-1306a.measure.md
 tests/1306/i2c.sh	TVI-WO-1306a.measure.md
+# TVI-WO-1300c: the gen-hc16 case's citation of its measurement, a comment, checked by hand 2026-11-26.
+tests/1300/rcc.sh	TVI-WO-1300c.measure.md

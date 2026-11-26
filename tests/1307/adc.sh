@@ -121,8 +121,8 @@ for t in ${TVIBURI_TESTS:-$CASES}; do
     "passes start && [ \"\$(readout start READ)\" = 0x00005D17 ] && [ \"\$(readout start READ2)\" = 0x0000100B ]" ;;
   res12) check "res12: RES = 110 (12 bits on rev V, p1016) reads 0x5D1 (round(1.2 / 3.3 x 4095))" \
     "passes res12 && [ \"\$(readout res12 READ)\" = 0x000005D1 ]" ;;
-  kernel) check "kernel: ADSTART with CKMODE = 00 and ADCSEL's pll2_p_ck stopped (PLL2 turned off after ADEN) refuses TVI-ADC-KERNEL, predicted-fault, naming the ADC, the selector and p920 (ruled Q3; the WO's acceptance)" \
-    "refuses kernel TVI-ADC-KERNEL predicted-fault 'r[\"bit\"].startswith(\"RCC_D3CCIPR.ADCSEL = 00\") and \"p920\" in r[\"citation\"] and \"adcM1S2 ADSTART\" in r[\"condition\"] and \"PLL2ON = 0\" in r[\"condition\"] and r[\"access\"][\"value\"] == \"0x10000205\"'" ;;
+  kernel) check "kernel: ADSTART with CKMODE = 00 and ADCSEL's pll2_p_ck stopped (PLL2 turned off after ADEN) refuses TVI-ADC-KERNEL, predicted-fault, naming the ADC, the selector and p920 (ruled Q3; the WO's acceptance); its state says f_ADC none, as the RCC guard's KernelHz has no frequency for a stopped clock (TVI-WO-1300c Q4)" \
+    "refuses kernel TVI-ADC-KERNEL predicted-fault 'r[\"bit\"].startswith(\"RCC_D3CCIPR.ADCSEL = 00\") and \"p920\" in r[\"citation\"] and \"adcM1S2 ADSTART\" in r[\"condition\"] and \"PLL2ON = 0\" in r[\"condition\"] and r[\"access\"][\"value\"] == \"0x10000205\" and r[\"state\"].endswith(\"f_ADC none\")'" ;;
   clocklost) check "clocklost: PLL2, ADCSEL's source, stopped under running conversions (ADSTART, CKMODE = 00) refuses TVI-RCC-CLOCK, predicted-fault, at the RCC write, naming ADSTART and p920 (IRccWatched, granted Q3; WO §5)" \
     "[ \$rc = 3 ] && records clocklost 'len(recs) == 1 and recs[0][\"rule\"] == \"TVI-RCC-CLOCK\" and recs[0][\"peripheral\"] == \"sysbus.rcc\" and \"adc12 is enabled (ADSTART = 1)\" in recs[0][\"condition\"] and \"p920\" in recs[0][\"citation\"]'" ;;
   ckmode) check "ckmode: CCR.CKMODE changed with ADEN = 1 refuses TVI-ADC-STATE, unmodeled, naming CKMODE, p934 and p1038-1039 (ruled Q5; WO §5)" \

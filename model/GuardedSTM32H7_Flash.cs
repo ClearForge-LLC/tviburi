@@ -10,8 +10,8 @@
 // What this guard models:
 //   Wait states against the clock (Table 17 p160; p159-161): FLASH_ACR's LATENCY against the AXI clock (rcc_aclk =
 //   sys_ck / D1CPRE / HPRE, p395; Table 17's F_ACLK) at the voltage scale in force, at every ACR write and after every
-//   write the RCC guard passes (its one event, `Written`: ruled Q6). The clock is read from the RCC guard's own object
-//   (CR, CFGR, D1CFGR, PLLCKSELR, PLLCFGR, PLL1DIVR, PLL1FRACR, its HSE and CSI frequencies), which logs nothing; the
+//   write the RCC guard passes that changes the clock (its one event, `Written`: ruled Q6). The clock is the RCC guard's
+//   BusHz("rcc_hclk"), the overlay's one frequency rule (TVI-WO-1300c, ruled 2026-11-26T04:03Z Q9), which logs nothing; the
 //   voltage scale from the pwr peripheral's PWR_D3CR.VOS (p310), read from the object at 0x58024818, which logs
 //   nothing (TVI-WO-1304.measure.md §2.3). A D3CR that reads VOS 00 (the stock stub drops every write) is "VOS unknown": decided at
 //   VOS1, the most permissive scale that can be known, so a mismatch only at VOS2/VOS3 passes, acknowledged in the
@@ -95,7 +95,7 @@ namespace Antmicro.Renode.Peripherals.Tviburi
             psize[0] = psize[1] = 3;
             key[0] = key[1] = 0;
             keyLost[0] = keyLost[1] = false;
-            waitWhy = progWhy = null;
+            waitWhy = progWhy = judgedClock = null;
         }
 
         public void Dispose()
@@ -362,15 +362,22 @@ namespace Antmicro.Renode.Peripherals.Tviburi
 
         // ---- the clock (Table 17 p160) -------------------------------------------------------------------------
 
-        // After every write the RCC guard passes (its event `Written`, ruled Q6): the clock that write leaves, against ACR.
-        // Only the registers the AXI clock is computed from can change it (Clock, Pll1); ArduPilot's other RCC writes, about
-        // 26,000 enables and resets in 5 s (TVI-WO-1300 §4), are not judged.
+        // After every write the RCC guard passes (its event `Written`, ruled Q6): the clock that write leaves, against ACR, when the
+        // write changed it (its frequency or how it is derived, as Clock reports it from the RCC guard's BusHz; TVI-WO-1300c Q9).
+        // ArduPilot's other RCC writes, about 26,000 enables and resets in 5 s (TVI-WO-1300 §4), are not judged.
         private void OnRccWritten(long offset, uint value)
         {
-            if(!ClockRegisters.Contains(offset) || records.LoadFailed || Config() != null)
+            if(records.LoadFailed || Config() != null)
             {
                 return;   // a guard that did not load, or cannot model the platform, refuses its own accesses instead
             }
+            var c = Clock();
+            var now = c.Hz + " " + c.Note;
+            if(now == judgedClock)
+            {
+                return;
+            }
+            judgedClock = now;
             Judge(base.ReadDoubleWord(Acr), RccBase + offset, value, 32);
         }
 
@@ -482,58 +489,20 @@ namespace Antmicro.Renode.Peripherals.Tviburi
                 c.Note = "no RCC guard on this platform";
                 return c;
             }
-            uint R(long o) => rcc.ReadDoubleWord(o);
-            var cr = R(0x00);
-            var cfgr = R(0x10);
-            var d1 = R(0x18);
-            var hsi = 64000000ul >> (int)(cr >> 3 & 3);
-            ulong? sys;
-            switch(cfgr >> 3 & 7)
+            // rcc_aclk is rcc_hclk (sys_ck / D1CPRE / HPRE, p395): the RCC guard's BusHz, the overlay's one frequency rule (TVI-WO-1300c,
+            // ruled 2026-11-26T04:03Z Q9).
+            var sys = rcc.BusHz("sys_ck", out var _);
+            var hz = rcc.BusHz("rcc_hclk", out var why);
+            var d1 = rcc.ReadDoubleWord(0x18);
+            if(hz == null)
             {
-            case 0: sys = hsi; break;
-            case 1: sys = rcc.CsiFrequency; break;
-            case 2: sys = rcc.HseFrequency; break;
-            case 3: sys = Pll1(rcc, hsi); break;
-            default: sys = null; break;
-            }
-            if(sys == null)
-            {
-                c.Note = "sys_ck's source gives no frequency the twin can compute (RCC_CFGR 0x" + cfgr.ToString("X") + ")";
+                c.Note = "sys_ck's source gives no frequency the twin can compute (" + why + ")";
                 return c;
             }
-            c.Hz = sys / Div(d1 >> 8 & 0xF) / Div(d1 & 0xF);
-            c.Note = "sys_ck " + sys + " Hz, D1CPRE /" + Div(d1 >> 8 & 0xF) + ", HPRE /" + Div(d1 & 0xF) + "; " + c.Scale;
+            c.Hz = (ulong)hz.Value;
+            c.Note = "sys_ck " + sys + " Hz, D1CPRE = " + Convert.ToString(d1 >> 8 & 0xF, 2).PadLeft(4, '0') + ", HPRE = " + Convert.ToString(d1 & 0xF, 2).PadLeft(4, '0')
+                + " (rcc_aclk " + c.Hz + " Hz); " + c.Scale;
             return c;
-        }
-
-        // PLL1's P output (RM0433 Rev 9 §8.7.11-8.7.14 p398-404): ref / DIVM1 * (DIVN1 + FRACN1 / 2^13) / DIVP1.
-        private static ulong? Pll1(GuardedSTM32H7_RCC rcc, ulong hsi)
-        {
-            var ck = rcc.ReadDoubleWord(0x28);
-            var cfg = rcc.ReadDoubleWord(0x2C);
-            var divr = rcc.ReadDoubleWord(0x30);
-            var frac = rcc.ReadDoubleWord(0x34);
-            ulong? reference;   // null when the platform declares no HSE: the result is null (TVI-WO-1300b (4), granted Q3)
-            switch(ck & 3)
-            {
-            case 0: reference = hsi; break;
-            case 1: reference = rcc.CsiFrequency; break;
-            case 2: reference = rcc.HseFrequency; break;
-            default: return null;
-            }
-            var divm = (ck >> 4) & 0x3F;
-            if(divm == 0)
-            {
-                return null;
-            }
-            var n = ((ulong)(divr & 0x1FF) + 1) * 8192 + ((cfg & 1) != 0 ? (frac >> 3) & 0x1FFF : 0);
-            return reference * n / (divm * 8192ul) / ((divr >> 9 & 0x7F) + 1);
-        }
-
-        // D1CPRE and HPRE (p394-395): 0xxx /1; 1000-1011 /2, /4, /8, /16; 1100-1111 /64, /128, /256, /512.
-        private static ulong Div(uint v)
-        {
-            return (v & 8) == 0 ? 1 : (v & 7) < 4 ? 2ul << (int)(v & 7) : 64ul << (int)((v & 7) - 4);
         }
 
         // PWR_D3CR.VOS (p310), as the scale's number: 11 Scale 1 is 1, 10 Scale 2 is 2, 01 Scale 3 is 3; 00 is 0, "unknown"
@@ -668,7 +637,7 @@ namespace Antmicro.Renode.Peripherals.Tviburi
         private readonly int[] key = { 0, 0 };
         private readonly bool[] keyLost = { false, false };
         private GuardedSTM32H7_RCC rcc;
-        private string waitWhy, progWhy;
+        private string waitWhy, progWhy, judgedClock;   // judgedClock: the AXI clock at the last RCC write judged (OnRccWritten)
         private string config;
 
         private const ulong FlashBase = 0x52002000;
@@ -695,7 +664,6 @@ namespace Antmicro.Renode.Peripherals.Tviburi
         private const long Sr2 = 0x110;
         private const long Ccr2 = 0x114;
 
-        private static readonly long[] ClockRegisters = { 0x00, 0x10, 0x18, 0x28, 0x2C, 0x30, 0x34 };   // RCC CR, CFGR, D1CFGR, PLLCKSELR, PLLCFGR, PLL1DIVR, PLL1FRACR
         private static readonly long[] Aliases = { 0x100, 0x108, 0x118, 0x11C, 0x120, 0x124, 0x140, 0x144, 0x15C };
         private static readonly long[] Options = { 0x008, 0x018, 0x020, 0x024 };
         private static readonly Dictionary<long, string> Names = new Dictionary<long, string>

@@ -13,7 +13,7 @@ set -euo pipefail
 
 here=$(cd "$(dirname "$0")/../.." && pwd)
 IMAGE=$(sed -n 's/^IMAGE=//p' "$here/tests/spike.sh")
-CASES="scar switch stuck clocked switched alias field pll divq pllref divm0 sw width read usart2 uncovered fields reset resetfwd spi1rst alias17c registrations hse16 recorded recordedfield ardupilot gen-s03 gen-hc16 oscclear oscsys rsrbyte misaligned ledger unenabled tim2 lost-pll lost-sel lost-en lost-osc lost-ckper stopped ckper-live blocked cfg2same sel5 divr pll1src kernelq spi1off cstart dma lost-alias adc3 unheld relost-sel relost-pll divr2rmw usart-lost usart-stopped usart-lost-en usart-othersel usart-unheld hse-none hse-declared adc rtcen rtcen-reset hse-zero"
+CASES="scar switch stuck clocked switched alias field pll divq pllref divm0 sw width read usart2 uncovered fields reset resetfwd spi1rst alias17c registrations hse16 recorded recordedfield ardupilot gen-s03 gen-hc16 oscclear oscsys rsrbyte misaligned ledger unenabled tim2 lost-pll lost-sel lost-en lost-osc lost-ckper stopped ckper-live blocked cfg2same sel5 divr pll1src kernelq spi1off cstart dma lost-alias adc3 unheld relost-sel relost-pll divr2rmw usart-lost usart-stopped usart-lost-en usart-othersel usart-unheld hse-none hse-declared adc rtcen rtcen-reset hse-zero onehome"
 scratch=${TVIBURI_SCRATCH:-$HOME/.cache/tviburi}
 mkdir -p "$scratch"
 work=$(mktemp -d "$scratch/rcc.XXXXXX")
@@ -95,6 +95,14 @@ first_kernel() { # first_kernel <name> <python expr over r, the first refusal>
 
 for t in ${TVIBURI_TESTS:-$CASES}; do
   case $t in
+  onehome)
+    # TVI-WO-1300c §2 (ruled 2026-11-26T04:03Z Q9): the RCC guard holds the overlay's only PLL and sys_ck frequency rule; the USART, ADC,
+    # I2C and flash guards ask its KernelHz or BusHz. No other model file reads an RCC_PLL* register (PLLCKSELR 0x28, PLLCFGR 0x2C,
+    # PLLxDIVR and PLLxFRACR 0x30-0x44, p398-410) or names a PLL rule's parts. Code lines only: a comment may cite the RCC.
+    bad=$(for f in "$src"/model/*.cs; do [ "${f##*/}" = GuardedSTM32H7_RCC.cs ] && continue
+      grep -nHiE 'ReadDoubleWord\((0x)?(28|2C|30|34|38|3C|40|44)\)|Pll[0-9]?(divr|cfgr|ckselr|fracr)Offset|\bVco\b|pllUntrusted|\bPll1\(|\bDIVN|\bdivn\b|DivmShift|HseFrequency|CsiFrequency|PLLCKSELR|RCC_PLL' "$f" | grep -vE '^[^:]*:[0-9]+: *//' || true; done)
+    [ -z "$bad" ] || printf '%s\n' "$bad"
+    check "onehome: no model file but the RCC guard's reads an RCC_PLL* register or holds a PLL or sys_ck rule (a VCO, DIVN, pllUntrusted, the HSE or CSI frequency): one home for the kernel clock's frequency (TVI-WO-1300c §2; ruled Q9)" '[ -z "$bad" ]' ;;
   scar)
     run_case scar scar "$run"
     check "scar: SPI1 started with SPI123SEL on pll1_q_ck and PLL1 off refuses at SPI1 (TVI-SPI-KERNEL), predicted-fault, naming the selector, the source and the pages" \
@@ -205,8 +213,15 @@ for t in ${TVIBURI_TESTS:-$CASES}; do
     if [ $t = gen-s03 ]; then
       check "gen-s03: sentinel-03's RCC sequence (Aethelgard 75da8053), then SPI1's start as generated: refused at SPI1, TVI-SPI-KERNEL, predicted-fault, naming SPI123SEL = 100 and p414, p371-372 (the per_ck scar; ruled 17:16Z)" \
         "[ \$rc = 3 ] && records $t 'len(recs) == 1 and recs[0][\"rule\"] == \"TVI-SPI-KERNEL\" and recs[0][\"kind\"] == \"predicted-fault\" and recs[0][\"bit\"] == \"RCC_D2CCIP1R.SPI123SEL = 100\" and \"p414\" in recs[0][\"citation\"] and \"p371-372\" in recs[0][\"citation\"]'"
+    elif [ $t = gen-hc16 ]; then
+      # TVI-WO-1300c (ruled 2026-11-26T04:03Z Q9): hse-crystal-16's sequence is written for its 16 MHz crystal (PLLCKSELR 0x52, PLL1DIVR
+      # 0x0103064F: HSE / 5 x 80), and this board declares hseFrequency 8 MHz, so PLL1's VCO is 128 MHz, below p404's 192 MHz. The
+      # flash guard, which asks the RCC guard's one frequency rule, cannot compute the AXI clock at the switch to PLL1: its record is
+      # the right answer for this planted case (the board itself, at 16 MHz, runs PLL1 at 256 MHz: TVI-WO-1300c.measure.md §2.2).
+      check "gen-hc16: hse-crystal-16's RCC sequence on this board's 8 MHz HSE (a 128 MHz VCO, below p404's range): at the switch to PLL1 the flash guard refuses TVI-FLASH-WAIT, unmodeled: the AXI clock cannot be computed (TVI-WO-1300c Q9); nothing else refuses, and SPI1 still starts after it" \
+        "[ \$rc = 3 ] && records $t 'len(recs) == 1 and recs[0][\"rule\"] == \"TVI-FLASH-WAIT\" and recs[0][\"kind\"] == \"unmodeled\" and recs[0][\"access\"][\"offset\"] == \"0x58024410\" and \"cannot be computed\" in recs[0][\"condition\"] and \"VCO 128000000 Hz\" in recs[0][\"condition\"]' && console $t | grep -A1 -x 'TVIBURI-MARK-AFTER' | tail -n1 | grep -qx '0xAF7E0002'"
     else
-      check "$t: the measured RCC sequence, after the consumer's cold writes (pc none)$([ $t = gen-hc16 ] && echo ', then SPI1'\''s start on pll1_q_ck'), passes enforcing (WO §2)" \
+      check "$t: the measured RCC sequence, after the consumer's cold writes (pc none), passes enforcing (WO §2)" \
         "[ \$rc = 0 ] && grep -qx 'CHECK PASS' '$work/$t.stdout' && console $t | grep -A1 -x 'TVIBURI-MARK-AFTER' | tail -n1 | grep -qx '0xAF7E0002'"
     fi
     case $t in
@@ -235,7 +250,7 @@ for t in ${TVIBURI_TESTS:-$CASES}; do
   ledger)
     mkdir -p "$work/ledger"
     rc=0; container -v "$src:/repo:ro,Z" -v "$work/ledger:/out:Z" "$IMAGE" sh -c '/repo/scripts/build-release /repo /out/release >/dev/null' </dev/null >"$work/ledger.stdout" 2>&1 || rc=$?
-    check "ledger: the release carries the RCC guard's 677 field rows; each acknowledged row cites TVI-WO-1300.rm0433.md §8, never 0100b's; the RCC bench rows R1-R10 are in it, with the (rule, bit) the cases emit (RUL-18)" \
+    check "ledger: the release carries the RCC guard's 677 field rows; each acknowledged row cites TVI-WO-1300.rm0433.md §8, never 0100b's; the RCC bench rows R1-R11 are in it, with the (rule, bit) the cases emit (RUL-18), R11 the VCOL acknowledgement's (TVI-WO-1300c Q1)" \
       "[ \$rc = 0 ] && python3 -I -c '
 import json, sys
 rows = [json.loads(l) for l in open(sys.argv[1]).read().splitlines()[1:]]
@@ -247,8 +262,8 @@ pairs = sorted((r[\"rule\"], r[\"bit\"]) for r in rcc if r[\"row\"] == \"bench\"
 want = sorted([(\"TVI-RCC-KERNEL\", \"RCC_D2CCIP1R.SPI123SEL = 000\"), (\"TVI-RCC-KERNEL\", \"RCC_D2CCIP1R.SPI123SEL = 100\"), (\"TVI-RCC-PLL\", \"DIVP1EN/DIVQ1EN/DIVR1EN\"),
   (\"TVI-RCC-CLOCK\", \"RCC_CR.PLL1ON (bit 24) = 0\"), (\"TVI-RCC-CLOCK\", \"RCC_D2CCIP1R.SPI123SEL (14:12) = 001\"), (\"TVI-RCC-CLOCK\", \"RCC_APB2ENR.SPI1EN (bit 12) = 0\"),
   (\"TVI-RCC-CLOCK\", \"RCC_CR.HSEON (bit 16) = 0\"), (\"TVI-RCC-CLOCK\", \"RCC_D1CCIPR.CKPERSEL (29:28) = 01\"), (\"TVI-RCC-PLL\", \"DIVN1/DIVP1/DIVQ1/DIVR1\"),
-  (\"TVI-RCC-PLL-REF\", \"PLL1ON (bit 24) = 1\")])
-sys.exit(0 if len(f) == 677 and a and all(r[\"reason\"].startswith(\"TVI-WO-1300.rm0433.md §8 A\") for r in a) and b == sorted(\"R%d\" % i for i in range(1, 11)) and pairs == want else 1)
+  (\"TVI-RCC-PLL-REF\", \"PLL1ON (bit 24) = 1\"), (\"KernelHz (VCOL above 2 MHz, acknowledged by name)\", \"RCC_PLLCFGR.PLL2VCOSEL (bit 5) = 1\")])
+sys.exit(0 if len(f) == 677 and a and all(r[\"reason\"].startswith(\"TVI-WO-1300.rm0433.md §8 A\") for r in a) and b == sorted(\"R%d\" % i for i in range(1, 12)) and pairs == want else 1)
 ' '$work/ledger/release/LEDGER.jsonl'" ;;
   alias17c)
     run_case alias17c - 'echo "R-17C"' 'sysbus ReadDoubleWord 0x5802457C'

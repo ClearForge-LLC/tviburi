@@ -281,9 +281,6 @@ DM42-reloadSpan	model/GuardedSTM32DMA.cs	var items = (ulong)(reload ? programmed
 FL01-waitShort	model/GuardedSTM32H7_Flash.cs	                if(latency < need)	                if(false)	flash-clockfirst
 FL03-vosUnknownAtVos1	model/GuardedSTM32H7_Flash.cs	var row = table[c.Vos == 0 ? 1 : c.Vos];	var row = table[c.Vos == 0 ? 3 : c.Vos];	flash-vosunknown
 FL04-over225	model/GuardedSTM32H7_Flash.cs	            if(clock.Hz == null || clock.Hz > MaxAclk)\n            {\n                kind = Unmodeled;\n                why = clock.Hz == null ? "the AXI clock cannot be computed (" + clock.Note + ")"\n                    :	            if(clock.Hz == null)\n            {\n                kind = Unmodeled;\n                why = clock.Hz == null ? "the AXI clock cannot be computed (" + clock.Note + ")"\n                    :	flash-over225
-FL05-divider	model/GuardedSTM32H7_Flash.cs	(v & 7) < 4 ? 2ul << (int)(v & 7)	(v & 7) < 4 ? 1ul << (int)(v & 7)	flash-clockfirst flash-prescaler
-FL06-divp	model/GuardedSTM32H7_Flash.cs	/ ((divr >> 9 & 0x7F) + 1);	/ ((divr >> 9 & 0x7F) + 2);	flash-vos3
-FL07-sysPll	model/GuardedSTM32H7_Flash.cs	case 3: sys = Pll1(rcc, hsi); break;	case 3: sys = hsi; break;	flash-clockfirst
 FL08-rccEvent	model/GuardedSTM32H7_RCC.cs	            Written?.Invoke(b, value);\n	(empty)	flash-clockfirst
 FL09-subscribe	model/GuardedSTM32H7_Flash.cs	                    rcc.Written += OnRccWritten;\n	(empty)	flash-clockfirst
 FL10-alias	model/GuardedSTM32H7_Flash.cs	return Aliases.Contains(b) ? b - 0x100 : b;	return b;	flash-alias flash-optsr
@@ -309,13 +306,11 @@ FL29-config	model/GuardedSTM32H7_Flash.cs	if(optionBytes < -1 || optionBytes > 0
 FL30-ledgerLatency	model/GuardedSTM32H7_Flash.cs	"LATENCY", 3, 0, Latencies,	"LATENCY", 3, 0, Any,	flash-ledger flash-regen
 FL31-bank	model/GuardedSTM32H7_Flash.cs	return b >= 0x100 ? 1 : 0;	return 0;	flash-keytwice
 FL32-restate	model/stm32h7-flash-restate.repl	    -> nvic@4\n	(empty)	flash-regen
-FL33-clockRegisters	model/GuardedSTM32H7_Flash.cs	{ 0x00, 0x10, 0x18, 0x28, 0x2C, 0x30, 0x34 }	{ 0x00, 0x10, 0x28, 0x2C, 0x30, 0x34 }	flash-prescaler
 FL34-locking	model/GuardedSTM32H7_Flash.cs	var locking = !locked && (word & LockBit) != 0;	var locking = false;	flash-locking
 FL35-latchWhy	model/GuardedSTM32H7_Flash.cs	if(why != null && why != waitWhy)	if(why != null && waitWhy == null)	flash-worse
 FL36-keyLost	model/GuardedSTM32H7_Flash.cs	                else if(keyLost[k])\n	                else if(false)\n	flash-recorded
 FL37-bandEdge	model/GuardedSTM32H7_Flash.cs	if(c.Hz <= (ulong)row[i] * 1000000)	if(c.Hz < (ulong)row[i] * 1000000)	flash-edge
 FL38-table17vos2	model/GuardedSTM32H7_Flash.cs	new[] { 55, 110, 165, 225 }	new[] { 55, 140, 165, 225 }	flash-vos2
-FL39-d1cpre	model/GuardedSTM32H7_Flash.cs	c.Hz = sys / Div(d1 >> 8 & 0xF) / Div(d1 & 0xF);	c.Hz = sys / Div(d1 & 0xF);	flash-d1cpre
 FL40-progWhileProgramming	model/GuardedSTM32H7_Flash.cs	            if(programming)\n	            if(false)\n	flash-wrhrcc
 FL41-commonRegisters	model/GuardedSTM32H7_Flash.cs	else if(key[k] == 1 && !Aliases.Contains(b + 0x100))	else if(key[k] == 1)	flash-keymid
 US01-ueRule	model/GuardedSTM32F7_USART.cs	            if((cr1 & UeBit) == 0 || (offset == Cr1Offset && (word & UeBit) == 0))	            if(true)	usart-m1ue usart-stopue
@@ -376,24 +371,9 @@ US47-heldClear	model/GuardedSTM32F7_USART.cs	brrHeld &= (word & 0xFFFF) < 16;	(e
 US48-overrunFifo	model/GuardedSTM32F7_USART.cs	if((cr1 & FifoenBit) != 0 || (inner.ReadDoubleWord(IsrOffset) & RxfneBit) == 0)	if((inner.ReadDoubleWord(IsrOffset) & RxfneBit) == 0)	usart-overrun
 US49-overrunRxne	model/GuardedSTM32F7_USART.cs	if((cr1 & FifoenBit) != 0 || (inner.ReadDoubleWord(IsrOffset) & RxfneBit) == 0)	if((cr1 & FifoenBit) != 0)	usart-overrun
 US50-idleStart	model/GuardedSTM32F7_USART.cs	refused |= KernelHz(out var why) == null && RefuseIdle(	refused |= KernelHz(out var why) == null && false && RefuseIdle(	usart-idlenorule
-US51-idleFrame	model/GuardedSTM32F7_USART.cs	RefuseIdle(what, hz == null ?	if(false) RefuseIdle(what, hz == null ?	usart-idlenone
-US52-noDefault	model/GuardedSTM32F7_USART.cs	                why += ": no rule for its frequency";\n                return null;	                return 64000000;	usart-idlenorule
-US53-hsidiv	model/GuardedSTM32F7_USART.cs	var hsi = 64000000ul >> (int)(R(0x00) >> 3 & 3);	var hsi = 64000000ul;	usart-idlekernel
-US54-sws	model/GuardedSTM32F7_USART.cs	: sws == 3 ? Vco(rcc, 1, hsi, ref why) / ((R(0x30) >> 9 & 0x7F) + 1) : null;	: sws == 3 ? Vco(rcc, 1, hsi, ref why) / ((R(0x30) >> 9 & 0x7F) + 1) : hsi;	usart-idlenone
-US55-d1cpre	model/GuardedSTM32F7_USART.cs	/ Div(d1 >> 8 & 0xF) / Div(d1 & 0xF)	/ Div(d1 & 0xF)	usart-idlekernel
-US56-apbField	model/GuardedSTM32F7_USART.cs	var ppre = d2 >> (usart16 ? 8 : 4) & 7;	var ppre = d2 >> (usart16 ? 4 : 8) & 7;	usart-idlekernel
-US57-pllRef	model/GuardedSTM32F7_USART.cs	ulong? input = (ck & 3) == 0 ? hsi : (ck & 3) == 2 ? rcc.HseFrequency : (ulong?)null;	ulong? input = (ck & 3) == 0 ? hsi : (ck & 3) == 2 ? rcc.HseFrequency : hsi;	usart-idlenone
+US51-idleFrame	model/GuardedSTM32F7_USART.cs	RefuseIdle(what, hz == null ?	if(false) RefuseIdle(what, hz == null ?	usart-hzbyte
 US61-benchU2	model/bench-checks.tsv	Tviburi.GuardedSTM32F7_USART\tU2\tTVI-USART-BRR	Tviburi.GuardedSTM32F7_USART\tU3\tTVI-USART-BRR	usart-ledger
-US58-pllWritten	model/GuardedSTM32F7_USART.cs	pllUntrusted[(offset - Pll1divrOffset) / 8 + 1] |= r.ReadDoubleWord(offset) != value;	(empty)	usart-idlenone
-US59-pllWide	model/GuardedSTM32F7_USART.cs	divm != 0 && !pllUntrusted[n] && refHz	divm != 0 && refHz	usart-idlenone
-US60-pllMachineReset	model/GuardedSTM32F7_USART.cs	m.MachineReset += _ => { pllUntrusted = new bool[3]; pllcfgr = PllcfgrReset; };	m.MachineReset += _ => { };	usart-idlekernel
 US62-pllPortReset	model/GuardedSTM32F7_USART.cs	                idle = brrHeld = false;	                idle = brrHeld = false; pllUntrusted = new bool[3];	usart-idlenone
-US63-pllRange	model/GuardedSTM32F7_USART.cs	&& vco >= (wide ? 192000000ul : 150000000ul) && vco <= (wide ? 960000000ul : 420000000ul))	)	usart-idlenone
-US64-selShift	model/GuardedSTM32F7_USART.cs	var sel = R(0x54) >> (usart16 ? 3 : 0) & 7;	var sel = R(0x54) >> 3 & 7;	usart-idlekernel
-US65-hseRef	model/GuardedSTM32F7_USART.cs	(ck & 3) == 2 ? rcc.HseFrequency :	(ck & 3) == 2 ? hsi :	usart-idlehse
-US66-sysPll1	model/GuardedSTM32F7_USART.cs	var sys = sws == 0 ? hsi : sws == 3 ?	var sys = sws == 0 ? hsi : sws == 4 ?	usart-idlehse
-US67-vcoselPassed	model/GuardedSTM32F7_USART.cs	var wide = (pllcfgr >> (n == 1 ? 1 : 5) & 1) == 0;	var wide = (rcc.ReadDoubleWord(0x2C) >> (n == 1 ? 1 : 5) & 1) == 0;	usart-idlenone
-US68-divp1	model/GuardedSTM32F7_USART.cs	Vco(rcc, 1, hsi, ref why) / ((R(0x30) >> 9 & 0x7F) + 1) : null;	Vco(rcc, 1, hsi, ref why) / 2 : null;	usart-idlehse
 RB01-usartWatched	model/GuardedSTM32H7_RCC.cs	.Concat(watched.Where(w => w.Value.IsRunning).Select(w => w.Key))	.Concat(new string[0])	rcc-usart-lost
 RB02-ueRunning	model/GuardedSTM32H7_RCC.cs	watched.Where(w => w.Value.IsRunning)	watched.Where(w => true)	rcc-usart-stopped
 RB03-usartHeld	model/GuardedSTM32F7_USART.cs	&& rcc.Holds(name, this)))	))	rcc-usart-unheld
@@ -542,3 +522,27 @@ I261-nackResetCancels	model/GuardedSTM32F7_I2C.cs	                CancelNack();\
 I262-nackEpoch	model/GuardedSTM32F7_I2C.cs	                    if(e != nackEpoch)\n                    {\n                        return;\n                    }\n                    nackf = true;	                    nackf = true;	i2c-nackpe
 I263-nackStopInterrupt	model/GuardedSTM32F7_I2C.cs	(nackStopf && (cr1 & StopieBit) != 0)	false	i2c-nackirq
 I264-nackcfNotForwarded	model/GuardedSTM32F7_I2C.cs	inner.WriteDoubleWord(offset, word & ~NackcfBit);	inner.WriteDoubleWord(offset, word);	i2c-nack
+HZ01-rge	model/GuardedSTM32H7_RCC.cs	if(refHz < 1e6 * (1 << (int)rge) || refHz > 2e6 * (1 << (int)rge))	if(false)	usart-hzrge
+HZ02-vcoh	model/GuardedSTM32H7_RCC.cs	if(wide && refHz < 2e6)	if(false)	usart-hzvcoh
+HZ03-vcolAck	model/GuardedSTM32H7_RCC.cs	if(wide && refHz < 2e6)	if((wide && refHz < 2e6) || (!wide && refHz > 2e6))	usart-hzvcol
+HZ04-divp1Odd	model/GuardedSTM32H7_RCC.cs	if(n == 1 && output == 'p' && (div & 1) == 0)	if(n == 1 && output == 'p' && div == 0)	flash-divp1odd
+HZ05-divp1Zero	model/GuardedSTM32H7_RCC.cs	if(n == 1 && output == 'p' && (div & 1) == 0)	if(n == 1 && output == 'p' && div == 2)	flash-divp1zero
+HZ06-unkeptNext	model/GuardedSTM32H7_RCC.cs	divrUnknown[pll] |= divrUnkept[pll] || (value != divr[b] && PllOn(pll));	divrUnknown[pll] |= value != divr[b] && PllOn(pll);	usart-hzdivr
+HZ07-pllOnWrite	model/GuardedSTM32H7_RCC.cs	divrUnknown[pll] |= divrUnkept[pll] || (value != divr[b] && PllOn(pll));	divrUnknown[pll] |= divrUnkept[pll];	usart-hzpllon
+HZ08-unkeptSelf	model/GuardedSTM32H7_RCC.cs	divrUnkept[pll] |= inner.ReadDoubleWord(b) != value;	divrUnkept[pll] |= inner.ReadDoubleWord(b) != value; divrUnknown[pll] |= divrUnkept[pll];	usart-hzwide i2c-nackpll
+HZ09-unknownUse	model/GuardedSTM32H7_RCC.cs	if(divrUnknown[n])	if(false)	usart-hzdivr
+HZ10-pll3qUsart	model/GuardedSTM32H7_RCC.cs	if(source == "pll3_q_ck" && (p.Mux == UsartMux || p.Mux == Usart2Mux))	if(false)	usart-hzpll3q
+HZ11-hclk	model/GuardedSTM32H7_RCC.cs	return clock == "sys_ck" ? sys : sys / Prescaler(d1 >> 8 & 0xF) / Prescaler(d1 & 0xF);	return sys;	flash-prescaler flash-d1cpre
+HZ12-sysCsi	model/GuardedSTM32H7_RCC.cs	sws == 1 ? CsiFrequency : sws == 2	sws == 1 ? (double?)null : sws == 2	usart-hzsyscsi
+HZ13-sysHse	model/GuardedSTM32H7_RCC.cs	sws == 2 ? (double?)HseFrequency : sws == 3	sws == 2 ? null : sws == 3	usart-hzsyshse
+HZ14-copyMask	model/GuardedSTM32H7_RCC.cs	return offset == PllcfgrOffset ? 0x01FF0FFFu : 0xFFFFFFFFu;	return offset == PllcfgrOffset ? 0x01FF0000u : 0xFFFFFFFFu;	usart-hzvcol
+HZ15-csiKer	model/GuardedSTM32H7_RCC.cs	            case "csi_ker_ck":\n                return CsiFrequency;	            case "csi_ker_ck":\n                return null;	usart-hzcsi
+HZ16-usartAsks	model/GuardedSTM32F7_USART.cs	return rcc.KernelHz(name, out why);	return rcc.ReadDoubleWord(0x38) == 0 ? null : rcc.KernelHz(name, out why);	rcc-onehome
+HZ17-usartOneRule	model/GuardedSTM32F7_USART.cs	return rcc.KernelHz(name, out why);	rcc.KernelHz(name, out why); return 64e6;	usart-idlekernel
+HZ18-adcKernel	model/GuardedSTM32H7_ADC.cs	input = Alias == null ? null : rcc.KernelHz(Alias, out why);	input = Alias == null ? null : rcc.BusHz("sys_ck", out why);	adc-rate2
+HZ19-adcSclkHpre	model/GuardedSTM32H7_ADC.cs	bus = (rcc.ReadDoubleWord(0x18) & 8) == 0 ? sys : sys / 2;	bus = sys;	adc-rccboost
+HZ20-adcHclk	model/GuardedSTM32H7_ADC.cs	bus = rcc.BusHz("rcc_hclk", out why);	bus = rcc.BusHz("sys_ck", out why);	adc-rccchange
+HZ21-flashJudged	model/GuardedSTM32H7_Flash.cs	var now = c.Hz + " " + c.Note;	var now = "";	flash-clockfirst
+HZ22-flashBus	model/GuardedSTM32H7_Flash.cs	var hz = rcc.BusHz("rcc_hclk", out var why);	var hz = rcc.BusHz("sys_ck", out var why);	flash-prescaler
+HZ23-cfgOn	model/GuardedSTM32H7_RCC.cs	cfgUnknown[n] |= src || (PllOn(n) && ((old ^ value) & mask) != 0);	cfgUnknown[n] |= src;	usart-hzcfgon
+HZ24-cfgUse	model/GuardedSTM32H7_RCC.cs	if(cfgUnknown[n])	if(false)	usart-hzcfgon
