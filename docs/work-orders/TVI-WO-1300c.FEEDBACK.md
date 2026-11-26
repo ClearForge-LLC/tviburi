@@ -129,4 +129,6 @@ Reduction pass (diff): **−105 net in the guards** · 4 duplicates removed (the
   - with the same code, named here: `US60` (the USART's machine-reset mirror), `FL05`–`FL07`, `FL33`, `FL39` (the flash guard's `Div`, `Pll1`, its `sys_ck` switch, its register list, its `D1CPRE` division; Q9 (a)).
 - **Memory:** `tests/1301/ci-memory.sh 189214b HEAD`, eleven boots a side, interleaved, on Furnace (load 11–23): **PASS**, medians `main` 1,055,224 KiB, branch 1,054,424 KiB, **−0.8 MiB**; every boot counted, the largest branch boot 1,111,872 KiB. P5 predicted ±5 MiB. CI judges it again.
 - **Route:** `tests/ci/route.sh origin/main` passes its inventory (the new citation row).
-- **CI:** (pending)
+- **CI:** run 45769699258 on `f4f4ce5`, **green**: route, budget, budget-tests, all ten shards and `ci`.
+  - **Wall:** 14.6 min for the whole run. The longest shard took 12.97 min (shard 2, on an AMD EPYC 9V74); the nine Intel Xeon 6975P-C shards took 11.4–12.4 min. At 1.53 the longest Intel shard projects to 19.0 min, under the 20-minute stop but close to it. The plan's weights read 10.4 min (measure §2.5): `times.tsv` under-reads this run by about 15 %, as `1306a` found. That is a re-weigh row for the next work order that adds a shard's worth of items.
+  - **CI's budget:** PASS, medians `main` 932,268 KiB, branch 941,864 KiB, **+9.4 MiB** over five boots a side. My eleven a side on Furnace read −0.8 MiB. Both are within 32 MiB; CI's five-boot medians have read ±10 MiB of noise before (`1302`, `1306a`).
