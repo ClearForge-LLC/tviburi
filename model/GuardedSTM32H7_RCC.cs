@@ -220,6 +220,91 @@ namespace Antmicro.Renode.Peripherals.Tviburi
                 citation + "; " + SourceCitation(source) + (source == "per_ck" ? "; " + SourceCitation(PerMux.Sources[muxes[0].Current]) : ""));
         }
 
+        // TVI-WO-1306a (granted outside its fence, ruled 2026-11-26T00:22Z Q2): P's kernel-clock frequency in Hz, read-only, from this
+        // guard's state: the selector's settled input (as QueryKernelClock), RCC_PLLCKSELR and RCC_PLLCFGR from its copies, RCC_PLLxDIVR
+        // as last written (`divr`), and the stock-stored RCC_CR (HSIDIV), RCC_CFGR (SWS), RCC_D1CFGR and RCC_D2CFGR. Null, with the
+        // reason, where the query says the clock does not run or has no rule, or where this guard has no rule for its frequency (lse_ck,
+        // I2S_CKIN, an HSE with no hseFrequency, a PLL outside the ranges p404 gives). It changes nothing.
+        public double? KernelHz(string peripheral, out string why)
+        {
+            var k = QueryKernelClock(peripheral);
+            if(!k.Modeled || !k.Running)
+            {
+                why = k.Condition;
+                return null;
+            }
+            var p = Clocked[peripheral];
+            var source = p.Mux.Sources[muxes.Single(m => m.Def == p.Mux).Current];
+            why = k.Selector + " (" + source + ")";
+            return SourceHz(source, ref why);
+        }
+
+        private double? SourceHz(string source, ref string why)
+        {
+            var hsi = 64e6 / (1 << (int)(Cr() >> 3 & 3));   // hsi_ck = 64 MHz / HSIDIV (p385)
+            switch(source)
+            {
+            case "rcc_pclk1":
+            case "rcc_pclk2":
+                // sys_ck by SWS (p393), / D1CPRE / HPRE (pp. 394-395) / D2PPRE1 or D2PPRE2 (p396)
+                var sws = inner.ReadDoubleWord(CfgrOffset) >> 3 & 7;
+                var sys = sws == 0 ? hsi : sws == 1 ? CsiFrequency : sws == 2 ? (double?)HseFrequency : sws == 3 ? PllHz(1, 'p', hsi, ref why) : null;
+                if(sys == null)
+                {
+                    why += sws > 3 ? ": RCC_CFGR.SWS = " + Bin(sws, 3) + ", no rule for its frequency" : sws == 2 ? ": sys_ck on the HSE with no hseFrequency" : "";
+                    return null;
+                }
+                var d1 = inner.ReadDoubleWord(0x018);
+                var ppre = inner.ReadDoubleWord(0x01C) >> (source == "rcc_pclk2" ? 8 : 4) & 7;   // 0xx /1; 100-111 /2-/16
+                return sys / Prescaler(d1 >> 8 & 0xF) / Prescaler(d1 & 0xF) / ((ppre & 4) == 0 ? 1 : 2 << (int)(ppre & 3));
+            case "hsi_ker_ck":
+                return hsi;
+            case "csi_ker_ck":
+                return CsiFrequency;
+            case "hse_ck":
+                if(HseFrequency == null)
+                {
+                    why += ": no hseFrequency";
+                }
+                return HseFrequency;
+            case "per_ck":
+                return SourceHz(PerMux.Sources[muxes[0].Current], ref why);
+            }
+            if(source.StartsWith("pll", StringComparison.Ordinal))
+            {
+                return PllHz(source[3] - '0', source[5], hsi, ref why);
+            }
+            why += ": no rule for its frequency";
+            return null;
+        }
+
+        // pllN_x_ck = vcoN_ck / (DIVxN + 1), vcoN_ck = refN_ck x (DIVNN + 1), refN_ck = the PLLSRC source / DIVMN (pp. 398-410), with
+        // FRACN 0 (this guard's allow-list); within the ranges p404 gives (refN_ck 1-16 MHz; the VCO 192-960 MHz, or 150-420 MHz with
+        // PLLNVCOSEL = 1), else no rule.
+        private double? PllHz(int n, char output, double hsi, ref string why)
+        {
+            var sel = Copy(PllckselrOffset);
+            var divm = sel >> DivmShift[n] & 0x3F;
+            var input = (sel & 3) == 0 ? hsi : (sel & 3) == 1 ? CsiFrequency : (sel & 3) == 2 ? (double?)HseFrequency : null;
+            var d = divr[Pll1divrOffset + 8 * (n - 1)];
+            var divn = d & 0x1FF;
+            var wide = (Copy(PllcfgrOffset) >> (1 + 4 * (n - 1)) & 1) == 0;
+            var refHz = input == null || divm == 0 ? 0 : input.Value / divm;
+            var vco = refHz * (divn + 1);
+            if(input == null || divm == 0 || divn < 3 || refHz < 1e6 || refHz > 16e6 || vco < (wide ? 192e6 : 150e6) || vco > (wide ? 960e6 : 420e6))
+            {
+                why += ": PLL" + n + " outside the ranges p404 gives, or with no reference (ref " + refHz + " Hz, VCO " + vco + " Hz): no rule for its frequency";
+                return null;
+            }
+            return vco / ((d >> (output == 'p' ? 9 : output == 'q' ? 16 : 24) & 0x7F) + 1);
+        }
+
+        // D1CPRE and HPRE (pp. 394-395): 0xxx /1; 1000-1011 /2-/16; 1100-1111 /64-/512.
+        private static double Prescaler(uint v)
+        {
+            return (v & 8) == 0 ? 1 : (v & 7) < 4 ? 2 << (int)(v & 7) : 64 << (int)((v & 7) - 4);
+        }
+
         // Monitor- and test-facing: refuse (predicted-fault) unless P's kernel clock runs. The start that needs it is
         // described by the caller. This is what a peripheral's guard will call at its own start (TVI-WO-1300a). True when
         // the clock runs; false when a refusal (or, in recorded mode, a would-refuse) was emitted.

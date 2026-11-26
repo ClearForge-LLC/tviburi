@@ -425,11 +425,10 @@ I211-readClears	model/GuardedSTM32F7_I2C.cs	                clearedLast = false;
 I212-kernelQuery	model/GuardedSTM32F7_I2C.cs	if(k != null && k.Modeled && k.Running)	if(k != null)	i2c-kernel
 I213-startOff	model/GuardedSTM32F7_I2C.cs	if((offset == TxdrOffset || start || stop) && !IsRunning)	if((offset == TxdrOffset || start || stop) && false)	i2c-startoff i2c-txdroff
 I215-emptyStart	model/GuardedSTM32F7_I2C.cs	((word >> 16) & 0xFF) == 0 && (word & ReloadBit) == 0)	((word >> 16) & 0xFF) == 0 && false)	i2c-empty
-I216-emptyRecorded	model/GuardedSTM32F7_I2C.cs	Pass(offset, empty ? value & ~StartBit : value);	Pass(offset, value);	i2c-recorded
+I216-emptyRecorded	model/GuardedSTM32F7_I2C.cs	Pass(offset, empty ? value & ~StartBit : value, tick);	Pass(offset, value, tick);	i2c-recorded
 I217-midStart	model/GuardedSTM32F7_I2C.cs	else if(start && Open())	else if(start && false)	i2c-midstart
 I218-midCr2	model/GuardedSTM32F7_I2C.cs	Cr2Held = 0x00FF1FFF;	Cr2Held = 0x00001FFF;	i2c-midcr2
 I219-openCloses	model/GuardedSTM32F7_I2C.cs	if(open && (stopf || (isr & (TcBit | TcrBit)) != 0))	if(open && (isr & TcrBit) != 0)	i2c-ap i2c-config
-I220-absentAck	model/GuardedSTM32F7_I2C.cs	Absent.TryGetValue(name, out var known) && known.Contains(a)	Absent.TryGetValue(name, out var known) && !known.Contains(a)	i2c-absent i2c-absentname
 I221-absentLine	model/GuardedSTM32F7_I2C.cs	"Unknown slave at address {0}.", a);	"Unknown device at address {0}.", a);	i2c-absentname
 I222-softReset	model/GuardedSTM32F7_I2C.cs	                    SoftwareReset(word);\n	                    inner.WriteDoubleWord(offset, word);\n	i2c-softreset
 I223-resetKeepsCr2	model/GuardedSTM32F7_I2C.cs	            inner.WriteDoubleWord(Cr2Offset, cr2);\n	(empty)	i2c-softreset
@@ -447,14 +446,13 @@ I234-restateSet	model/stm32h7-i2c-restate.awk	/^i2c[123]: I2C	/^i2c[12]: I2C	i2c
 I235-sensorsShared	model/GuardedSTM32F7_I2C.cs	.SetValue(inner, ChildCollection);	.SetValue(inner, new Dictionary<int, II2CPeripheral>());	i2c-config
 I236-completionTracked	model/GuardedSTM32F7_I2C.cs	                Open();   // as in Read\n	(empty)	i2c-blindclear
 I237-reservedNotServed	model/GuardedSTM32F7_I2C.cs	cr1 = word & Cr1Defined;	cr1 = word;	i2c-recorded
-I238-absentListAgrees	model/GuardedSTM32F7_I2C.cs	0x54, 0x55, 0x76 }	0x54, 0x55 }	i2c-ledger
 I239-txdrOutside	model/GuardedSTM32F7_I2C.cs	else if(offset == TxdrOffset && !(Open()	else if(offset == TxdrOffset && false && !(Open()	i2c-txdrread
 I240-startStop	model/GuardedSTM32F7_I2C.cs	else if(start && stop)	else if(false)	i2c-startstop
 I241-stopIdle	model/GuardedSTM32F7_I2C.cs	else if(stop && !Controller())	else if(stop && false)	i2c-stopidle
 I242-staleStopf	model/GuardedSTM32F7_I2C.cs	staleStopf = stopf;	staleStopf = false;	i2c-stalestop
 I243-resetTxis	model/GuardedSTM32F7_I2C.cs	                inner.WriteDoubleWord(Cr1Offset, 0);   // the stock Reset leaves TXIS	                // the stock Reset leaves TXIS	i2c-rccreset
 I244-emptyEveryPath	model/GuardedSTM32F7_I2C.cs	var empty = offset == Cr2Offset && (value & StartBit) != 0 && ((value >> 16) & 0xFF) == 0;	var empty = false;	i2c-recorded
-I245-absentEndsData	model/GuardedSTM32F7_I2C.cs	                        open = false;\n                    }	                    }	i2c-absentnext
+I245-absentEndsData	model/GuardedSTM32F7_I2C.cs	                        open = false;\n                        if(tick != null)	                        if(tick != null)	i2c-absentnext
 # TVI-WO-1303a: the DMA guard's circular mode (ruled 2026-11-25T18:49Z), one mutant per change, killed by its case.
 DM50-circReload	model/GuardedSTM32DMA.cs	                inner.WriteDoubleWord(b + NdtrOffset, n);   // the wrap	                // the wrap	dma-circ dma-adc
 DM51-enClear	model/GuardedSTM32DMA.cs	                    inner.WriteDoubleWord(b + CrOffset, inner.ReadDoubleWord(b + CrOffset) & ~EnBit);   // p654, p665	                    // p654, p665	dma-circoff dma-adcoff
@@ -525,3 +523,17 @@ AD44-fieldsClass	tests/1307/fields.py	'EXTEN': ('Zero', G,	'EXTEN': ('Any', G,	a
 AD45-rateStale	model/GuardedSTM32H7_ADC.cs	rateStale |= (cr & AdstartBit) != 0;	rateStale |= false;	adc-rccchange adc-rccboost
 AD46-internal	model/GuardedSTM32H7_ADC.cs	if(Name == "adc3" && ch >= 17 && (regs[CcrOffset] & (1u << (41 - ch))) == 0)	if(false)	adc-internal
 AD47-oneshotCirc	model/GuardedSTM32H7_ADC.cs	if(dmngt == 1 && ServingCircular())	if(false)	adc-oneshotcirc
+I246-nackNinePeriods	model/GuardedSTM32F7_I2C.cs	private const int AddressPeriods = 9;	private const int AddressPeriods = 8;	i2c-nacktime
+I247-nackStopGap	model/GuardedSTM32F7_I2C.cs	host.ScheduleAction(TimeInterval.FromNanoseconds((ulong)Math.Ceiling(tick * 1e9)), __ =>	host.ScheduleAction(TimeInterval.FromNanoseconds(0), __ =>	i2c-nacktime
+I248-nackSyncFloor	model/GuardedSTM32F7_I2C.cs	return (counted + 2 * (2 + ((cr1 >> 8) & 0xF))) / hz.Value;	return counted / hz.Value;	i2c-nacktime
+I249-nackStopAbsorbed	model/GuardedSTM32F7_I2C.cs	if((word & StopBit) != 0 && nackStopPending)	if(false)	i2c-nackstop
+I250-nackPeCancels	model/GuardedSTM32F7_I2C.cs	            CancelNack();   // NACKF and STOPF are reset by PE = 0	            // NACKF and STOPF are reset by PE = 0	i2c-nackpe
+I251-nackInterrupt	model/GuardedSTM32F7_I2C.cs	(nackf && (cr1 & NackieBit) != 0)	false	i2c-nackirq
+I252-nackcfClears	model/GuardedSTM32F7_I2C.cs	nackf &= (word & NackcfBit) == 0;	nackf &= true;	i2c-nack
+I253-nackIsrServed	model/GuardedSTM32F7_I2C.cs	case IsrOffset: return Isr();	case IsrOffset: return inner.ReadDoubleWord(offset);	i2c-nack
+I254-nackPendingRule	model/GuardedSTM32F7_I2C.cs	else if(nackStopPending && (start ||	else if(false && (start ||	i2c-nacktransfer
+I255-nackNoClock	model/GuardedSTM32F7_I2C.cs	refused |= tick == null && RefuseNack(why, value, width);	refused |= false;	i2c-nackclock
+I256-absentReadOnly	model/GuardedSTM32F7_I2C.cs	(word & StartBit) == 0 || (word & RdWrnBit) == 0 || !IsRunning	(word & StartBit) == 0 || (word & RdWrnBit) != 0 || !IsRunning	i2c-absent
+I257-kernelHzApb1	model/GuardedSTM32H7_RCC.cs	/ ((ppre & 4) == 0 ? 1 : 2 << (int)(ppre & 3));	/ 1;	i2c-nacktime
+I258-kernelHzPllR	model/GuardedSTM32H7_RCC.cs	(output == 'p' ? 9 : output == 'q' ? 16 : 24)	(output == 'p' ? 9 : output == 'q' ? 16 : 16)	i2c-nackpll
+I259-kernelHzVcoRange	model/GuardedSTM32H7_RCC.cs	vco < (wide ? 192e6 : 150e6) || 	(empty)	i2c-nackclock

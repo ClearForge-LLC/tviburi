@@ -16,9 +16,25 @@
 //!                        and a read of 1 to the BME280 with software STOP; ICR = 0x40, 0x4, 0x2 (reserved bits, Q10); a probe of
 //!                        0x30 (no device; acknowledged, Q9) ended by STOP; a stop (CR1 = 0xD2) and a start again: passes.
 //!                        MARK_READ = RXDR (0x60), MARK_READ2 = TIMINGR (0x00300F38).
-//!   path="absentnext"  - config, the generated firmware's probe of 0x48 (no device; acknowledged, Q9): a START, ISR polled (no NACKF
-//!                        comes), ICR = 0x30; then the chip id: passes. MARK_READ = RXDR (0x60).
-//!   path="absent"      - config, then a START to 0x31 (no device, not measured): TVI-I2C-ABSENT, unmodeled (p1975).
+//!   path="absentnext"  - config, the generated firmware's probe of 0x48 (no device): a START, NACKed (TVI-WO-1306a), ISR polled to
+//!                        STOPF, ICR = 0x30; then the chip id: passes. MARK_READ = RXDR (0x60).
+//!   path="absent"      - config, then a read START from 0x31 (no device): TVI-I2C-ABSENT, unmodeled (TVI-WO-1306a Q6; p1975).
+//! The NACK (TVI-WO-1306a; ruled 2026-11-26T00:22Z): a write START to an address with no device sets NACKF nine SCL periods later
+//! (p1955, p1971) and STOPF one period after that (inferred), whatever AUTOEND (p1975). MARK_READ3/MARK_READ4 at 0x2000_0110/0x114.
+//!   path="nack"        - rcc_pclk1 / 2 (D2PPRE1 = 100, p396), CR1.DNF = 15, config, a write START to 0x31 with AUTOEND = 1: ISR at
+//!                        once (MARK_READ, 0x1), polled to NACKF (MARK_READ2, 0x11), to STOPF (MARK_READ3, 0x31), ICR = 0x30
+//!                        (MARK_READ4, 0x1). Its timing is tests/1306/i2c.sh `nacktime`, from the monitor.
+//!   path="nackirq"     - CR1.NACKIE, config, a write START to 0x31; then idle: tests/1306/i2c.sh reads the event line and the NVIC.
+//!   path="nackstop"    - ChibiOS's NACK (TVI-WO-1306a.measure.md §2.1): CR1 0x90/0x91, a write START to 0x30, polled to NACKF
+//!                        (MARK_READ, 0x11), ICR = ISR & 0xFE, CR2 |= STOP while the NACK's STOP is pending (absorbed: MARK_READ2,
+//!                        0x1), polled to STOPF (MARK_READ3, 0x21), then PE cleared, checked, the driver started again and the chip
+//!                        id read (MARK_READ4, 0x60): passes.
+//!   path="nackpe"      - config, a write START to 0x31, then PE cleared, checked and set at once: the pending NACK is cancelled (p1959);
+//!                        ISR polled (MARK_READ, 0x1): passes.
+//!   path="nacktransfer" - config, a write START to 0x31, then a START to the BME280 while the NACK's STOP is pending:
+//!                        TVI-I2C-TRANSFER, unmodeled (Q4).
+//!   path="nackclock"   - I2C123SEL = 01 with PLL3's VCO at 20 MHz (outside p404's ranges), config, a write START to 0x31:
+//!                        TVI-I2C-NACK, unmodeled (no frequency to time it by, Q2).
 //!   path="icrres"      - config, then ICR = 0x80 (bit 7, reserved, not ChibiOS's): TVI-I2C-FIELD, unmodeled.
 //!   path="field"       - CR1.TXDMAEN = 1 with PE = 0: TVI-I2C-FIELD, unmodeled (the allow-list).
 //!   path="width"       - a byte write to CR1: TVI-I2C-WIDTH, unmodeled (p2001).
@@ -60,6 +76,12 @@ const TXDR: usize = 0x28;
 const MARK_AFTER: *mut u32 = 0x2000_0104 as *mut u32;
 const MARK_READ: *mut u32 = 0x2000_0108 as *mut u32;
 const MARK_READ2: *mut u32 = 0x2000_010C as *mut u32;
+const MARK_READ3: *mut u32 = 0x2000_0110 as *mut u32;
+const MARK_READ4: *mut u32 = 0x2000_0114 as *mut u32;
+const RCC_CR: *mut u32 = 0x5802_4400 as *mut u32;
+const RCC_D2CFGR: *mut u32 = 0x5802_441C as *mut u32;
+const RCC_PLL3DIVR: *mut u32 = 0x5802_4440 as *mut u32;
+const ABSENT: u32 = 0x31 << 1;
 const TIMING: u32 = 0x10C7_123C;
 const BME: u32 = 0x76 << 1;
 const START: u32 = 1 << 13;
@@ -81,6 +103,14 @@ unsafe fn until(bits: u32) {
             return;
         }
     }
+}
+
+/// PLL3 on, from the HSI (64 MHz) through DIVM3's reset 32 (2 MHz, p398-399), times DIVN3 + 1 (p410), its R output over DIVR3 + 1
+/// = 20 (p409), and I2C123SEL = 01 (pll3_r_ck, p416): with divn = 9 the VCO (20 MHz) is outside p404's ranges (`nackclock`).
+unsafe fn pll3_30mhz(divn: u32) {
+    write_volatile(RCC_PLL3DIVR, 19 << 24 | 1 << 16 | 1 << 9 | divn);
+    write_volatile(RCC_CR, read_volatile(RCC_CR) | 1 << 28);
+    write_volatile(RCC_D2CCIP2R, 1 << 12);
 }
 
 /// The generated firmware's sequence: CR1 = 0, TIMINGR, CR1 = PE.
@@ -184,14 +214,82 @@ pub unsafe extern "C" fn reset() -> ! {
     {
         config();
         w(CR2, 1 << 16 | START | 0x48 << 1);
-        until(1 << 4);
+        until(1 << 5);
         w(ICR, 0x30);
         write_volatile(MARK_READ, chip_id());
     }
     #[cfg(path = "absent")]
     {
         config();
-        w(CR2, 1 << 16 | START | 0x31 << 1);
+        w(CR2, 1 << 16 | RD | START | ABSENT);
+    }
+    #[cfg(path = "nack")]
+    {
+        write_volatile(RCC_D2CFGR, 0b100 << 4);
+        w(CR1, 0xF << 8);
+        w(TIMINGR, TIMING);
+        w(CR1, 0xF << 8 | 1);
+        w(CR2, AUTOEND | 1 << 16 | START | ABSENT);
+        write_volatile(MARK_READ, r(ISR));
+        until(1 << 4);
+        write_volatile(MARK_READ2, r(ISR));
+        until(1 << 5);
+        write_volatile(MARK_READ3, r(ISR));
+        w(ICR, 0x30);
+        write_volatile(MARK_READ4, r(ISR));
+    }
+    #[cfg(path = "nackirq")]
+    {
+        w(CR1, 1 << 4);
+        w(TIMINGR, TIMING);
+        w(CR1, 1 << 4 | 1);
+        w(CR2, 1 << 16 | START | ABSENT);
+    }
+    #[cfg(path = "nackstop")]
+    {
+        w(CR1, 0x90);
+        w(TIMINGR, 0x0030_0F38);
+        w(CR1, 0x91);
+        w(CR2, 0x30 << 1);
+        w(CR2, r(CR2) | 1 << 16);
+        w(CR2, r(CR2) | START);
+        until(1 << 4);
+        let isr = r(ISR);
+        write_volatile(MARK_READ, isr);
+        w(ICR, isr & 0xFE);
+        w(CR2, r(CR2) | STOP);
+        write_volatile(MARK_READ2, r(ISR));
+        until(1 << 5);
+        write_volatile(MARK_READ3, r(ISR));
+        w(CR1, r(CR1) & !0x46);
+        w(CR1, r(CR1) & !1);
+        w(CR1, 0x90);
+        w(TIMINGR, 0x0030_0F38);
+        w(CR1, 0x91);
+        write_volatile(MARK_READ4, chip_id());
+    }
+    #[cfg(path = "nackpe")]
+    {
+        config();
+        w(CR2, 1 << 16 | START | ABSENT);
+        w(CR1, 0);
+        if r(CR1) & 1 == 0 {
+            w(CR1, 1);
+        }
+        until(1 << 4);
+        write_volatile(MARK_READ, r(ISR));
+    }
+    #[cfg(path = "nacktransfer")]
+    {
+        config();
+        w(CR2, 1 << 16 | START | ABSENT);
+        w(CR2, 1 << 16 | START | BME);
+    }
+    #[cfg(path = "nackclock")]
+    {
+        pll3_30mhz(9);
+        config();
+        w(CR2, 1 << 16 | START | ABSENT);
     }
     #[cfg(path = "icrres")]
     {
