@@ -1,7 +1,7 @@
 # TVI-WO-1205 (1), (2): Phase 1's exit gate, clause by clause, on `main`
 
 **Builder:** Claude (Opus 5.5), Furnace, 2026-11-26. **Branch:** `wo/tvi-1205-gate-judged`, from `main` `63fe557`.
-**Judged on:** `main` `63fe557` and its CI run 45858432173: every shard green, and the aggregate reads "1000 expected (446 cases, 554 mutants), 1000 ran across 10 shards, 0 failures". Clause 1's final rows are on the post-`1308` `main` (§1.3).
+**Judged on:** `main` `63fe557` and its CI run 45858432173: every shard green, and the aggregate reads "1000 expected (446 cases, 554 mutants), 1000 ran across 10 shards, 0 failures". Clause 1's final rows are on the post-`1308` `main` (§1.3), and its verdict, as Scotty ruled, is in §1.4: **not met**.
 **Evidence:** this file; `spike/1205/` (the queue join's scripts and data); `~/.cache/tvi-1205/` (the runs).
 
 How each clause is judged:
@@ -86,7 +86,7 @@ As amended and ratified 2026-11-26: a planted monitor write proves a path whose 
 
 **The join:** 935 rows: guarded 612, acknowledged 254, inherited 69, findings 0.
 
-**Above the cut, nothing is open.**
+**Above the cut, nothing is open by `1100a`'s states.** Under Scotty's ruling, 129 of the acknowledged items do not count (§1.4).
 - **653 rows:** 412 guarded, 241 acknowledged. 86 of the acknowledged carry a `stock-wrong` field, and 105 rest only on `inherited, unaudited (acknowledged by name)` fields (§1.4).
 - **97 armed registers outside every row:** 71 guarded, 26 acknowledged.
 - **The table below sums both:** 483 guarded, 267 acknowledged.
@@ -111,13 +111,32 @@ As amended and ratified 2026-11-26: a planted monitor write proves a path whose 
 - **Mutants** (granted 18:38Z): `DX34-fieldsSweep` and `PW39-fieldsSweep`, each the guard's `RefusedField` returning false, killed by `dmamux-fields` and `pwr-fields`. Before the grant, a scratch mutant failed both sweeps (`~/.cache/tvi-1205/h/c6mut-1308.sh`).
 - **So clause 6 is met for all eleven guards.**
 
-**Clause 1: met on post-`1308` `main`.**
+**Guarded and acknowledged on post-`1308` `main`:**
 - **Guarded:** 412 rows and 71 armed registers above the cut. Some are guarded by type, with the evidence from a sibling's case:
   - 97 rows on a sibling instance's sweep;
   - 9 DMA registers on stream 0's sweep (streams 1–7, and `dma2` on `dma1`'s);
   - 9 DMAMUX1 channel registers on C0's.
 - **Every guarded row and register has a clause-6 case.** The join now fails one with none (its fourth change). It reads `adc-fieldsmonwrite` and `i2c-isrmonwrite`, which covered six ADC registers it had listed as "NO case".
 - **Acknowledged by name:** 241 rows and 26 registers, `TIMx_SR` included in full; but see §1.4.
+
+### 1.4 The unaudited acknowledgements, and clause 1's verdict
+
+**The question** (18:49Z point 1): does `RUL-17`'s class "inherited, unaudited (acknowledged by name)" count as acknowledged? The ruled cut and `1100a`'s join counted it; the architect's 17:02Z reading did not ("the ledger admitting it hasn't looked").
+
+**Scotty's ruling** (relayed by the architect at 22:53Z; `RUL-17` amended in docs PR #70): **(b).** In his words: "I want to make sure that we stay as honest and accurate as possible." So `inherited-unaudited` is not acknowledged for the gate.
+
+**What that leaves**, from `spike/1205/data/main-5d4a61a/` (`states.tsv` rows whose reach names `arm`, and `arm-reach-outside.tsv`, both off path `other`; a field's class is the second word of its `ledger_fields` entry):
+
+| | Above the cut | Holding an `inherited-unaudited` field | By instance |
+|---|---|---|---|
+| **Rows** | 653 (412 guarded, 241 acknowledged) | **105,** each that one field | USART1–3 19 each; GPIO A 10, B 9, E 3, D 1; I2C1 6, I2C2 4; TIM1 9; RCC 6 |
+| **Armed registers outside rows** | 97 (71 guarded, 26 acknowledged) | **24** | RCC 13; USART1 2, USART2 1, USART3 2; TIM1 3; SPI1 1, SPI2 1; I2C1 1 |
+
+- **None of the 105 rows also carries a field read some other way.** Three of the 24 registers do: RCC `ResetStatus` (an `(A<n>)` field), and TIM1 `Control2` and `DmaOrInterruptEnable` (stock-undefined fields). Their unaudited fields are still unread, so they are counted.
+- **Off the cut, not counted:** dma2's `HIFCR` and five `SxCR` registers (path `other`: request none). They hold unaudited fields next to `stock, wrong` ones.
+- **The rest above the cut** (136 rows and 2 registers acknowledged, and every guarded item) is guarded, or acknowledged by a reading: an `(A<n>)` row, a `stock, wrong` or stock-undefined reason, a quoted ruling (R3), or a reserved, read-only or tag field.
+
+**Clause 1: not met on post-`1308` `main`.** Nothing above the cut is open in `1100a`'s sense, but 129 items hold fields nobody has read against RM0433. `TVI-WO-1206` reads them, as `TIMx_SR` was read here (§1.1), and then re-judges this clause.
 
 ## 2. Clause 2: same build, byte-identical ledgers; any overlay file changes the hash
 
