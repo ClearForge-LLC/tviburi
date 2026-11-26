@@ -163,10 +163,11 @@ def build():
             cls, allowed, behaves = 'inherited', [0, 1], ('the guard\'s copy, served on read: 0 from construction (a backup domain reset, p427, '
                 'p334), kept across a machine reset (p427); it gates rtc_ck only (p366), which has no source while RTCSEL = 00 ("No clock", p427), '
                 'and the RTC\'s registers follow RCC_APB4ENR.RTCAPBEN (p471), so `rtc` is never locked by it; RCC_BDCR\'s write protection '
-                '(PWR_CR1.DBP, p427) is not modeled: the twin\'s PWR is a canned stub that reads DBP = 1 (acknowledged by name) (TVI-WO-1300b, '
-                'ruled 2026-11-25T03:03Z Q4)')
+                '(PWR_CR1.DBP, p427): with a PWR guard on the platform, a write that changes RCC_BDCR while its DBP = 0 refuses TVI-RCC-DBP, '
+                'unmodeled (TVI-WO-1308, ruled 2026-11-26T09:31Z Q10); with none, the stock pwr stub reads DBP = 1 and the write is taken '
+                '(acknowledged by name) (TVI-WO-1300b, ruled 2026-11-25T03:03Z Q4)')
         elif reg == 'RCC_BDCR' and acc not in ('r', '-') and field != 'Reserved':
-            cls, allowed, behaves = 'inherited', [rv or 0], 'its reset value only: RCC_BDCR is write-protected after a system reset until PWR_CR1.DBP = 1 (p427), which the twin does not model, and the RTC\'s kernel clock (RTCSEL) is not modeled'
+            cls, allowed, behaves = 'inherited', [rv or 0], 'its reset value only: the RTC\'s kernel clock (RTCSEL) is not modeled; RCC_BDCR is write-protected after a system reset until PWR_CR1.DBP = 1 (p427): with a PWR guard on the platform, a write that changes RCC_BDCR while its DBP = 0 refuses TVI-RCC-DBP, unmodeled (TVI-WO-1308, ruled 2026-11-26T09:31Z Q10); with none, the stock pwr stub reads DBP = 1'
         if (reg, field) in FREQ:
             c, behaves = FREQ[(reg, field)]
             if c:

@@ -299,6 +299,17 @@ fn restated<'a>(declared: &'a [(String, String, String)], stock_ty: &str, names:
     Ok((restates, consumer.iter().map(String::as_str).collect()))
 }
 
+/// The chain's declarations as one class row sees them (TVI-WO-1308 Q19, granted 2026-11-26T11:06Z): a stock instance the chain
+/// declares only as canned (a `Python.PythonPeripheral` stub, such as `pwr`) counts as declared with its type for a row of that
+/// type that names it in its stock column, and for that row only. Every other row, and the ledger's canned rows, see the chain as
+/// it is: `fmc`, named by no row, stays canned.
+fn declared_for(chain: &stock::Chain, stock_ty: &str, names: &[String]) -> Vec<(String, String, String)> {
+    let mut out = chain.declared.clone();
+    out.extend(chain.canned.iter().filter(|c| c.2 == stock_ty && names.contains(&c.0) && !chain.declared.iter().any(|d| d.1 == c.0))
+        .map(|c| (c.2.clone(), c.0.clone(), c.1.clone())));
+    out
+}
+
 /// Every (guard type, instance) that a committed restatement runs guarded (TVI-WO-1203 (1)): the files
 /// `model/stm32h7-*-restate.repl`, which every replay loads (tests/1301/replay-1301.sh; `tests/spike.sh manifest` checks
 /// that it loads each). An entry is a top-level line `<var>: Tviburi.<Type> @ …`, named by its `as "<name>"`, on that line or on
@@ -523,7 +534,8 @@ fn build(repo: &Path, renode: &Path, out: &Path) -> Result<(String, String), Str
         m += &format!("class {stock_ty} {guard}\n");
         let names = pins.instances.get(guard).ok_or(format!("the class row for {guard} names no instances"))?;
         let consumer = pins.consumer.get(guard).ok_or(format!("the class row for {guard} names no instances"))?;
-        let (restates, retypes) = restated(&chain.declared, stock_ty, names, consumer)?;
+        let declared = declared_for(&chain, stock_ty, names);
+        let (restates, retypes) = restated(&declared, stock_ty, names, consumer)?;
         for (inst, file) in restates {
             // TVI-WO-1203 (1): restated onto a guard only where a committed restatement runs it under that guard.
             if !guarded.contains(&(guard.clone(), inst.to_string())) {
@@ -872,6 +884,23 @@ mod tests {
         assert!(restated(&declared, "DMA.STM32DMA", &names(&["dma01"]), &[]).unwrap_err().contains("does not declare as DMA.STM32DMA"));
         assert!(restated(&declared, "DMA.STM32DMA", &names(&["timer1"]), &[]).unwrap_err().contains("does not declare as DMA.STM32DMA"));
         assert!(restated(&declared, "DMA.STM32DMA", &[], &names(&["dma1"])).unwrap_err().contains("as the consumer's"));
+    }
+
+    #[test]
+    fn a_canned_stub_is_restated_only_by_a_row_of_its_type_that_names_it() {
+        // TVI-WO-1308 Q19: `pwr` and `fmc` are Python stubs (canned); a PythonPeripheral row naming pwr restates pwr alone, and a row
+        // of another type naming it still refuses, as the chain alone does.
+        let f = "platforms/cpus/stm32h7.repl".to_string();
+        let stub = |i: &str| (i.to_string(), f.clone(), "Python.PythonPeripheral".to_string(), "a stock Python script's fixed answers".to_string());
+        let chain = stock::Chain { declared: vec![("DMA.STM32DMA".into(), "dma1".into(), f.clone())], canned: vec![stub("pwr"), stub("fmc")], tags: vec![] };
+        let names = |v: &[&str]| v.iter().map(|x| x.to_string()).collect::<Vec<_>>();
+        let py = "Python.PythonPeripheral";
+        let d = declared_for(&chain, py, &names(&["pwr"]));
+        assert_eq!(restated(&d, py, &names(&["pwr"]), &[]).unwrap().0, vec![("pwr", "platforms/cpus/stm32h7.repl")]);
+        assert!(!d.iter().any(|x| x.1 == "fmc"));
+        assert!(restated(&chain.declared, py, &names(&["pwr"]), &[]).unwrap_err().contains("does not declare as Python.PythonPeripheral"));
+        let other = declared_for(&chain, "DMA.STM32DMA", &names(&["dma1", "pwr"]));
+        assert!(restated(&other, "DMA.STM32DMA", &names(&["dma1", "pwr"]), &[]).unwrap_err().contains("names pwr, which the pinned stock chain does not declare as DMA.STM32DMA"));
     }
 
     #[test]

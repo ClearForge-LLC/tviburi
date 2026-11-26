@@ -29,3 +29,5 @@ class	MTD.STM32H7_FlashController	Tviburi.GuardedSTM32H7_Flash	flashController	-
 class	UART.STM32F7_USART	Tviburi.GuardedSTM32F7_USART	usart1 usart2 usart3 uart4 uart5 usart6 uart7 uart8	-
 class	I2C.STM32F7_I2C	Tviburi.GuardedSTM32F7_I2C	i2c1 i2c2 i2c3	-
 class	Analog.STM32H7_ADC	Tviburi.GuardedSTM32H7_ADC	adc3 adcM1S2	-
+class	Miscellaneous.STM32_DMAMUX	Tviburi.GuardedSTM32H7_DMAMUX	dmamux1	-
+class	Python.PythonPeripheral	Tviburi.GuardedSTM32H7_PWR	pwr	-

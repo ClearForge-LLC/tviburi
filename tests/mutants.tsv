@@ -263,7 +263,7 @@ DM23-sharedAcross	model/GuardedSTM32DMA.cs	return other == null ? Off : other.St
 DM24-request	model/GuardedSTM32DMA.cs	if(!raised.Contains(id))	if(false)	dma-request
 DM25-txAck	model/GuardedSTM32DMA.cs	private static readonly uint[] RaisedFromMemory = { 38, 40, 42, 46 };	private static readonly uint[] RaisedFromMemory = { 38, 40, 42, 44, 46 };	dma-txother
 DM26-bench	model/bench-checks.tsv	DMA_S0M0AR = 0x20000400 (DTCM (0x20000000-0x2001FFFF))	DMA_S0M0AR = 0x20000401 (DTCM (0x20000000-0x2001FFFF))	dma-ledger
-DM27-route	model/stm32h7-dma-restate.repl	    [0-7] -> tviburiDma1@[0-7]\n	(empty)	dma-registrations
+DM27-route	model/stm32h7-dmamux-restate.repl	    [0-7] -> tviburiDma1@[0-7]\n	(empty)	dma-registrations
 DM28-irq	model/GuardedSTM32DMA.cs	public IReadOnlyDictionary<int, IGPIO> Connections => connections;	public IReadOnlyDictionary<int, IGPIO> Connections => Enumerable.Range(0, Streams).ToDictionary(i => i, i => (IGPIO)new GPIO());	dma-irq
 DM29-config	model/GuardedSTM32DMA.cs	if(dmamux == null)	if(false)	dma-config
 DM30-recordedKeep	model/GuardedSTM32DMA.cs	            word = (word & ~mask) | (old & mask);\n	(empty)	dma-recorded
@@ -279,7 +279,7 @@ DM39-fthProtected	model/GuardedSTM32DMA.cs	case FcrOffset: return DmdisBit | Fth
 DM40-fthAny	tests/1303/fields.py	"FTH[1:0]", 1, 0, A,	"FTH[1:0]", 1, 0, Z,	dma-regen
 DM42-reloadSpan	model/GuardedSTM32DMA.cs	var items = (ulong)(reload ? programmed[s] : Items(s));	var items = (ulong)Items(s);	dma-reloadtcm
 FL01-waitShort	model/GuardedSTM32H7_Flash.cs	                if(latency < need)	                if(false)	flash-clockfirst
-FL03-vosUnknownAtVos1	model/GuardedSTM32H7_Flash.cs	var row = table[c.Vos == 0 ? 1 : c.Vos];	var row = table[c.Vos == 0 ? 3 : c.Vos];	flash-vosunknown
+FL03-vosUnknownAtVos1	model/GuardedSTM32H7_Flash.cs	var row = table[c.Vos <= 0 ? 1 : c.Vos];	var row = table[c.Vos <= 0 ? 3 : c.Vos];	flash-vosunknown
 FL04-over225	model/GuardedSTM32H7_Flash.cs	            if(clock.Hz == null || clock.Hz > MaxAclk)\n            {\n                kind = Unmodeled;\n                why = clock.Hz == null ? "the AXI clock cannot be computed (" + clock.Note + ")"\n                    :	            if(clock.Hz == null)\n            {\n                kind = Unmodeled;\n                why = clock.Hz == null ? "the AXI clock cannot be computed (" + clock.Note + ")"\n                    :	flash-over225
 FL08-rccEvent	model/GuardedSTM32H7_RCC.cs	            Written?.Invoke(b, value);\n	(empty)	flash-clockfirst
 FL09-subscribe	model/GuardedSTM32H7_Flash.cs	                    rcc.Written += OnRccWritten;\n	(empty)	flash-clockfirst
@@ -546,6 +546,36 @@ HZ21-flashJudged	model/GuardedSTM32H7_Flash.cs	var now = c.Hz + " " + c.Note;	va
 HZ22-flashBus	model/GuardedSTM32H7_Flash.cs	var hz = rcc.BusHz("rcc_hclk", out var why);	var hz = rcc.BusHz("sys_ck", out var why);	flash-prescaler
 HZ23-cfgOn	model/GuardedSTM32H7_RCC.cs	cfgUnknown[n] |= src || (PllOn(n) && ((old ^ value) & mask) != 0);	cfgUnknown[n] |= src;	usart-hzcfgon
 HZ24-cfgUse	model/GuardedSTM32H7_RCC.cs	if(cfgUnknown[n])	if(false)	usart-hzcfgon
+# TVI-WO-1308: the DMAMUX1 guard (tests/1308/dmamux.sh), one mutant per rule and per restated reference.
+DX01-pairOff	model/GuardedSTM32H7_DMAMUX.cs	if(p != null && p.Address == par && leaves == null)	if(true)	dmamux-pair dmamux-pairtx
+DX02-pairCall	model/GuardedSTM32DMA.cs	refused |= raised.Contains(id) && dmamux is GuardedSTM32H7_DMAMUX g && g.RefusedPair(ch, inner.ReadDoubleWord(StreamBase(s) + ParOffset), p2m, offset, word, inner.ReadDoubleWord(StreamBase(s) + NdtrOffset));	refused |= false && dmamux is GuardedSTM32H7_DMAMUX g && g.RefusedPair(ch, inner.ReadDoubleWord(StreamBase(s) + ParOffset), p2m, offset, word, inner.ReadDoubleWord(StreamBase(s) + NdtrOffset));	dmamux-pair
+DX03-pairAddress	model/GuardedSTM32H7_DMAMUX.cs	new Pair(41, "usart1_rx_dma", true, 0x40011024,	new Pair(41, "usart1_rx_dma", true, 0x40011028,	dmamux-routes
+DX04-pairDirection	model/GuardedSTM32H7_DMAMUX.cs	new Pair(38, "spi1_tx_dma", false,	new Pair(38, "spi1_tx_dma", true,	dmamux-pairs
+DX05-liveOff	model/GuardedSTM32H7_DMAMUX.cs	var state = StreamState(ch);\n            if(state == 0)	var state = StreamState(ch);\n            if(true)	dmamux-live
+DX06-liveSame	model/GuardedSTM32H7_DMAMUX.cs	if(id == ids[ch])	if(false)	dmamux-livesame
+DX07-liveRunningOnly	model/GuardedSTM32H7_DMAMUX.cs	var state = StreamState(ch);\n            if(state == 0)	var state = StreamState(ch);\n            if(state != 1)	dmamux-livedone
+DX08-fieldOff	model/GuardedSTM32H7_DMAMUX.cs	if(f.Offset != r || f.Allowed == null || f.Allowed.Contains(f.Of(word)))	if(true)	dmamux-se
+DX09-seRow	model/GuardedSTM32H7_DMAMUX.cs	"SE", 16, 16, Zero,	"SE", 16, 16, Any,	dmamux-se
+DX10-geRow	model/GuardedSTM32H7_DMAMUX.cs	"GE", 16, 16, Zero,	"GE", 16, 16, Any,	dmamux-ge
+DX11-reservedId	model/GuardedSTM32H7_DMAMUX.cs	"DMAREQ_ID", 6, 0, Any,	"DMAREQ_ID", 6, 0, new uint[] { 0, 9, 37, 38, 39, 40, 41, 42, 43, 45, 46, 77, 83, 115 },	dmamux-reserved
+DX12-rgMap	model/GuardedSTM32H7_DMAMUX.cs	return RgcrOffset;	return b;	dmamux-ge
+DX13-reservedBits	model/GuardedSTM32H7_DMAMUX.cs	"Res15_10", 15, 10, Zero,	"Res15_10", 15, 10, Any,	dmamux-ledger
+DX14-misaligned	model/GuardedSTM32H7_DMAMUX.cs	if((offset & (width / 8 - 1)) == 0)	if(true)	dmamux-misaligned
+DX15-read	model/GuardedSTM32H7_DMAMUX.cs	if(RowOffset(b) < 0)\n                {\n                    records.Refuse("TVI-DMAMUX-READ"	if(false)\n                {\n                    records.Refuse("TVI-DMAMUX-READ"	dmamux-read
+DX16-byteMerge	model/GuardedSTM32H7_DMAMUX.cs	var word = width == 32 && shift == 0 ? value :	var word = true ? value :	dmamux-byte
+DX17-clock	model/GuardedSTM32H7_DMAMUX.cs	return (Rcc().ReadDoubleWord(Ahb1enrOffset) & (Dma1En | Dma2En)) != 0;	return true;	dmamux-clock
+DX18-clockOne	model/GuardedSTM32H7_DMAMUX.cs	& (Dma1En | Dma2En)) != 0;	& Dma1En) != 0;	dmamux-clockone
+DX19-rst	model/GuardedSTM32H7_DMAMUX.cs	(value & (Dma1Rst | Dma2Rst)) != 0	(value & Dma2Rst) != 0	dmamux-rst
+DX20-resetCopy	model/GuardedSTM32H7_DMAMUX.cs	Array.Clear(ids, 0, ids.Length);	(empty)	dmamux-reset
+DX21-resetStock	model/GuardedSTM32H7_DMAMUX.cs	base.Reset();\n                Array.Clear	Array.Clear	dmamux-reset
+DX22-recorded	model/GuardedSTM32H7_DMAMUX.cs	if(refused && !records.Recorded)\n                {\n                    return;\n                }\n                Pass(b, word);	if(refused)\n                {\n                    return;\n                }\n                Pass(b, word);	dmamux-recorded
+DX23-config	model/GuardedSTM32H7_DMAMUX.cs	if(Rcc() == null)	if(false)	dmamux-norcc
+DX24-restateGen	model/stm32h7-dmamux-restate.awk	print "    OutDMA -> tviburiDmamux1@77"	print "    OutDMA -> tviburiDmamux1@78"	dmamux-regen
+DX25-restateSpi4	model/stm32h7-dmamux-restate.repl	spi4:\n    DMARecieve -> tviburiDmamux1@83\n	(empty)	dmamux-registrations
+DX26-served	model/GuardedSTM32H7_DMAMUX.cs	return b < CxcrEnd ? ids[b / 4] : 0;	return 0;	dmamux-routes
+DX27-copy	model/GuardedSTM32H7_DMAMUX.cs	ids[b / 4] = word & IdMask;	(empty)	dmamux-routes
+DX28-boardMode	model/tviburi-nucleo-h753zi.repl	tviburiDmamux1:\n    mode: "enforcing"	tviburiDmamux1:\n    mode: "recorded"	dmamux-pair
+DX29-pairRecorded	model/GuardedSTM32H7_DMAMUX.cs	return !records.Recorded;	return true;	dmamux-pairrec
 MF01-restated	tools/tviburi-release/src/main.rs	if !guarded.contains(&(guard.clone(), inst.to_string())) {	if false {	manifest
 MF02-bareVar	tools/tviburi-release/src/main.rs	 || var.is_empty() || !var.bytes().all(|b| b.is_ascii_alphanumeric() || b == b'_')	(empty)	manifest
 MF03-stockTypo	tools/tviburi-release/src/main.rs	        if !declared.iter().any(|d| &d.1 == n && d.0 == stock_ty) {	        if false {	manifest
@@ -556,6 +586,49 @@ MF07-consumerStock	tools/tviburi-release/src/main.rs	        if let Some(d) = de
 MF08-twice	tools/tviburi-release/src/main.rs	                if let Some(d) = all.iter().find(|n| all.iter().filter(|m| m == n).count() > 1) {	                if let Some(d) = all.iter().find(|_| false) {	manifest
 MF09-consumerRun	tools/tviburi-release/src/main.rs	if !consumer_run_guarded(	if false && !consumer_run_guarded(	manifest
 MF10-loaded	tools/tviburi-release/src/main.rs	if !loaded_by_replay(	if false && !loaded_by_replay(	manifest
+DX30-parMemory	model/GuardedSTM32H7_DMAMUX.cs	if(par < PeripheralsStart || par > PeripheralsEnd)	if(false)	dmamux-parmem
+PW01-lowerOnce	model/GuardedSTM32H7_PWR.cs	else if(lowerByte && written && low != (cr3 & 0xFF))	else if(false)	pwr-second pwr-reset
+PW02-invalidPair	model/GuardedSTM32H7_PWR.cs	else if(lowerByte && !written && (low & LdoenBit) >> 1 == (low & BypassBit))	else if(false)	pwr-invalid pwr-locked
+PW03-porReset	model/GuardedSTM32H7_PWR.cs	                vos = 1;\n	                vos = 1;\n                written = false;\n	pwr-reset
+PW04-recordedIgnore	model/GuardedSTM32H7_PWR.cs	the upper bytes go on as if no rule had fired\n                cr3 = (cr3 & 0xFF)	the upper bytes go on as if no rule had fired\n                cr3 = (word & Cr3Writable)	pwr-recorded
+PW05-vosEarly	model/GuardedSTM32H7_PWR.cs	if(!ActvosRdy)	if(false)	pwr-vosearly pwr-locked
+PW06-vosLower	model/GuardedSTM32H7_PWR.cs	if(ScaleOf(next) <= ScaleOf(vos))	if(true)	pwr-voslow
+PW07-dbp	model/GuardedSTM32H7_PWR.cs	if((cr1 & DbpBit) != 0 || (word & Cr2Writable) == (cr2 & Cr2Writable))	if(true)	pwr-cr2dbp
+PW08-brenAck	model/GuardedSTM32H7_PWR.cs	if(word == BrenBit && cr2 == 0)	if(false)	pwr-ap
+PW09-actvosRdy	model/GuardedSTM32H7_PWR.cs	private bool ActvosRdy => written && !locked;	private bool ActvosRdy => written && locked;	pwr-same pwr-ap
+PW10-nibble	model/GuardedSTM32H7_PWR.cs	NibbleQ11 = { 0, 15 };	NibbleQ11 = { 0 };	pwr-ap pwr-nibble
+PW11-revisionRequired	model/GuardedSTM32H7_PWR.cs	config = revision == "V" || revision == "Y" ? null	config = true ? null	pwr-norev
+PW12-revY	model/GuardedSTM32H7_PWR.cs	cr3 = revision == "Y" ? 0x06u : 0x46u;	cr3 = 0x46u;	pwr-revy
+PW13-limitEdge	model/GuardedSTM32H7_PWR.cs	clocks[i] <= max * 1e6	clocks[i] < max * 1e6	pwr-ap pwr-order
+PW14-footnoteNever	model/GuardedSTM32H7_PWR.cs	(scale == 3 && i >= 2 && !apbEnabled[i - 2])	(scale == 3 && i >= 2)	pwr-apbvos3
+PW15-footnoteAlways	model/GuardedSTM32H7_PWR.cs	 || (scale == 3 && i >= 2 && !apbEnabled[i - 2])	(empty)	pwr-apbvos3
+PW16-usb33rdy	model/GuardedSTM32H7_PWR.cs	case Cr3Offset: return cr3 | ((cr3 & Usb33denBit) != 0 ? Usb33rdyBit : 0);	case Cr3Offset: return cr3;	pwr-same
+PW17-readNoReg	model/GuardedSTM32H7_PWR.cs	if(!Fields.Any(f => f.Offset == b))	if(false)	pwr-read
+PW18-misaligned	model/GuardedSTM32H7_PWR.cs	if((offset & (width / 8 - 1)) == 0)	if(true)	pwr-misaligned
+PW19-subword	model/GuardedSTM32H7_PWR.cs	var word = width == 32 && shift == 0 ? value :	var word = true ? value :	pwr-byte
+PW20-revYBit6	model/GuardedSTM32H7_PWR.cs	if(b == Cr3Offset && Revision == "Y" && (word & Cr3Bit6) != 0)	if(false)	pwr-revy
+PW21-vos00	model/GuardedSTM32H7_PWR.cs	return v == 3 ? 1 : v == 2 ? 2 : 3;	return v == 3 ? 1 : v == 2 ? 2 : v == 1 ? 3 : 1;	pwr-flashvos3
+PW22-rccVos	model/GuardedSTM32H7_RCC.cs	if(after == null || after == before)	if(true)	pwr-clockfirst pwr-apbvos3
+PW23-rccNoGuard	model/GuardedSTM32H7_RCC.cs	            if(p == null)\n            {\n                return false;   // ruled 2026-11-26T11:06Z Q20 (A): not judged without a PWR guard\n            }\n            var revision = p.Revision;\n            var scale = p.Scale;\n            var held = p.ScaleCitation;	            var revision = p?.Revision ?? "V";\n            var scale = p?.Scale ?? 1;\n            var held = p?.ScaleCitation ?? "no PWR guard, judged at VOS1";	pwr-notjudged flash-order flash-clockfirst
+PW24-rccTrialSw	model/GuardedSTM32H7_RCC.cs	var sys = SysHz(b == CfgrOffset ? value & 7 : inner.ReadDoubleWord(CfgrOffset) >> 3 & 7, ref why);	var sys = SysHz(inner.ReadDoubleWord(CfgrOffset) >> 3 & 7, ref why);	pwr-clockfirst
+PW25-rccDbp	model/GuardedSTM32H7_RCC.cs	if(p == null || p.Dbp || value == Served(b))	if(true)	pwr-bdcr
+PW26-flashAsksPwr	model/GuardedSTM32H7_Flash.cs	if(guard != null)	if(false)	pwr-flashvos3
+MF11-cannedNamed	tools/tviburi-release/src/main.rs	c.2 == stock_ty && names.contains(&c.0) &&	c.2 == stock_ty &&	unit
+MF12-cannedRow	tools/tviburi-release/src/main.rs	let (restates, retypes) = restated(&declared, stock_ty, names, consumer)?;	let (restates, retypes) = restated(&chain.declared, stock_ty, names, consumer)?;	manifest pwr-ledger
+PW27-vos0Kind	model/GuardedSTM32H7_PWR.cs	kind = vos0 ? Unmodeled : PredictedFault;	kind = PredictedFault;	pwr-vos0
+PW28-revYTable	model/GuardedSTM32H7_PWR.cs	var table = revision == "V" ? LimitsV : revision == "Y" ? LimitsY : null;	var table = revision == "V" || revision == "Y" ? LimitsV : null;	pwr-revy200
+PW29-flashPwrEvent	model/GuardedSTM32H7_Flash.cs	                    pwrGuard.Written += OnPwrWritten;\n	(empty)	pwr-flashlow
+PW30-sysBeforeSupply	model/GuardedSTM32H7_RCC.cs	if(!p.ActvosReady && sys1 != sys0)	if(false)	pwr-clockearly
+PW31-vos0Ldo	model/GuardedSTM32H7_PWR.cs	var vos0 = within0 && ldo;	var vos0 = within0;	pwr-vos0byp
+PW32-bdcrSubword	model/GuardedSTM32H7_RCC.cs	fired |= records.Evaluates(fired) && RefusedDbp(offset, b, word, width);	fired |= false;	pwr-bdcrbyte
+PW33-vosNoRcc	model/GuardedSTM32H7_PWR.cs	if(rcc == null)	if(false)	pwr-norcc
+PW34-vosNoClocks	model/GuardedSTM32H7_PWR.cs	why = clocks == null ? "the running clocks cannot be computed (" + none + ")" :	why = clocks == null ? null :	pwr-noclock
+PW35-pwrAddr	model/GuardedSTM32H7_PWR.cs	if(start != PwrBase)	if(false)	pwr-addr
+PW36-noPwrNamed	model/GuardedSTM32H7_Flash.cs	return -1;   // nothing at PWR_D3CR: unknown, and named so	return 0;	pwr-nopwr
+DX31-dmamuxAddr	model/GuardedSTM32H7_DMAMUX.cs	if(start != Dmamux1Base)	if(false)	dmamux-addr
+DX32-pairAccess	model/GuardedSTM32H7_DMAMUX.cs	State(), crOffset, crValue, 32);	State(), 4 * channel, id, 32);	dmamux-pair
+PW37-wholeHertz	model/GuardedSTM32H7_PWR.cs	            clocks = clocks.Select(c => Math.Round(c, MidpointRounding.AwayFromZero)).ToArray();\n	(empty)	pwr-hse400 pwr-hse400v3 pwr-hse25
+DX33-pairSpan	model/GuardedSTM32H7_DMAMUX.cs	&& step != 0 && items > 1 ? par + step : (uint?)null;	&& false ? par + step : (uint?)null;	dmamux-pinc
 TD01-endFlush	model/Refusal.cs	                Logger.Flush();\n	(empty)	teardown
 RM01-evaluatesAll	model/Refusal.cs	public bool Evaluates(bool fired) => !fired || Recorded;	public bool Evaluates(bool fired) => !fired;	recorded rcc-recordedtwo
 RM02-spiOrderWord	model/GuardedSTM32H7_SPI.cs	fired |= records.Evaluates(fired) && RefusedOrder(offset, value, 32);	fired |= !fired && RefusedOrder(offset, value, 32);	recorded
@@ -568,3 +641,4 @@ FL42-fieldsSweep	model/GuardedSTM32H7_Flash.cs	        private bool RefusedField
 US63-fieldsSweep	model/GuardedSTM32F7_USART.cs	        private bool RefusedField(long offset, uint word, int width)\n        {\n	        private bool RefusedField(long offset, uint word, int width)\n        {\n            return false;\n	usart-fields
 I265-isrMonwrite	model/GuardedSTM32F7_I2C.cs	        private bool RefusedField(long offset, uint word, int width)\n        {\n	        private bool RefusedField(long offset, uint word, int width)\n        {\n            return false;\n	i2c-isrmonwrite
 AD48-fieldsMonwrite	model/GuardedSTM32H7_ADC.cs	        private bool RefusedField(long b, uint word, int width)\n        {\n	        private bool RefusedField(long b, uint word, int width)\n        {\n            return false;\n	adc-fieldsmonwrite
+PW38-recordedEveryRule	model/GuardedSTM32H7_RCC.cs	            fired |= records.Evaluates(fired) && RefusedClockLoss(offset, b, value);	            fired |= !fired && RefusedClockLoss(offset, b, value);	pwr-bothrec

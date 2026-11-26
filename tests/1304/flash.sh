@@ -122,7 +122,7 @@ for t in ${TVIBURI_TESTS:-$CASES}; do
     vosunknown) check "vosunknown: with the stock pwr (VOS reads 00), LATENCY 2 at 200 MHz is decided at VOS1 and passes (ruled Q1); ACR reads 0x22" \
       "passes vosunknown && [ \"\$(readout vosunknown READ)\" = 0x00000022 ]" ;;
     vosunknownlow) check "vosunknownlow: with VOS unknown, LATENCY 1 at 200 MHz is short even at VOS1: TVI-FLASH-WAIT, predicted-fault, its record saying it was decided at VOS1 (ruled Q1)" \
-      "refuses vosunknownlow TVI-FLASH-WAIT predicted-fault '\"VOS unknown on this platform (PWR_D3CR reads VOS 00), decided at VOS1: Table 17 needs 2\" in r[\"condition\"]'" ;;
+      "refuses vosunknownlow TVI-FLASH-WAIT predicted-fault '\"VOS unknown on this platform (no PWR guard, and PWR_D3CR reads VOS 00; acknowledged), decided at VOS1: Table 17 needs 2\" in r[\"condition\"]'" ;;
     over225) check "over225: an AXI clock of 400 MHz refuses TVI-FLASH-WAIT, unmodeled: above 225 MHz only VOS0, which cannot be read (ruled Q1)" \
       "refuses over225 TVI-FLASH-WAIT unmodeled '\"above 225 MHz\" in r[\"condition\"]'" ;;
     lockedcr) check "lockedcr: PG2 written while LOCK2 = 1 refuses TVI-FLASH-LOCK, predicted-fault (p182, p226-229)" \

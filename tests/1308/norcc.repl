@@ -1,0 +1,12 @@
+// TVI-WO-1308 (ruled 2026-11-26T09:31Z Q4): a DMAMUX1 guard on a machine with no RCC guard. Its clock (DMA1EN, DMA2EN, p455)
+// and its reset (DMA1RST, DMA2RST, p433) live in the RCC guard, so without one the twin cannot say whether a write takes:
+// every access refuses, unmodeled.
+using "platforms/boards/nucleo_h753zi.repl"
+
+dmamux1: @none
+
+tviburiDmamux1: Tviburi.GuardedSTM32H7_DMAMUX @ sysbus 0x40020800 as "dmamux1"
+    numberOfInputRequestChannels: 115
+    numberOfOutputRequestChannels: 16
+    numberOfRequestGeneratorChannels: 8
+    mode: "enforcing"
