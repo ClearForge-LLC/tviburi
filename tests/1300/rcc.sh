@@ -13,7 +13,7 @@ set -euo pipefail
 
 here=$(cd "$(dirname "$0")/../.." && pwd)
 IMAGE=$(sed -n 's/^IMAGE=//p' "$here/tests/spike.sh")
-CASES="scar switch stuck clocked switched alias field pll divq pllref divm0 sw width read usart2 uncovered fields reset resetfwd spi1rst alias17c registrations hse16 recorded recordedfield recordedtwo ardupilot gen-s03 gen-hc16 oscclear oscsys rsrbyte misaligned ledger unenabled tim2 lost-pll lost-sel lost-en lost-osc lost-ckper stopped ckper-live blocked cfg2same sel5 divr pll1src kernelq spi1off cstart dma lost-alias adc3 unheld relost-sel relost-pll divr2rmw usart-lost usart-stopped usart-lost-en usart-othersel usart-unheld hse-none hse-declared adc rtcen rtcen-reset hse-zero onehome"
+CASES="scar switch stuck clocked switched alias field pll divq pllref divm0 sw width read usart2 uncovered fields reset resetfwd spi1rst alias17c registrations hse16 recorded recordedfield recordedtwo hsesw ardupilot gen-s03 gen-hc16 oscclear oscsys rsrbyte misaligned ledger unenabled tim2 lost-pll lost-sel lost-en lost-osc lost-ckper stopped ckper-live blocked cfg2same sel5 divr pll1src kernelq spi1off cstart dma lost-alias adc3 unheld relost-sel relost-pll divr2rmw usart-lost usart-stopped usart-lost-en usart-othersel usart-unheld hse-none hse-declared adc rtcen rtcen-reset hse-zero onehome"
 scratch=${TVIBURI_SCRATCH:-$HOME/.cache/tviburi}
 mkdir -p "$scratch"
 work=$(mktemp -d "$scratch/rcc.XXXXXX")
@@ -410,6 +410,21 @@ import json, sys
 r = [json.loads(l.split(\" rcc: \", 1)[1]) for l in open(sys.argv[1]) if \" rcc: {\\\"tviburi\\\":\\\"would-refuse\" in l]
 sys.exit(0 if [(x[\"rule\"], x[\"access\"][\"value\"]) for x in r] == [(\"TVI-RCC-HSE\", \"0x10003\"), (\"TVI-RCC-FIELD\", \"0x10003\")] else 1)
 ' '$work/recordedtwo/renode-log.txt'" ;;
+  hsesw)
+    # TVI-WO-1204 (3) P2, ruled 2026-11-26T12:51Z: no crystal declared, HSEON then SW = HSE, from the monitor, in both modes. Recorded:
+    # TVI-RCC-HSE is recorded and the run goes on, the stock RCC on its placeholder 8 MHz (model/Refusal.cs's one exception), to the
+    # marker and an end; never a pass. Before the placeholder the forwarded SW = HSE threw ("Frequency must be greater than 0").
+    # Enforcing: TVI-RCC-HSE refuses at the HSEON write, as hse-none's firmware shows, and nothing throws.
+    hse=('cpu IsHalted true' 'sysbus WriteDoubleWord 0x58024400 0x00010001' 'sysbus WriteDoubleWord 0x58024410 0x2' 'emulation RunFor "0.00001"'
+      'echo "TVIBURI-MARK-AFTER"' 'sysbus ReadDoubleWord 0x58024410')
+    PLATFORM_SED='/^    hseFrequency: 8000000$/d; /^tviburiRcc:/,/mode:/ s/mode: "enforcing"/mode: "recorded"/' run_case hsesw - "${hse[@]}"
+    r=$rc; mv "$work/hsesw" "$work/hsesw-rec"; mv "$work/hsesw.stdout" "$work/hsesw-rec.stdout"
+    PLATFORM_SED='/^    hseFrequency: 8000000$/d' run_case hsesw - "${hse[@]}"
+    check "hsesw: no crystal, HSEON then SW = HSE: recorded, TVI-RCC-HSE is recorded, the stock RCC runs on (CFGR reads SWS = HSE, 0x12), the marker and rcc's end follow, never a pass, nothing throws; enforcing, TVI-RCC-HSE refuses first and nothing throws (TVI-WO-1204 (3) P2)" \
+      "[ \$r = 1 ] && grep -q ' rcc: {\"tviburi\":\"would-refuse\",\"seq\":1,\"rule\":\"TVI-RCC-HSE\"' '$work/hsesw-rec/renode-log.txt' \
+       && [ \"\$(console hsesw-rec | grep -A1 -x TVIBURI-MARK-AFTER | tail -n1)\" = 0x00000012 ] && grep -q ' rcc: {\"tviburi\":\"end\"' '$work/hsesw-rec/renode-log.txt' \
+       && ! grep -q 'Frequency must be greater than 0' '$work/hsesw-rec/renode.out' \
+       && [ \$rc = 3 ] && records hsesw 'recs[0][\"rule\"] == \"TVI-RCC-HSE\" and recs[0][\"kind\"] == \"unmodeled\"' && ! grep -q 'Frequency must be greater than 0' '$work/hsesw/renode.out'" ;;
   hse-none)
     PLATFORM_SED='/^    hseFrequency: 8000000$/d' run_case hse-none hse-on "$run" 'echo "TVIBURI-MARK-AFTER"' "$after"
     check "hse-none: on a platform that declares no hseFrequency, the HSE's start refuses, TVI-RCC-HSE, unmodeled, naming HSEON, p384 and the firmware's PC; no 8 MHz default (TVI-WO-1300b (4))" \

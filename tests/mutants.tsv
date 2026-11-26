@@ -560,3 +560,5 @@ TD01-endFlush	model/Refusal.cs	                Logger.Flush();\n	(empty)	teardow
 RM01-evaluatesAll	model/Refusal.cs	public bool Evaluates(bool fired) => !fired || Recorded;	public bool Evaluates(bool fired) => !fired;	recorded rcc-recordedtwo
 RM02-spiOrderByte	model/GuardedSTM32H7_SPI.cs	fired |= records.Evaluates(fired) && RefusedOrder(offset, value, 8);	fired |= !fired && RefusedOrder(offset, value, 8);	recorded
 RM03-rccField	model/GuardedSTM32H7_RCC.cs	fired |= records.Evaluates(fired) && RefusedField(offset, b, value);	fired |= !fired && RefusedField(offset, b, value);	rcc-recordedtwo
+RM04-hsePlaceholder	model/GuardedSTM32H7_RCC.cs	(mode == Records.RecordedMode ? RecordedHsePlaceholder : 0UL)	(mode == Records.RecordedMode ? 0UL : 0UL)	rcc-hsesw
+I264-recNackStopf	model/GuardedSTM32F7_I2C.cs	                            nackStopf = true;\n	(empty)	i2c-recnack

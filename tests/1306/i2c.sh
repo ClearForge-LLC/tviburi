@@ -12,8 +12,8 @@ set -euo pipefail
 
 here=$(cd "$(dirname "$0")/../.." && pwd)
 IMAGE=$(sed -n 's/^IMAGE=//p' "$here/tests/spike.sh")
-CASES="config timingrpe timingrsame timingroff dnfpe anfoff clearfield ap absentnext absent icrres field width read kernel reset resetok startoff txdroff empty midstart midcr2 txdrread stopidle startstop stalestop blindclear softreset clock registrations recorded rccreset unheld clocklost absentname fields ledger regen nack nacktime nackpll nackirq nackstop nackpe nacktransfer nacktxdr nackclock isrmonwrite"
-MONITOR="clock registrations recorded rccreset unheld clocklost absentname fields ledger regen nacktime nackpll isrmonwrite"
+CASES="config timingrpe timingrsame timingroff dnfpe anfoff clearfield ap absentnext absent icrres field width read kernel reset resetok startoff txdroff empty midstart midcr2 txdrread stopidle startstop stalestop blindclear softreset clock registrations recorded rccreset unheld clocklost absentname fields ledger regen nack nacktime nackpll nackirq nackstop nackpe nacktransfer nacktxdr nackclock isrmonwrite recnack"
+MONITOR="clock registrations recorded rccreset unheld clocklost absentname fields ledger regen nacktime nackpll isrmonwrite recnack"
 CUSTOM="nackirq"   # a firmware case whose monitor lines are its own (TVI-WO-1306a)
 PATHS=$(for c in $CASES; do case " $MONITOR " in *" $c "*) ;; *) printf '"%s",' "$c" ;; esac; done | sed 's/,$//')
 scratch=${TVIBURI_SCRATCH:-$HOME/.cache/tviburi}
@@ -278,6 +278,16 @@ sys.exit(0 if ok else 1)
     # tSCL = ((0x12 + 1) + (0x3C + 1)) x 2 + 2 x (2 + 15) = 194 kernel clocks = 6.0625 us; the address phase 54.5625 us.
     check "nacktime (the acceptance's timing): NACKF 54.5625 us after a write START (AUTOEND = 1) and not before (ISR 0x1 at 54.06 us, 0x11 at 55.06), STOPF one SCL period (6.0625 us) later (0x11 at 60.13 us, 0x31 at 61.13), ICR = 0x30 clears both: the page's timing at rcc_pclk1 / 2, DNF 15 (p1955, p1971; the RCC guard's KernelHz, ruled Q2; STOPF's period inferred, Q3)" \
       "nackat nacktime 54.5625 6.0625 'sysbus WriteDoubleWord 0x5802441C 0x40' 'sysbus WriteDoubleWord 0x40005400 0xF00' 'sysbus WriteDoubleWord 0x40005410 0x10C7123C' 'sysbus WriteDoubleWord 0x40005400 0xF01' 'sysbus WriteDoubleWord 0x40005404 0x02012062' && passed nacktime" ;;
+  recnack)
+    # 1306a F10's first edge, pinned as model/Refusal.cs's contract names it (TVI-WO-1204 (3) P3, ruled 12:21Z): recorded, a START to
+    # the BME280 while a NACKed address's automatic STOP is pending records TVI-I2C-TRANSFER and goes on; the NACK is not
+    # cancelled, so its NACKF and STOPF land inside the new transfer. What follows a would-refuse is the stock model's behaviour.
+    PLATFORM_SED=$rec run_case recnack - "$clk" 'sysbus WriteDoubleWord 0x5802441C 0x40' 'sysbus WriteDoubleWord 0x40005400 0xF00' \
+      'sysbus WriteDoubleWord 0x40005410 0x10C7123C' 'sysbus WriteDoubleWord 0x40005400 0xF01' 'sysbus WriteDoubleWord 0x40005404 0x02012062' \
+      'emulation RunFor "0.00001"' 'sysbus WriteDoubleWord 0x40005404 0x020120EC' 'emulation RunFor "0.00006"' 'echo "R-ISR"' 'sysbus ReadDoubleWord 0x40005418'
+    check "recnack (1306a F10 edge 1, pinned): recorded, a START to the BME280 inside a NACK's pending STOP records TVI-I2C-TRANSFER and goes on; the NACK's NACKF and STOPF still land, inside the new transfer (ISR has 0x30); never a pass" \
+      "[ \$rc = 1 ] && logged recnack '[(r[\"tviburi\"], r[\"rule\"]) for r in recs] == [(\"would-refuse\", \"TVI-I2C-TRANSFER\")] and \"automatic STOP is pending\" in recs[0][\"condition\"]' \
+       && [ \$(( \$(readout recnack ISR) & 0x30 )) = 48 ]" ;;
   nackpll)
     # pll3_r_ck = HSI 64 MHz / DIVM3 32 (reset) x 300 / 20 = 30 MHz (pp. 398-410), I2C123SEL = 01 (p416); ArduPilot's CR1 and TIMINGR
     # 0x00300F38: tSCL = (16 + 57) + 4 = 77 kernel clocks = 2.5667 us; the address phase 23.1 us.

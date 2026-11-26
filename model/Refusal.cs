@@ -19,6 +19,8 @@
 //     (Records.Evaluates). Nothing pauses. TVI-LOAD is the exception: a guard that failed to load refuses in either mode.
 //   - Recorded: the access goes on to the stock model and to the guard's copies as if no rule had fired, so a read returns
 //     what the stock model serves and a write reaches the stock model whole.
+//   - One exception (TVI-WO-1204 (3) P2, ruled 2026-11-26T12:51Z): in recorded mode with no crystal declared, the stock RCC runs on a placeholder 8 MHz so a run
+//     can continue past TVI-RCC-HSE; no guard reads it (model/GuardedSTM32H7_RCC.cs).
 //   - What follows a would-refuse is the stock model's behaviour, not a guard's promise; a recorded run is never a pass.
 //     Two named examples (TVI-WO-1306a F10): a START the I2C guard passes while a NACK is pending still gets that NACK's
 //     STOPF, inside the new transfer; and an uncleared NACK STOPF keeps the port in controller mode, so a later STOP passes
