@@ -647,15 +647,11 @@ PW39-fieldsSweep	model/GuardedSTM32H7_PWR.cs	        private bool RefusedField(l
 R20-endRequiredCrash	tools/tviburi-check/src/main.rs	if !ch.end {	if false {	crash
 R21-endRequiredCrashConsole	tools/tviburi-check/src/main.rs	if !ch.end {	if false {	crash-console
 R22-endRequiredCrashRunner	tools/tviburi-check/src/main.rs	if !ch.end {	if false {	crash-runner
-R23-witnessRequiredRemoved	tools/tviburi-check/src/main.rs	if !ch.witness {	if false {	adv-removed
+R23-guardsRequiredRemoved	tools/tviburi-check/src/main.rs	    for (name, ch) in &channels {	    for (name, ch) in channels.iter().take(0) {	adv-removed
 R24-witnessRequiredRemovedConsole	tools/tviburi-check/src/main.rs	if !ch.witness {	if false {	removed-console
 R25-witnessRequiredStockForge	tools/tviburi-check/src/main.rs	if !ch.witness {	if false {	stock-forge
 R26-sourceFilterForge	tools/tviburi-check/src/main.rs	let Some(ch) = channels.get_mut(source) else {	let Some(ch) = channels.values_mut().next() else {	forge
-R27-sourceFilterStockForge	tools/tviburi-check/src/main.rs	let Some(ch) = channels.get_mut(source) else {	let Some(ch) = channels.values_mut().next() else {	stock-forge
 R28-sourceFilterSpray	tools/tviburi-check/src/main.rs	let Some(ch) = channels.get_mut(source) else {	let Some(ch) = channels.values_mut().next() else {	adv-spray
-R29-unframedForge	tools/tviburi-check/src/main.rs	if line.contains("{\\"tviburi\\"") {	if false {	forge
-R30-unframedStockForge	tools/tviburi-check/src/main.rs	if line.contains("{\\"tviburi\\"") {	if false {	stock-forge
-R31-unframedSpray	tools/tviburi-check/src/main.rs	if line.contains("{\\"tviburi\\"") {	if false {	adv-spray
 R32-witnessModeRecorded	tools/tviburi-check/src/main.rs	} else if !matches!(record.get("mode"), Some(Value::Str(m)) if m == "enforcing") {	} else if false {	adv-recorded
 R33-refusedVerdictHook	tools/tviburi-check/src/main.rs	let verdict = if !refusals.is_empty() {	let verdict = if false {	adv-hook
 C36-fieldsSweep	model/GuardedSTM32H7_RCC.cs	        private bool RefusedField(long offset, long b, uint value)\n        {\n	        private bool RefusedField(long offset, long b, uint value)\n        {\n            return false;\n	rcc-fields

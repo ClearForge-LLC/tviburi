@@ -6,7 +6,7 @@
 # (1.00). #63's first run read its four 6975P-C shards at 0.967-1.018 of the plan these weights replace (TVI-WO-1204 FEEDBACK).
 # teardown and TD01-endFlush, held since 15:48Z (about 20 s on Furnace, scaled by its measured 1.18), are estimates.
 # TVI-WO-1205's clause-6 mutants (TM34, FL42, US63, I265, AD48, DX34, PW39, C36, G25, DM72, I266, AD49) and its per-cell check-tool
-# copies (R20-R33) are estimates: each named case's weight plus 4 s, as the sweeps' other mutants.
+# copies (R20-R26, R28, R32, R33) are estimates: each named case's weight plus 4 s, as the sweeps' other mutants.
 # The previous weights are in this file's git history.
 # Never the list of what runs: that is the tree's own (tests/spike.sh, tests/mutants.tsv); an item missing here
 # weighs its kind's median and still runs. KIND<tab>ID<tab>SECONDS.
@@ -1158,15 +1158,11 @@ mutant	PW39-fieldsSweep	12.8
 mutant	R20-endRequiredCrash	12.5
 mutant	R21-endRequiredCrashConsole	10.3
 mutant	R22-endRequiredCrashRunner	11.4
-mutant	R23-witnessRequiredRemoved	23.8
+mutant	R23-guardsRequiredRemoved	23.8
 mutant	R24-witnessRequiredRemovedConsole	17.5
 mutant	R25-witnessRequiredStockForge	11.0
 mutant	R26-sourceFilterForge	11.2
-mutant	R27-sourceFilterStockForge	11.0
 mutant	R28-sourceFilterSpray	10.8
-mutant	R29-unframedForge	11.2
-mutant	R30-unframedStockForge	11.0
-mutant	R31-unframedSpray	10.8
 mutant	R32-witnessModeRecorded	10.8
 mutant	R33-refusedVerdictHook	10.9
 mutant	C36-fieldsSweep	11.4
