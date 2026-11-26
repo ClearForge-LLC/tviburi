@@ -1,0 +1,43 @@
+# The release job (TVI-WO-2100 (1)): given a commit on main, ci/release.sh builds the release twice in the pinned tools
+# image, from two `git archive` extractions, compares the two builds byte for byte, runs `tviburi-release verify` on one
+# against the hash it printed, and keeps the tarball, MANIFEST and LEDGER.jsonl as this run's artifact, with the commit and
+# the hashes in the job summary. It fails on any difference, on a commit not on main, or on a dirty checkout. It never
+# creates a tag or a GitHub Release: its token can only read (`contents: read`), and no step writes to the repository.
+# The tag is the architect's, after TVI-WO-1205's verdict and Scotty's go (TVI-WO-2100).
+name: release
+on:
+  workflow_dispatch:
+    inputs:
+      commit:
+        description: "The commit on main to release (full sha)"
+        required: true
+        type: string
+permissions:
+  contents: read
+jobs:
+  release:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          ref: ${{ inputs.commit }}
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Pull the pinned tools image, by digest
+        run: podman pull "$(sed -n 's/^IMAGE=//p' tests/spike.sh)"
+      - name: Build twice, compare byte for byte, verify, keep (ci/release.sh all)
+        env:
+          COMMIT: ${{ inputs.commit }}
+        run: |
+          TVIBURI_CI=1 TVIBURI_SCRATCH="$RUNNER_TEMP/tviburi" RELEASE_OUT="$RUNNER_TEMP/release" ci/release.sh all "$COMMIT" origin/main
+          cat "$RUNNER_TEMP/release/summary.md" >>"$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: tviburi-release-${{ inputs.commit }}
+          path: |
+            ${{ runner.temp }}/release/tviburi-release.tar
+            ${{ runner.temp }}/release/MANIFEST
+            ${{ runner.temp }}/release/LEDGER.jsonl
+            ${{ runner.temp }}/release/summary.md
+          if-no-files-found: error
