@@ -50,7 +50,10 @@
 ## 2. Acceptance
 
 - **Every clause has its job, case and mutant named, with a run id:** `gate.md`, run 45858432173.
-  - **This PR's CI** runs the post-`1308` tree and the 21 new mutants: [result].
+  - **This PR's CI on `33dd82e`** (45881160764), the post-`1308` tree: green.
+    - **Aggregate:** 1,166 items (518 cases, 648 mutants) across 11 shards, 0 failures. So every one of the 21 new mutants was killed.
+    - **Budget:** medians `main` 958,948 KiB, branch 943,560 KiB (−15.0 MiB).
+  - **Its first run** (45880658289, `28b5f99`) failed at the route. The inventory refused `spike/1205/consumer-coverage.sh` for naming documentation. It is now `spike/1205/coverage.sh`, which takes the paths as arguments (`33dd82e`).
   - **The 18:56Z mutants, locally:** 19 built, 14 killed by their one cell or sweep.
     - **Removed, because their cells rest on other lines:** R27 and R29–R31. `forge` and `adv-spray` rest on the source filter (R26, R28), `stock-forge` on witness-required (R25).
     - **`adv-removed`:** R23 tried two lines and survived each. The cell rests on two independent lines in two files: the check's witness and end requirement, and the runner's after-marker. Each has its own mutant (R06/R07; S05 by `nomark`). Ruled at 19:10Z: `adv-removed` is held by two independent lines (the check's R06/R07 and the runner's S05), each mutant-proven; by design, no single mutant passes it.

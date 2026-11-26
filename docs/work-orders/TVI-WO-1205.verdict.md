@@ -3,7 +3,7 @@
 **The verdict:** clauses 2–7 are **met**. Clause 1 is [held for your ruling on the unaudited acknowledgements, below].
 
 **What it was judged on:**
-- `main` with `TVI-WO-1308` merged (`5d4a61a`), and this PR's CI [run].
+- `main` with `TVI-WO-1308` merged (`5d4a61a`), and this PR's CI on `33dd82e` (45881160764): 1,166 items (518 cases, 648 mutants, the 21 new ones among them), 0 failures; memory budget −15.0 MiB.
 - Clauses 2–7 were also green on `63fe557`, CI 45858432173: 1,000 items, 0 failures.
 - **The rule:** each clause rests on named cases, and each case is named by a mutant it kills. This PR adds 21 of those mutants.
 - **The evidence:** `TVI-WO-1205.gate.md`.
