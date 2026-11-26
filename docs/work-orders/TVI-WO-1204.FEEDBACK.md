@@ -33,8 +33,13 @@
 | branch, two machines | 20 | **0** |
 
 - **The measure file's A-load row** was 16 of 50 on `main`, at a heavier host load.
-- **CI case `teardown`:** 15 clean quits, each needing every guard's witness and end record, in the log file and on the console. The first is the runner's own run, unloaded; it builds the firmware, check and release. The other 14 run beside 12 busy loops (3 per core on a 4-core CI runner).
-- **Mutant `TD01-endFlush`** drops the flush; `teardown` kills it.
+- **CI case `teardown`, deterministic since the architect's 15:48Z stop** (TD01 survived #63's run on `09e4d71`: fifteen loaded quits on that runner happened to lose nothing).
+  - **What it runs:** the runner's own run, then three quits of the same script with `tests/1204/TeardownHold.cs` installed.
+  - **What the hold is:** a test-only Renode logger backend that the harness `include`s; it is never in a release. Its `Log` blocks until the logger's own `stopThread` is true, so the queue is still full when the old emulation's logger is disposed.
+  - **Without the flush,** every held quit loses every end record. **With it,** `Flush` sets `stopThread`, the hold returns, and `Flush` writes the queue.
+  - **Safety:** `stopThread` is the pinned build's private field, read by reflection; installing refuses if it is absent, and a hold over 90 s releases.
+  - **The 15 loaded quits are dropped:** the hold makes the loss certain, so load adds only a probability. The 50-quit tables above stay as the measurement of the real race.
+- **Mutant `TD01-endFlush`** drops the flush. Held, it loses all 31 end records and all 31 witnesses in every quit. **Proof on Furnace, capped:** the clean `teardown` case passed 10 of 10, and `TD01` was killed 10 of 10, 19–24 s a run (the loaded form took 285 s on CI). CI's run on the push follows on the bus.
 
 **The adversarial checks the ruling named:**
 - **Several guards ending in one dispose, each flushing; nothing is reordered.**
@@ -169,8 +174,8 @@
   - **Aggregate:** 1,000 items expected (446 cases, 554 mutants), 1,000 ran across ten shards, 0 failures.
   - **Budget:** medians `main` 941,656 KiB, branch 942,648 KiB, +1.0 MiB (the local one-boot peak in the replays was noise).
   - **Witness check:** `witnessed.sh` found a witness for every one of the 32 instances under a guard, on each of the 5 branch boots.
-  - **`teardown`** on a 4-core EPYC 9V45 runner: 285.6 s for its 15 quits, about 18 s a quit against the 120 s timeout. 0 lost.
-  - **`TD01-endFlush`** was killed there too (shard 1, EPYC 9V45, 288.4 s). The kill is probabilistic: a loaded quit lost an end record about 1 in 5 on Furnace, so 14 loaded quits all passing without the flush is about 4 % (0.8^14).
+  - **`teardown`,** the loaded form, on a 4-core EPYC 9V45 runner: 285.6 s for its 15 quits, about 18 s a quit against the 120 s timeout. 0 lost.
+  - **`TD01-endFlush`** was killed on that run (shard 1, EPYC 9V45, 288.4 s), but **survived the next, on `09e4d71`** (shard 1, a 6975P-C). That is the architect's 15:48Z stop, answered by the held form above.
   - **The plan against CI, out of sample:** #63's four 6975P-C shards ran at 0.967–1.018 of the plan from `main`'s run, all within 5 %.
   - **Re-weighed from both runs,** as the review asked: every item now measured (teardown 309 s, TD01 334 s, RM01 26 s, RM05 19 s; the five restate mutants that now name `manifest`, 5–6 s). Against those weights both runs' 6975P-C shards read 0.959–1.026, within 4.1 %.
 
@@ -223,6 +228,11 @@ Reduction pass (diff): −23 net · 9 duplicates removed · 1 dead paths removed
 ## 5. Findings and rows
 
 - **F1. Renode's own `machine-0: Disposed.` line can still be lost** at a clean quit. It follows the last guard's flush. Nothing reads it; recorded here so nobody mistakes it for a regression.
+- **F2. After any `Logger.Flush()`, Renode's asynchronous logging thread is dead for that emulation.** `StopLoggingThread` sets `stopThread = true`, and `StartLoggingThread` never resets it, so the restarted thread's `while(!stopThread)` exits at once (pinned `Logger.cs`; found while building the hold). Later entries are written only by the next `Flush`.
+  - **At a clean quit this is harmless:** each guard's `End()` flushes in turn. It is also why F1's line, logged after the last flush, is lost.
+  - **Mid-run it matters:** a guarded machine removed mid-emulation would flush, and the logger would then write nothing until the next flush. Under asynchronous logging, a refusal logged after that reaches no backend until a clean quit's flush. A crash would lose it, though that run already fails on its missing end record.
+  - **The consumer runs synchronous logging,** where `Flush` only flushes the backends.
+  - **The row:** decide whether `End()` should flush only at the emulation's teardown, or whether Tviburi's harness should run synchronous (R1).
 - **R1, (b): whether Tviburi's harness should run under the consumer's synchronous logging.** Measured: Aethelgard's committed `renode.config` is synchronous, so the consumer never raced (variant B, 0 of 50). Not built.
 - **R2, the Phase 2 seam:** confirm that Aethelgard's parser does not treat Renode's `[ERROR]` lines as a failure on their own, so a refusal is read as a refusal record.
 - **R3, (5):** the witness cannot list the floating inputs read. It needs a grammar WO that adds a field to `end`, and Aethelgard's read of it.
