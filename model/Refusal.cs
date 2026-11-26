@@ -8,12 +8,21 @@
 //             predicted-fault or unmodeled. Logged at Error,
 //             which `logLevel` cannot suppress (measured: `logLevel 4` is rejected). Latches
 //             (RUL-08): after it, nothing the run does is claimed.
-//             In recorded mode (RUL-19) the same record is a `would-refuse`: nothing pauses, and the
-//             guard passes the access on as if no rule had fired. A recorded run is never a pass.
+//             In recorded mode (RUL-19) the same record is a `would-refuse` (the contract below).
 //   end     - from Dispose, when Renode tears the machine down cleanly. A crash (an unhandled
 //             exception, SIGKILL) leaves none (measured). SIGTERM still disposes, so an end record
 //             shows a clean teardown, not that the consumer's script completed.
 //             The logger is flushed after it, so a clean quit never loses it (TVI-WO-1204 (2)).
+// Recorded mode's contract (RUL-19; TVI-WO-1204 (3), ruled 2026-11-26T12:21Z), written here once; each guard's header cites it:
+//   - Enforcing: the first rule that fires refuses the access, and no later rule is evaluated for it.
+//   - Recorded: every rule is evaluated for the access, in the guard's order, and each that fires records a `would-refuse`
+//     (Records.Evaluates). Nothing pauses. TVI-LOAD is the exception: a guard that failed to load refuses in either mode.
+//   - Recorded: the access goes on to the stock model and to the guard's copies as if no rule had fired, so a read returns
+//     what the stock model serves and a write reaches the stock model whole.
+//   - What follows a would-refuse is the stock model's behaviour, not a guard's promise; a recorded run is never a pass.
+//     Two named examples (TVI-WO-1306a F10): a START the I2C guard passes while a NACK is pending still gets that NACK's
+//     STOPF, inside the new transfer; and an uncleared NACK STOPF keeps the port in controller mode, so a later STOP passes
+//     where enforcing mode would refuse it.
 // Each record carries a per-peripheral `seq` from 0. Renode collapses identical consecutive messages
 // into "msg (2)" (measured), so the sequence also keeps every record distinct.
 //
@@ -65,10 +74,13 @@ namespace Antmicro.Renode.Peripherals.Tviburi
         // True when the guard failed to load: it must refuse every access, in either mode.
         public bool LoadFailed => loadFailure != null;
 
-        // True in recorded mode (RUL-19): after a rule fires and Refuse records it, the guard passes the
-        // access on to the stock model and to its copies as if no rule had fired, and evaluates no further
-        // rule for that access. Never true while LoadFailed: a load failure is a mode other than these two.
+        // True in recorded mode (RUL-19; the contract in this file's header). Never true while LoadFailed: a load failure is
+        // a mode other than these two.
         public bool Recorded => mode == RecordedMode;
+
+        // Whether the access's next rule is evaluated, given whether one has fired: in recorded mode always, in enforcing
+        // mode only while none has (the contract in this file's header).
+        public bool Evaluates(bool fired) => !fired || Recorded;
 
         public void Refuse(string rule, string kind, string register, string bit, string condition, string citation,
             string state, long offset, ulong value, int width)

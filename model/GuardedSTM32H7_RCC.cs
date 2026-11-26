@@ -66,8 +66,8 @@
 //                   model keeps the bit, and nothing is lost. PLL1's source cleared with PLL1 on is TVI-RCC-PLL-REF's (above).
 //   TVI-RCC-KERNEL  (RequireKernelClock) a peripheral started with no kernel clock: predicted-fault, naming the selector,
 //                   its source and the pages; unmodeled for a peripheral the query does not cover.
-// Recorded mode (RUL-19): after a rule fires and is recorded, the access goes on to the stock model and the copies as
-// if no rule had fired, and no further rule is evaluated for it (model/Refusal.cs).
+// Recorded mode (RUL-19) is model/Refusal.cs's contract: every rule is evaluated and records, and the access goes on to the
+// stock model and the copies as if no rule had fired.
 // Enabling a bus clock before its kernel source runs is valid and never refused (architect, 2026-11-23). Whether
 // a peripheral's start finds its kernel clock is that peripheral's guard's rule, through the query (TVI-SPI-KERNEL);
 // RequireKernelClock asks the same question from the monitor, recorded under rcc, for a peripheral with no guard yet.
@@ -560,7 +560,7 @@ namespace Antmicro.Renode.Peripherals.Tviburi
             return inner.ReadDoubleWord(b);
         }
 
-        // The first rule that fires for a 32-bit write, in the header's order; the rest are not evaluated.
+        // The rules for a 32-bit write, in the header's order: enforcing, the first that fires; recorded, every one (model/Refusal.cs).
         private bool Refused(long offset, uint value)
         {
             if(records.LoadFailed)
@@ -575,8 +575,13 @@ namespace Antmicro.Renode.Peripherals.Tviburi
                 return true;
             }
             var b = Base(offset);
-            return RefusedHse(b, value) || RefusedPll(b, value) || RefusedPllReference(b, value) || RefusedSwitch(b, value)
-                || RefusedField(offset, b, value) || RefusedClockLoss(offset, b, value);
+            var fired = RefusedHse(b, value);
+            fired |= records.Evaluates(fired) && RefusedPll(b, value);
+            fired |= records.Evaluates(fired) && RefusedPllReference(b, value);
+            fired |= records.Evaluates(fired) && RefusedSwitch(b, value);
+            fired |= records.Evaluates(fired) && RefusedField(offset, b, value);
+            fired |= records.Evaluates(fired) && RefusedClockLoss(offset, b, value);
+            return fired;
         }
 
         private void Pass(long b, uint value)

@@ -724,9 +724,11 @@ t_recorded() {
   local console; console=$("$src/scripts/monitor-output" "$work/recorded-monitor/renode.out")
   # SR: CSUSP with SPE = 0 (TVI-SPI-ORDER) goes on, so EOT is the suspend's, and the SR read refuses (TVI-SPI-READ);
   # recorded, it is served by the stock model, whose TXP is always 1, so it is not 0.
-  check "recorded: refused accesses go on (CFG2's copy reads 0x02000000; the refused SR read is the stock value); one record per access" \
+  # Every rule per access (model/Refusal.cs's contract; TVI-WO-1204 (3), ruled 12:21Z, which moved this check from "one record per
+  # access"): the 8-bit TXDR write breaks two rules, TVI-SPI-WIDTH and TVI-SPI-ORDER, and records both.
+  check "recorded: refused accesses go on (CFG2's copy reads 0x02000000; the refused SR read is the stock value); every rule per access: the 8-bit TXDR write records TVI-SPI-WIDTH and TVI-SPI-ORDER" \
     "[ \"\$(grep -A1 -x READ-CFG2 <<<\"\$console\" | tail -n1)\" = 0x02000000 ] && grep -A1 -x READ-SR <<<\"\$console\" | tail -n1 | grep -qv '^0x00000000\$' \
-     && spi1_records recorded-monitor '[(r[\"tviburi\"], r.get(\"rule\")) for r in recs] == [(\"witness\", None), (\"would-refuse\", \"TVI-SPI-FIELD\"), (\"would-refuse\", \"TVI-SPI-WIDTH\"), (\"would-refuse\", \"TVI-SPI-ORDER\"), (\"would-refuse\", \"TVI-SPI-READ\"), (\"end\", None)]'"
+     && spi1_records recorded-monitor '[(r[\"tviburi\"], r.get(\"rule\"), r.get(\"access\", {}).get(\"offset\")) for r in recs] == [(\"witness\", None, None), (\"would-refuse\", \"TVI-SPI-FIELD\", \"0xC\"), (\"would-refuse\", \"TVI-SPI-WIDTH\", \"0x20\"), (\"would-refuse\", \"TVI-SPI-ORDER\", \"0x20\"), (\"would-refuse\", \"TVI-SPI-ORDER\", \"0x0\"), (\"would-refuse\", \"TVI-SPI-READ\", \"0x14\"), (\"end\", None, None)]'"
 }
 
 # --- Adversarial (WO §5): a refusal or a missing witness that still passes; a firmware-written

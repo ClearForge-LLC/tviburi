@@ -557,3 +557,6 @@ MF08-twice	tools/tviburi-release/src/main.rs	                if let Some(d) = al
 MF09-consumerRun	tools/tviburi-release/src/main.rs	if !consumer_run_guarded(	if false && !consumer_run_guarded(	manifest
 MF10-loaded	tools/tviburi-release/src/main.rs	if !loaded_by_replay(	if false && !loaded_by_replay(	manifest
 TD01-endFlush	model/Refusal.cs	                Logger.Flush();\n	(empty)	teardown
+RM01-evaluatesAll	model/Refusal.cs	public bool Evaluates(bool fired) => !fired || Recorded;	public bool Evaluates(bool fired) => !fired;	recorded rcc-recordedtwo
+RM02-spiOrderByte	model/GuardedSTM32H7_SPI.cs	fired |= records.Evaluates(fired) && RefusedOrder(offset, value, 8);	fired |= !fired && RefusedOrder(offset, value, 8);	recorded
+RM03-rccField	model/GuardedSTM32H7_RCC.cs	fired |= records.Evaluates(fired) && RefusedField(offset, b, value);	fired |= !fired && RefusedField(offset, b, value);	rcc-recordedtwo

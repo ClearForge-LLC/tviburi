@@ -48,8 +48,7 @@
 //                     the twin's queue keeps every byte. unmodeled (ruled at TVI-WO-1305's merge, Q3). FIFO mode is unchanged.
 //   A byte's arrival is not a bus access: its records carry the CPU's PC if one is running, else "none", and the exact
 //   virtual time of the injection.
-// Enforcing: the first rule that fires refuses the access. Recorded mode (RUL-19): every rule is evaluated and records what
-// it finds, and the access goes on as if none had fired (model/Refusal.cs).
+// Enforcing and recorded mode (RUL-19) are model/Refusal.cs's contract.
 //
 // Modeled, cited:
 //   IDLE (p2090, p2021): one idle frame (a start bit, the data bits by M, the stop bits by STOP, at the kernel clock over BRR,

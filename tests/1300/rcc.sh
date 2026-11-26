@@ -13,7 +13,7 @@ set -euo pipefail
 
 here=$(cd "$(dirname "$0")/../.." && pwd)
 IMAGE=$(sed -n 's/^IMAGE=//p' "$here/tests/spike.sh")
-CASES="scar switch stuck clocked switched alias field pll divq pllref divm0 sw width read usart2 uncovered fields reset resetfwd spi1rst alias17c registrations hse16 recorded recordedfield ardupilot gen-s03 gen-hc16 oscclear oscsys rsrbyte misaligned ledger unenabled tim2 lost-pll lost-sel lost-en lost-osc lost-ckper stopped ckper-live blocked cfg2same sel5 divr pll1src kernelq spi1off cstart dma lost-alias adc3 unheld relost-sel relost-pll divr2rmw usart-lost usart-stopped usart-lost-en usart-othersel usart-unheld hse-none hse-declared adc rtcen rtcen-reset hse-zero onehome"
+CASES="scar switch stuck clocked switched alias field pll divq pllref divm0 sw width read usart2 uncovered fields reset resetfwd spi1rst alias17c registrations hse16 recorded recordedfield recordedtwo ardupilot gen-s03 gen-hc16 oscclear oscsys rsrbyte misaligned ledger unenabled tim2 lost-pll lost-sel lost-en lost-osc lost-ckper stopped ckper-live blocked cfg2same sel5 divr pll1src kernelq spi1off cstart dma lost-alias adc3 unheld relost-sel relost-pll divr2rmw usart-lost usart-stopped usart-lost-en usart-othersel usart-unheld hse-none hse-declared adc rtcen rtcen-reset hse-zero onehome"
 scratch=${TVIBURI_SCRATCH:-$HOME/.cache/tviburi}
 mkdir -p "$scratch"
 work=$(mktemp -d "$scratch/rcc.XXXXXX")
@@ -398,6 +398,18 @@ sys.exit(0 if [(r[\"rule\"], r[\"bit\"]) for r in recs] == [(\"TVI-RCC-CLOCK\", 
     PLATFORM=/repo/tests/1300/usart-unheld.repl run_case usart-unheld - 'sysbus WriteDoubleWord 0x580244F0 0x00000010' 'sysbus WriteDoubleWord 0x4001100C 0x22C'
     check "usart-unheld (TVI-WO-1300b (2), ruled Q2; 1305 G6): a USART guard not registered on the RCC guard refuses its access, TVI-USART-CONFIG, unmodeled: unwatched, it cannot pass" \
       "[ \$rc = 3 ] && records usart-unheld 'len(recs) == 1 and recs[0][\"rule\"] == \"TVI-USART-CONFIG\" and recs[0][\"kind\"] == \"unmodeled\" and recs[0][\"peripheral\"] == \"sysbus.usart1\" and \"not registered on an RCC guard\" in recs[0][\"condition\"]'" ;;
+  recordedtwo)
+    # TVI-WO-1204 (3), ruled 12:21Z: in recorded mode every rule is evaluated for one access (model/Refusal.cs). One CR write,
+    # 0x00010003, on a board with no crystal: HSEON's start (TVI-RCC-HSE) and HSIKERON = 1, which the ledger allows only at 0
+    # (TVI-RCC-FIELD): two would-refuse records at the one write. Enforcing, only the first.
+    PLATFORM_SED='/^    hseFrequency: 8000000$/d; /^tviburiRcc:/,/mode:/ s/mode: "enforcing"/mode: "recorded"/' run_case recordedtwo - \
+      'cpu IsHalted true' 'sysbus WriteDoubleWord 0x58024400 0x00010003'
+    check "recordedtwo: recorded, one RCC_CR write breaking two rules (HSEON with no crystal; HSIKERON = 1) records both, TVI-RCC-HSE then TVI-RCC-FIELD, at that write; never a pass" \
+      "[ \$rc = 1 ] && python3 -I -c '
+import json, sys
+r = [json.loads(l.split(\" rcc: \", 1)[1]) for l in open(sys.argv[1]) if \" rcc: {\\\"tviburi\\\":\\\"would-refuse\" in l]
+sys.exit(0 if [(x[\"rule\"], x[\"access\"][\"value\"]) for x in r] == [(\"TVI-RCC-HSE\", \"0x10003\"), (\"TVI-RCC-FIELD\", \"0x10003\")] else 1)
+' '$work/recordedtwo/renode-log.txt'" ;;
   hse-none)
     PLATFORM_SED='/^    hseFrequency: 8000000$/d' run_case hse-none hse-on "$run" 'echo "TVIBURI-MARK-AFTER"' "$after"
     check "hse-none: on a platform that declares no hseFrequency, the HSE's start refuses, TVI-RCC-HSE, unmodeled, naming HSEON, p384 and the firmware's PC; no 8 MHz default (TVI-WO-1300b (4))" \
