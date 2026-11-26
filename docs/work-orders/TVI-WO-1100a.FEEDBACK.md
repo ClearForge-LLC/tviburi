@@ -96,5 +96,5 @@ Reduction pass (diff): −2 lines net · 0 duplicates removed · 3 dead paths re
 
 - **Predictions before runs:** `2514129`, before A0.
 - **Containers:** one at a time, `~/bin/capped-run`, `nice -n 10`, `--network none`, `free -g` checked first. One exception (§5).
-- **Route, locally** (`tests/ci/route.sh origin/main`): the route's tests pass; inventory 387 files, 0 failures; `class=code`, `budget=no`. To be re-run after this file is committed.
+- **Route, locally** (`tests/ci/route.sh origin/main`), re-run with this file committed: the route's 11 tests pass; inventory 389 files, 86 documentation, 0 failures; `class=code`, `budget=no`. `main` had not moved from `39e51af`, so there was nothing to merge.
 - **CI:** this PR's run, reported on the bus when it ends.
