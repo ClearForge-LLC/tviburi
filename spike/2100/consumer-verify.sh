@@ -16,12 +16,13 @@ tar=$1 pin=$2 root=${3:-}
 d=$(mktemp -d)
 trap 'rm -rf "$d"' EXIT
 no() { echo "CONSUMER VERIFY FAIL: $*"; exit 1; }
-[ "$(tar -tf "$tar" | LC_ALL=C sort | tr '\n' ' ')" = "LEDGER.jsonl MANIFEST Tviburi.cs TviburiRelease.cs.template " ] \
+four="LEDGER.jsonl MANIFEST Tviburi.cs TviburiRelease.cs.template "   # sorted, as each check below lists them
+[ "$(tar -tf "$tar" | LC_ALL=C sort | tr '\n' ' ')" = "$four" ] \
   || no "the tarball's members are $(tar -tf "$tar" | tr '\n' ' '), not exactly the four files once each"
 tar -C "$d" -xf "$tar"
 cd "$d"
 sha() { sha256sum | cut -c1-64; }
-[ "$(ls -A | LC_ALL=C sort | tr '\n' ' ')" = "LEDGER.jsonl MANIFEST Tviburi.cs TviburiRelease.cs.template " ] || no "the tarball holds $(ls -A | tr '\n' ' ')"
+[ "$(ls -A | LC_ALL=C sort | tr '\n' ' ')" = "$four" ] || no "the tarball holds $(ls -A | tr '\n' ' ')"
 m=$(sha <MANIFEST)
 [ "sha256:$m" = "$pin" ] || no "the MANIFEST is sha256:$m, not the pinned $pin"
 t=$(sed -n 's/^file \([0-9a-f]\{64\}\) TviburiRelease\.cs\.template$/\1/p' MANIFEST)

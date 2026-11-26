@@ -501,11 +501,6 @@ fn bench_rows(src: &Source, pins: &Pins) -> Result<Vec<Row>, String> {
     Ok(rows)
 }
 
-/// The assembly a `build` row names, under the Renode root.
-fn assembly(asm: &str) -> &'static str {
-    if asm == "renode" { "Renode.dll" } else { "Infrastructure.dll" }
-}
-
 /// Every peripheral Tviburi class, with its public constructor's properties (TVI-WO-2100 Q23 (B); widened by its adversarial
 /// pass): each guard of the class map, and every other class a model file declares whose base list names a type with
 /// `Peripheral` in its name, a stock peripheral type (the class map's or the pinned chain's), or such a class of the overlay;
@@ -520,9 +515,8 @@ fn peripherals(models: &[&Source], pins: &Pins, chain: &stock::Chain) -> Result<
         }
         texts.push(t);
     }
-    let bare = |t: &str| t.rsplit('.').next().unwrap_or("").to_string();
     let mapped: Vec<String> = pins.classes.iter().map(|c| c.1.strip_prefix("Tviburi.").unwrap_or(&c.1).to_string()).collect();
-    let stock: Vec<String> = pins.classes.iter().map(|c| bare(&c.0)).chain(chain.declared.iter().map(|d| bare(&d.0))).collect();
+    let stock: Vec<String> = pins.classes.iter().map(|c| props::bare(&c.0)).chain(chain.declared.iter().map(|d| props::bare(&d.0))).collect();
     let names = props::peripheral_names(&declared, &mapped, &stock);
     let mut out = Vec::new();
     for name in &names {
@@ -542,7 +536,7 @@ fn build(repo: &Path, renode: &Path, out: &Path) -> Result<(String, String), Str
     let pins = pins(repo)?;
     // TVI-WO-2100 Q25: a release is built only against the assemblies its `build` rows name, by sha256.
     for (asm, _, pin) in &pins.builds {
-        let file = assembly(asm);
+        let file = if asm == "renode" { "Renode.dll" } else { "Infrastructure.dll" };
         let got = sha256::hex(&fs::read(renode.join(file)).map_err(|e| format!("{file}: {e}"))?);
         if got != *pin {
             return Err(format!("{file} is sha256 {got}, not the pinned {pin} (pins.tsv `build {asm}`): a release is built only against the assemblies it names"));
@@ -814,7 +808,7 @@ fn cases(ledger_text: &str, guard: &str, base: u32, size: u32, enable: Option<(u
 
 fn hex_pin(a: &str) -> Option<String> {
     let h = a.strip_prefix("sha256:").unwrap_or(a);
-    (h.len() == 64 && h.bytes().all(|b| b.is_ascii_hexdigit() && !b.is_ascii_uppercase())).then(|| h.to_string())
+    hex64(h).then(|| h.to_string())
 }
 
 fn main() -> ExitCode {

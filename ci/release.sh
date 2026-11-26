@@ -5,7 +5,7 @@
 #   ci/release.sh all COMMIT [MAIN]   COMMIT must be on MAIN (default origin/main) and the checkout clean. Two builds of
 #                                     COMMIT, each from its own `git archive` extraction (umask 022 and 077, mtimes 2000
 #                                     and 2030, as tests/spike.sh's `reproducible` makes them), compared byte for byte;
-#                                     `verify` on the first against the hash it printed (or RELEASE_PIN if set); then the
+#                                     `verify` on the first against the hash it printed; then the
 #                                     tarball, MANIFEST and LEDGER.jsonl kept in RELEASE_OUT with summary.md.
 #   ci/release.sh dry COMMIT          `all` without the on-main check and without keeping: the pull request's own tree built
 #                                     twice, compared and verified, so a change to the release's tools is exercised before it
@@ -18,13 +18,11 @@
 set -euo pipefail
 . "$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)/tests/ci/common.sh"   # here, IMAGE, container(), scratch
 fail() { echo "RELEASE FAIL: $*"; exit 1; }
-jobs() { [ -n "${CARGO_BUILD_JOBS:-}" ] && printf -- '-e\nCARGO_BUILD_JOBS=%s\n' "$CARGO_BUILD_JOBS"; return 0; }
 
 build_tree() { # build_tree TREE OUT: the tree's own scripts/build-release, in the pinned image, the tree read-only
-  local tree=$1 out=$2 opts
+  local tree=$1 out=$2
   mkdir -p "$out"
-  mapfile -t opts < <(jobs)
-  container "${opts[@]}" -v "$tree:/repo:ro,Z" -v "$out:/out:Z" "$IMAGE" sh /repo/scripts/build-release /repo /out/release \
+  container ${CARGO_BUILD_JOBS:+-e "CARGO_BUILD_JOBS=$CARGO_BUILD_JOBS"} -v "$tree:/repo:ro,Z" -v "$out:/out:Z" "$IMAGE" sh /repo/scripts/build-release /repo /out/release \
     2>"$out/build.err" | tail -n 1
 }
 
@@ -64,7 +62,7 @@ twice() { # twice COMMIT: two builds of COMMIT from two extractions, compared an
   h2=$(build_tree "$ci/b.tree" "$ci/b") || fail "the second build failed: $(tail -n 3 "$ci/b/build.err")"
   [ "$h1" = "$h2" ] || fail "the two builds printed different hashes: $h1, $h2"
   compare "$ci/a" "$ci/b"
-  verify "$ci/a" "${RELEASE_PIN:-$h1}" "$ci/a.tree"
+  verify "$ci/a" "$h1" "$ci/a.tree"
   echo "$h1"
 }
 
@@ -77,26 +75,25 @@ dry() { # dry COMMIT
 }
 
 all() { # all COMMIT [MAIN]
-  local commit main sha h1 out=${RELEASE_OUT:-$ci/out}
+  local commit main h1 out=${RELEASE_OUT:-$ci/out}
   commit=$(git -C "$here" rev-parse --verify -q "$1^{commit}") || fail "$1 is not a commit"
   main=${2:-origin/main}
   git -C "$here" merge-base --is-ancestor "$commit" "$main" || fail "$commit is not on $main"
   h1=$(twice "$commit" | tee /dev/stderr | tail -n 1)
   mkdir -p "$out"
   for f in tviburi-release.tar MANIFEST LEDGER.jsonl; do cp "$ci/a/release/$f" "$out/$f"; done
-  sha=$(sha256sum <"$out/tviburi-release.tar" | cut -c1-64)
   { echo "## Tviburi release (not tagged, not published)"; echo
     echo "| | |"; echo "|---|---|"
     echo "| commit | \`$commit\` (on \`$main\` at \`$(git -C "$here" rev-parse "$main")\`) |"
     echo "| release hash (sha256 of MANIFEST; the witnesses' model_version) | \`$h1\` |"
     echo "| ledger sha256 (LEDGER.jsonl) | \`sha256:$(sha256sum <"$out/LEDGER.jsonl" | cut -c1-64)\` |"
     echo "| ledger rows (MANIFEST \`ledger-rows\`) | \`sha256:$(sed -n 's/^ledger-rows \([0-9a-f]*\) .*/\1/p' "$out/MANIFEST")\` |"
-    echo "| tarball sha256 | \`sha256:$sha\` |"
+    echo "| tarball sha256 | \`sha256:$(sha256sum <"$out/tviburi-release.tar" | cut -c1-64)\` |"
     for asm in renode infrastructure; do
       echo "| \`build $asm\` (MANIFEST: the build string, then its assembly's sha256) | \`$(sed -n "s/^build $asm //p" "$out/MANIFEST")\` |"
     done
     echo "| image | \`$IMAGE\` |"
-    echo; echo "Two builds byte-identical (every file in each); \`verify\` passed against \`${RELEASE_PIN:-$h1}\`."; } >"$out/summary.md"
+    echo; echo "Two builds byte-identical (every file in each); \`verify\` passed against \`$h1\`."; } >"$out/summary.md"
   cat "$out/summary.md"
 }
 

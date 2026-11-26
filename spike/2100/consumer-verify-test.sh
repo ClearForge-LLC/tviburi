@@ -16,18 +16,18 @@ expect() { # expect NAME PATTERN OUTPUT
 }
 expect pass "CONSUMER VERIFY PASS" "$(v "$tar" "$pin")"
 expect wrongpin "not the pinned" "$(v "$tar" "sha256:$(printf '%064d' 0)")"
-mkdir "$w/x" && tar -C "$w/x" -xf "$tar"
+mkdir "$w/x" && tar -C "$w/x" -xf "$tar" && order=$(tar -tf "$tar")   # the release's members, in its order
 edit() { # edit NAME FILE SED: a copy of the release with FILE edited, retarred in the release's order
-  rm -rf "$w/e" && cp -r "$w/x" "$w/e" && sed -i "$3" "$w/e/$2" && (cd "$w/e" && tar -cf "$w/$1.tar" MANIFEST Tviburi.cs TviburiRelease.cs.template LEDGER.jsonl)
+  rm -rf "$w/e" && cp -r "$w/x" "$w/e" && sed -i "$3" "$w/e/$2" && (cd "$w/e" && tar -cf "$w/$1.tar" $order)
 }
 edit overlay Tviburi.cs '0,/records runtime/s//records runtimE/'
 expect overlay "first" "$(v "$w/overlay.tar" "$pin")"
 edit ledger LEDGER.jsonl '2s/"field"/"Field"/'
 expect ledger "LEDGER.jsonl's rows" "$(v "$w/ledger.tar" "$pin")"
-(cd "$w/x" && echo x >.payload.cs && tar -cf "$w/hidden.tar" MANIFEST Tviburi.cs TviburiRelease.cs.template LEDGER.jsonl .payload.cs && rm .payload.cs)
+(cd "$w/x" && echo x >.payload.cs && tar -cf "$w/hidden.tar" $order .payload.cs && rm .payload.cs)
 expect hidden "not exactly the four files" "$(v "$w/hidden.tar" "$pin")"
 mkdir "$w/j" && echo junk >"$w/j/Tviburi.cs"
-(cd "$w/j" && tar -cf "$w/dup.tar" Tviburi.cs) && (cd "$w/x" && tar -rf "$w/dup.tar" MANIFEST Tviburi.cs TviburiRelease.cs.template LEDGER.jsonl)
+(cd "$w/j" && tar -cf "$w/dup.tar" Tviburi.cs) && (cd "$w/x" && tar -rf "$w/dup.tar" $order)
 expect duplicate "not exactly the four files" "$(v "$w/dup.tar" "$pin")"
 edit placeholder TviburiRelease.cs.template 's|"sha256:@@MANIFEST_SHA256@@"|"sha256:@@MANIFEST_SHA256@@" + "@@MANIFEST_SHA256@@"|'
 expect placeholder "the template" "$(v "$w/placeholder.tar" "$pin")"

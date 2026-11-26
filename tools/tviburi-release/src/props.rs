@@ -111,7 +111,7 @@ pub fn mask(path: &str, text: &str) -> Result<String, String> {
 
 /// A type's name without its namespace or type arguments: `Bus.IWordPeripheral` and `SimpleContainer<II2CPeripheral>` are
 /// `IWordPeripheral` and `SimpleContainer`.
-fn bare(t: &str) -> String {
+pub fn bare(t: &str) -> String {
     t.split('<').next().unwrap_or("").trim().rsplit('.').next().unwrap_or("").to_string()
 }
 
