@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """TVI-WO-1306: the I2C guard's Fields table (RUL-16, RUL-17), generated, never typed: from RM0433 Rev 9's I2C register fields
 (tests/1306/data/rm0433-rev9-i2c-fields.tsv, written by tests/1306/extract.py) and the classes ruled 2026-11-25T05:06Z (Q2, Q5,
-Q8-Q11). Prints the C# `R(...)` rows of model/GuardedSTM32F7_I2C.cs's `Fields`; tests/1306/i2c.sh `regen` checks them byte for
+Q8-Q11) and, for the NACK, 2026-11-26T00:22Z (TVI-WO-1306a). Prints the C# `R(...)` rows of model/GuardedSTM32F7_I2C.cs's `Fields`; tests/1306/i2c.sh `regen` checks them byte for
 byte. Usage: python3 -I tests/1306/fields.py tests/1306/data/rm0433-rev9-i2c-fields.tsv"""
 import sys
 
@@ -12,10 +12,14 @@ PE = ('protected under PE (p%d): changed with PE = 1 it is TVI-I2C-PE, unmodeled
       'and not what silicon does with such a write (' + RULED + ' Q2)')
 TARGET = 'target (slave) mode is not modeled'
 SMBUS = 'SMBus is not modeled'
-ABSENT = ('a START to an address with no device: the stock model logs "Unknown slave", sets no NACKF and the firmware times out, '
-          'where silicon NACKs and sends a STOP (p1975); acknowledged by name for the measured addresses only, i2c1 0x30 0x38 0x39 '
-          '0x48 0x54 0x55 0x76 and i2c2 0x30 0x38 0x39 0x54 0x55 (TVI-WO-1306.measure.md §2.1), the guard writing the stock line '
-          'under its own name; any other address with no device is TVI-I2C-ABSENT, unmodeled (' + RULED + ' Q9)')
+RULED2 = 'ruled 2026-11-26T00:22Z'
+NACK = ('a write START to an address with no device is NACKed by the guard: NACKF nine SCL periods after the START (p1955; the period '
+        'by p1971 from TIMINGR, DNF and the RCC guard\'s KernelHz, each tSYNC at its stated floor; inferred: the START\'s hold, tHD:STA, '
+        'which SCLH sets (p1973), is not added), STOPF one SCL period '
+        'after NACKF (inferred: RM0433 gives no figure), whatever AUTOEND ("a STOP condition is automatically sent", p1975), the guard '
+        'writing the stock line "Unknown slave at address N." under its own name (TVI-WO-1306a.measure.md; ' + RULED2 + ' Q1-Q3, Q5, Q8); '
+        'with no kernel-clock frequency it is TVI-I2C-NACK, unmodeled (Q2); a read START to an address with no device is TVI-I2C-ABSENT, '
+        'unmodeled: RM0433 states the automatic STOP only for a write (Q6)')
 OPEN = ('changed while a transfer is open (START passed, no TC, TCR or STOPF since, no STOP or PE clear) it is TVI-I2C-TRANSFER, '
         'unmodeled ("Changing these bits when the START bit is set is not allowed", p2004-2006; ' + RULED + ' Q8)')
 
@@ -41,13 +45,13 @@ def cls(reg, f, msb, lsb, page):
             'TXDMAEN': ('Zero', T, '0 only: a stock tag; the DMA side of I2C is not modeled (TVI-WO-1306 NOT)'),
             'ANFOFF': ('Any', G, 'kept by the guard and served on read (a stock tag; ' + RULED + ' Q5); the twin\'s bus carries no noise to filter; '
                        + PE % page),
-            'DNF': ('Any', G, 'kept by the guard and served on read (a stock tag; ' + RULED + ' Q5); the twin\'s bus carries no noise to filter; '
-                    + PE % page),
+            'DNF': ('Any', G, 'kept by the guard and served on read (a stock tag; ' + RULED + ' Q5); the twin\'s bus carries no noise to filter, '
+                    'but DNF x tI2CCLK adds to each tSYNC of the NACK\'s SCL period (p1971; TVI-WO-1306a); ' + PE % page),
             'ERRIE': ('Any', I, 'the stock model keeps it; no bus error (BERR, ARLO, OVR, TIMEOUT, PECERR, ALERT) is ever raised, so it never fires '
                       '(ArduPilot sets it; ' + RULED + ' Q11)'),
             'TCIE': ('Any', I, 'the stock model: TC and TCR raise the event interrupt'),
-            'STOPIE': ('Any', I, 'the stock model: STOPF raises the event interrupt'),
-            'NACKIE': ('Any', I, 'the stock model keeps it; NACKF is never set (' + RULED + ' Q9), so it never fires (ArduPilot sets it; Q11)'),
+            'STOPIE': ('Any', I, 'the stock model: STOPF raises the event interrupt; and the guard\'s STOPF after a NACK (TVI-WO-1306a)'),
+            'NACKIE': ('Any', G, 'the guard: NACKF raises the event interrupt (Table 400 p1999; the stock model has NACKIE && false); the NACK: see I2C_CR2.START'),
             'ADDRIE': ('Zero', I, '0 only: the stock model stores it; ' + TARGET),
             'RXIE': ('Any', I, 'the stock model: RXNE on a read raises the event interrupt'),
             'TXIE': ('Any', I, 'the stock model: TXIS raises the event interrupt'),
@@ -60,15 +64,17 @@ def cls(reg, f, msb, lsb, page):
     if r == 'CR2':
         return {
             'PECBYTE': ('Zero', T, '0 only: a stock tag; ' + SMBUS),
-            'AUTOEND': ('Any', I, 'the stock model: a STOP after NBYTES (STOPF)'),
+            'AUTOEND': ('Any', I, 'the stock model: a STOP after NBYTES (STOPF); a NACKed address\'s STOP comes whatever AUTOEND (p1975; TVI-WO-1306a)'),
             'RELOAD': ('Zero', I, '0 only: the stock model stores it and extends a transfer, used by no firmware (TVI-WO-1306.measure.md §2.1), '
                        'so held at 0, not audited (' + RULED + ' Q11)'),
             'NBYTES': ('Any', I, 'the stock model; a START with NBYTES = 0 and RELOAD = 0 is TVI-I2C-TRANSFER, unmodeled, never passed on: the '
                        'stock model hands the device an empty write and Renode aborts (measure.md §2.3 I8b; ' + RULED + ' Q8); ' + OPEN),
             'NACK': ('Zero', T, '0 only: a stock tag; ' + TARGET),
-            'STOP': ('Any', I, 'the stock model: STOPF; it closes an open transfer'),
+            'STOP': ('Any', G, 'the stock model: STOPF; it closes an open transfer; written while a NACKed address\'s automatic STOP is pending, '
+                     'absorbed by the guard: silicon clears it "when a STOP condition is detected" (p2005; ' + RULED2 + ' Q4)'),
             'START': ('Any', G, 'the stock model starts the transfer; with PE = 0, or while a transfer is open, it is TVI-I2C-TRANSFER, '
-                      'unmodeled (p2003 "Peripheral disabled"; ' + RULED + ' Q8); ' + ABSENT),
+                      'unmodeled (p2003 "Peripheral disabled"; ' + RULED + ' Q8); while a NACKed address\'s automatic STOP is pending it is TVI-I2C-TRANSFER, '
+                      'unmodeled (' + RULED2 + ' Q4); ' + NACK),
             'HEAD10R': ('Zero', T, '0 only: a stock tag; 10-bit addressing is not modeled'),
             'ADD10': ('Zero', I, '0 only: the stock model stores it; 10-bit addressing is not modeled'),
             'RD_WRN': ('Any', I, 'the stock model; ' + OPEN),
@@ -78,7 +84,7 @@ def cls(reg, f, msb, lsb, page):
         return ('Zero', I, '0 only: the stock model stores it; ' + TARGET)
     if r == 'TIMINGR':
         return ('Any', G, 'kept by the guard and served on read: the stock model has every TIMINGR field as a tag that reads 0 (measure.md '
-                '§2.3 I2; ' + RULED + ' Q5); the twin times nothing by it; ' + PE % page)
+                '§2.3 I2; ' + RULED + ' Q5); the guard times a NACK by it (p1971; TVI-WO-1306a), and nothing else; ' + PE % page)
     if r == 'TIMEOUTR':
         return ('Zero', U, '0 only: the stock model has no register 0x14; SMBus timeouts are not modeled; reads 0')
     if r == 'ISR':
@@ -87,7 +93,11 @@ def cls(reg, f, msb, lsb, page):
         if f == 'TXIS':
             return ('Zero', I, '0 only: writing 1 generates TXIS with NOSTRETCH = 1 only, ' + TARGET)
         if f == 'NACKF':
-            return ('Any', RO, 'read-only: a write is ignored; the stock model never sets it (' + ABSENT + '; modeling it is a roadmap row)')
+            return ('Any', G, 'read-only (a write is ignored), set and served by the guard: ' + NACK + '; cleared by NACKCF (p2012) and at '
+                    'PE = 0 (p2011); a NACK in the data phase is not modeled: no device model in Renode NACKs a byte (' + RULED2 + ' Q7)')
+        if f == 'STOPF':
+            return ('Any', RO, 'read-only: a write is ignored; the stock model\'s, and the guard\'s one SCL period after a NACK\'s NACKF (inferred: '
+                    'RM0433 gives no figure; ' + RULED2 + ' Q3)')
         return ('Any', RO, 'read-only: a write is ignored and changes nothing (no record, RUL-18 as amended)')
     if r == 'ICR':
         return {
@@ -97,9 +107,8 @@ def cls(reg, f, msb, lsb, page):
             'OVRCF': ('Zero', T, '0 only: a stock tag; no bus error is modeled'),
             'ARLOCF': ('Zero', T, '0 only: a stock tag; no bus error is modeled'),
             'BERRCF': ('Zero', T, '0 only: a stock tag; no bus error is modeled'),
-            'STOPCF': ('Any', I, 'the stock model clears STOPF'),
-            'NACKCF': ('Any', I, 'clears NACKF, which the stock model never sets: a write that changes nothing (the generated firmware\'s '
-                       'ICR = 0x30; ' + RULED + ' Q11)'),
+            'STOPCF': ('Any', G, 'the stock model clears STOPF; the guard clears the NACK\'s own STOPF (p2012)'),
+            'NACKCF': ('Any', G, 'the guard clears NACKF (p2012); the NACK: see I2C_CR2.START'),
             'ADDRCF': ('Zero', I, '0 only: ' + TARGET + ' (in controller mode the stock model clears TXIS, where silicon clears ADDR and a pending START, p2012)'),
         }[f]
     if r == 'PECR':

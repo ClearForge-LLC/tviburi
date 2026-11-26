@@ -5,15 +5,17 @@
 #   TVIBURI_TESTS="config timingrpe ..."  run only these cases.
 #   TVIBURI_CI=1                          plain `podman run`, for a disposable CI runner only; elsewhere ~/bin/capped-run.
 # Exit 0 only if every selected case passed. Pages: RM0433 Rev 9 §47 (I2C); the rulings of 2026-11-25T05:06Z (Q1-Q12) and the
-# measurement in docs/work-orders/TVI-WO-1306.measure.md. Each firmware case puts a BME280 at 0x76 on i2c1 (the platform's
+# measurement in docs/work-orders/TVI-WO-1306.measure.md; the NACK's cases (nack*) TVI-WO-1306a's, ruled 2026-11-26T00:22Z
+# (docs/work-orders/TVI-WO-1306a.measure.md). Each firmware case puts a BME280 at 0x76 on i2c1 (the platform's
 # sensor, declared on the guard's variable: measure.md §2.4).
 set -euo pipefail
 
 here=$(cd "$(dirname "$0")/../.." && pwd)
 IMAGE=$(sed -n 's/^IMAGE=//p' "$here/tests/spike.sh")
-CASES="config timingrpe timingrsame timingroff dnfpe anfoff clearfield ap absentnext absent icrres field width read kernel reset resetok startoff txdroff empty midstart midcr2 txdrread stopidle startstop stalestop blindclear softreset clock registrations recorded rccreset unheld clocklost absentname fields ledger regen"
+CASES="config timingrpe timingrsame timingroff dnfpe anfoff clearfield ap absentnext absent icrres field width read kernel reset resetok startoff txdroff empty midstart midcr2 txdrread stopidle startstop stalestop blindclear softreset clock registrations recorded rccreset unheld clocklost absentname fields ledger regen nack nacktime nackpll nackirq nackstop nackpe nacktransfer nacktxdr nackclock"
 GUARDS="spi1 rcc gpioPortA gpioPortB gpioPortC gpioPortD gpioPortE gpioPortF gpioPortG gpioPortH gpioPortI gpioPortJ gpioPortK timer1 timer8 dma1 dma2 flashController usart1 usart2 usart3 uart4 uart5 usart6 uart7 uart8 i2c1 i2c2 i2c3 adcM1S2 adc3"
-MONITOR="clock registrations recorded rccreset unheld clocklost absentname fields ledger regen"
+MONITOR="clock registrations recorded rccreset unheld clocklost absentname fields ledger regen nacktime nackpll"
+CUSTOM="nackirq"   # a firmware case whose monitor lines are its own (TVI-WO-1306a)
 PATHS=$(for c in $CASES; do case " $MONITOR " in *" $c "*) ;; *) printf '"%s",' "$c" ;; esac; done | sed 's/,$//')
 scratch=${TVIBURI_SCRATCH:-$HOME/.cache/tviburi}
 mkdir -p "$scratch"
@@ -86,6 +88,17 @@ readout() { console "$1" | grep -A1 -x "R-$2" | tail -n1; }
 passed() { [ "$rc" = 0 ] && grep -qx 'CHECK PASS' "$work/$1.stdout"; }
 passes() { passed "$1" && after "$1"; }
 refuses() { [ "$rc" = 3 ] && first "$1" "r[\"rule\"] == \"$2\" and r[\"kind\"] == \"$3\" and r[\"peripheral\"] == \"sysbus.i2c1\" and r[\"access\"][\"pc\"] != \"none\" and $4"; }
+nackat() { # nackat <name> <address phase, us> <SCL period, us> <setup monitor lines...>: TVI-WO-1306a's timing, monitor-driven (a RunFor
+  # is exact; the log's stamps are not). After the setup's last line, a write START to an absent address, ISR is read 0.5 us either
+  # side of NACKF (nine SCL periods, p1955, p1971) and of STOPF (one period more, inferred, ruled Q3), then after ICR = 0x30.
+  local name=$1 a=$2 t=$3; shift 3
+  local us; mapfile -t us < <(python3 -I -c 'import sys; a, t = map(float, sys.argv[1:]); print("\n".join("%.10f" % (x / 1e6) for x in (a - 0.5, 1, t - 1, 1)))' "$a" "$t")
+  run_case "$name" - "$clk" "$@" 'echo "R-T0"' 'sysbus ReadDoubleWord 0x40005418' \
+    "emulation RunFor \"${us[0]}\"" 'echo "R-T1"' 'sysbus ReadDoubleWord 0x40005418' "emulation RunFor \"${us[1]}\"" 'echo "R-T2"' 'sysbus ReadDoubleWord 0x40005418' \
+    "emulation RunFor \"${us[2]}\"" 'echo "R-T3"' 'sysbus ReadDoubleWord 0x40005418' "emulation RunFor \"${us[3]}\"" 'echo "R-T4"' 'sysbus ReadDoubleWord 0x40005418' \
+    'sysbus WriteDoubleWord 0x4000541C 0x30' 'echo "R-T5"' 'sysbus ReadDoubleWord 0x40005418'
+  [ "$(for k in 0 1 2 3 4 5; do readout "$name" "T$k"; done | paste -sd' ')" = "0x00000001 0x00000001 0x00000011 0x00000011 0x00000031 0x00000001" ]
+}
 logged() { # logged <name> <python expr over `recs`, the records under <source> in the log, in order> [source]
   python3 -I -c '
 import json, sys
@@ -94,13 +107,14 @@ recs = [json.loads(l.split(sys.argv[3] + ": ", 1)[1]) for l in open(sys.argv[1])
 sys.exit(0 if eval("(" + sys.argv[2] + ")") else 1)
 ' "$work/$1/renode-log.txt" "$2" "${3:-i2c1}"
 }
-marks=('echo "TVIBURI-MARK-AFTER"' 'sysbus ReadDoubleWord 0x20000104' 'echo "R-READ"' 'sysbus ReadDoubleWord 0x20000108' 'echo "R-READ2"' 'sysbus ReadDoubleWord 0x2000010C')
+marks=('echo "TVIBURI-MARK-AFTER"' 'sysbus ReadDoubleWord 0x20000104' 'echo "R-READ"' 'sysbus ReadDoubleWord 0x20000108' 'echo "R-READ2"' 'sysbus ReadDoubleWord 0x2000010C'
+  'echo "R-READ3"' 'sysbus ReadDoubleWord 0x20000110' 'echo "R-READ4"' 'sysbus ReadDoubleWord 0x20000114')
 clk='sysbus WriteDoubleWord 0x580244E8 0x200000'   # I2C1EN (p463): an unclocked port is locked on the bus (TVI-WO-1300a)
 cfg=("$clk" 'sysbus WriteDoubleWord 0x40005410 0x10C7123C' 'sysbus WriteDoubleWord 0x40005400 0x1')   # config, from the monitor
 rec='/^tviburiI2c1:$/{n;s/enforcing/recorded/}'
 
 for t in ${TVIBURI_TESTS:-$CASES}; do
-  case " $MONITOR " in *" $t "*) mon=1 ;; *) mon=0 ;; esac
+  case " $MONITOR $CUSTOM " in *" $t "*) mon=1 ;; *) mon=0 ;; esac
   if [ $mon = 0 ]; then
     run_case "$t" "$t" 'emulation RunFor "0.001"' "${marks[@]}"
   fi
@@ -117,12 +131,12 @@ for t in ${TVIBURI_TESTS:-$CASES}; do
   anfoff) check "anfoff: CR1 with ANFOFF and DNF = 1111 written with PE = 0, then PE: passes; CR1 reads 0x1F01 (the stock model drops both tags)" \
     "passes anfoff && [ \"\$(readout anfoff READ)\" = 0x00001F01 ]" ;;
   clearfield) check "clearfield: CR1 written from PE = 1 with PE = 0 and DNF changed in one write passes, judged as with PE = 0 (ruled Q2)" "passes clearfield" ;;
-  ap) check "ap: ArduPilot's I2C1 sequence (CR1 0x90, TIMINGR 0x00300F38, CR1 0x91; transfers with software STOP; ICR 0x40, 0x4, 0x2, its reserved bits (ruled Q10); a probe of 0x30, absent, acknowledged (ruled Q9); a stop and a start) passes, enforcing; RXDR 0x60, TIMINGR 0x00300F38" \
+  ap) check "ap: ArduPilot's I2C1 sequence (CR1 0x90, TIMINGR 0x00300F38, CR1 0x91; transfers with software STOP; ICR 0x40, 0x4, 0x2, its reserved bits (ruled Q10); a probe of 0x30, absent, NACKed, its software STOP absorbed while the NACK's STOP is pending (TVI-WO-1306a Q4); a stop and a start) passes, enforcing; RXDR 0x60, TIMINGR 0x00300F38" \
     "passes ap && [ \"\$(readout ap READ)\" = 0x00000060 ] && [ \"\$(readout ap READ2)\" = 0x00300F38 ] && grep -q 'i2c1: Unknown slave at address 48\\.' '$work/ap/renode-log.txt'" ;;
-  absentnext) check "absentnext: the generated firmware's probe of 0x48 (no device, acknowledged: no NACKF comes, ISR polled, ICR = 0x30), then the chip id: passes (silicon NACKs and stops, so the next START is valid) and reads 0x60" \
+  absentnext) check "absentnext: the generated firmware's probe of 0x48 (no device: NACKed, ISR polled to STOPF, ICR = 0x30), then the chip id: passes and reads 0x60" \
     "passes absentnext && [ \"\$(readout absentnext READ)\" = 0x00000060 ]" ;;
-  absent) check "absent: a START to 0x31, where the platform has no device and no firmware was measured probing, refuses TVI-I2C-ABSENT, unmodeled (p1975; ruled Q9)" \
-    "refuses absent TVI-I2C-ABSENT unmodeled 'r[\"access\"][\"offset\"] == \"0x4\" and \"0x31\" in r[\"condition\"] and \"p1975\" in r[\"citation\"]'" ;;
+  absent) check "absent: a read START from 0x31, where the platform has no device, refuses TVI-I2C-ABSENT, unmodeled: RM0433 states the automatic STOP only for a write (p1975; TVI-WO-1306a Q6)" \
+    "refuses absent TVI-I2C-ABSENT unmodeled 'r[\"access\"][\"offset\"] == \"0x4\" and \"read from 0x31\" in r[\"condition\"] and \"p1975\" in r[\"citation\"]'" ;;
   icrres) check "icrres: ICR bit 7 (reserved, not ChibiOS's 1, 2 or 6) refuses TVI-I2C-FIELD, unmodeled (p2012)" \
     "refuses icrres TVI-I2C-FIELD unmodeled 'r[\"bit\"] == \"Res7 (bit 7) = 1\" and \"p2012\" in r[\"citation\"]'" ;;
   field) check "field: CR1.TXDMAEN = 1 refuses TVI-I2C-FIELD, unmodeled (the allow-list, ruled Q11)" \
@@ -198,7 +212,7 @@ for t in ${TVIBURI_TESTS:-$CASES}; do
     # Ruled Q9: the generated firmware's TMP117 probe at 0x48 (no Renode model) passes, and the guard writes the stock model's
     # line under its own name, which Aethelgard's absent_address reads by source (the owned instance's has none).
     run_case absentname - "${cfg[@]}" 'sysbus WriteDoubleWord 0x40005404 0x00012090' 'echo "R-ISR"' 'sysbus ReadDoubleWord 0x40005418'
-    check "absentname: a START to 0x48 (measured: the TMP117 has no model) passes, acknowledged by name; the log has '[WARNING] i2c1: Unknown slave at address 72.' under the guard's name; ISR reads 0x1 (no NACKF: the stock's gap, acknowledged)" \
+    check "absentname: a START to 0x48 (measured: the TMP117 has no model) passes, NACKed; the log has '[WARNING] i2c1: Unknown slave at address 72.' under the guard's name; ISR read at the START reads 0x1 (NACKF only at the end of the address phase)" \
       "passed absentname && grep -q '\\[WARNING\\] i2c1: Unknown slave at address 72\\.\$' '$work/absentname/renode-log.txt' && [ \"\$(readout absentname ISR)\" = 0x00000001 ]" ;;
   fields)
     # The allow-list (RUL-17) by enumeration, recorded: every field the table allows only at 0, given its widest value with
@@ -226,7 +240,7 @@ EOF
   ledger)
     mkdir -p "$work/ledger"
     rc=0; container -v "$src:/repo:ro,Z" -v "$work/ledger:/out:Z" "$IMAGE" sh -c '/repo/scripts/build-release /repo /out/release >/dev/null' </dev/null >"$work/ledger.stdout" 2>&1 || rc=$?
-    check "ledger: the release carries the I2C guard's field rows over its 11 registers (TIMINGR, DNF, ANFOFF, PE, START modeled; NACKF's absent-address acknowledgement; ICR's reserved bits 1, 2 and 6 acknowledged; the ledger's acknowledged absent addresses are exactly the guard's Absent table); the manifest restates i2c1-i2c3 and not i2c4; the stock type's guarded row lists the three, the unguarded row i2c4" \
+    check "ledger: the release carries the I2C guard's field rows over its 11 registers (TIMINGR, DNF, ANFOFF, PE, START modeled; NACKF, NACKCF, NACKIE and STOP modeled by the guard, NACKF's STOPF time named inferred (TVI-WO-1306a); ICR's reserved bits 1, 2 and 6 acknowledged); the manifest restates i2c1-i2c3 and not i2c4; the stock type's guarded row lists the three, the unguarded row i2c4" \
       "[ \$rc = 0 ] && python3 -I -c '
 import json, sys
 rows = [json.loads(l) for l in open(sys.argv[1]).read().splitlines()[1:]]
@@ -235,7 +249,8 @@ f = [r for r in rows if r.get(\"peripheral\") == g and r[\"row\"] == \"field\"]
 by = {(r[\"register\"], r[\"field\"]): r for r in f}
 ok = len({r[\"register\"] for r in f}) == 11 and all(by[(\"I2C_TIMINGR\", x)][\"state\"] == \"guard\" for x in (\"PRESC\", \"SCLDEL\", \"SDADEL\", \"SCLH\", \"SCLL\"))
 ok = ok and by[(\"I2C_CR1\", \"DNF\")][\"state\"] == \"guard\" and by[(\"I2C_CR1\", \"ANFOFF\")][\"state\"] == \"guard\" and by[(\"I2C_CR2\", \"START\")][\"state\"] == \"guard\"
-ok = ok and \"0x48\" in by[(\"I2C_ISR\", \"NACKF\")][\"behaves_as\"] and by[(\"I2C_ICR\", \"Res6\")][\"allowed\"] == \"any\" and by[(\"I2C_ICR\", \"Res7\")][\"allowed\"] == [0]
+ok = ok and all(by[(r, f)][\"state\"] == \"guard\" for r, f in ((\"I2C_ISR\", \"NACKF\"), (\"I2C_ICR\", \"NACKCF\"), (\"I2C_CR1\", \"NACKIE\"), (\"I2C_CR2\", \"STOP\")))
+ok = ok and \"inferred: RM0433 gives no figure\" in by[(\"I2C_ISR\", \"NACKF\")][\"behaves_as\"] and \"p1975\" in by[(\"I2C_CR2\", \"START\")][\"behaves_as\"] and by[(\"I2C_ICR\", \"Res6\")][\"allowed\"] == \"any\" and by[(\"I2C_ICR\", \"Res7\")][\"allowed\"] == [0]
 ok = ok and by[(\"I2C_ICR\", \"Res2_1\")][\"state\"] == \"inherited-unaudited\" and by[(\"I2C_CR2\", \"RELOAD\")][\"allowed\"] == [0]
 m = [r for r in rows if r[\"row\"] == \"model\" and r[\"peripheral\"] == \"I2C.STM32F7_I2C\"]
 mg = [x for x in m if x[\"field\"] == \"guarded\"]; mu = [x for x in m if x[\"field\"] == \"unguarded\"]
@@ -243,12 +258,6 @@ ok = ok and len(mg) == 1 and mg[0].get(\"guarded_by\") == g and mg[0][\"instance
 ok = ok and len(mu) == 1 and \"guarded_by\" not in mu[0] and mu[0][\"instances\"] == [\"i2c4\"]
 r = sorted(l.split()[2] for l in open(sys.argv[2]) if l.startswith(\"restate I2C.STM32F7_I2C \"))
 ok = ok and r == [\"i2c1\", \"i2c2\", \"i2c3\"]
-import re
-cs = open(sys.argv[3]).read()
-code = {p: sorted(int(x, 16) for x in re.findall(r\"0x[0-9A-F]+\", a)) for p, a in re.findall(r\"\\[\\\"(i2c\\d)\\\"\\] = new\\[\\] \\{([^}]*)\\}\", cs)}
-text = by[(\"I2C_ISR\", \"NACKF\")][\"behaves_as\"]
-said = {p: sorted(int(x, 16) for x in re.findall(r\"0x[0-9a-fA-F]+\", a)) for p, a in re.findall(r\"(i2c\\d)((?: 0x[0-9a-fA-F]+)+)\", text)}
-ok = ok and code == said and len(code) == 2
 sys.exit(0 if ok else 1)
 ' '$work/ledger/release/LEDGER.jsonl' '$work/ledger/release/MANIFEST' '$src/model/GuardedSTM32F7_I2C.cs'" ;;
   regen)
@@ -258,6 +267,36 @@ sys.exit(0 if ok else 1)
       -f /repo/model/stm32h7-i2c-restate.awk /opt/renode/platforms/cpus/stm32h7.repl > /out/restate.repl' </dev/null >"$work/regen.stdout" 2>&1 || rc=$?
     check "regen: the guard's Fields table regenerates from tests/1306/data by tests/1306/fields.py, and the restatement from the pinned stm32h7.repl, byte for byte (RUL-16)" \
       "[ \$rc = 0 ] && sed -n '/^        private static readonly Row\[\] Fields =$/,/^        };$/p' '$src/model/GuardedSTM32F7_I2C.cs' | sed '1,2d;\$d' | cmp -s - '$work/fields.cs' && cmp -s '$work/regen/restate.repl' '$src/model/stm32h7-i2c-restate.repl'" ;;
+  nack) check "nack (TVI-WO-1306a acceptance, the planted firmware): a write START with AUTOEND = 1 to 0x31, no device: ISR 0x1 at the START, polled to NACKF (0x11: STOPF not yet), to STOPF (0x31), and ICR = 0x30 clears both (0x1), the guard's NACKCF not handed to the stock tag (no 'Unhandled write ... NACKCF'); no record (p1975, p2011, p2012). Its timing: nacktime" \
+    "passes nack && [ \"\$(readout nack READ)\" = 0x00000001 ] && [ \"\$(readout nack READ2)\" = 0x00000011 ] && [ \"\$(readout nack READ3)\" = 0x00000031 ] && [ \"\$(readout nack READ4)\" = 0x00000001 ] && ! grep -q 'NACKCF' '$work/nack/renode.out'" ;;
+  nacktime)
+    # nack's configuration from the monitor: rcc_pclk1 = 32 MHz (HSI 64 MHz, D2PPRE1 = 100: /2, p396), DNF = 15, TIMINGR 0x10C7123C:
+    # tSCL = ((0x12 + 1) + (0x3C + 1)) x 2 + 2 x (2 + 15) = 194 kernel clocks = 6.0625 us; the address phase 54.5625 us.
+    check "nacktime (the acceptance's timing): NACKF 54.5625 us after a write START (AUTOEND = 1) and not before (ISR 0x1 at 54.06 us, 0x11 at 55.06), STOPF one SCL period (6.0625 us) later (0x11 at 60.13 us, 0x31 at 61.13), ICR = 0x30 clears both: the page's timing at rcc_pclk1 / 2, DNF 15 (p1955, p1971; the RCC guard's KernelHz, ruled Q2; STOPF's period inferred, Q3)" \
+      "nackat nacktime 54.5625 6.0625 'sysbus WriteDoubleWord 0x5802441C 0x40' 'sysbus WriteDoubleWord 0x40005400 0xF00' 'sysbus WriteDoubleWord 0x40005410 0x10C7123C' 'sysbus WriteDoubleWord 0x40005400 0xF01' 'sysbus WriteDoubleWord 0x40005404 0x02012062' && passed nacktime" ;;
+  nackpll)
+    # pll3_r_ck = HSI 64 MHz / DIVM3 32 (reset) x 300 / 20 = 30 MHz (pp. 398-410), I2C123SEL = 01 (p416); ArduPilot's CR1 and TIMINGR
+    # 0x00300F38: tSCL = (16 + 57) + 4 = 77 kernel clocks = 2.5667 us; the address phase 23.1 us.
+    check "nackpll: the kernel clock pll3_r_ck at 30 MHz through the RCC guard's KernelHz, ArduPilot's TIMINGR 0x00300F38, a write START with AUTOEND = 0 to 0x30: NACKF at 23.1 us, STOPF 2.567 us later (a STOP whatever AUTOEND, p1975; ruled Q1)" \
+      "nackat nackpll 23.1 2.566667 'sysbus WriteDoubleWord 0x58024440 0x1301032B' 'sysbus WriteDoubleWord 0x58024400 0x10000025' 'sysbus WriteDoubleWord 0x58024454 0x1000' 'sysbus WriteDoubleWord 0x40005400 0x90' 'sysbus WriteDoubleWord 0x40005410 0x00300F38' 'sysbus WriteDoubleWord 0x40005400 0x91' 'sysbus WriteDoubleWord 0x40005404 0x00012060' && passed nackpll" ;;
+  nackirq)
+    run_case nackirq nackirq 'emulation RunFor "0.00001"' 'echo "R-PRE"' 'sysbus.i2c1 EventInterrupt' 'emulation RunFor "0.0001"' 'echo "R-IRQ"' 'sysbus.i2c1 EventInterrupt' \
+      'echo "R-ISPR"' 'sysbus ReadDoubleWord 0xE000E200' 'sysbus WriteDoubleWord 0x4000541C 0x10' 'echo "R-CLR"' 'sysbus.i2c1 EventInterrupt' \
+      'sysbus WriteDoubleWord 0x4000541C 0x20' 'echo "R-CLR2"' 'sysbus.i2c1 EventInterrupt' \
+      'sysbus WriteDoubleWord 0x40005404 0x00012062' 'emulation RunFor "0.0001"' 'sysbus WriteDoubleWord 0x4000541C 0x20' 'echo "R-CLR3"' 'sysbus.i2c1 EventInterrupt' \
+      'sysbus WriteDoubleWord 0x4000541C 0x10' 'echo "R-CLR4"' 'sysbus.i2c1 EventInterrupt' 'echo "TVIBURI-MARK-AFTER"' 'sysbus ReadDoubleWord 0x20000104'
+    check "nackirq: with NACKIE and STOPIE, a NACK raises I2C1's event line (unset 10 us after the START, set at 110 us; I2C1_EV pending in the NVIC, ISPR0 bit 31; p1999 Table 400); NACKCF leaves it set by the NACK's STOPF, and STOPCF drops it; a second NACK, cleared the other way round: STOPCF leaves it set by NACKF, and NACKCF drops it (p2012)" \
+      "passed nackirq && [ \"\$(readout nackirq PRE)\" = 'GPIO: unset' ] && [ \"\$(readout nackirq IRQ)\" = 'GPIO: set' ] && [ \"\$(readout nackirq ISPR)\" = 0x80000000 ] && [ \"\$(readout nackirq CLR)\" = 'GPIO: set' ] && [ \"\$(readout nackirq CLR2)\" = 'GPIO: unset' ] && [ \"\$(readout nackirq CLR3)\" = 'GPIO: set' ] && [ \"\$(readout nackirq CLR4)\" = 'GPIO: unset' ]" ;;
+  nackstop) check "nackstop: ChibiOS's NACK: ISR 0x11 at NACKF, ICR = ISR & 0xFE, CR2 |= STOP while the NACK's STOP is pending: absorbed (ISR 0x1, no STOPF yet: p2005), STOPF at its time (0x21), the driver restarted and the chip id read (0x60): passes (ruled Q4)" \
+    "passes nackstop && [ \"\$(readout nackstop READ)\" = 0x00000011 ] && [ \"\$(readout nackstop READ2)\" = 0x00000001 ] && [ \"\$(readout nackstop READ3)\" = 0x00000021 ] && [ \"\$(readout nackstop READ4)\" = 0x00000060 ]" ;;
+  nackpe) check "nackpe: PE cleared, checked and set while a NACK is pending cancels it (p1959: the state machines reset), and so does an I2C1RST pulse (p438, the guard's Reset): no NACKF comes either time (ISR 0x1, 0x1); passes" \
+    "passes nackpe && [ \"\$(readout nackpe READ)\" = 0x00000001 ] && [ \"\$(readout nackpe READ2)\" = 0x00000001 ]" ;;
+  nacktransfer) check "nacktransfer: a START to the BME280 while a NACKed address's automatic STOP is pending refuses TVI-I2C-TRANSFER, unmodeled (ruled Q4)" \
+    "refuses nacktransfer TVI-I2C-TRANSFER unmodeled 'r[\"access\"][\"value\"] == \"0x120EC\" and \"automatic STOP is pending\" in r[\"condition\"]'" ;;
+  nacktxdr) check "nacktxdr: a TXDR write after a NACKed START, before its STOPF, refuses TVI-I2C-TRANSFER, unmodeled: no data phase follows a NACK (p1975, p2014); the stock model would send the byte" \
+    "refuses nacktxdr TVI-I2C-TRANSFER unmodeled 'r[\"access\"][\"offset\"] == \"0x28\" and \"outside a write transfer\" in r[\"condition\"]'" ;;
+  nackclock) check "nackclock: a write START to 0x31 with I2C123SEL = 01 and PLL3's VCO at 20 MHz (outside p404's ranges: KernelHz has no frequency) refuses TVI-I2C-NACK, unmodeled (ruled Q2)" \
+    "refuses nackclock TVI-I2C-NACK unmodeled 'r[\"access\"][\"offset\"] == \"0x4\" and \"cannot time it\" in r[\"condition\"] and \"outside the ranges p404 gives\" in r[\"condition\"]'" ;;
   *) echo "unknown case: $t" >&2; exit 2 ;;
   esac
 done
