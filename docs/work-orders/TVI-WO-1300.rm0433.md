@@ -775,6 +775,7 @@ The RCC wrapper adds nothing measurable beyond the one compilation. Host load wa
 | 13:10Z: the `RCC_C1_*` aliases are their base registers | `Base()`; cases `alias`, `alias17c`; mutant C13 |
 | 13:45Z: the per_ck boards are not a stop | §5; case `gen-s03` records that SPI1 has no kernel clock there, without an RCC refusal |
 | 14:35Z F1–F6, acknowledged by name | rows of class "acknowledged by name" whose `behaves as` ends `(A1)`…`(A6)`: **A1** = F1, **A2** = F2, **A3** = F3, **A4** = F4, **A5** = F5, **A6** = F6 (A6 carries the backlog row: CSleep is not modeled) |
+| 2026-11-25T03:03Z (`TVI-WO-1300b` Q1): **A6** extended | A6 also acknowledges `RCC_AHB1LPENR.ADC12LPEN`, `RCC_AHB4LPENR.ADC3LPEN`, `RCC_APB1LLPENR.USART2LPEN` and `RCC_APB2LPENR.TIM1LPEN` written 0 (p477, p480, p485, p492), the armed Sentinel-03 run's, with F6's reason; recorded here by `TVI-WO-1300c` (granted 2026-11-26T04:03Z Q8 (ii)) so that their ledger `detail` names them |
 | 14:35Z F7: the query covers USART2 and USART3 | `USART234578SEL` (p417) as a sixth mux; `usart2`/`usart3` in the query; case `usart2` |
 | 14:35Z F8: `ADC3EN` `unmodeled` | the row allows 0 only; `d1-drv8876`'s generated firmware therefore refuses at `AHB4ENR = 0x01000023` |
 | 14:35Z: the 22 non-query selectors stored and served | rows "modeled by the guard", any value; their peripherals' enables allow 0 only |

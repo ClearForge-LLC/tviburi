@@ -11,10 +11,11 @@ set -euo pipefail
 
 here=$(cd "$(dirname "$0")/../.." && pwd)
 IMAGE=$(sed -n 's/^IMAGE=//p' "$here/tests/spike.sh")
-CASES="config m1ue over8ue psue psoff stopue reinit reinitstop disable same ap width tdrbyte read field nine kernel clock rxoff idle idleframe idlere dmarx fields ledger registrations recorded reset config2 regen brr0 brr8 brrheld overrun idlekernel idlenorule idlenone idlehse"
+CASES="config m1ue over8ue psue psoff stopue reinit reinitstop disable same ap width tdrbyte read field nine kernel clock rxoff idle idleframe idlere dmarx fields ledger registrations recorded reset config2 regen brr0 brr8 brrheld overrun idlekernel idlenorule idlenone idlehse hzcsi hzsyscsi hzsyshse hzvcol hzwide hzdivr hzpllon hzvcoh hzrge hzpll3q hzport hzcsiref"
 GUARDS="spi1 rcc gpioPortA gpioPortB gpioPortC gpioPortD gpioPortE gpioPortF gpioPortG gpioPortH gpioPortI gpioPortJ gpioPortK timer1 timer8 dma1 dma2 flashController usart1 usart2 usart3 uart4 uart5 usart6 uart7 uart8 i2c1 i2c2 i2c3 adcM1S2 adc3"
-MONITOR="clock rxoff idle idleframe idlere dmarx fields ledger registrations recorded reset config2 regen brrheld overrun idlekernel idlenone idlehse"
+MONITOR="clock rxoff idle idleframe idlere dmarx fields ledger registrations recorded reset config2 regen brrheld overrun idlekernel idlenone idlehse hzcsi hzsyscsi hzsyshse hzvcol hzwide hzport hzpllon hzcsiref"
 PATHS=$(for c in $CASES; do case " $MONITOR " in *" $c "*) ;; *) printf '"%s",' "$c" ;; esac; done | sed 's/,$//')
+PATHS="$PATHS,\"hzcsi\",\"hzsyscsi\",\"hzsyshse\",\"hzvcol\",\"hzwide\",\"hzpllon\",\"hzcsiref\""   # TVI-WO-1300c: firmware run with monitor lines after it
 scratch=${TVIBURI_SCRATCH:-$HOME/.cache/tviburi}
 mkdir -p "$scratch"
 work=$(mktemp -d "$scratch/usart.XXXXXX")
@@ -332,6 +333,8 @@ sys.exit(0 if ok else 1)
     # the consumer declares (ruled 2026-11-25T00:00Z: kept as a test), BRR 0x271: 115,200 baud, 86.8 us (64 MHz would give
     # 97.7 us, 200 MHz 31.25); in ArduPilot's order, PLL2 first, then RCC_APB2RSTR.USART1RST pulsed (p443), which resets the
     # port and not what it knows of PLL2; and after a wide PLL2DIVR was written before the machine Reset, which clears it.
+    # PLL2RGE = 11 (8-16 MHz) for its 8 MHz reference (pp. 401-402), as ArduPilot sets it: the RCC guard's KernelHz has no rule
+    # for a range left at reset (TVI-WO-1300c, ruled 2026-11-26T04:03Z Q3; the case's time is unchanged).
     # (USART16SEL only: ArduPilot's 0x9 also moves usart2's mux, and the RCC guard keeps a mux's state across machine Reset, a
     # row for the RCC guard in this work order's feedback.)
     # U: usart2 on rcc_pclk1 = 64 MHz / D2PPRE1 4 = 16 MHz (USART16SEL = 011 beside it, D2PPRE2 2), BRR 50.
@@ -343,7 +346,7 @@ sys.exit(0 if ok else 1)
       'sysbus WriteDoubleWord 0x58024400 0x9' 'sysbus WriteDoubleWord 0x5802441C 0x400' 'sysbus WriteDoubleWord 0x58024454 0x18' 'sysbus WriteDoubleWord 0x4001100C 0x64' "${byte[@]}" \
       'echo "R-H20"' 'sysbus ReadDoubleWord 0x4001101C' 'emulation RunFor "0.00002"' 'echo "R-H40"' 'sysbus ReadDoubleWord 0x4001101C' \
       'sysbus WriteDoubleWord 0x58024438 0x01090367' 'machine Reset' 'cpu IsHalted true' "$clk" \
-      'sysbus WriteDoubleWord 0x58024428 0x00408040' 'sysbus WriteDoubleWord 0x58024438 0x0704022C' 'sysbus WriteDoubleWord 0x58024400 0x04000001' \
+      'sysbus WriteDoubleWord 0x58024428 0x00408040' 'sysbus WriteDoubleWord 0x5802442C 0x01FF00C0' 'sysbus WriteDoubleWord 0x58024438 0x0704022C' 'sysbus WriteDoubleWord 0x58024400 0x04000001' \
       'sysbus WriteDoubleWord 0x58024454 0x8' 'sysbus WriteDoubleWord 0x58024498 0x10' 'sysbus WriteDoubleWord 0x58024498 0x0' 'sysbus WriteDoubleWord 0x4001100C 0x271' 'sysbus WriteDoubleWord 0x40011000 0x2000001D' 'sysbus.usart1 WriteChar 0x41' \
       'emulation RunFor "0.000085"' 'echo "R-A85"' 'sysbus ReadDoubleWord 0x4001101C' 'emulation RunFor "0.000004"' 'echo "R-A89"' 'sysbus ReadDoubleWord 0x4001101C' \
       'machine Reset' 'cpu IsHalted true' 'sysbus WriteDoubleWord 0x580244E8 0x20000' \
@@ -351,8 +354,35 @@ sys.exit(0 if ok else 1)
       'sysbus.usart2 WriteChar 0x41' 'emulation RunFor "0.00002"' 'echo "R-U20"' 'sysbus ReadDoubleWord 0x4000441C' 'emulation RunFor "0.00002"' 'echo "R-U40"' 'sysbus ReadDoubleWord 0x4000441C'
     check "idlekernel: IDLE one frame after a byte at the kernel clock's baud, not the stock frequency's: from rcc_pclk2 through D1CPRE, HPRE and D2PPRE2, from hsi_ker_ck through HSIDIV (each clear at 20 us, set at 40 us), from ArduPilot's own PLL2 at exactly 72 MHz after a USART1RST pulse (clear at 85 us, set at 89 us at BRR 0x271), and on usart2 from rcc_pclk1 through D2PPRE1 (TVI-WO-1305a (3))" \
       "passed idlekernel && idleat idlekernel P && idleat idlekernel H && bit \"\$(readout idlekernel A85)\" 4 0 && bit \"\$(readout idlekernel A89)\" 4 1 && idleat idlekernel U" ;;
-  idlenorule) check "idlenorule: USART1 started on csi_ker_ck, running, refuses TVI-USART-IDLE, unmodeled, at the CR1 write: the guard has no rule for its frequency and uses no default (TVI-WO-1305a (3); invariant 1)" \
-    "refuses idlenorule TVI-USART-IDLE unmodeled 'r[\"access\"][\"value\"] == \"0x2000000D\" and \"USART16SEL = 100 (csi_ker_ck): no rule\" in r[\"bit\"] and \"p2034\" in r[\"citation\"]'" ;;
+  idlenorule) check "idlenorule: USART1 started on pll2_q_ck, running, with PLL2's VCO at 6 MHz (outside p407's 192-960 MHz), refuses TVI-USART-IDLE, unmodeled, at the CR1 write: the RCC guard's KernelHz has no rule for its frequency and the guard uses no default (TVI-WO-1305a (3); invariant 1; re-planted from csi_ker_ck, which the union now times, by TVI-WO-1300c Q6)" \
+    "refuses idlenorule TVI-USART-IDLE unmodeled 'r[\"access\"][\"value\"] == \"0x2000000D\" and \"USART16SEL = 001 (pll2_q_ck): PLL2 outside the ranges p404 gives\" in r[\"bit\"] and \"p2034\" in r[\"citation\"]'" ;;
+  hzcsi|hzsyscsi|hzsyshse|hzvcol|hzwide|hzcsiref)
+    # TVI-WO-1300c: the one answer, read as IDLE one frame after a byte at BRR 0x22C (p2034): csi_ker_ck or rcc_pclk2 from the CSI,
+    # 4 MHz: 1,390.048 us; rcc_pclk2 from the HSE (hseFrequency 8 MHz): 695.025 us; pll2_q_ck at 72 MHz: 77.223 us; pll2_q_ck from
+    # the CSI at 100 MHz: 55.601 us. Clear 1 us before, set 1 us after.
+    case $t in hzcsi|hzsyscsi) us=1390 ;; hzsyshse) us=695 ;; hzcsiref) us=56 ;; *) us=77 ;; esac
+    run_case "$t" "$t" 'emulation RunFor "0.001"' "${marks[@]}" 'sysbus.usart1 WriteChar 0x41' "emulation RunFor \"$(printf '0.%06d' $((us - 1)))\"" \
+      'echo "R-T1"' 'sysbus ReadDoubleWord 0x4001101C' 'emulation RunFor "0.000002"' 'echo "R-T2"' 'sysbus ReadDoubleWord 0x4001101C'
+    check "$t: $(case $t in hzcsi) echo 'csi_ker_ck (USART16SEL = 100)';; hzsyscsi) echo 'rcc_pclk2 with sys_ck on the CSI';; hzsyshse) echo 'rcc_pclk2 with sys_ck on the HSE';; hzvcol) echo "pll2_q_ck from ArduPilot's PLL2, VCOL on an 8 MHz reference (acknowledged by name, Q1), its PLLCFGR read back as written (0x01BF0FFD: the RCC guard's copy, (4))";; hzwide) echo 'pll2_q_ck after one PLL2DIVR write the stock model narrowed (silicon holds DIVN2 = 359, Q2)';; hzcsiref) echo 'pll2_q_ck from a CSI reference (PLLSRC = 01), 100 MHz';; esac): the RCC guard's KernelHz gives the frequency, and IDLE is clear $((us - 1)) us after a byte and set at $((us + 1)) (TVI-WO-1300c, the union)" \
+      "passes $t && bit \"\$(readout $t T1)\" 4 0 && bit \"\$(readout $t T2)\" 4 1 && { [ $t != hzvcol ] || [ \"\$(readout hzvcol READ2)\" = 0x01BF0FFD ]; }" ;;
+  hzvcoh|hzrge|hzdivr|hzpllon|hzpll3q)
+    if [ $t = hzpllon ]; then
+      PLATFORM_SED='/^tviburiRcc:$/,/mode:/s/enforcing/recorded/' run_case "$t" "$t" 'emulation RunFor "0.001"' "${marks[@]}"
+    fi
+    case $t in
+      hzvcoh) w='PLL2VCOSEL = 0 (VCOH, 2 to 16 MHz, p346) with ref2_ck at 1000000 Hz' ;;
+      hzrge) w='PLL2RGE = 00 (1 to 2 MHz) with ref2_ck at 8000000 Hz' ;;
+      hzdivr|hzpllon) w='RCC_PLL2DIVR written after a write the stock model did not keep, or while PLL2 ran' ;;
+      hzpll3q) w='USART16SEL = 010 (pll3_q_ck): no rule for its frequency on a USART' ;;
+    esac
+    check "$t: the RCC guard's KernelHz has no rule ($w), so USART1's start refuses TVI-USART-IDLE, unmodeled (TVI-WO-1300c Q1, Q2, Q3, Q10)$([ $t = hzpllon ] && echo '; the RCC, recorded, records TVI-RCC-PLL for the change')" \
+      "$([ $t = hzpllon ] && echo "grep -q '\"tviburi\":\"would-refuse\".*TVI-RCC-PLL' '$work/hzpllon/renode-log.txt' && [ \$rc = 1 -o \$rc = 3 ] && logged hzpllon" || echo "refuses $t") $([ $t = hzpllon ] && echo "'len(recs) >= 1 and recs[0][\"rule\"] == \"TVI-USART-IDLE\" and \"$w\" in recs[0][\"bit\"]'" || echo "TVI-USART-IDLE unmodeled '\"$w\" in r[\"bit\"]'")" ;;
+  hzport)
+    # Q6: a port outside the RCC guard's query (usart6) answers "no rule": recorded, USART6EN (the RCC's would-refuse) and a start with RE.
+    PLATFORM_SED='/^tviburiRcc:$/,/mode:/s/enforcing/recorded/; /^tviburiUsart6:$/{n;s/enforcing/recorded/}' run_case hzport - 'cpu IsHalted true' \
+      'sysbus WriteDoubleWord 0x580244F0 0x20' 'sysbus WriteDoubleWord 0x4001140C 0x22C' 'sysbus WriteDoubleWord 0x40011400 0x2000000D'
+    check "hzport: usart6, outside the RCC guard's query, started with RE in recorded mode: TVI-USART-IDLE, unmodeled, its reason the query's (the query is not widened; TVI-WO-1300c Q6)" \
+      "grep -q 'usart6: {\"tviburi\":\"would-refuse\",\"seq\":[0-9]*,\"rule\":\"TVI-USART-IDLE\",\"kind\":\"unmodeled\",.*\"bit\":\"IDLE (bit 4): no kernel clock rule for usart6\"' '$work/hzport/renode-log.txt'" ;;
   idlenone)
     # Recorded: the other ways to no rule, each from reset: (1) a byte arriving after the source moved to csi_ker_ck under the
     # running port (the RCC guard's TVI-RCC-CLOCK does not fire: the CSI is on, so the mux switches with a clock on both
@@ -363,6 +393,10 @@ sys.exit(0 if ok else 1)
     # 192-960 MHz; (6) rcc_pclk2 from PLL1 with PLL1VCOSEL = 1 (150-420 MHz, p404) and a 500 MHz VCO: the stock model reads
     # VCOSEL as 0 (measure §3), under which 500 MHz would pass; (7) rcc_pclk2 from PLL1 after PLL1DIVR was written with DIVP1 =
     # 2 (/3, "odd division factors are not allowed", p404), a write the stock model ignores.
+    # TVI-WO-1300c (the RCC guard's KernelHz, the one rule; ruled 2026-11-26T04:03Z): (1) and (2) have a frequency now (the CSI, 4
+    # MHz: the union), and so has (4) (one PLL2DIVR write the stock model narrowed is silicon's value, Q2). (7) is "no rule" by
+    # (3)'s DIVP1 rule (p404, Figure 47). The flash guard, which asks the same rule for the AXI clock, refuses at (6) and (7)
+    # (enforcing): the twin cannot compute sys_ck there (Q9).
     PLATFORM_SED='/^tviburiUsart1:$/{n;s/enforcing/recorded/}' run_case idlenone - 'cpu IsHalted true' "$clk" 'emulation RunFor "0.0001"' \
       'sysbus WriteDoubleWord 0x4001100C 0xC8' 'sysbus WriteDoubleWord 0x40011000 0x2000000D' 'sysbus WriteDoubleWord 0x58024400 0x81' \
       'sysbus WriteDoubleWord 0x58024454 0x20' 'sysbus.usart1 WriteChar 0x41' \
@@ -378,15 +412,13 @@ sys.exit(0 if ok else 1)
       'sysbus WriteDoubleWord 0x58024454 0x8' 'sysbus WriteDoubleWord 0x58024498 0x10' 'sysbus WriteDoubleWord 0x58024498 0x0' 'sysbus WriteDoubleWord 0x4001100C 0xE1' 'sysbus WriteDoubleWord 0x40011000 0x2000000D' \
       'machine Reset' 'cpu IsHalted true' "$clk" 'sysbus WriteDoubleWord 0x58024438 0x01010002' 'sysbus WriteDoubleWord 0x58024400 0x04000001' \
       'sysbus WriteDoubleWord 0x58024454 0x8' 'sysbus WriteDoubleWord 0x4001100C 0x10' 'sysbus WriteDoubleWord 0x40011000 0x2000000D'
-    check "idlenone: recorded: seven TVI-USART-IDLE would-refuses, unmodeled: a byte after the source moved to csi_ker_ck under the running port (at the byte, RDR, the byte's value), and receiver starts on rcc_pclk2 with sys_ck on the CSI, on pll2_q_ck from a CSI reference, after a PLL2DIVR the stock model narrows (kept through a USART1RST), with a VCO outside p407's range, on PLL1 with a VCO outside the medium range its VCOSEL chose, and on PLL1 after a DIVP1 the stock model ignored; nothing else; never a pass" \
-      "[ \$rc = 1 ] && logged idlenone 'len(recs) == 7 and all(r[\"rule\"] == \"TVI-USART-IDLE\" and r[\"kind\"] == \"unmodeled\" for r in recs)
-        and \"(csi_ker_ck): no rule for its frequency\" in recs[0][\"bit\"] and recs[0][\"access\"][\"offset\"] == \"0x24\" and recs[0][\"access\"][\"value\"] == \"0x41\"
-        and \"with sys_ck not the HSI or PLL1 (RCC_CFGR.SWS = 001)\" in recs[1][\"bit\"] and recs[1][\"access\"][\"offset\"] == \"0x0\"
-        and \"(rcc_pclk2) with PLL1 outside its ranges (reference 2000000 Hz, VCO 500000000 Hz)\" in recs[2][\"bit\"]
-        and \"(rcc_pclk2) with RCC_PLL1DIVR once written with a value its read-back does not keep: no rule\" in recs[3][\"bit\"]
-        and \"(pll2_q_ck) with PLL2\" in recs[4][\"bit\"] and \"reference not the HSI\" in recs[4][\"bit\"]
-        and \"with RCC_PLL2DIVR once written with a value its read-back does not keep: no rule\" in recs[5][\"bit\"]
-        and \"with PLL2 outside its ranges\" in recs[6][\"bit\"] and \"VCO 6000000 Hz\" in recs[6][\"bit\"]'" ;;
+    check "idlenone: recorded: four TVI-USART-IDLE would-refuses, unmodeled, each the RCC guard's reason: receiver starts on PLL1 with a VCO outside the medium range its VCOSEL chose, on PLL1 after a DIVP1 the stock model ignored (/3: p404, Figure 47), on pll2_q_ck from a CSI reference, and with a VCO outside p407's range; the CSI paths and the one wide PLL2DIVR write have a frequency (TVI-WO-1300c Q2, Q6); and the flash guard's two TVI-FLASH-WAIT, unmodeled, at the two PLL1 paths (Q9); never a pass" \
+      "[ \$rc = 3 ] && logged idlenone 'len(recs) == 4 and all(r[\"rule\"] == \"TVI-USART-IDLE\" and r[\"kind\"] == \"unmodeled\" for r in recs)
+        and \"(rcc_pclk2): PLL1 outside the ranges p404 gives, or with no reference (ref 2000000 Hz, VCO 500000000 Hz)\" in recs[0][\"bit\"]
+        and \"(rcc_pclk2): DIVP1 = 2 (/3)\" in recs[1][\"bit\"] and \"Figure 47 p346\" in recs[1][\"bit\"]
+        and \"(pll2_q_ck): PLL2 outside the ranges p404 gives, or with no reference (ref 125000 Hz\" in recs[2][\"bit\"]
+        and \"(pll2_q_ck): PLL2 outside the ranges p404 gives, or with no reference (ref 2000000 Hz, VCO 6000000 Hz)\" in recs[3][\"bit\"]' \
+       && [ \$(grep -c 'flashController: {\"tviburi\":\"refusal\".*\"rule\":\"TVI-FLASH-WAIT\",\"kind\":\"unmodeled\".*cannot be computed' '$work/idlenone/renode-log.txt') = 2 ]" ;;
   idlehse)
     # (3), ruled 2026-11-25T01:12Z: rcc_pclk2 from sys_ck = PLL1's P output on the HSE, as hse-crystal-16's generated firmware
     # sets it up (HSEON, HSECSSON, PLLCKSELR 0x52: PLLSRC HSE, DIVM1 5; PLLCFGR 0x30004; PLL1DIVR 0x0103064F: x80, /4; PLL1ON;

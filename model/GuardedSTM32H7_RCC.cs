@@ -10,11 +10,15 @@
 //
 // What this guard models (the query, below): whether a peripheral's kernel clock is running now, for spi1, spi2, i2c1,
 // i2c2, usart1, usart2, usart3 and rng (TVI-WO-1300 (4); usart2/3 ruled 14:35Z). It keeps copies of
-// every field the query reads that the stock model drops (PLLCKSELR, PLLCFGR's DIVxyEN, the kernel clock selectors,
-// the *ENR bits as written), serves those fields on read from the copies (RUL-17), and models each kernel clock
+// every field the query reads that the stock model drops (PLLCKSELR, PLLCFGR's DIVxyEN, RGE, VCOSEL and FRACEN, the kernel clock
+// selectors, the *ENR bits as written), serves those fields on read from the copies (RUL-17), and models each kernel clock
 // mux's current input (p371-372): a mux switches to a new selector value only while a clock is present on both its
 // current and its new input; until then no clock reaches the peripheral, and a system reset changes the selector
 // back to its reset value but not the mux's input.
+//
+// The kernel clock's frequency, in one place (TVI-WO-1300c, ruled 2026-11-26T04:03Z): KernelHz (a peripheral's kernel clock)
+// and BusHz (sys_ck, rcc_hclk) are the overlay's only PLL and sys_ck rule; the USART, ADC, I2C and flash guards ask them and keep
+// no copy. PllHz states what it allows, by page; a configuration RM0433 does not allow is "no rule", never a number.
 //
 // Enables at reset (TVI-WO-1300a (1)): the *ENR copies start at 0, as silicon, and are written into the owned stock RCC
 // after each registration and at reset. Its write callbacks lock every registered peripheral whose enable is 0 on the bus:
@@ -220,11 +224,13 @@ namespace Antmicro.Renode.Peripherals.Tviburi
                 citation + "; " + SourceCitation(source) + (source == "per_ck" ? "; " + SourceCitation(PerMux.Sources[muxes[0].Current]) : ""));
         }
 
-        // TVI-WO-1306a (granted outside its fence, ruled 2026-11-26T00:22Z Q2): P's kernel-clock frequency in Hz, read-only, from this
-        // guard's state: the selector's settled input (as QueryKernelClock), RCC_PLLCKSELR and RCC_PLLCFGR from its copies, RCC_PLLxDIVR
-        // as last written (`divr`), and the stock-stored RCC_CR (HSIDIV), RCC_CFGR (SWS), RCC_D1CFGR and RCC_D2CFGR. Null, with the
-        // reason, where the query says the clock does not run or has no rule, or where this guard has no rule for its frequency (lse_ck,
-        // I2S_CKIN, an HSE with no hseFrequency, a PLL outside the ranges p404 gives). It changes nothing.
+        // The kernel clock's frequency, in one place (TVI-WO-1300c, ruled 2026-11-26T04:03Z Q1-Q10; first granted to TVI-WO-1306a,
+        // 2026-11-26T00:22Z Q2): the only PLL and sys_ck rule in the overlay. The USART, ADC, I2C and flash guards ask it, read-only.
+        // P's kernel-clock frequency in Hz, from the selector's settled input (as QueryKernelClock), RCC_PLLCKSELR and RCC_PLLCFGR
+        // from this guard's copies, RCC_PLLxDIVR as last written (`divr`, silicon's value; ruled Q2), and the stock-stored RCC_CR
+        // (HSIDIV), RCC_CFGR (SWS), RCC_D1CFGR and RCC_D2CFGR. Null, with the reason, where the query says the clock does not run or
+        // has no rule, or where this guard has no rule for its frequency (lse_ck, I2S_CKIN, an HSE with no hseFrequency, pll3_q_ck on
+        // a USART (the WO's NOT list; ruled Q10), a PLL outside what PllHz allows). It changes nothing.
         public double? KernelHz(string peripheral, out string why)
         {
             var k = QueryKernelClock(peripheral);
@@ -236,29 +242,63 @@ namespace Antmicro.Renode.Peripherals.Tviburi
             var p = Clocked[peripheral];
             var source = p.Mux.Sources[muxes.Single(m => m.Def == p.Mux).Current];
             why = k.Selector + " (" + source + ")";
+            if(source == "pll3_q_ck" && (p.Mux == UsartMux || p.Mux == Usart2Mux))
+            {
+                why += ": no rule for its frequency on a USART (TVI-WO-1300c, ruled 2026-11-26T04:03Z Q10)";
+                return null;
+            }
             return SourceHz(source, ref why);
+        }
+
+        // A bus clock's frequency in Hz, with no query (ruled 2026-11-26T04:03Z Q5): "sys_ck" (SWS, p393) or "rcc_hclk" (sys_ck /
+        // D1CPRE / HPRE, pp. 394-395; the AXI clock rcc_aclk and the ADC's adc_hclk). Null, with the reason, as KernelHz. It changes nothing.
+        public double? BusHz(string clock, out string why)
+        {
+            why = clock;
+            if(clock != "sys_ck" && clock != "rcc_hclk")
+            {
+                why += ": no rule for its frequency";
+                return null;
+            }
+            var sys = SysHz(ref why);
+            var d1 = inner.ReadDoubleWord(0x018);
+            return clock == "sys_ck" ? sys : sys / Prescaler(d1 >> 8 & 0xF) / Prescaler(d1 & 0xF);
+        }
+
+        private double Hsi()
+        {
+            return 64e6 / (1 << (int)(Cr() >> 3 & 3));   // hsi_ck = 64 MHz / HSIDIV (p385)
+        }
+
+        // sys_ck by SWS (p393): the HSI, the CSI, the HSE or PLL1's P output.
+        private double? SysHz(ref string why)
+        {
+            var sws = inner.ReadDoubleWord(CfgrOffset) >> 3 & 7;
+            var sys = sws == 0 ? Hsi() : sws == 1 ? CsiFrequency : sws == 2 ? (double?)HseFrequency : sws == 3 ? PllHz(1, 'p', ref why) : null;
+            if(sys == null)
+            {
+                why += sws > 3 ? ": RCC_CFGR.SWS = " + Bin(sws, 3) + ", no rule for its frequency" : sws == 2 ? ": sys_ck on the HSE with no hseFrequency" : "";
+            }
+            return sys;
         }
 
         private double? SourceHz(string source, ref string why)
         {
-            var hsi = 64e6 / (1 << (int)(Cr() >> 3 & 3));   // hsi_ck = 64 MHz / HSIDIV (p385)
             switch(source)
             {
             case "rcc_pclk1":
             case "rcc_pclk2":
-                // sys_ck by SWS (p393), / D1CPRE / HPRE (pp. 394-395) / D2PPRE1 or D2PPRE2 (p396)
-                var sws = inner.ReadDoubleWord(CfgrOffset) >> 3 & 7;
-                var sys = sws == 0 ? hsi : sws == 1 ? CsiFrequency : sws == 2 ? (double?)HseFrequency : sws == 3 ? PllHz(1, 'p', hsi, ref why) : null;
-                if(sys == null)
+                // rcc_hclk (BusHz) / D2PPRE1 or D2PPRE2 (p396)
+                var hclk = BusHz("rcc_hclk", out var w);
+                if(hclk == null)
                 {
-                    why += sws > 3 ? ": RCC_CFGR.SWS = " + Bin(sws, 3) + ", no rule for its frequency" : sws == 2 ? ": sys_ck on the HSE with no hseFrequency" : "";
+                    why += w.Substring("rcc_hclk".Length);
                     return null;
                 }
-                var d1 = inner.ReadDoubleWord(0x018);
                 var ppre = inner.ReadDoubleWord(0x01C) >> (source == "rcc_pclk2" ? 8 : 4) & 7;   // 0xx /1; 100-111 /2-/16
-                return sys / Prescaler(d1 >> 8 & 0xF) / Prescaler(d1 & 0xF) / ((ppre & 4) == 0 ? 1 : 2 << (int)(ppre & 3));
+                return hclk / ((ppre & 4) == 0 ? 1 : 2 << (int)(ppre & 3));
             case "hsi_ker_ck":
-                return hsi;
+                return Hsi();
             case "csi_ker_ck":
                 return CsiFrequency;
             case "hse_ck":
@@ -272,31 +312,60 @@ namespace Antmicro.Renode.Peripherals.Tviburi
             }
             if(source.StartsWith("pll", StringComparison.Ordinal))
             {
-                return PllHz(source[3] - '0', source[5], hsi, ref why);
+                return PllHz(source[3] - '0', source[5], ref why);
             }
             why += ": no rule for its frequency";
             return null;
         }
 
         // pllN_x_ck = vcoN_ck / (DIVxN + 1), vcoN_ck = refN_ck x (DIVNN + 1), refN_ck = the PLLSRC source / DIVMN (pp. 398-410), with
-        // FRACN 0 (this guard's allow-list); within the ranges p404 gives (refN_ck 1-16 MHz; the VCO 192-960 MHz, or 150-420 MHz with
-        // PLLNVCOSEL = 1), else no rule.
-        private double? PllHz(int n, char output, double hsi, ref string why)
+        // FRACN 0 (this guard's allow-list). No rule (null, with the page) unless every one of these holds (ruled 2026-11-26T04:03Z):
+        //   refN_ck within 1-16 MHz and the VCO within its PLLNVCOSEL's range, 192-960 MHz or 150-420 MHz (p404, p407, p410);
+        //   RCC_PLLNDIVR known as silicon holds it (Q2): not written after a write the stock model did not keep, nor while PLLN ran;
+        //   PLLNRGE's range holds refN_ck, its edges inclusive (pp. 401-402, p347; Q3);
+        //   the VCO choice: VCOH takes 2-16 MHz (p346; p347); VCOL takes 1-2 MHz, and VCOL above 2 MHz with its VCO in VCOL's range
+        //     is acknowledged by name: ChibiOS chooses VCOL for any VCO at most 420 MHz, whatever its reference (hal_lld_type1.h
+        //     L1834-1837), as ArduPilot sets PLL2 and PLL3 (Q1; bench row RC1);
+        //   for pll1_p_ck, DIVP1 an even divisor: "odd division factors are not allowed" (p404) and "DIVPx = 2,4,6,...128 when x = 1"
+        //     (Figure 47 p346), so neither DIVP1 = 0 (/1) nor an even DIVP1 (Q7).
+        private double? PllHz(int n, char output, ref string why)
         {
             var sel = Copy(PllckselrOffset);
+            var cfg = Copy(PllcfgrOffset);
             var divm = sel >> DivmShift[n] & 0x3F;
-            var input = (sel & 3) == 0 ? hsi : (sel & 3) == 1 ? CsiFrequency : (sel & 3) == 2 ? (double?)HseFrequency : null;
+            var input = (sel & 3) == 0 ? Hsi() : (sel & 3) == 1 ? CsiFrequency : (sel & 3) == 2 ? (double?)HseFrequency : null;
             var d = divr[Pll1divrOffset + 8 * (n - 1)];
-            var divn = d & 0x1FF;
-            var wide = (Copy(PllcfgrOffset) >> (1 + 4 * (n - 1)) & 1) == 0;
+            var wide = (cfg >> (1 + 4 * (n - 1)) & 1) == 0;
             var refHz = input == null || divm == 0 ? 0 : input.Value / divm;
-            var vco = refHz * (divn + 1);
-            if(divn < 3 || refHz < 1e6 || refHz > 16e6 || vco < (wide ? 192e6 : 150e6) || vco > (wide ? 960e6 : 420e6))
+            var vco = refHz * ((d & 0x1FF) + 1);
+            if(refHz < 1e6 || refHz > 16e6 || vco < (wide ? 192e6 : 150e6) || vco > (wide ? 960e6 : 420e6))
             {
                 why += ": PLL" + n + " outside the ranges p404 gives, or with no reference (ref " + refHz + " Hz, VCO " + vco + " Hz): no rule for its frequency";
                 return null;
             }
-            return vco / ((d >> (output == 'p' ? 9 : output == 'q' ? 16 : 24) & 0x7F) + 1);
+            if(divrUnknown[n])
+            {
+                why += ": RCC_PLL" + n + "DIVR written after a write the stock model did not keep, or while PLL" + n + " ran: silicon's value cannot be known (TVI-WO-1300c Q2): no rule for its frequency";
+                return null;
+            }
+            var rge = cfg >> (2 + 4 * (n - 1)) & 3;
+            if(refHz < 1e6 * (1 << (int)rge) || refHz > 2e6 * (1 << (int)rge))
+            {
+                why += ": PLL" + n + "RGE = " + Bin(rge, 2) + " (" + (1 << (int)rge) + " to " + (2 << (int)rge) + " MHz) with ref" + n + "_ck at " + refHz + " Hz: \"must be set according to the reference input frequency\" (p347; pp. 401-402): no rule for its frequency";
+                return null;
+            }
+            if(wide && refHz < 2e6)
+            {
+                why += ": PLL" + n + "VCOSEL = 0 (VCOH, 2 to 16 MHz, p346) with ref" + n + "_ck at " + refHz + " Hz: \"if the frequency of the reference clock is lower or equal to 2 MHz, then VCOL must be selected\" (p347): no rule for its frequency";
+                return null;
+            }
+            var div = d >> (output == 'p' ? 9 : output == 'q' ? 16 : 24) & 0x7F;
+            if(n == 1 && output == 'p' && (div & 1) == 0)
+            {
+                why += ": DIVP1 = " + div + " (/" + (div + 1) + "): \"odd division factors are not allowed\" (p404), \"DIVPx = 2,4,6,...128 when x = 1\" (Figure 47 p346): no rule for its frequency";
+                return null;
+            }
+            return vco / (div + 1);
         }
 
         // D1CPRE and HPRE (pp. 394-395): 0xxx /1; 1000-1011 /2-/16; 1100-1111 /64-/512.
@@ -515,11 +584,20 @@ namespace Antmicro.Renode.Peripherals.Tviburi
             {
                 copies[b] = value;
             }
-            if(divr.ContainsKey(b))
+            var pll = divr.ContainsKey(b) ? (int)(b - Pll1divrOffset) / 8 + 1 : 0;
+            if(pll != 0)
             {
+                // Ruled 2026-11-26T04:03Z Q2: the write is silicon's value, unless it follows a write the stock model did not keep (a
+                // read-modify-write may carry the stock's narrowed bits back) or changes the register while the PLL runs (silicon
+                // ignores it, p403-410; this write reaches here only in recorded mode, after TVI-RCC-PLL). Until a machine reset.
+                divrUnknown[pll] |= divrUnkept[pll] || (value != divr[b] && PllOn(pll));
                 divr[b] = value;
             }
             inner.WriteDoubleWord(b, value);
+            if(pll != 0)
+            {
+                divrUnkept[pll] |= inner.ReadDoubleWord(b) != value;
+            }
             if(EnableOffsets.Contains(b))
             {
                 UnlockGuarded();
@@ -934,6 +1012,8 @@ namespace Antmicro.Renode.Peripherals.Tviburi
             {
                 copies[off] = ResetValue(off);
             }
+            divrUnkept = new bool[4];
+            divrUnknown = new bool[4];
             foreach(var off in divr.Keys.ToArray())
             {
                 divr[off] = DivrReset;
@@ -962,11 +1042,12 @@ namespace Antmicro.Renode.Peripherals.Tviburi
             }
         }
 
-        // Bits served from the copy on read: the whole register, except PLLCFGR, where the stock model stores the
-        // fields other than DIVxyEN.
+        // Bits served from the copy on read: the whole register, except PLLCFGR's reserved bits, which the stock model keeps:
+        // DIVxyEN, and since TVI-WO-1300c (4) PLLxRGE, PLLxVCOSEL and PLLxFRACEN, which the frequency rule reads from the copy and the
+        // stock model drops but PLL2VCOSEL (tags reading 0, p400-402).
         private static uint CopyMask(long offset)
         {
-            return offset == PllcfgrOffset ? 0x01FF0000u : 0xFFFFFFFFu;
+            return offset == PllcfgrOffset ? 0x01FF0FFFu : 0xFFFFFFFFu;
         }
 
         // RCC_C1_* (0x130-0x17C) are the same physical registers as 0x0D0-0x11C (p382, §8.7.1, Figure 64).
@@ -1120,6 +1201,9 @@ namespace Antmicro.Renode.Peripherals.Tviburi
         // RCC_PLLxDIVR as last written, at the reset value p403-410 give: TVI-RCC-PLL refuses a write that differs from it and
         // from what the stock model reads back, which drops the top bit of each PLL2/3 field (a read-modify-write is no change).
         private readonly Dictionary<long, uint> divr = new Dictionary<long, uint> { [Pll1divrOffset] = DivrReset, [Pll1divrOffset + 8] = DivrReset, [Pll1divrOffset + 16] = DivrReset };
+        // Per PLL (1-3): a write to RCC_PLLnDIVR the stock model did not keep; and divr no longer silicon's value (ruled Q2).
+        private bool[] divrUnkept = new bool[4];
+        private bool[] divrUnknown = new bool[4];
         private uint? crAfter;
         private readonly Records records;
         private readonly MuxState[] muxes;
@@ -1205,7 +1289,7 @@ namespace Antmicro.Renode.Peripherals.Tviburi
             R("RCC_CR", 0x000, "§8.7.2", "CSION", 7, 7, Any, "inherited, unaudited (acknowledged by name)", "the stock model (stored+callback): stored; write 0 reverted if SW==CSI or PLL1 selected with PLLSRC==CSI", 385),
             R("RCC_CR", 0x000, "§8.7.2", "Res6", 6, 6, Zero, "reserved", "reserved: dropped, reads its reset value", 385),
             R("RCC_CR", 0x000, "§8.7.2", "HSIDIVF", 5, 5, Any, "read-only", "ignored (read-only; stock read-only-constant)", 385),
-            R("RCC_CR", 0x000, "§8.7.2", "HSIDIV", 4, 3, Any, "inherited, unaudited (acknowledged by name)", "the stock model (stored+callback): stored enum 64/32/16/8 MHz; change reverted if PLLSRC==HSI and any PLLxON; feeds HsiFrequency -> sys_ck/PLL ref", 385),
+            R("RCC_CR", 0x000, "§8.7.2", "HSIDIV", 4, 3, Any, "inherited, unaudited (acknowledged by name)", "the stock model (stored+callback): stored; a change reverted while PLLSRC = HSI with a PLL on; hsi_ck = 64 MHz / HSIDIV (p385), for sys_ck, hsi_ker_ck and the PLL reference in the guard's KernelHz and BusHz (the overlay's one frequency rule; TVI-WO-1300c, ruled 2026-11-26T04:03Z)", 385),
             R("RCC_CR", 0x000, "§8.7.2", "HSIRDY", 2, 2, Any, "read-only", "ignored (read-only; stock computed-read)", 386),
             R("RCC_CR", 0x000, "§8.7.2", "HSIKERON", 1, 1, Zero, "tag", "its reset value (stock tag)", 386),
             R("RCC_CR", 0x000, "§8.7.2", "HSION", 0, 0, Any, "inherited, unaudited (acknowledged by name)", "the stock model (stored+callback): stored; write 0 reverted (previous restored, Warning) if SW==HSI or PLL1 selected with PLLSRC==HSI (writeCallback)", 386),
@@ -1229,29 +1313,29 @@ namespace Antmicro.Renode.Peripherals.Tviburi
             R("RCC_CFGR", 0x010, "§8.7.7", "RTCPRE", 13, 8, Any, "acknowledged by name", "no MCO pin and no RTC clock are modeled; with MCOx at reset no pin is driven (TVI-WO-1300 A2)", 392),
             R("RCC_CFGR", 0x010, "§8.7.7", "STOPKERWUCK", 7, 7, Zero, "tag", "its reset value (stock tag)", 392),
             R("RCC_CFGR", 0x010, "§8.7.7", "STOPWUCK", 6, 6, Zero, "tag", "its reset value (stock tag)", 393),
-            R("RCC_CFGR", 0x010, "§8.7.7", "SWS", 5, 3, Any, "read-only", "ignored (read-only; stock computed-read)", 393),
+            R("RCC_CFGR", 0x010, "§8.7.7", "SWS", 5, 3, Any, "read-only", "ignored (read-only; stock computed-read); it selects sys_ck (the HSI, CSI, HSE or pll1_p_ck, p393) for the guard's KernelHz and BusHz (the overlay's one frequency rule; TVI-WO-1300c, ruled 2026-11-26T04:03Z)", 393),
             R("RCC_CFGR", 0x010, "§8.7.7", "SW", 2, 0, new uint[] { 0, 1, 2, 3 }, "inherited, unaudited (acknowledged by name)", "the stock model (stored+callback); 100-111 are reserved (p393), and the stock model keeps the old value", 393),
             R("RCC_D1CFGR", 0x018, "§8.7.8", "Res31_12", 31, 12, Zero, "reserved", "reserved: dropped, reads its reset value", 394),
-            R("RCC_D1CFGR", 0x018, "§8.7.8", "D1CPRE", 11, 8, Any, "inherited, unaudited (acknowledged by name)", "the stock model (stored+callback): stored; changeCallback derives d1CpreDivider (core/systick divider)", 394),
+            R("RCC_D1CFGR", 0x018, "§8.7.8", "D1CPRE", 11, 8, Any, "inherited, unaudited (acknowledged by name)", "the stock model (stored+callback): stored; rcc_hclk = sys_ck / D1CPRE / HPRE (pp. 394-395) in the guard's KernelHz and BusHz (the overlay's one frequency rule; TVI-WO-1300c, ruled 2026-11-26T04:03Z)", 394),
             R("RCC_D1CFGR", 0x018, "§8.7.8", "Res7", 7, 7, Zero, "reserved", "reserved: dropped, reads its reset value", 395),
             R("RCC_D1CFGR", 0x018, "§8.7.8", "D1PPRE", 6, 4, Any, "inherited, unaudited (acknowledged by name)", "the stock model (stored+callback): stored; changeCallback derives d1PpreDivider (APB3 divider)", 395),
-            R("RCC_D1CFGR", 0x018, "§8.7.8", "HPRE", 3, 0, Any, "inherited, unaudited (acknowledged by name)", "the stock model (stored+callback): stored; changeCallback derives hpreDivider (bit3 set: 2^((v&7)+1) else 1)", 395),
+            R("RCC_D1CFGR", 0x018, "§8.7.8", "HPRE", 3, 0, Any, "inherited, unaudited (acknowledged by name)", "the stock model (stored+callback): stored; rcc_hclk = sys_ck / D1CPRE / HPRE (pp. 394-395) in the guard's KernelHz and BusHz (the overlay's one frequency rule; TVI-WO-1300c, ruled 2026-11-26T04:03Z)", 395),
             R("RCC_D2CFGR", 0x01C, "§8.7.9", "Res31_11", 31, 11, Zero, "reserved", "reserved: dropped, reads its reset value", 396),
-            R("RCC_D2CFGR", 0x01C, "§8.7.9", "D2PPRE2", 10, 8, Any, "inherited, unaudited (acknowledged by name)", "the stock model (stored+callback): stored; derives d2Ppre2Divider (APB2)", 396),
+            R("RCC_D2CFGR", 0x01C, "§8.7.9", "D2PPRE2", 10, 8, Any, "inherited, unaudited (acknowledged by name)", "the stock model (stored+callback): stored; rcc_pclk2 = rcc_hclk / D2PPRE2 (p396) in the guard's KernelHz and BusHz (the overlay's one frequency rule; TVI-WO-1300c, ruled 2026-11-26T04:03Z)", 396),
             R("RCC_D2CFGR", 0x01C, "§8.7.9", "Res7", 7, 7, Zero, "reserved", "reserved: dropped, reads its reset value", 396),
-            R("RCC_D2CFGR", 0x01C, "§8.7.9", "D2PPRE1", 6, 4, Any, "inherited, unaudited (acknowledged by name)", "the stock model (stored+callback): stored; derives d2Ppre1Divider (APB1)", 396),
+            R("RCC_D2CFGR", 0x01C, "§8.7.9", "D2PPRE1", 6, 4, Any, "inherited, unaudited (acknowledged by name)", "the stock model (stored+callback): stored; rcc_pclk1 = rcc_hclk / D2PPRE1 (p396) in the guard's KernelHz and BusHz (the overlay's one frequency rule; TVI-WO-1300c, ruled 2026-11-26T04:03Z)", 396),
             R("RCC_D2CFGR", 0x01C, "§8.7.9", "Res3_0", 3, 0, Zero, "reserved", "reserved: dropped, reads its reset value", 396),
             R("RCC_D3CFGR", 0x020, "§8.7.10", "Res31_7", 31, 7, Zero, "reserved", "reserved: dropped, reads its reset value", 397),
             R("RCC_D3CFGR", 0x020, "§8.7.10", "D3PPRE", 6, 4, Any, "inherited, unaudited (acknowledged by name)", "the stock model (stored+callback): stored; derives d3PpreDivider (APB4); NO register-level PropagateClock here", 397),
             R("RCC_D3CFGR", 0x020, "§8.7.10", "Res3_0", 3, 0, Zero, "reserved", "reserved: dropped, reads its reset value", 397),
             R("RCC_PLLCKSELR", 0x028, "§8.7.11", "Res31_26", 31, 26, Zero, "reserved", "reserved: dropped, reads its reset value", 398),
-            R("RCC_PLLCKSELR", 0x028, "§8.7.11", "DIVM3", 25, 20, Any, "modeled by the guard", "the guard's copy (the kernel clock query)", 398),
+            R("RCC_PLLCKSELR", 0x028, "§8.7.11", "DIVM3", 25, 20, Any, "modeled by the guard", "the guard's copy (the kernel clock query); ref3_ck = the PLLSRC source / DIVM3, 0 \"prescaler disabled\" (pp. 398-399), in the guard's KernelHz and BusHz (the overlay's one frequency rule; TVI-WO-1300c, ruled 2026-11-26T04:03Z)", 398),
             R("RCC_PLLCKSELR", 0x028, "§8.7.11", "Res19_18", 19, 18, Zero, "reserved", "reserved: dropped, reads its reset value", 398),
-            R("RCC_PLLCKSELR", 0x028, "§8.7.11", "DIVM2", 17, 12, Any, "modeled by the guard", "the guard's copy (the kernel clock query)", 398),
+            R("RCC_PLLCKSELR", 0x028, "§8.7.11", "DIVM2", 17, 12, Any, "modeled by the guard", "the guard's copy (the kernel clock query); ref2_ck = the PLLSRC source / DIVM2, 0 \"prescaler disabled\" (pp. 398-399), in the guard's KernelHz and BusHz (the overlay's one frequency rule; TVI-WO-1300c, ruled 2026-11-26T04:03Z)", 398),
             R("RCC_PLLCKSELR", 0x028, "§8.7.11", "Res11_10", 11, 10, Zero, "reserved", "reserved: dropped, reads its reset value", 398),
-            R("RCC_PLLCKSELR", 0x028, "§8.7.11", "DIVM1", 9, 4, Any, "modeled by the guard", "the guard's copy (the kernel clock query)", 399),
+            R("RCC_PLLCKSELR", 0x028, "§8.7.11", "DIVM1", 9, 4, Any, "modeled by the guard", "the guard's copy (the kernel clock query); ref1_ck = the PLLSRC source / DIVM1, 0 \"prescaler disabled\" (pp. 398-399), in the guard's KernelHz and BusHz (the overlay's one frequency rule; TVI-WO-1300c, ruled 2026-11-26T04:03Z)", 399),
             R("RCC_PLLCKSELR", 0x028, "§8.7.11", "Res3_2", 3, 2, Zero, "reserved", "reserved: dropped, reads its reset value", 399),
-            R("RCC_PLLCKSELR", 0x028, "§8.7.11", "PLLSRC", 1, 0, Any, "modeled by the guard", "the guard's copy (the kernel clock query)", 399),
+            R("RCC_PLLCKSELR", 0x028, "§8.7.11", "PLLSRC", 1, 0, Any, "modeled by the guard", "the guard's copy (the kernel clock query); the PLLs' reference, the HSI, CSI or HSE, 11 none (p399), in the guard's KernelHz and BusHz (the overlay's one frequency rule; TVI-WO-1300c, ruled 2026-11-26T04:03Z)", 399),
             R("RCC_PLLCFGR", 0x02C, "§8.7.12", "Res31_25", 31, 25, Zero, "reserved", "reserved: dropped, reads its reset value", 400),
             R("RCC_PLLCFGR", 0x02C, "§8.7.12", "DIVR3EN", 24, 24, Any, "modeled by the guard", "the guard's copy (the kernel clock query)", 400),
             R("RCC_PLLCFGR", 0x02C, "§8.7.12", "DIVQ3EN", 23, 23, Any, "modeled by the guard", "the guard's copy (the kernel clock query)", 400),
@@ -1263,39 +1347,39 @@ namespace Antmicro.Renode.Peripherals.Tviburi
             R("RCC_PLLCFGR", 0x02C, "§8.7.12", "DIVQ1EN", 17, 17, Any, "modeled by the guard", "the guard's copy (the kernel clock query)", 401),
             R("RCC_PLLCFGR", 0x02C, "§8.7.12", "DIVP1EN", 16, 16, Any, "modeled by the guard", "the guard's copy (the kernel clock query)", 401),
             R("RCC_PLLCFGR", 0x02C, "§8.7.12", "Res15_12", 15, 12, Zero, "reserved", "reserved: dropped, reads its reset value", 401),
-            R("RCC_PLLCFGR", 0x02C, "§8.7.12", "PLL3RGE", 11, 10, Any, "acknowledged by name", "no PLL frequency is modeled beyond PLL1's integer one: the field sets range or mode, not whether an output runs (TVI-WO-1300 A1)", 401),
-            R("RCC_PLLCFGR", 0x02C, "§8.7.12", "PLL3VCOSEL", 9, 9, Any, "acknowledged by name", "no PLL frequency is modeled beyond PLL1's integer one: the field sets range or mode, not whether an output runs (TVI-WO-1300 A1)", 401),
-            R("RCC_PLLCFGR", 0x02C, "§8.7.12", "PLL3FRACEN", 8, 8, Any, "acknowledged by name", "no PLL frequency is modeled beyond PLL1's integer one: the field sets range or mode, not whether an output runs (TVI-WO-1300 A1)", 401),
-            R("RCC_PLLCFGR", 0x02C, "§8.7.12", "PLL2RGE", 7, 6, Any, "acknowledged by name", "no PLL frequency is modeled beyond PLL1's integer one: the field sets range or mode, not whether an output runs (TVI-WO-1300 A1)", 402),
-            R("RCC_PLLCFGR", 0x02C, "§8.7.12", "PLL2VCOSEL", 5, 5, Any, "inherited, unaudited (acknowledged by name)", "the stock model (stored): plain stored flag (WithFlag, not tagged)", 402),
-            R("RCC_PLLCFGR", 0x02C, "§8.7.12", "PLL2FRACEN", 4, 4, Any, "acknowledged by name", "no PLL frequency is modeled beyond PLL1's integer one: the field sets range or mode, not whether an output runs (TVI-WO-1300 A1)", 402),
-            R("RCC_PLLCFGR", 0x02C, "§8.7.12", "PLL1RGE", 3, 2, Any, "acknowledged by name", "no PLL frequency is modeled beyond PLL1's integer one: the field sets range or mode, not whether an output runs (TVI-WO-1300 A1)", 402),
-            R("RCC_PLLCFGR", 0x02C, "§8.7.12", "PLL1VCOSEL", 1, 1, Any, "acknowledged by name", "no PLL frequency is modeled beyond PLL1's integer one: the field sets range or mode, not whether an output runs (TVI-WO-1300 A1)", 402),
-            R("RCC_PLLCFGR", 0x02C, "§8.7.12", "PLL1FRACEN", 0, 0, Any, "acknowledged by name", "no PLL frequency is modeled beyond PLL1's integer one: the field sets range or mode, not whether an output runs (TVI-WO-1300 A1)", 402),
+            R("RCC_PLLCFGR", 0x02C, "§8.7.12", "PLL3RGE", 11, 10, Any, "modeled by the guard", "the guard's copy, served on read (the stock model drops it): ref3_ck must lie in the range it names, 1-2, 2-4, 4-8 or 8-16 MHz, edges inclusive, else the guard's KernelHz and BusHz (the overlay's one frequency rule; TVI-WO-1300c, ruled 2026-11-26T04:03Z) has no frequency (\"must be set according to the reference input frequency\", p347; pp. 401-402; Q3)", 401),
+            R("RCC_PLLCFGR", 0x02C, "§8.7.12", "PLL3VCOSEL", 9, 9, Any, "modeled by the guard", "the guard's copy, served on read: the VCO's output range, 192-960 MHz or 150-420 MHz (p404, p407, p410), and its input: VCOH takes 2-16 MHz, VCOL 1-2 MHz (p346, p347), else the guard's KernelHz and BusHz (the overlay's one frequency rule; TVI-WO-1300c, ruled 2026-11-26T04:03Z) has no frequency; VCOL above 2 MHz with its VCO in VCOL's range acknowledged by name, as ChibiOS chooses it (hal_lld_type1.h L1834-1837; bench row R11; Q1)", 401),
+            R("RCC_PLLCFGR", 0x02C, "§8.7.12", "PLL3FRACEN", 8, 8, Any, "modeled by the guard", "the guard's copy, served on read; FRACN3 is 0 (its allow-list), so the PLL runs in integer mode whatever this bit says (p349, p405) in the guard's KernelHz and BusHz (the overlay's one frequency rule; TVI-WO-1300c, ruled 2026-11-26T04:03Z)", 401),
+            R("RCC_PLLCFGR", 0x02C, "§8.7.12", "PLL2RGE", 7, 6, Any, "modeled by the guard", "the guard's copy, served on read (the stock model drops it): ref2_ck must lie in the range it names, 1-2, 2-4, 4-8 or 8-16 MHz, edges inclusive, else the guard's KernelHz and BusHz (the overlay's one frequency rule; TVI-WO-1300c, ruled 2026-11-26T04:03Z) has no frequency (\"must be set according to the reference input frequency\", p347; pp. 401-402; Q3)", 402),
+            R("RCC_PLLCFGR", 0x02C, "§8.7.12", "PLL2VCOSEL", 5, 5, Any, "modeled by the guard", "the guard's copy, served on read: the VCO's output range, 192-960 MHz or 150-420 MHz (p404, p407, p410), and its input: VCOH takes 2-16 MHz, VCOL 1-2 MHz (p346, p347), else the guard's KernelHz and BusHz (the overlay's one frequency rule; TVI-WO-1300c, ruled 2026-11-26T04:03Z) has no frequency; VCOL above 2 MHz with its VCO in VCOL's range acknowledged by name, as ChibiOS chooses it (hal_lld_type1.h L1834-1837; bench row R11; Q1)", 402),
+            R("RCC_PLLCFGR", 0x02C, "§8.7.12", "PLL2FRACEN", 4, 4, Any, "modeled by the guard", "the guard's copy, served on read; FRACN2 is 0 (its allow-list), so the PLL runs in integer mode whatever this bit says (p349, p405) in the guard's KernelHz and BusHz (the overlay's one frequency rule; TVI-WO-1300c, ruled 2026-11-26T04:03Z)", 402),
+            R("RCC_PLLCFGR", 0x02C, "§8.7.12", "PLL1RGE", 3, 2, Any, "modeled by the guard", "the guard's copy, served on read (the stock model drops it): ref1_ck must lie in the range it names, 1-2, 2-4, 4-8 or 8-16 MHz, edges inclusive, else the guard's KernelHz and BusHz (the overlay's one frequency rule; TVI-WO-1300c, ruled 2026-11-26T04:03Z) has no frequency (\"must be set according to the reference input frequency\", p347; pp. 401-402; Q3)", 402),
+            R("RCC_PLLCFGR", 0x02C, "§8.7.12", "PLL1VCOSEL", 1, 1, Any, "modeled by the guard", "the guard's copy, served on read: the VCO's output range, 192-960 MHz or 150-420 MHz (p404, p407, p410), and its input: VCOH takes 2-16 MHz, VCOL 1-2 MHz (p346, p347), else the guard's KernelHz and BusHz (the overlay's one frequency rule; TVI-WO-1300c, ruled 2026-11-26T04:03Z) has no frequency; VCOL above 2 MHz with its VCO in VCOL's range acknowledged by name, as ChibiOS chooses it (hal_lld_type1.h L1834-1837; bench row R11; Q1)", 402),
+            R("RCC_PLLCFGR", 0x02C, "§8.7.12", "PLL1FRACEN", 0, 0, Any, "modeled by the guard", "the guard's copy, served on read; FRACN1 is 0 (its allow-list), so the PLL runs in integer mode whatever this bit says (p349, p405) in the guard's KernelHz and BusHz (the overlay's one frequency rule; TVI-WO-1300c, ruled 2026-11-26T04:03Z)", 402),
             R("RCC_PLL1DIVR", 0x030, "§8.7.13", "Res31", 31, 31, Zero, "reserved", "reserved: dropped, reads its reset value", 403),
-            R("RCC_PLL1DIVR", 0x030, "§8.7.13", "DIVR1", 30, 24, Any, "inherited, unaudited (acknowledged by name)", "the stock model (stored+callback): stored; change reverted if PLL1ON; no frequency use", 403),
+            R("RCC_PLL1DIVR", 0x030, "§8.7.13", "DIVR1", 30, 24, Any, "inherited, unaudited (acknowledged by name)", "the stock model (stored+callback); the guard's copy of the write it passed, silicon's value, feeds the guard's KernelHz and BusHz (the overlay's one frequency rule; TVI-WO-1300c, ruled 2026-11-26T04:03Z) (pp. 403-404): none after a write the stock model did not keep, or one made while PLL1 ran (Q2)", 403),
             R("RCC_PLL1DIVR", 0x030, "§8.7.13", "Res23", 23, 23, Zero, "reserved", "reserved: dropped, reads its reset value", 403),
-            R("RCC_PLL1DIVR", 0x030, "§8.7.13", "DIVQ1", 22, 16, Any, "inherited, unaudited (acknowledged by name)", "the stock model (stored+callback): stored; change reverted if PLL1ON; no frequency use", 404),
-            R("RCC_PLL1DIVR", 0x030, "§8.7.13", "DIVP1", 15, 9, Any, "inherited, unaudited (acknowledged by name)", "the stock model (computed-read): read = divp1Divider-1 (computed); write sets divider=v+1 unless odd-and-not-1 or PLL1ON (ignored, Warning)", 404),
-            R("RCC_PLL1DIVR", 0x030, "§8.7.13", "DIVN1", 8, 0, Any, "inherited, unaudited (acknowledged by name)", "the stock model (computed-read): read = divn1Multiplier-1 (computed); write updates divn1Multiplier=v+1 unless PLL1ON; warns if v<3 or >0x1FF", 404),
+            R("RCC_PLL1DIVR", 0x030, "§8.7.13", "DIVQ1", 22, 16, Any, "inherited, unaudited (acknowledged by name)", "the stock model (stored+callback); the guard's copy of the write it passed, silicon's value, feeds the guard's KernelHz and BusHz (the overlay's one frequency rule; TVI-WO-1300c, ruled 2026-11-26T04:03Z) (pp. 403-404): none after a write the stock model did not keep, or one made while PLL1 ran (Q2)", 404),
+            R("RCC_PLL1DIVR", 0x030, "§8.7.13", "DIVP1", 15, 9, Any, "inherited, unaudited (acknowledged by name)", "the stock model (computed-read); the guard's copy of the write it passed, silicon's value, feeds the guard's KernelHz and BusHz (the overlay's one frequency rule; TVI-WO-1300c, ruled 2026-11-26T04:03Z) (pp. 403-404): none after a write the stock model did not keep, or one made while PLL1 ran (Q2); DIVP1 = 0 or an odd divisor gives none (p404; Figure 47 p346; Q7)", 404),
+            R("RCC_PLL1DIVR", 0x030, "§8.7.13", "DIVN1", 8, 0, Any, "inherited, unaudited (acknowledged by name)", "the stock model (computed-read); the guard's copy of the write it passed, silicon's value, feeds the guard's KernelHz and BusHz (the overlay's one frequency rule; TVI-WO-1300c, ruled 2026-11-26T04:03Z) (pp. 403-404): none after a write the stock model did not keep, or one made while PLL1 ran (Q2)", 404),
             R("RCC_PLL1FRACR", 0x034, "§8.7.14", "Res31_16", 31, 16, Zero, "reserved", "reserved: dropped, reads its reset value", 405),
             R("RCC_PLL1FRACR", 0x034, "§8.7.14", "FRACN1", 15, 3, Zero, "tag", "its reset value (stock tag)", 405),
             R("RCC_PLL1FRACR", 0x034, "§8.7.14", "Res2_0", 2, 0, Zero, "reserved", "reserved: dropped, reads its reset value", 405),
             R("RCC_PLL2DIVR", 0x038, "§8.7.15", "Res31", 31, 31, Zero, "reserved", "reserved: dropped, reads its reset value", 406),
-            R("RCC_PLL2DIVR", 0x038, "§8.7.15", "DIVR2", 30, 24, Any, "inherited, unaudited (acknowledged by name)", "the stock model (stored): stored and read back; no side effect", 406),
+            R("RCC_PLL2DIVR", 0x038, "§8.7.15", "DIVR2", 30, 24, Any, "inherited, unaudited (acknowledged by name)", "the stock model (stored, DIVN and DIVQ narrowed to 8 and 6 bits where silicon has 9 and 7, a row); the guard's copy of the write it passed, silicon's value, feeds the guard's KernelHz and BusHz (the overlay's one frequency rule; TVI-WO-1300c, ruled 2026-11-26T04:03Z) (pp. 406-407): none after a write the stock model did not keep, or one made while PLL2 ran (Q2)", 406),
             R("RCC_PLL2DIVR", 0x038, "§8.7.15", "Res23", 23, 23, Zero, "reserved", "reserved: dropped, reads its reset value", 406),
-            R("RCC_PLL2DIVR", 0x038, "§8.7.15", "DIVQ2", 22, 16, Any, "inherited, unaudited (acknowledged by name)", "the stock model (stored): stored and read back; no side effect", 407),
-            R("RCC_PLL2DIVR", 0x038, "§8.7.15", "DIVP2", 15, 9, Any, "inherited, unaudited (acknowledged by name)", "the stock model (stored): stored and read back; no side effect", 407),
-            R("RCC_PLL2DIVR", 0x038, "§8.7.15", "DIVN2", 8, 0, Any, "inherited, unaudited (acknowledged by name)", "the stock model (stored): stored and read back; no side effect", 407),
+            R("RCC_PLL2DIVR", 0x038, "§8.7.15", "DIVQ2", 22, 16, Any, "inherited, unaudited (acknowledged by name)", "the stock model (stored, DIVN and DIVQ narrowed to 8 and 6 bits where silicon has 9 and 7, a row); the guard's copy of the write it passed, silicon's value, feeds the guard's KernelHz and BusHz (the overlay's one frequency rule; TVI-WO-1300c, ruled 2026-11-26T04:03Z) (pp. 406-407): none after a write the stock model did not keep, or one made while PLL2 ran (Q2)", 407),
+            R("RCC_PLL2DIVR", 0x038, "§8.7.15", "DIVP2", 15, 9, Any, "inherited, unaudited (acknowledged by name)", "the stock model (stored, DIVN and DIVQ narrowed to 8 and 6 bits where silicon has 9 and 7, a row); the guard's copy of the write it passed, silicon's value, feeds the guard's KernelHz and BusHz (the overlay's one frequency rule; TVI-WO-1300c, ruled 2026-11-26T04:03Z) (pp. 406-407): none after a write the stock model did not keep, or one made while PLL2 ran (Q2)", 407),
+            R("RCC_PLL2DIVR", 0x038, "§8.7.15", "DIVN2", 8, 0, Any, "inherited, unaudited (acknowledged by name)", "the stock model (stored, DIVN and DIVQ narrowed to 8 and 6 bits where silicon has 9 and 7, a row); the guard's copy of the write it passed, silicon's value, feeds the guard's KernelHz and BusHz (the overlay's one frequency rule; TVI-WO-1300c, ruled 2026-11-26T04:03Z) (pp. 406-407): none after a write the stock model did not keep, or one made while PLL2 ran (Q2)", 407),
             R("RCC_PLL2FRACR", 0x03C, "§8.7.16", "Res31_16", 31, 16, Zero, "reserved", "reserved: dropped, reads its reset value", 408),
             R("RCC_PLL2FRACR", 0x03C, "§8.7.16", "FRACN2", 15, 3, Zero, "tag", "its reset value (stock tag)", 408),
             R("RCC_PLL2FRACR", 0x03C, "§8.7.16", "Res2_0", 2, 0, Zero, "reserved", "reserved: dropped, reads its reset value", 408),
             R("RCC_PLL3DIVR", 0x040, "§8.7.17", "Res31", 31, 31, Zero, "reserved", "reserved: dropped, reads its reset value", 409),
-            R("RCC_PLL3DIVR", 0x040, "§8.7.17", "DIVR3", 30, 24, Any, "inherited, unaudited (acknowledged by name)", "the stock model (stored): stored and read back; no side effect", 409),
+            R("RCC_PLL3DIVR", 0x040, "§8.7.17", "DIVR3", 30, 24, Any, "inherited, unaudited (acknowledged by name)", "the stock model (stored, DIVN and DIVQ narrowed to 8 and 6 bits where silicon has 9 and 7, a row); the guard's copy of the write it passed, silicon's value, feeds the guard's KernelHz and BusHz (the overlay's one frequency rule; TVI-WO-1300c, ruled 2026-11-26T04:03Z) (pp. 409-410): none after a write the stock model did not keep, or one made while PLL3 ran (Q2)", 409),
             R("RCC_PLL3DIVR", 0x040, "§8.7.17", "Res23", 23, 23, Zero, "reserved", "reserved: dropped, reads its reset value", 409),
-            R("RCC_PLL3DIVR", 0x040, "§8.7.17", "DIVQ3", 22, 16, Any, "inherited, unaudited (acknowledged by name)", "the stock model (stored): stored and read back; no side effect", 410),
-            R("RCC_PLL3DIVR", 0x040, "§8.7.17", "DIVP3", 15, 9, Any, "inherited, unaudited (acknowledged by name)", "the stock model (stored): stored and read back; no side effect", 410),
-            R("RCC_PLL3DIVR", 0x040, "§8.7.17", "DIVN3", 8, 0, Any, "inherited, unaudited (acknowledged by name)", "the stock model (stored): stored and read back; no side effect", 410),
+            R("RCC_PLL3DIVR", 0x040, "§8.7.17", "DIVQ3", 22, 16, Any, "inherited, unaudited (acknowledged by name)", "the stock model (stored, DIVN and DIVQ narrowed to 8 and 6 bits where silicon has 9 and 7, a row); the guard's copy of the write it passed, silicon's value, feeds the guard's KernelHz and BusHz (the overlay's one frequency rule; TVI-WO-1300c, ruled 2026-11-26T04:03Z) (pp. 409-410): none after a write the stock model did not keep, or one made while PLL3 ran (Q2)", 410),
+            R("RCC_PLL3DIVR", 0x040, "§8.7.17", "DIVP3", 15, 9, Any, "inherited, unaudited (acknowledged by name)", "the stock model (stored, DIVN and DIVQ narrowed to 8 and 6 bits where silicon has 9 and 7, a row); the guard's copy of the write it passed, silicon's value, feeds the guard's KernelHz and BusHz (the overlay's one frequency rule; TVI-WO-1300c, ruled 2026-11-26T04:03Z) (pp. 409-410): none after a write the stock model did not keep, or one made while PLL3 ran (Q2)", 410),
+            R("RCC_PLL3DIVR", 0x040, "§8.7.17", "DIVN3", 8, 0, Any, "inherited, unaudited (acknowledged by name)", "the stock model (stored, DIVN and DIVQ narrowed to 8 and 6 bits where silicon has 9 and 7, a row); the guard's copy of the write it passed, silicon's value, feeds the guard's KernelHz and BusHz (the overlay's one frequency rule; TVI-WO-1300c, ruled 2026-11-26T04:03Z) (pp. 409-410): none after a write the stock model did not keep, or one made while PLL3 ran (Q2)", 410),
             R("RCC_PLL3FRACR", 0x044, "§8.7.18", "Res31_16", 31, 16, Zero, "reserved", "reserved: dropped, reads its reset value", 411),
             R("RCC_PLL3FRACR", 0x044, "§8.7.18", "FRACN3", 15, 3, Zero, "tag", "its reset value (stock tag)", 411),
             R("RCC_PLL3FRACR", 0x044, "§8.7.18", "Res2_0", 2, 0, Zero, "reserved", "reserved: dropped, reads its reset value", 411),

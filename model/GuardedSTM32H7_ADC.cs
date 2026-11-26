@@ -96,12 +96,6 @@ namespace Antmicro.Renode.Peripherals.Tviburi
                     + (revision == null ? "" : ", and " + Quote(revision) + " is neither");
             config = config ?? ParseLevels(levels);
             machine.PeripheralsChanged += OnPeripheralsChanged;
-            if(machine is Machine m)
-            {
-                // The RCC registers this guard mirrors return to their reset values with the RCC, at a machine reset; never at this
-                // ADC's own reset, which the RCC's ADC12RST/ADC3RST runs (memory: guard Reset() runs at RCC *RST).
-                m.MachineReset += _ => { pllUntrusted = new bool[4]; pllcfgr = PllcfgrReset; };
-            }
             ResetCopies();
         }
 
@@ -849,7 +843,9 @@ namespace Antmicro.Renode.Peripherals.Tviburi
 
         // ---- the clock (ruled Q2, Q4) ------------------------------------------------------------------------------
 
-        // f_ADC in Hz: the clock the analog block converts on, or null with the reason.
+        // f_ADC in Hz: the clock the analog block converts on, or null with the reason. Its source's frequency is the RCC guard's, the
+        // overlay's one frequency rule (TVI-WO-1300c, ruled 2026-11-26T04:03Z Q5): KernelHz for adc_ker_ck_input (CKMODE = 00, ADCSEL,
+        // p419), BusHz for the bus clock (CKMODE != 00); then this ADC's own PRESC or CKMODE divider and rev V's /2 (p920, p1039).
         private double? AdcHz(out string why)
         {
             why = null;
@@ -858,103 +854,37 @@ namespace Antmicro.Renode.Peripherals.Tviburi
                 why = "no RCC guard at " + RccName;
                 return null;
             }
-            uint R(long o) => rcc.ReadDoubleWord(o);
-            var hsi = 64000000.0 / (1 << (int)(R(0x00) >> 3 & 3));
             double? input;
             var ccr = regs[CcrOffset];
             var ckmode = (ccr >> 16) & 3;
             if(ckmode == 0)
             {
-                var sel = R(0x58) >> 16 & 3;
-                why = "RCC_D3CCIPR.ADCSEL = " + Convert.ToString(sel, 2).PadLeft(2, '0');
-                switch(sel)
-                {
-                case 0:
-                    input = Vco(rcc, 2, hsi, ref why) / ((R(0x38) >> 9 & 0x7F) + 1);   // pll2_p_ck: DIVP2 (p406-407)
-                    break;
-                case 1:
-                    input = Vco(rcc, 3, hsi, ref why) / ((R(0x40) >> 24 & 0x7F) + 1);  // pll3_r_ck: DIVR3 (p409-410)
-                    break;
-                case 2:
-                    var per = R(0x4C) >> 28 & 3;   // CKPERSEL (p412): hsi_ker_ck, csi_ker_ck, hse_ck
-                    input = per == 0 ? hsi : per == 1 ? (double?)rcc.CsiFrequency : per == 2 ? (double?)rcc.HseFrequency : null;
-                    if(input == null)
-                    {
-                        why += ", per_ck with CKPERSEL = " + Convert.ToString(per, 2).PadLeft(2, '0') + ": no frequency";
-                    }
-                    break;
-                default:
-                    why += ": the kernel clock is disabled";
-                    input = null;
-                    break;
-                }
+                input = Alias == null ? null : rcc.KernelHz(Alias, out why);
+                why = why ?? (Name ?? "an ADC") + ": no kernel-clock query names it";
                 var presc = (ccr >> 18) & 0xF;
                 input = presc > 11 ? null : input / Prescale[presc];
             }
             else
             {
-                var sys = SysHz(rcc, hsi, ref why);
-                var hpre = R(0x18) & 0xF;
                 double? bus;
                 if(Revision == "V")
                 {
-                    bus = (hpre & 8) == 0 ? sys : sys / 2;   // adc_sclk: "sys_ck when HPRE is set to 0, otherwise ... sys_ck/2" (p920)
+                    var sys = rcc.BusHz("sys_ck", out why);
+                    bus = (rcc.ReadDoubleWord(0x18) & 8) == 0 ? sys : sys / 2;   // adc_sclk: "sys_ck when HPRE is set to 0, otherwise ... sys_ck/2" (p920)
                 }
                 else
                 {
-                    bus = sys / Div(R(0x18) >> 8 & 0xF) / Div(hpre);   // adc_hclk: rcc_hclk1/rcc_hclk4, sys_ck / D1CPRE / HPRE (p394-395)
+                    bus = rcc.BusHz("rcc_hclk", out why);   // adc_hclk: rcc_hclk1/rcc_hclk4, sys_ck / D1CPRE / HPRE (p394-395)
                 }
                 input = bus / (ckmode == 1 ? 1 : ckmode == 2 ? 2 : 4);
-                why = why ?? "CKMODE = " + Convert.ToString(ckmode, 2).PadLeft(2, '0');
             }
             return input == null ? null : Revision == "V" ? input / 2 : input;   // rev V: "an additional divider factor of 2" (p1039)
-        }
-
-        private double? SysHz(GuardedSTM32H7_RCC rcc, double hsi, ref string why)
-        {
-            var sws = rcc.ReadDoubleWord(0x10) >> 3 & 7;   // RCC_CFGR.SWS (p393)
-            if(sws == 0)
-            {
-                return hsi;
-            }
-            if(sws == 3)
-            {
-                return Vco(rcc, 1, hsi, ref why) / ((rcc.ReadDoubleWord(0x30) >> 9 & 0x7F) + 1);   // pll1_p_ck (p404)
-            }
-            why = "sys_ck not the HSI or PLL1 (RCC_CFGR.SWS = " + Convert.ToString(sws, 2).PadLeft(3, '0') + "): no rule";
-            return null;
-        }
-
-        // PLLn's VCO in Hz, or null with the reason, as the USART guard's (TVI-WO-1305a): its reference (the HSI, or the HSE at the
-        // RCC guard's HseFrequency; PLLSRC p399) over DIVMn, times DIVNn + 1, within its range, from RCC_PLLnDIVR as last written
-        // while every write read back as written; PLLnVCOSEL from the last RCC_PLLCFGR the RCC guard passed.
-        private double? Vco(GuardedSTM32H7_RCC rcc, int n, double hsi, ref string why)
-        {
-            var ck = rcc.ReadDoubleWord(0x28);
-            var divm = ck >> (n == 1 ? 4 : n == 2 ? 12 : 20) & 0x3F;
-            double? input = (ck & 3) == 0 ? hsi : (ck & 3) == 2 ? (double?)rcc.HseFrequency : null;
-            var refHz = input == null || divm == 0 ? 0 : input.Value / divm;
-            var vco = refHz * ((rcc.ReadDoubleWord(0x30 + 8 * (n - 1)) & 0x1FF) + 1);
-            var wide = (pllcfgr >> (n == 1 ? 1 : n == 2 ? 5 : 9) & 1) == 0;
-            if(input != null && divm != 0 && !pllUntrusted[n] && refHz >= 1e6 && refHz <= 16e6 && vco >= (wide ? 192e6 : 150e6) && vco <= (wide ? 960e6 : 420e6))
-            {
-                return vco;
-            }
-            why += input == null || divm == 0 ? " with PLL" + n + "'s reference not the HSI or HSE through DIVM" + n + ": no rule"
-                : pllUntrusted[n] ? " with RCC_PLL" + n + "DIVR once written with a value its read-back does not keep: no rule"
-                : " with PLL" + n + " outside its ranges (reference " + refHz + " Hz, VCO " + vco + " Hz): no rule";
-            return null;
-        }
-
-        private static double Div(uint v)
-        {
-            return (v & 8) == 0 ? 1 : (v & 7) < 4 ? 2 << (int)(v & 7) : 64 << (int)((v & 7) - 4);
         }
 
         // ---- the platform --------------------------------------------------------------------------------------
 
         // Each default channel source's first sample, kept once the stock part has made them (at the name), so that a SetVoltage can be
-        // told from an untouched source; the RCC guard's PLL writes, as the USART guard follows them (its `Written` event).
+        // told from an untouched source; and every RCC write, which marks a running conversion's rate stale (its `Written` event).
         private void OnPeripheralsChanged(IMachine m, PeripheralsChangedEventArgs args)
         {
             if(args.Peripheral == this && args.Operation == PeripheralsChangedEventArgs.PeripheralChangeType.NameChanged)
@@ -976,15 +906,7 @@ namespace Antmicro.Renode.Peripherals.Tviburi
             if(rccSeen == null && args.Peripheral is GuardedSTM32H7_RCC r)
             {
                 rccSeen = r;
-                r.Written += (offset, value) =>
-                {
-                    if(offset == 0x30 || offset == 0x38 || offset == 0x40)
-                    {
-                        pllUntrusted[(offset - 0x30) / 8 + 1] |= r.ReadDoubleWord(offset) != value;
-                    }
-                    pllcfgr = offset == 0x2C ? value : pllcfgr;
-                    rateStale |= (cr & AdstartBit) != 0;
-                };
+                r.Written += (offset, value) => rateStale |= (cr & AdstartBit) != 0;
             }
         }
 
@@ -1137,8 +1059,6 @@ namespace Antmicro.Renode.Peripherals.Tviburi
         private readonly Dictionary<int, ulong> levels = new Dictionary<int, ulong>();
         private readonly Dictionary<int, VoltageSample> initial = new Dictionary<int, VoltageSample>();
         private GuardedSTM32H7_RCC rccSeen;
-        private bool[] pllUntrusted = new bool[4];
-        private uint pllcfgr = PllcfgrReset;
         private uint cr, isr, dr;
         private int drChannel, index;
         private bool drDeclared, ldoReady, oneShotDone;
@@ -1171,7 +1091,6 @@ namespace Antmicro.Renode.Peripherals.Tviburi
         private const double OffCalCycles = 1280;    // t_OFF_CAL, offset only (DS12117 p167, p273)
         private const int VregStartupMicros = 10;    // t_ADCVREG_STUP max (DS12117 p167, p273)
         private const int RunningStream = 1;
-        private const uint PllcfgrReset = 0x01FF0000;   // p400
         private const long IsrOffset = 0x00;
         private const long IerOffset = 0x04;
         private const long CrOffset = 0x08;
