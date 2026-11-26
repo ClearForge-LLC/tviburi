@@ -283,7 +283,7 @@ namespace Antmicro.Renode.Peripherals.Tviburi
                 {
                     if(!refused || records.Recorded)
                     {
-                        WriteCr3(word, width, lowerByte, refused);
+                        WriteCr3(word, width, lowerByte);
                     }
                     return;
                 }
@@ -415,8 +415,8 @@ namespace Antmicro.Renode.Peripherals.Tviburi
             return false;
         }
 
-        // TVI-PWR-SUPPLY (p308; Table 34 p261; ruled Q6). `refused`: an earlier rule refused (we are here only in recorded mode).
-        private void WriteCr3(uint word, int width, bool lowerByte, bool refused)
+        // TVI-PWR-SUPPLY (p308; Table 34 p261; ruled Q6).
+        private void WriteCr3(uint word, int width, bool lowerByte)
         {
             var low = word & 0xFF;
             string why = null;
@@ -450,10 +450,6 @@ namespace Antmicro.Renode.Peripherals.Tviburi
                 }
                 // recorded: the lower byte is still ignored (the model), the upper bytes go on as if no rule had fired
                 cr3 = (cr3 & 0xFF) | (word & Cr3Writable & ~0xFFu);
-                return;
-            }
-            if(refused && !records.Recorded)
-            {
                 return;
             }
             if(locked)

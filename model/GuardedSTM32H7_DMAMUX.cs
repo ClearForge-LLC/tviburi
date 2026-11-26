@@ -193,10 +193,6 @@ namespace Antmicro.Renode.Peripherals.Tviburi
         {
             lock(sync)
             {
-                if(channel < 0 || channel >= Channels)
-                {
-                    return false;
-                }
                 if(par < PeripheralsStart || par > PeripheralsEnd)
                 {
                     return false;   // memory, paced by the request: legal on silicon, moved exactly by the stock model (Q18 (b))

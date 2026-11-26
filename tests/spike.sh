@@ -940,28 +940,18 @@ t_adc() { # t_adc <case>: one case of tests/1307/adc.sh on this source, its ok/F
   fails=$((fails + f))
 }
 for c in $ADC_CASES; do eval "t_adc-$c() { t_adc $c; }"; done
-t_dmamux() { # t_dmamux <case>: one case of tests/1308/dmamux.sh on this source, its ok/FAIL lines counted here (TVI-WO-1308)
+t_1308() { # t_1308 <suite> <case>: one case of tests/1308/<suite>.sh on this source, its ok/FAIL lines counted here (TVI-WO-1308)
   local out trc=0
-  out=$(TVIBURI_TESTS="$1" TVIBURI_SCRATCH="$work" "$src/tests/1308/dmamux.sh" "$src" 2>&1) || trc=$?
+  out=$(TVIBURI_TESTS="$2" TVIBURI_SCRATCH="$work" "$src/tests/1308/$1.sh" "$src" 2>&1) || trc=$?
   grep -E '^(ok|FAIL) ' <<<"$out" || true
   local f; f=$(grep -c '^FAIL ' <<<"$out" || true)
   if [ "$trc" -ne 0 ] && [ "$f" -eq 0 ]; then
-    echo "FAIL dmamux-$1: tests/1308/dmamux.sh exited $trc with no verdict"; f=1
+    echo "FAIL $1-$2: tests/1308/$1.sh exited $trc with no verdict"; f=1
   fi
   fails=$((fails + f))
 }
-for c in $DMAMUX_CASES; do eval "t_dmamux-$c() { t_dmamux $c; }"; done
-t_pwr() { # t_pwr <case>: one case of tests/1308/pwr.sh on this source, its ok/FAIL lines counted here (TVI-WO-1308)
-  local out trc=0
-  out=$(TVIBURI_TESTS="$1" TVIBURI_SCRATCH="$work" "$src/tests/1308/pwr.sh" "$src" 2>&1) || trc=$?
-  grep -E '^(ok|FAIL) ' <<<"$out" || true
-  local f; f=$(grep -c '^FAIL ' <<<"$out" || true)
-  if [ "$trc" -ne 0 ] && [ "$f" -eq 0 ]; then
-    echo "FAIL pwr-$1: tests/1308/pwr.sh exited $trc with no verdict"; f=1
-  fi
-  fails=$((fails + f))
-}
-for c in $PWR_CASES; do eval "t_pwr-$c() { t_pwr $c; }"; done
+for c in $DMAMUX_CASES; do eval "t_dmamux-$c() { t_1308 dmamux $c; }"; done
+for c in $PWR_CASES; do eval "t_pwr-$c() { t_1308 pwr $c; }"; done
 
 for t in ${TVIBURI_TESTS:-acceptance}; do
   case "$t" in
