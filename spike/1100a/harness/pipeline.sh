@@ -27,7 +27,7 @@ python3 -I "$tree/tests/1307/fields.py" "$tree/tests/1307/data/rm0433-rev9-adc-f
 # 3. The arm (mav.py: the COMMAND_ACK for 400 with result 0), then B's writes per register.
 zcat "$work/arm/B.console.txt.gz" | tr -d '\r' > "$work/B.txt"
 arm=$(python3 -I "$d/reader/mav.py" "$work/B.txt" | awk '/COMMAND_ACK command 400 result 0/{print $1; exit}')
-python3 -I "$d/reader/arm-writes.py" "$work/B.txt" "$arm" "$d/data/arm-periph.tsv" "$d/data/arm-writes.tsv"
+python3 -I "$d/reader/arm-writes.py" "$work/B.txt" "$arm" "$d/data/arm-periph.tsv" "$d/data/arm-writes.tsv" "$d/data/arm-unmapped.tsv"
 # 4. Place the rows (1100's 722, 1150's 844, 4400h's armed-only ids), then join.
 python3 -I "$d/reader/rows.py" "$tree/spike/1100/data/queue.tsv" "$tree/spike/1100/data/joined.tsv" "$tree/spike/1150/data/queue-ap.tsv" \
   "$d/data/cmsis-regs.tsv" "$d/data/arm-periph.tsv" "$d/data/rows.tsv" "$d/data/aet-4400h-queue-ap-armed-sentinel-03.tsv"

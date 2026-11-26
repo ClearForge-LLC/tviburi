@@ -112,8 +112,10 @@ def tier(inst, reg):
     if inst == 'rcc' or (inst == 'flashController' and reg.endswith('ACR')): return '4a'
     return '4b'
 
-def state_of(inst, off, lsb, width):
-    """(wo state, ledger fields text, evidence, case scope, ledger register)"""
+def state_of(inst, off, lsb, width, mask=None):
+    """(wo state, ledger fields text, evidence, case scope, ledger register). `mask`, when given, is the row's own bits
+    (a whole-word row named `undefined bits 0x...`, adversarial D2-2): a field counts only where it overlaps them."""
+    if mask is None: mask = ((1 << width) - 1) << lsb
     ty = ptype.get(inst, '?')
     if not ty.startswith('Guarded'):
         mr = model.get(inst)
@@ -122,7 +124,7 @@ def state_of(inst, off, lsb, width):
             ev += '; NOTE the ledger row names guarded_by %s for %s, but the run binds the stock type here' % (mr[0]['guarded_by'], inst)
         return 'inherited', '-', ev, '-', '-'
     lo, note = ledger_offset(ty, inst, off)
-    hit = [(r, msb, l) for (r, msb, l) in fields.get((ty, lo), []) if not (msb < lsb or l > lsb + width - 1)]
+    hit = [(r, msb, l) for (r, msb, l) in fields.get((ty, lo), []) if (((1 << (msb + 1)) - 1) & ~((1 << l) - 1)) & mask]
     if not hit:
         return 'FINDING', '-', 'no ledger field at %s offset 0x%X' % (ty, lo), '-', '-'
     parts, worst, evs, scopes = [], 'guarded', [], set()
@@ -136,7 +138,7 @@ def state_of(inst, off, lsb, width):
         if r['state'] in ('acknowledged', 'inherited-unaudited'):
             s, sc = 'acknowledged', 'acknowledged'
             ev = '%s: %s%s%s' % (loc, r['behaves_as'][:120], (' [' + r['reason'] + ']') if r.get('reason') else '', '' if full else '; other values refuse')
-        elif r['state'] == 'guard':
+        elif r['state'] == 'guard' and full:
             s, ev, sc = 'guarded', 'modeled (%s)' % loc, 'modeled'
         elif not full:
             s = 'guarded'
@@ -149,7 +151,7 @@ def state_of(inst, off, lsb, width):
                 tinst, tname = TEST[ty]
                 sc = 'own' if inst == tinst and not note else ('stream 0' if note and note.startswith('stream') and note != 'stream 0' else ('sibling ' + tinst if inst != tinst else 'own'))
                 if note == 'ADC2': sc = 'ADC1 half of ' + tinst
-                ev = '%s; %s: %s' % (loc, tname, c)
+                ev = '%s%s; %s: %s' % ('modeled, other values refuse: ' if r['state'] == 'guard' else '', loc, tname, c)
             else:
                 ev, sc = '%s; NO clause-6 case names it' % loc, 'none'
         elif r['state'] == 'read-only':
@@ -189,14 +191,16 @@ for f in rows:
     rid, prov, rank, cls, inst, off, lsb, width = f[0], f[1], f[2], f[3], f[4], int(f[5], 16), int(f[6]), int(f[7])
     covered.add((inst, off))
     a = arm.get((inst, off)); s = stock.get(rid)
-    st, lf, ev, sc, lreg = state_of(inst, off, lsb, width)
+    mm = re.search(r'undefined bits (0x[0-9A-Fa-f]+)', rid)
+    st, lf, ev, sc, lreg = state_of(inst, off, lsb, width, int(mm.group(1), 16) if mm else None)
     g = gen[rid]; reset = kind.get(rid) == 'reset'
-    reach = [n for n, v in (('gen', g > 0 or reset), ('ap5', ap5.get((inst, off), 0) > 0), ('arm', a is not None)) if v]
+    cpu = a is not None and int(a[4]) > 0; lockd = a is not None and int(a[16]) > 0
+    reach = [n for n, v in (('gen', g > 0 or reset), ('ap5', ap5.get((inst, off), 0) > 0), ('arm', cpu), ('arm-locked', lockd and not cpu)) if v]
     wo = st
     if st == 'inherited' and not reach: wo = 'not reached'
     reg = rid.split('.')[1] if '@' not in rid.split('.')[0] else lreg
     row = [rid, prov, rank, cls, inst, '0x%03X' % off, '%d:%d' % (lsb + width - 1, lsb), str(g) + ('@reset' if reset else ''), str(genb[rid]),
-           str(ap5.get((inst, off), 0)), a[4] if a else '0', a[5] if a else '0', fvals(a, lsb, width),
+           str(ap5.get((inst, off), 0)), (a[4] + ('+%s locked' % a[16] if a[16] != '0' else '')) if a else '0', a[5] if a else '0', fvals(a if cpu else None, lsb, width),
            s[4] if s else '-', s[6] if s else '-', ptype.get(inst, '?'), lf, st, ev, sc, ','.join(reach) or 'none', wo,
            path(inst, off, lsb, cls), tier(inst, reg)]
     out.write(clean('\t'.join(row)) + '\n'); tally[wo] += 1
@@ -207,5 +211,5 @@ with open(out_reach, 'w') as o:
     for (inst, off), f in sorted(arm.items()):
         if (inst, off) in covered: continue
         st, lf, ev, sc, lreg = state_of(inst, off, 0, 32)
-        o.write(clean('\t'.join([inst, '0x%03X' % off, f[3] if f[3] != 'unknown' else lreg, f[4], f[5], f[15][:200], ptype.get(inst, '?'), lf, st, ev, sc, path(inst, off, 0, '-')])) + '\n'); n += 1
+        o.write(clean('\t'.join([inst, '0x%03X' % off, f[3] if f[3] not in ('unknown', '-') else lreg, f[4] + ('+%s locked' % f[16] if f[16] != '0' else ''), f[5], f[15][:200], ptype.get(inst, '?'), lf, st, ev, sc, path(inst, off, 0, '-')])) + '\n'); n += 1
 print('join: %d rows %s; %d armed registers outside every row' % (len(rows), dict(tally), n))

@@ -7,7 +7,7 @@
 - **The twin:** today's `main` (`39e51af`), every guard on and in recorded mode.
 - **Its result:** it arms at 9.3 s with no record from any guard. That needs the battery pin's voltage declared, which no consumer property supplies yet.
 - **The rows judged:** 935. These are the old queues (`1100`: the generated boards, 722 rows; `1150` (v): ArduPilot's first 5 s, 122 more) and 91 rows only the armed run reaches.
-- **Every row's state:** **guarded** 609 (modeled, or any other value refuses); **acknowledged by name** in the ledger 254; **inherited, unaudited** 72; **not reached** 0.
+- **Every row's state:** **guarded** 610 (modeled, or any other value refuses); **acknowledged by name** in the ledger 253; **inherited, unaudited** 72; **not reached** 0.
 
 ## The proposed cut (recommended)
 
@@ -32,14 +32,14 @@ On `main` today, all of it is guarded or acknowledged, **except two families:**
 - **Cost:** a third slice, the timer guard extended to TIM2–TIM5. That also takes the 54 rows of TIM2, which only generated test boards use. It adds about one guard's CI time and memory.
 - **Not recommended:** a wrong tick moves *when* ArduPilot does things, which the twin does not claim to time exactly (northstar §5), not *whether* a path it takes is modeled.
 
-**A stricter reading of clause 1 is also possible:** the 254 acknowledged rows must refuse rather than pass by name. That means re-opening every past acknowledgement ruling, across all nine guards, so it is not recommended.
+**A stricter reading of clause 1 is also possible:** the 253 acknowledged rows must refuse rather than pass by name. That means re-opening every past acknowledgement ruling, across all nine guards, so it is not recommended.
 
 ## What it leaves for Phase 4's bench
 
-- **What the armed run reaches off the four paths:** TIM5 (unless the alternative is ruled), the interrupt controller, the RTC, the watchdog, BDMA (ADC3's internal channels), the debug unit, the RNG.
+- **What the armed run reaches off the four paths:** TIM5 (unless the alternative is ruled), the interrupt controller, the RTC, the watchdog, BDMA and DMAMUX2 (ADC3's internal channels; the platform has no DMAMUX2 model at all), the debug units, the RNG.
 - **What only the generated test boards reach:** TIM2.
 - **Unused instances:** `i2c4`, `lpuart1`, `spi4`, every other timer.
-- **The 254 acknowledged rows,** which keep their ledger entries.
+- **The 253 acknowledged rows,** which keep their ledger entries.
 
 ## The gate's other clauses, at `main` `39e51af` (CI run 45774342008, green)
 
@@ -47,7 +47,7 @@ On `main` today, all of it is guarded or acknowledged, **except two families:**
 |---|---|---|
 | 2 identical ledgers; any changed file changes the hash | **met** | — |
 | 3 removed guard / crash / refusal fails, runner and records check, both log framings | **cells unproven:** removed and crash in Aethelgard's console framing; a crash at Tviburi's runner | a test fix |
-| 4 the MODF scar refuses where stock Renode passes | **met, weakly:** the stock half passes because the run has no witness, not because stock reached the end (it does; measured) | a test fix |
+| 4 the MODF scar refuses where stock Renode passes, condition matching the manual's page | **partly:** the refusal is met; the stock half passes because the run has no witness, not because stock reached the end (it does; measured); the page match is checked by hand, not in CI | a test fix |
 | 5 a forged record line is not a record | **met** | — |
 | 6 each field outside a guard's allow-list refuses | **met for 7 of 9 guards;** 20 rows unproven (I2C 2, ADC 18) | a test fix |
 | 7 a recorded run is never a pass | **met** | — |
