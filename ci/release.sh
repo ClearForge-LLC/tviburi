@@ -29,7 +29,7 @@ compare() { # compare A B: the two release directories' listings, then every fil
   local a=$1/release b=$2/release f d=""
   [ "$(cd "$a" && ls -A)" = "$(cd "$b" && ls -A)" ] || fail "the two builds hold different files: $(cd "$a" && ls -A | tr '\n' ' ')/ $(cd "$b" && ls -A | tr '\n' ' ')"
   for f in $(cd "$a" && ls -A | grep -vx tviburi-release.tar) tviburi-release.tar; do
-    cmp "$a/$f" "$b/$f" >/dev/null || d="$d $f ($(cmp "$a/$f" "$b/$f" | sed 's/^[^ ]* [^ ]* //'));"
+    cmp -s "$a/$f" "$b/$f" || d="$d $f ($( { cmp "$a/$f" "$b/$f" || true; } | sed 's/^[^ ]* [^ ]* //'));"
   done
   [ -z "$d" ] || fail "the two builds differ:$d"
   echo "the two builds are byte-identical: $(cd "$a" && ls -A | tr '\n' ' ')"
