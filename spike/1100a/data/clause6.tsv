@@ -1,0 +1,10 @@
+# guard	restricted ledger rows	named by a refuse case	not named	swept instance	instances bound in the armed run	how written
+GuardedSTM32DMA	40	40	-	dma1 (stream 0 rows; streams 1-7 written 0 only)	dma1,dma2	monitor sysbus writes (pc none)
+GuardedSTM32F7_I2C	51	49	I2C_ISR.TXE,I2C_ISR.TXIS	i2c1	i2c1,i2c2,i2c3	monitor sysbus writes (pc none)
+GuardedSTM32F7_USART	67	67	-	usart1	uart4,uart5,uart7,uart8,usart1,usart2,usart3,usart6	monitor sysbus writes (pc none)
+GuardedSTM32H7_ADC	123	105	ADC_CFGR.AWD1CH,ADC_SQR1.SQ1,ADC_SQR1.SQ2,ADC_SQR1.SQ3,ADC_SQR1.SQ4,ADC_SQR2.SQ5,ADC_SQR2.SQ6,ADC_SQR2.SQ7,ADC_SQR2.SQ8,ADC_SQR2.SQ9,ADC_SQR3.SQ10,ADC_SQR3.SQ11,ADC_SQR3.SQ12,ADC_SQR3.SQ13,ADC_SQR3.SQ14,ADC_SQR4.SQ15,ADC_SQR4.SQ16,ADCx_CCR.PRESC	adcM1S2 (ADC1 and common offsets)	adc3,adcM1S2	monitor sysbus writes (pc none)
+GuardedSTM32H7_Flash	43	43	-	flashController	flashController	monitor sysbus writes (pc none)
+GuardedSTM32H7_RCC	356	356	-	rcc	rcc	monitor sysbus writes (pc none)
+GuardedSTM32H7_SPI	54	54	-	spi1	spi1,spi2	monitor sysbus writes (pc none)
+GuardedSTM32_GPIOPort	22	22	-	gpioPortA	gpioPortA,gpioPortB,gpioPortC,gpioPortD,gpioPortE,gpioPortF,gpioPortG,gpioPortH,gpioPortI,gpioPortJ,gpioPortK	monitor sysbus writes (pc none)
+GuardedSTM32_Timer	159	159	-	timer1	timer1,timer8	monitor sysbus writes (pc none)
