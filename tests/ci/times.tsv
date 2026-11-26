@@ -1003,7 +1003,7 @@ mutant	MF09-consumerRun	10.9
 mutant	MF10-loaded	11.5
 mutant	TD01-endFlush	260.0
 mutant	RM01-evaluatesAll	6.9
-mutant	RM02-spiOrderByte	6.9
+mutant	RM02-spiOrderWord	6.9
 mutant	RM03-rccField	6.9
 mutant	RM04-hsePlaceholder	6.9
 mutant	I264-recNackStopf	6.9
