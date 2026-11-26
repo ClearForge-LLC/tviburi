@@ -272,7 +272,7 @@ namespace Antmicro.Renode.Peripherals.Tviburi
             return inner.ReadDoubleWord(IsrOffset) | (nackf ? NackfBit : 0) | (nackStopf ? StopfBit : 0);
         }
 
-        private void Pass(long offset, uint word, double? tick = null)
+        private void Pass(long offset, uint word, double? tick)
         {
             switch(offset)
             {
@@ -363,11 +363,8 @@ namespace Antmicro.Renode.Peripherals.Tviburi
 
         // ---- the NACK (TVI-WO-1306a; ruled 2026-11-26T00:22Z) ------------------------------------------------------------------
 
-        // A write START to an address with no device on this port's bus: "When a NACK is received, the TXIS flag is not set and a STOP
-        // condition is automatically sent. The NACKF flag of the I2C_ISR register is set. An interrupt is generated if the NACKIE bit is
-        // set" (§47.4.9 p1975), whatever AUTOEND (Figure 556 p1976; ruled Q1). NACKF at the ninth SCL pulse of the address (p1955):
-        // nine SCL periods after the START (inferred). STOPF one SCL period after NACKF: inferred: RM0433 gives no figure (ruled Q3). From the
-        // START to that STOPF the automatic STOP is pending.
+        // The NACK, as the header states it (NACKF, then STOPF, one SCL period apart). From the START to that STOPF the automatic STOP
+        // is pending.
         private void Nack(double tick)
         {
             var e = ++nackEpoch;
@@ -420,8 +417,7 @@ namespace Antmicro.Renode.Peripherals.Tviburi
 
         // The controller's SCL period (§47.4.9 p1971): tSCL = tSYNC1 + tSYNC2 + [(SCLH+1) + (SCLL+1)] x (PRESC+1) x tI2CCLK, each tSYNC
         // at the floor p1971 states, two i2c_ker_ck periods plus DNF x tI2CCLK; the slope and the analog filter add more, with no figure
-        // here, and nine periods from the START leave out the START's hold (tHD:STA, set by SCLH, p1973): inferred, not cited. tI2CCLK
-        // from the RCC guard's KernelHz (ruled Q2); null, with the reason, without one.
+        // here. tI2CCLK from the RCC guard's KernelHz (ruled Q2); null, with the reason, without one.
         private double? SclPeriod(out string why)
         {
             why = null;
@@ -842,7 +838,7 @@ namespace Antmicro.Renode.Peripherals.Tviburi
             R("I2C_CR1", 0x000, "§47.9.1", "ERRIE", 7, 7, Any, "inherited, unaudited (acknowledged by name)", "the stock model keeps it; no bus error (BERR, ARLO, OVR, TIMEOUT, PECERR, ALERT) is ever raised, so it never fires (ArduPilot sets it; ruled 2026-11-25T05:06Z Q11)", 2003),
             R("I2C_CR1", 0x000, "§47.9.1", "TCIE", 6, 6, Any, "inherited, unaudited (acknowledged by name)", "the stock model: TC and TCR raise the event interrupt", 2003),
             R("I2C_CR1", 0x000, "§47.9.1", "STOPIE", 5, 5, Any, "inherited, unaudited (acknowledged by name)", "the stock model: STOPF raises the event interrupt; and the guard's STOPF after a NACK (TVI-WO-1306a)", 2003),
-            R("I2C_CR1", 0x000, "§47.9.1", "NACKIE", 4, 4, Any, "modeled by the guard", "the guard: NACKF raises the event interrupt (Table 400 p1999; the stock model has NACKIE && false); a write START to an address with no device is NACKed by the guard: NACKF nine SCL periods after the START (p1955; the period by p1971 from TIMINGR, DNF and the RCC guard's KernelHz, each tSYNC at its stated floor; inferred: the START's hold, tHD:STA, which SCLH sets (p1973), is not added), STOPF one SCL period after NACKF (inferred: RM0433 gives no figure), whatever AUTOEND (\"a STOP condition is automatically sent\", p1975), the guard writing the stock line \"Unknown slave at address N.\" under its own name (TVI-WO-1306a.measure.md; ruled 2026-11-26T00:22Z Q1-Q3, Q5, Q8); with no kernel-clock frequency it is TVI-I2C-NACK, unmodeled (Q2); a read START to an address with no device is TVI-I2C-ABSENT, unmodeled: RM0433 states the automatic STOP only for a write (Q6)", 2003),
+            R("I2C_CR1", 0x000, "§47.9.1", "NACKIE", 4, 4, Any, "modeled by the guard", "the guard: NACKF raises the event interrupt (Table 400 p1999; the stock model has NACKIE && false); the NACK: see I2C_CR2.START", 2003),
             R("I2C_CR1", 0x000, "§47.9.1", "ADDRIE", 3, 3, Zero, "inherited, unaudited (acknowledged by name)", "0 only: the stock model stores it; target (slave) mode is not modeled", 2003),
             R("I2C_CR1", 0x000, "§47.9.1", "RXIE", 2, 2, Any, "inherited, unaudited (acknowledged by name)", "the stock model: RXNE on a read raises the event interrupt", 2003),
             R("I2C_CR1", 0x000, "§47.9.1", "TXIE", 1, 1, Any, "inherited, unaudited (acknowledged by name)", "the stock model: TXIS raises the event interrupt", 2003),
@@ -912,7 +908,7 @@ namespace Antmicro.Renode.Peripherals.Tviburi
             R("I2C_ICR", 0x01C, "§47.9.8", "Res7", 7, 7, Zero, "reserved", "reserved: must be kept at reset value", 2012),
             R("I2C_ICR", 0x01C, "§47.9.8", "Res6", 6, 6, Any, "inherited, unaudited (acknowledged by name)", "ChibiOS writes 1 here (ICR = 0x2, 0x4 or 0x40, the TXIS, RXNE and TC positions of ISR, at every ICR write it makes, TVI-WO-1306.measure.md §2.1); RM0433 marks the bits reserved, \"must be kept at reset value\" (p2012); a clear register: the write clears nothing (ruled 2026-11-25T05:06Z Q10)", 2012),
             R("I2C_ICR", 0x01C, "§47.9.8", "STOPCF", 5, 5, Any, "modeled by the guard", "the stock model clears STOPF; the guard clears the NACK's own STOPF (p2012)", 2012),
-            R("I2C_ICR", 0x01C, "§47.9.8", "NACKCF", 4, 4, Any, "modeled by the guard", "the guard clears NACKF (p2012); a write START to an address with no device is NACKed by the guard: NACKF nine SCL periods after the START (p1955; the period by p1971 from TIMINGR, DNF and the RCC guard's KernelHz, each tSYNC at its stated floor; inferred: the START's hold, tHD:STA, which SCLH sets (p1973), is not added), STOPF one SCL period after NACKF (inferred: RM0433 gives no figure), whatever AUTOEND (\"a STOP condition is automatically sent\", p1975), the guard writing the stock line \"Unknown slave at address N.\" under its own name (TVI-WO-1306a.measure.md; ruled 2026-11-26T00:22Z Q1-Q3, Q5, Q8); with no kernel-clock frequency it is TVI-I2C-NACK, unmodeled (Q2); a read START to an address with no device is TVI-I2C-ABSENT, unmodeled: RM0433 states the automatic STOP only for a write (Q6)", 2012),
+            R("I2C_ICR", 0x01C, "§47.9.8", "NACKCF", 4, 4, Any, "modeled by the guard", "the guard clears NACKF (p2012); the NACK: see I2C_CR2.START", 2012),
             R("I2C_ICR", 0x01C, "§47.9.8", "ADDRCF", 3, 3, Zero, "inherited, unaudited (acknowledged by name)", "0 only: target (slave) mode is not modeled (in controller mode the stock model clears TXIS, where silicon clears ADDR and a pending START, p2012)", 2012),
             R("I2C_ICR", 0x01C, "§47.9.8", "Res2_1", 2, 1, Any, "inherited, unaudited (acknowledged by name)", "ChibiOS writes 1 here (ICR = 0x2, 0x4 or 0x40, the TXIS, RXNE and TC positions of ISR, at every ICR write it makes, TVI-WO-1306.measure.md §2.1); RM0433 marks the bits reserved, \"must be kept at reset value\" (p2012); a clear register: the write clears nothing (ruled 2026-11-25T05:06Z Q10)", 2012),
             R("I2C_ICR", 0x01C, "§47.9.8", "Res0", 0, 0, Zero, "reserved", "reserved: must be kept at reset value", 2012),

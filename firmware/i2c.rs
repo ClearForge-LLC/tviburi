@@ -14,7 +14,7 @@
 //!   path="clearfield"  - config, then CR1 written with PE = 0 and DNF = 3 in one write: passes (judged as with PE = 0, Q2).
 //!   path="ap"          - ArduPilot's I2C1 sequence (measure.md §2.1): CR1 = 0x90, TIMINGR 0x00300F38, CR1 = 0x91; a write of 1
 //!                        and a read of 1 to the BME280 with software STOP; ICR = 0x40, 0x4, 0x2 (reserved bits, Q10); a probe of
-//!                        0x30 (no device; acknowledged, Q9) ended by STOP; a stop (CR1 = 0xD2) and a start again: passes.
+//!                        0x30 (no device: NACKed, TVI-WO-1306a) ended by STOP (absorbed while the NACK's STOP is pending); a stop (CR1 = 0xD2) and a start again: passes.
 //!                        MARK_READ = RXDR (0x60), MARK_READ2 = TIMINGR (0x00300F38).
 //!   path="absentnext"  - config, the generated firmware's probe of 0x48 (no device): a START, NACKed (TVI-WO-1306a), ISR polled to
 //!                        STOPF, ICR = 0x30; then the chip id: passes. MARK_READ = RXDR (0x60).

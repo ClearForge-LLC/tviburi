@@ -51,7 +51,7 @@ def cls(reg, f, msb, lsb, page):
                       '(ArduPilot sets it; ' + RULED + ' Q11)'),
             'TCIE': ('Any', I, 'the stock model: TC and TCR raise the event interrupt'),
             'STOPIE': ('Any', I, 'the stock model: STOPF raises the event interrupt; and the guard\'s STOPF after a NACK (TVI-WO-1306a)'),
-            'NACKIE': ('Any', G, 'the guard: NACKF raises the event interrupt (Table 400 p1999; the stock model has NACKIE && false); ' + NACK),
+            'NACKIE': ('Any', G, 'the guard: NACKF raises the event interrupt (Table 400 p1999; the stock model has NACKIE && false); the NACK: see I2C_CR2.START'),
             'ADDRIE': ('Zero', I, '0 only: the stock model stores it; ' + TARGET),
             'RXIE': ('Any', I, 'the stock model: RXNE on a read raises the event interrupt'),
             'TXIE': ('Any', I, 'the stock model: TXIS raises the event interrupt'),
@@ -108,7 +108,7 @@ def cls(reg, f, msb, lsb, page):
             'ARLOCF': ('Zero', T, '0 only: a stock tag; no bus error is modeled'),
             'BERRCF': ('Zero', T, '0 only: a stock tag; no bus error is modeled'),
             'STOPCF': ('Any', G, 'the stock model clears STOPF; the guard clears the NACK\'s own STOPF (p2012)'),
-            'NACKCF': ('Any', G, 'the guard clears NACKF (p2012); ' + NACK),
+            'NACKCF': ('Any', G, 'the guard clears NACKF (p2012); the NACK: see I2C_CR2.START'),
             'ADDRCF': ('Zero', I, '0 only: ' + TARGET + ' (in controller mode the stock model clears TXIS, where silicon clears ADDR and a pending START, p2012)'),
         }[f]
     if r == 'PECR':

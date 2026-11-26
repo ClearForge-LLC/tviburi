@@ -291,7 +291,7 @@ namespace Antmicro.Renode.Peripherals.Tviburi
             var wide = (Copy(PllcfgrOffset) >> (1 + 4 * (n - 1)) & 1) == 0;
             var refHz = input == null || divm == 0 ? 0 : input.Value / divm;
             var vco = refHz * (divn + 1);
-            if(input == null || divm == 0 || divn < 3 || refHz < 1e6 || refHz > 16e6 || vco < (wide ? 192e6 : 150e6) || vco > (wide ? 960e6 : 420e6))
+            if(divn < 3 || refHz < 1e6 || refHz > 16e6 || vco < (wide ? 192e6 : 150e6) || vco > (wide ? 960e6 : 420e6))
             {
                 why += ": PLL" + n + " outside the ranges p404 gives, or with no reference (ref " + refHz + " Hz, VCO " + vco + " Hz): no rule for its frequency";
                 return null;
