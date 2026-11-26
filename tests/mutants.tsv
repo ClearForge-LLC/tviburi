@@ -642,9 +642,23 @@ RP01-propNoRow	tools/tviburi-release/src/props.rs	            if !rows.iter().an
 RP02-propNoParam	tools/tviburi-release/src/props.rs	let Some(param) = param else {\n            return Err(	let Some(param) = param else {\n            continue;\n            return Err(	unit
 RP03-propGuard	tools/tviburi-release/src/props.rs	peripherals.iter().filter(|p| p.0 == r.guard).flat_map(	peripherals.iter().filter(|_| true).flat_map(	unit
 RP04-propOptional	tools/tviburi-release/src/props.rs	if !r.required && !param.has_default {	if false {	unit
-RP05-busInterface	tools/tviburi-release/src/props.rs	    bases.iter().any(|b| BUS_INTERFACES.contains(&b.as_str()))	    false && bases.iter().any(|b| BUS_INTERFACES.contains(&b.as_str()))	unit
 RP06-propLines	tools/tviburi-release/src/main.rs	    for p in &pins.props {\n        m += &format!(	    for p in pins.props.iter().take(0) {\n        m += &format!(	manifest
 RA01-asmSha	tools/tviburi-release/src/main.rs	        if got != *pin {	        if false {	adv-release
 RA02-buildLineSha	tools/tviburi-release/src/main.rs	m += &format!("build {asm} {b} {sha}\\n");	m += &format!("build {asm} {b}\\n");	manifest
 # TVI-WO-2100 (Q26; granted 2026-11-26T19:45Z): a canned stub restated onto its guard (pwr) is a guarded model row in the ledger.
 Q26-stubCanned	tools/tviburi-release/src/main.rs	    pins.classes.iter().any(|(ty, g)| *ty == c.2 &&	    false && pins.classes.iter().any(|(ty, g)| *ty == c.2 &&	unit pwr-ledger
+# TVI-WO-2100 (adversarial pass): the props reader masks comments and literals, reads any class declaration, widens the peripheral rule; each check the pass found untested, killed.
+AP01-maskLineComment	tools/tviburi-release/src/props.rs	if c[i] == '/' && at(i + 1) == '/' {	if false {	unit
+AP02-maskBlockComment	tools/tviburi-release/src/props.rs	} else if c[i] == '/' && at(i + 1) == '*' {	} else if false {	unit
+AP03-maskVerbatim	tools/tviburi-release/src/props.rs	verbatim |= c[i] == '@';	verbatim |= false;	unit
+AP04-maskNewlineInString	tools/tviburi-release/src/props.rs	if i >= n || (!verbatim && c[i] == '\\n') {	if i >= n {	unit
+AP05-attributes	tools/tviburi-release/src/props.rs	while t.starts_with('[') {	while false && t.starts_with('[') {	unit
+AP06-unsafeModifier	tools/tviburi-release/src/props.rs	"partial", "unsafe", "new"]	"partial", "new", "new"]	unit
+AP07-typeParameters	tools/tviburi-release/src/props.rs	if tail.starts_with('<') {	if false {	unit
+AP08-peripheralName	tools/tviburi-release/src/props.rs	bases.iter().any(|b| b.contains("Peripheral") || stock.contains(b) || out.contains(b))	bases.iter().any(|b| stock.contains(b) || out.contains(b))	unit
+AP09-stockBase	tools/tviburi-release/src/props.rs	b.contains("Peripheral") || stock.contains(b) || out.contains(b)	b.contains("Peripheral") || out.contains(b)	unit
+AP10-overlayBase	tools/tviburi-release/src/props.rs	|| stock.contains(b) || out.contains(b))	|| stock.contains(b))	unit
+AP11-propRowForm	tools/tviburi-release/src/main.rs	if !f[1].starts_with("Tviburi.") || !matches!(f[3], "required" | "optional") || !f[4].bytes().all(|b| (0x20..0x7f).contains(&b)) {	if false {	unit
+AP12-rowWidth	tools/tviburi-release/src/main.rs	if f.len() != width && f[0] != "class" {	if false {	unit
+AP13-guardUnread	tools/tviburi-release/src/main.rs	if let Some(g) = mapped.iter().find(|g| !names.contains(g)) {	if let Some(g) = mapped.iter().find(|_| false) {	unit
+AP14-declaredTwice	tools/tviburi-release/src/main.rs	.filter(|(d, _)| &d.0 == name).map(|(_, k)| *k).collect();	.filter(|(d, _)| &d.0 == name).take(1).map(|(_, k)| *k).collect();	unit

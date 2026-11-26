@@ -30,10 +30,13 @@
 #                                      with no row, a row naming no parameter, and a row `optional` for a parameter with no C#
 #                                      default (a platform without one does not load). Renode supplies the first parameter,
 #                                      `IMachine machine` or `Machine machine`, itself: it has no row. A peripheral Tviburi
-#                                      class is every guard of the class map, and every other class model/*.cs declares whose
-#                                      base list names a bus-peripheral interface (IBusPeripheral, IBytePeripheral,
-#                                      IWordPeripheral, IDoubleWordPeripheral, IQuadWordPeripheral); a helper such as Records
-#                                      (model/Refusal.cs), or a class nested in a guard with no such base, takes no rows.
+#                                      class is every guard of the class map, and every other class model/*.cs declares (with
+#                                      any attributes, modifiers and type parameters; comments and literals ignored) whose
+#                                      base list names a type with `Peripheral` in its name (IDoubleWordPeripheral,
+#                                      BasicDoubleWordPeripheral, ...), a stock peripheral type (a class row's stock type, or a
+#                                      type the pinned chain declares), or another peripheral Tviburi class. A helper with no
+#                                      such base, such as Records (model/Refusal.cs) or a class nested in a guard, takes no
+#                                      rows; the release constant's class is not in model/.
 #                                      `required`: without it the guard refuses or the platform does not load; its meaning
 #                                      cites the case that shows it, or says the parameter has no default. `optional`: its
 #                                      meaning says what absence does. The meaning is free ASCII text. The rows go into the
