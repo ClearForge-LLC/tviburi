@@ -10,19 +10,20 @@
 73	A Tviburi guard row (ADC CKMODE); Aethelgard 4240e named as the measurement
 75	A Tviburi guard row (SYSCFG_PMCR); Aethelgard 4410 named as the measurement
 81	Tviburi's replay harness and Aethelgard's reaper argv: a Tviburi harness fix
-175	Phase 2 heading
-179	Phase 2 goal text
-181	Phase 2 Work header; each bullet R:182-189 is cited
-193	Phase 2 exit gate heading; its clauses are Aethelgard's gate, not a checklist item
-203	Phase 3 context
-214	Phase 4 goal text
-216	Phase 4 shape; after Phase 2
-222	Phase 5 trigger
-228	Phase 5 family order
-229	Phase 5 family order
-254	Sequencing: Aethelgard's Phase 2 queues behind its own package queue
-269	Amendments row
-278	Amendments row
-279	Amendments row
-295	Amendments row
-303	Reconciliation: Scotty's instruction, the reason for the whole roadmap
+183	Phase 2 heading
+187	Phase 2 goal text
+189	Phase 2 Work header; each bullet R:182-189 is cited
+207	Phase 2 exit gate heading; its clauses are Aethelgard's gate, not a checklist item
+217	Phase 3 context
+228	Phase 4 goal text
+230	Phase 4 shape; after Phase 2
+236	Phase 5 trigger
+242	Phase 5 family order
+243	Phase 5 family order
+268	Sequencing: Aethelgard's Phase 2 queues behind its own package queue
+283	Amendments row
+292	Amendments row
+293	Amendments row
+309	Amendments row
+318	Reconciliation: Scotty's instruction, the reason for the whole roadmap
+203	TVI-WO-2100 row: Tviburi's first release, whose notes cite this checklist; no consumer action beyond its items
