@@ -8,11 +8,28 @@
 //             predicted-fault or unmodeled. Logged at Error,
 //             which `logLevel` cannot suppress (measured: `logLevel 4` is rejected). Latches
 //             (RUL-08): after it, nothing the run does is claimed.
-//             In recorded mode (RUL-19) the same record is a `would-refuse`: nothing pauses, and the
-//             guard passes the access on as if no rule had fired. A recorded run is never a pass.
+//             In recorded mode (RUL-19) the same record is a `would-refuse` (the contract below).
 //   end     - from Dispose, when Renode tears the machine down cleanly. A crash (an unhandled
 //             exception, SIGKILL) leaves none (measured). SIGTERM still disposes, so an end record
 //             shows a clean teardown, not that the consumer's script completed.
+//             The logger is flushed after it, so a clean quit never loses it (TVI-WO-1204 (2)).
+// Recorded mode's contract (RUL-19; TVI-WO-1204 (3), ruled 2026-11-26T12:21Z), written here once; each guard's header cites it:
+//   - Enforcing: the first rule that fires refuses the access, and no later rule is evaluated for it.
+//   - Recorded: every rule is evaluated for the access, in the guard's order, and each that fires records a `would-refuse`
+//     (Records.Evaluates). Nothing pauses. TVI-LOAD is the exception: a guard that failed to load refuses in either mode.
+//   - Recorded: the access goes on to the stock model and to the guard's copies as if no rule had fired, so a read returns
+//     what the stock model serves and a write reaches the stock model whole.
+//   - The malformed-access exception (TVI-WO-1204, architect review 15:18Z): an unloaded, misaligned or wrong-width access is
+//     refused alone in most guards, with no later rule evaluated for it. GPIO's and the timer's Misaligned or Narrow write and
+//     the RCC's misaligned write (its TVI-RCC-WIDTH) still go on to the stock model in recorded mode. The DMA's, the I2C's and
+//     the USART's Narrow access, and the I2C's and the USART's access to an offset with no register, go on to nothing, in
+//     either mode. The SPI evaluates its later rules past TVI-SPI-WIDTH, and so does the ADC past its Narrow.
+//   - One exception (TVI-WO-1204 (3) P2, ruled 2026-11-26T12:51Z): in recorded mode with no crystal declared, the stock RCC runs on a placeholder 8 MHz so a run
+//     can continue past TVI-RCC-HSE; no guard reads it (model/GuardedSTM32H7_RCC.cs).
+//   - What follows a would-refuse is the stock model's behaviour, not a guard's promise; a recorded run is never a pass.
+//     Two named examples (TVI-WO-1306a F10): a START the I2C guard passes while a NACK is pending still gets that NACK's
+//     STOPF, inside the new transfer; and an uncleared NACK STOPF keeps the port in controller mode, so a later STOP passes
+//     where enforcing mode would refuse it.
 // Each record carries a per-peripheral `seq` from 0. Renode collapses identical consecutive messages
 // into "msg (2)" (measured), so the sequence also keeps every record distinct.
 //
@@ -64,10 +81,13 @@ namespace Antmicro.Renode.Peripherals.Tviburi
         // True when the guard failed to load: it must refuse every access, in either mode.
         public bool LoadFailed => loadFailure != null;
 
-        // True in recorded mode (RUL-19): after a rule fires and Refuse records it, the guard passes the
-        // access on to the stock model and to its copies as if no rule had fired, and evaluates no further
-        // rule for that access. Never true while LoadFailed: a load failure is a mode other than these two.
+        // True in recorded mode (RUL-19; the contract in this file's header). Never true while LoadFailed: a load failure is
+        // a mode other than these two.
         public bool Recorded => mode == RecordedMode;
+
+        // Whether the access's next rule is evaluated, given whether one has fired: in recorded mode always, in enforcing
+        // mode only while none has (the contract in this file's header).
+        public bool Evaluates(bool fired) => !fired || Recorded;
 
         public void Refuse(string rule, string kind, string register, string bit, string condition, string citation,
             string state, long offset, ulong value, int width)
@@ -104,6 +124,12 @@ namespace Antmicro.Renode.Peripherals.Tviburi
             if(named)
             {
                 Emit(LogLevel.Info, "end", ",\"guard\":" + Json(guard) + ",\"model_version\":" + Json(version));
+                // The teardown race (TVI-WO-1204 (1), (2)): under asynchronous logging, Renode's default, Emit only enqueues, and
+                // a clean quit disposes the machines, then this emulation's logger, whose writer thread is cancelled with its
+                // queue undrained, so a queued end record is never written. Flushing here writes every queued entry before this
+                // Dispose returns, so before the logger can be torn down: deterministic, not a delay. Measured: 16 of 50 loaded
+                // quits lost an end record without it, 0 of 50 with it. Under synchronous logging it only flushes the backends.
+                Logger.Flush();
             }
         }
 

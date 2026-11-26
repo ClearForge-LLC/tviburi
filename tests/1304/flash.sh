@@ -11,7 +11,6 @@ set -euo pipefail
 here=$(cd "$(dirname "$0")/../.." && pwd)
 IMAGE=$(sed -n 's/^IMAGE=//p' "$here/tests/spike.sh")
 CASES="order clockfirst lowerfast prescaler alias divp1zero divp1odd vosunknown vosunknownlow vos3 over225 edge vos2 d1cpre wrhrcc lockedcr lockedsame locking badkey keytwice keymid keyhalf wrhlow wrhpg worse ap gen optsr optsrnone optwrite bank1 readreg fields ledger registrations recorded reset config regen"
-GUARDS="spi1 rcc gpioPortA gpioPortB gpioPortC gpioPortD gpioPortE gpioPortF gpioPortG gpioPortH gpioPortI gpioPortJ gpioPortK timer1 timer8 dma1 dma2 flashController usart1 usart2 usart3 uart4 uart5 usart6 uart7 uart8 i2c1 i2c2 i2c3 adcM1S2 adc3"
 # The planted firmware's paths (firmware/flash.rs): every case but optsrnone (optsr's firmware) and the monitor-driven ones.
 PATHS=$(for c in $CASES; do case $c in optsrnone|fields|ledger|registrations|recorded|reset|config|regen) ;; *) printf '"%s",' "$c" ;; esac; done | sed 's/,$//')
 scratch=${TVIBURI_SCRATCH:-$HOME/.cache/tviburi}
@@ -32,6 +31,7 @@ else
   mkdir "$src"
   git -C "$here" archive HEAD | tar -x -C "$src"
 fi
+GUARDS=$("$src/scripts/guards")   # the one guard list (scripts/guards; TVI-WO-1204 (6))
 
 fails=0
 check() { if eval "$2"; then echo "ok   $1"; else echo "FAIL $1"; fails=$((fails + 1)); fi; }
@@ -253,11 +253,8 @@ sys.exit(0 if ok else 1)
       "[ \$rc = 3 ] && first config 'r[\"rule\"] == \"TVI-FLASH-CONFIG\" and r[\"kind\"] == \"unmodeled\"'" ;;
   regen)
     rc=0; python3 -I "$src/tests/1304/fields.py" "$src/tests/1304/data/rm0433-rev9-flash-fields.tsv" > "$work/fields.cs" || rc=$?
-    mkdir -p "$work/regen"
-    container -v "$src:/repo:ro,Z" -v "$work/regen:/out:Z" "$IMAGE" sh -c 'awk -v sha=$(sha256sum /opt/renode/platforms/cpus/stm32h7.repl | cut -c1-64) \
-      -f /repo/model/stm32h7-flash-restate.awk /opt/renode/platforms/cpus/stm32h7.repl > /out/restate.repl' </dev/null >"$work/regen.stdout" 2>&1 || rc=$?
-    check "regen: the guard's Fields table regenerates from tests/1304/data by tests/1304/fields.py, and the restatement from the pinned stm32h7.repl, byte for byte (RUL-16)" \
-      "[ \$rc = 0 ] && sed -n '/^        private static readonly Row\[\] Fields =$/,/^        };$/p' '$src/model/GuardedSTM32H7_Flash.cs' | sed '1,2d;\$d' | cmp -s - '$work/fields.cs' && cmp -s '$work/regen/restate.repl' '$src/model/stm32h7-flash-restate.repl'" ;;
+    check "regen: the guard's Fields table regenerates from tests/1304/data by tests/1304/fields.py, byte for byte (RUL-16); its restatement is tests/spike.sh manifest's (TVI-WO-1204 (6))" \
+      "[ \$rc = 0 ] && sed -n '/^        private static readonly Row\[\] Fields =$/,/^        };$/p' '$src/model/GuardedSTM32H7_Flash.cs' | sed '1,2d;\$d' | cmp -s - '$work/fields.cs'" ;;
   *) echo "unknown case: $t" >&2; exit 2 ;;
   esac
 done

@@ -48,8 +48,7 @@
 //   TVI-FLASH-PROG    WRHIGHFREQ below Table 17's value for the clock at a program or erase start (PG set, START or FW
 //                     with SER or BER), or at an ACR or RCC write while PG is set ("too tight", p164). predicted-fault;
 //                     unmodeled as TVI-FLASH-WAIT.
-// Enforcing: the first rule that fires refuses the access. Recorded mode (RUL-19): every rule is evaluated and records
-// what it finds, and the access goes on as if none had fired (model/Refusal.cs). Recorded records after the first rank
+// Enforcing and recorded mode (RUL-19) are model/Refusal.cs's contract. Recorded records after the first rank
 // paths, they do not prove them: the guard's own state (the key sequence, a mismatch already recorded) follows the
 // firmware's writes, the stock model's follows the stock model's rules.
 

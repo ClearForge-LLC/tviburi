@@ -82,8 +82,7 @@
 //                     these registers when the EN bit is read as 1" says nothing of what silicon does (ruled Q2).
 //                     unmodeled; in recorded mode CIRC keeps its old value.
 //   TVI-DMA-HALF      HTIE set on a non-circular stream: no HTIF is modeled there (ruled Q3). unmodeled.
-// Enforcing: the first rule that fires refuses the access. Recorded mode (RUL-19): every rule is evaluated and records what
-// it finds, and the access goes on as if none had fired (model/Refusal.cs), with protected fields kept as silicon keeps them.
+// Enforcing and recorded mode (RUL-19) are model/Refusal.cs's contract; a recorded write goes on with protected fields kept as silicon keeps them.
 //
 // Modeled (TVI-WO-1305, ruled 2026-11-24T18:55Z Q6): software clearing EN while the stream runs (NDT > 0) suspends it as
 // silicon does: TCIF is set "to indicate the end of transfer due to the stream interruption", and the stream's next transfer

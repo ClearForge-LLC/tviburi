@@ -50,9 +50,7 @@
 //                     With no package declared the rule does not run, and the witness says "package": "none", so a
 //                     consumer sees a check that did not run (ruled 17:52Z; the witness field granted 19:08Z).
 // TVI-GPIO-AF and TVI-GPIO-PACKAGE record each pin that enters the faulting state, once, not on every later write.
-// Enforcing: the first rule that fires refuses the access, which is not passed. Recorded mode (RUL-19): every rule is
-// evaluated, each records what it finds as a would-refuse, and the access goes on to the stock port as if none had
-// fired (model/Refusal.cs).
+// Enforcing and recorded mode (RUL-19) are model/Refusal.cs's contract.
 // A port whose RCC clock is off is locked by the RCC guard's sync (TVI-WO-1300a), before this guard sees the access;
 // it adds no rule of its own for it (ruled 2026-11-23T17:52Z).
 

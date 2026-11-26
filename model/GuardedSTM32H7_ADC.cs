@@ -41,8 +41,7 @@
 //                     this ADC's request (the twin cannot see the DMA's last transfer, p964). unmodeled.
 //   TVI-ADC-LEVEL     DR read (by the CPU or a DMA) holding a conversion of a channel no `levels` entry and no SetVoltage declared
 //                     (ruled Q10): never 0 V by default. unmodeled. A conversion nobody reads makes no record.
-// Enforcing: the first rule that fires refuses the access. Recorded mode (RUL-19): every rule is evaluated and records what it
-// finds, and the access goes on as if none had fired (a start whose rate cannot be computed converts nothing).
+// Enforcing and recorded mode (RUL-19) are model/Refusal.cs's contract, but a recorded start whose rate cannot be computed converts nothing.
 //
 // Modeled, cited:
 //   The clock (p920, p1039; ruled Q2, Q4): CKMODE = 00, the kernel clock ADCSEL selects (pll2_p_ck, pll3_r_ck, per_ck, p419) /

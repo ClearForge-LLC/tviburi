@@ -54,8 +54,7 @@
 //                     answers none: a PLL outside its ranges, an HSE with no hseFrequency, a source with no rule). unmodeled (Q2).
 // Every START to an address with no device, passed, is logged under the guard's name with the stock model's own line, "Unknown
 // slave at address N.", which the owned instance's line lacks (Aethelgard's absent_address reads it by source; TVI-WO-1306 Q9).
-// Enforcing: the first rule that fires refuses the access. Recorded mode (RUL-19): every rule is evaluated and records what
-// it finds, and the access goes on as if none had fired (model/Refusal.cs), but the empty START above.
+// Enforcing and recorded mode (RUL-19) are model/Refusal.cs's contract, but the empty START above; its two F10 edges are named there.
 //
 // Modeled, cited:
 //   TIMINGR, CR1.DNF and ANFOFF stored, and served on read as written (ruled Q5): the stock model has them as tags reading 0.
