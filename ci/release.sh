@@ -7,6 +7,10 @@
 #                                     and 2030, as tests/spike.sh's `reproducible` makes them), compared byte for byte;
 #                                     `verify` on the first against the hash it printed (or RELEASE_PIN if set); then the
 #                                     tarball, MANIFEST and LEDGER.jsonl kept in RELEASE_OUT with summary.md.
+#   ci/release.sh dry COMMIT          `all` without the on-main check and without keeping: the pull request's own tree built
+#                                     twice, compared and verified, so a change to the release's tools is exercised before it
+#                                     merges (the release job's pull_request trigger; Q24 (a) builds the base commit as `all`);
+#                                     the first build's tarball and its hash are left in RELEASE_OUT/dry for the job's checks
 #   ci/release.sh tree TREE OUT       one build of the source tree TREE into OUT/release (the hash on stdout)
 #   ci/release.sh compare A B         byte-compare two builds' files; on a difference, the file and its first differing byte
 #   ci/release.sh verify DIR PIN      `tviburi-release verify` on DIR against PIN (sha256:<hex>)
@@ -51,11 +55,8 @@ extract() { # extract COMMIT DIR UMASK STAMP: the commit's tree, as a consumer's
   find "$2" -exec touch -h -t "$4" {} +
 }
 
-all() { # all COMMIT [MAIN]
-  local commit main sha h1 h2 out=${RELEASE_OUT:-$ci/out}
-  commit=$(git -C "$here" rev-parse --verify -q "$1^{commit}") || fail "$1 is not a commit"
-  main=${2:-origin/main}
-  git -C "$here" merge-base --is-ancestor "$commit" "$main" || fail "$commit is not on $main"
+twice() { # twice COMMIT: two builds of COMMIT from two extractions, compared and verified; the hash on stdout's last line
+  local commit=$1 h1 h2
   [ -z "$(git -C "$here" status --porcelain --untracked-files=normal)" ] || fail "the checkout is not clean: $(git -C "$here" status --porcelain | head -n 3 | tr '\n' ' ')"
   extract "$commit" "$ci/a.tree" 022 200001010000
   extract "$commit" "$ci/b.tree" 077 203012312359
@@ -64,6 +65,23 @@ all() { # all COMMIT [MAIN]
   [ "$h1" = "$h2" ] || fail "the two builds printed different hashes: $h1, $h2"
   compare "$ci/a" "$ci/b"
   verify "$ci/a" "${RELEASE_PIN:-$h1}" "$ci/a.tree"
+  echo "$h1"
+}
+
+dry() { # dry COMMIT
+  local commit h out=${RELEASE_OUT:-$ci/out}/dry
+  commit=$(git -C "$here" rev-parse --verify -q "$1^{commit}") || fail "$1 is not a commit"
+  h=$(twice "$commit" | tee /dev/stderr | tail -n 1)
+  mkdir -p "$out" && cp "$ci/a/release/tviburi-release.tar" "$out/" && echo "$h" >"$out/hash"
+  echo "dry run of $commit (not a release; not on main): two builds byte-identical, verify passed, $h"
+}
+
+all() { # all COMMIT [MAIN]
+  local commit main sha h1 out=${RELEASE_OUT:-$ci/out}
+  commit=$(git -C "$here" rev-parse --verify -q "$1^{commit}") || fail "$1 is not a commit"
+  main=${2:-origin/main}
+  git -C "$here" merge-base --is-ancestor "$commit" "$main" || fail "$commit is not on $main"
+  h1=$(twice "$commit" | tee /dev/stderr | tail -n 1)
   mkdir -p "$out"
   for f in tviburi-release.tar MANIFEST LEDGER.jsonl; do cp "$ci/a/release/$f" "$out/$f"; done
   sha=$(sha256sum <"$out/tviburi-release.tar" | cut -c1-64)
@@ -74,8 +92,9 @@ all() { # all COMMIT [MAIN]
     echo "| ledger sha256 (LEDGER.jsonl) | \`sha256:$(sha256sum <"$out/LEDGER.jsonl" | cut -c1-64)\` |"
     echo "| ledger rows (MANIFEST \`ledger-rows\`) | \`sha256:$(sed -n 's/^ledger-rows \([0-9a-f]*\) .*/\1/p' "$out/MANIFEST")\` |"
     echo "| tarball sha256 | \`sha256:$sha\` |"
-    echo "| Renode build (MANIFEST: string, Renode.dll sha256) | \`$(sed -n 's/^build renode \([^ ]*\) .*/\1/p' "$out/MANIFEST")\`, \`$(sed -n 's/^build renode [^ ]* \([0-9a-f]*\)$/\1/p' "$out/MANIFEST")\` |"
-    echo "| Infrastructure build (MANIFEST: string, Infrastructure.dll sha256) | \`$(sed -n 's/^build infrastructure \([^ ]*\) .*/\1/p' "$out/MANIFEST")\`, \`$(sed -n 's/^build infrastructure [^ ]* \([0-9a-f]*\)$/\1/p' "$out/MANIFEST")\` |"
+    for asm in renode infrastructure; do
+      echo "| \`build $asm\` (MANIFEST: the build string, then its assembly's sha256) | \`$(sed -n "s/^build $asm //p" "$out/MANIFEST")\` |"
+    done
     echo "| image | \`$IMAGE\` |"
     echo; echo "Two builds byte-identical (every file in each); \`verify\` passed against \`${RELEASE_PIN:-$h1}\`."; } >"$out/summary.md"
   cat "$out/summary.md"
@@ -83,8 +102,9 @@ all() { # all COMMIT [MAIN]
 
 case "${1:-}" in
   all) [ $# -ge 2 ] && [ $# -le 3 ] || exit 2; all "${@:2}" ;;
+  dry) [ $# -eq 2 ] || exit 2; dry "$2" ;;
   tree) [ $# -eq 3 ] || exit 2; build_tree "$(cd "$2" && pwd)" "$3" ;;
   compare) [ $# -eq 3 ] || exit 2; compare "$2" "$3" ;;
   verify) [ $# -eq 3 ] || exit 2; verify "$(cd "$2" && pwd)" "$3" ;;
-  *) echo "usage: ci/release.sh all COMMIT [MAIN] | tree TREE OUT | compare A B | verify DIR PIN" >&2; exit 2 ;;
+  *) echo "usage: ci/release.sh all COMMIT [MAIN] | dry COMMIT | tree TREE OUT | compare A B | verify DIR PIN" >&2; exit 2 ;;
 esac
