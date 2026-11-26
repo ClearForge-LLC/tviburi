@@ -15,7 +15,7 @@
 set -euo pipefail
 
 IMAGE=ghcr.io/clearforge-llc/aethelgard-tools@sha256:1e0ab105ec42bdba66b773464f0b6679d622e4afdafef30ec4931e4326f49c63
-ACCEPTANCE="unit modf modeled ardupilot generated field stable cfg2first iolock rmw forge stock-forge stock-modf modf-page removed-console crash-console crash-runner nomark conditions fields load crash identity verify reproducible manifest lognames guards teardown recorded allowlist"
+ACCEPTANCE="unit modf modeled ardupilot generated field stable cfg2first iolock rmw forge stock-forge stock-modf modf-page removed-console crash-console crash-runner nomark conditions fields load crash identity verify reproducible manifest lognames guards teardown witnessed recorded allowlist"
 ADVERSARIAL="adv-removed adv-extra-arg adv-bad-variant adv-hook adv-loglevel adv-spray adv-noend adv-version adv-recorded adv-noname adv-release adv-cache"
 # TVI-WO-1300: the RCC guard's cases live in tests/1300/rcc.sh; each is a test here, rcc-<case>, run as part of the
 # acceptance group, so CI and tests/mutants.sh reach them.
@@ -674,6 +674,23 @@ t_teardown() {
   pod teardown "$src" -- bash /repo/tests/1204/teardown.sh
   check "15 clean quits under load each write every guard's witness and end record, in the log file and on the console (TVI-WO-1204 (2))" \
     "[ \$rc -eq 0 ] && grep -q '^teardown: 0 of 15 clean quits lost' '$work/teardown.stdout' && [ \"\$(awk 'NR > 1' '$work/teardown/teardown.tsv' | wc -l)\" = 15 ]"
+}
+
+t_witnessed() {
+  # TVI-WO-1204 (6): tests/1301/witnessed.sh, which the budget job runs on each branch boot of the consumer's fixture, names the
+  # instances, never counts them. Consoles in RUL-11's framing, made from this tree's own MANIFEST: one witness per instance
+  # passes; one missing fails naming it; as many witnesses under other names fails; a planted restatement with no witness fails.
+  pod witnessed "$src" -- sh -c '/repo/scripts/build-release >/dev/null'
+  local m=$work/witnessed/release/MANIFEST d=$work/witnessed
+  awk '$1 == "restate" || $1 == "retype" {printf "[00:00:00.000000000] [INFO] %s: {\"tviburi\":\"witness\",\"seq\":0}\n", $3}' "$m" >"$d/all.txt"
+  grep -v '\] timer8: ' "$d/all.txt" >"$d/less.txt"
+  sed 's/\] \([A-Za-z0-9_]*\): /] x\1: /' "$d/all.txt" >"$d/renamed.txt"
+  { cat "$m"; echo 'restate Timers.STM32_Timer timer5 platforms/cpus/stm32h7.repl'; } >"$d/planted.MANIFEST"
+  check "witnessed: a witness for each instance the MANIFEST restates or retypes passes; one missing (timer8), the same count under other names, or a planted restatement (timer5) with no witness each fails, naming what lacks one" \
+    "[ \$rc = 0 ] && [ \$(wc -l <'$d/all.txt') -ge 30 ] && bash '$src/tests/1301/witnessed.sh' '$d/all.txt' '$m' >/dev/null \
+     && ! bash '$src/tests/1301/witnessed.sh' '$d/less.txt' '$m' >'$d/less.out' && grep -q 'no witness for timer8 (of ' '$d/less.out' \
+     && ! bash '$src/tests/1301/witnessed.sh' '$d/renamed.txt' '$m' >/dev/null \
+     && ! bash '$src/tests/1301/witnessed.sh' '$d/all.txt' '$d/planted.MANIFEST' >'$d/planted.out' && grep -q 'no witness for timer5 (of ' '$d/planted.out'"
 }
 
 t_reproducible() {
