@@ -77,6 +77,13 @@ for l in open(os.path.join(repo, 'tests/1301/fields.resc')):
         n = l.split()[2].replace('GPIOA_', 'GPIOx_'); refuse['GuardedSTM32_GPIOPort'][n] = 'FIELD ' + l.split()[2]
 for g, f in (('GuardedSTM32F7_I2C', 'i2c-zero.txt'), ('GuardedSTM32H7_ADC', 'adc-zero.txt')):
     for l in open(os.path.join(cases_dir, f)): refuse[g][l.strip()] = 'swept at its widest value (allowed only at 0)'
+# TVI-WO-1203's two monwrite cases (tests/1306/i2c.sh isrmonwrite, tests/1307/adc.sh fieldsmonwrite), each matched to its own
+# write; 1205's third change, after its adversarial pass: 1100a's join read only the "allowed only at 0" sweeps for these guards.
+for n in ('I2C_ISR.TXE', 'I2C_ISR.TXIS'):
+    refuse['GuardedSTM32F7_I2C'].setdefault(n, 'tests/1306/i2c.sh isrmonwrite')
+for n in ['ADC_SQR1.SQ%d' % k for k in range(1, 5)] + ['ADC_SQR2.SQ%d' % k for k in range(5, 10)] + \
+         ['ADC_SQR3.SQ%d' % k for k in range(10, 15)] + ['ADC_SQR4.SQ%d' % k for k in (15, 16)] + ['ADC_CFGR.AWD1CH', 'ADCx_CCR.PRESC']:
+    refuse['GuardedSTM32H7_ADC'].setdefault(n, 'tests/1307/adc.sh fieldsmonwrite')
 MASKED_SPI = {'SPI_CR1.CSUSP': 'TVI-SPI-ORDER', 'SPI_CR1.CSTART': 'TVI-SPI-ORDER', 'SPI_CR1.SPE': 'TVI-SPI-MODF',
               'SPI_TXDR.TXDR': 'TVI-SPI-WIDTH', 'SPI_RXDR.RXDR': 'TVI-SPI-WIDTH', 'SPI_I2SCFGR.I2SMOD': 'TVI-SPI-I2SMOD'}
 
@@ -168,7 +175,8 @@ def state_of(inst, off, lsb, width, mask=None):
                 if note == 'ADC2': sc = 'ADC1 half of ' + tinst
                 ev = '%s%s; %s: %s' % ('modeled, other values refuse: ' if r['state'] == 'guard' else '', loc, tname, c)
             else:
-                ev, sc = '%s; NO clause-6 case names it' % loc, 'none'
+                # 1205's fourth change (adversarial pass): a restricted field no clause-6 case names is a finding, not guarded.
+                s, ev, sc = 'FINDING', '%s; NO clause-6 case names it' % loc, 'none'
         elif r['state'] == 'read-only':
             # Reading R1 (measure §1.3, after the data): RUL-16's read-only is "silicon ignores a write, and the guard does too".
             s, ev, sc = 'guarded', 'read-only, ignored as silicon ignores it (%s)' % loc, 'modeled'

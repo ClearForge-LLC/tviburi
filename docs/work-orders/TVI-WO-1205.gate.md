@@ -51,14 +51,18 @@ How each clause is judged:
 
 **TIM1's `TIMx_SR`: read in full, and acknowledged by name** (architect 17:02Z and 17:35Z; it was `1100a` F3's form finding).
 - **What the armed run does at TIM1** (run B, every access logged):
-  - SR: written `0x0` three times (0.104 s, 7.77 s), and never read. There are no TIM1 reads at all among 4,470,613 read lines.
+  - SR: written `0x0` three times, and never read. There are no TIM1 reads at all: 0 of 5,568,732 CPU read lines in the post-`1308` run B (`spike/1205/data/main-5d4a61a/tim1-accesses.tsv`; the pre-`1308` run gave the same).
   - DIER: `0x0`, so no TIM1 interrupt or DMA request.
-  - CCMR1/2 `0x6868` (all four channels PWM outputs); SMCR never written; BDTR `0x8000`; CR2 `0`; EGR `0x1`.
+  - CCMR1/2 `0x6868` and CCMR3 `0x01016868` (channels 1–6 outputs); SMCR never written; BDTR `0x8000` (no BKE/BK2E); CR2 `0`; EGR `0x1` (UG only: no BG, B2G, COMG or TG).
 - **Each field against the stock model and RM0433 Rev 9 pp1596–1597:**
-  - **UIF, CC1IF–CC4IF, TIF, CC5IF, CC6IF, BIF, B2IF, SBIF, COMIF:** `stock, wrong`. The stock model sets UIF/CCxIF/TIF only with their interrupt enabled, and the twin never sets the channel 5–6, break and COM flags; silicon sets each on its own event. Each row now says why ArduPilot's path is not affected, quoting the ruling.
+  - **UIF, CC1IF–CC4IF, TIF, CC5IF, CC6IF, BIF, B2IF, SBIF, COMIF:** `stock, wrong`.
+    - **The twin:** the stock model sets UIF/CCxIF/TIF only with their interrupt enabled, and never sets the channel 5–6, break and COM flags.
+    - **Silicon** sets each on its own event: a TRG event or TG (pp1597–1598); a break input with BKE/BK2E, or BG/B2G whatever those bits (p1567); a system break source (p1566); a COM event (COMG, or a TRGI edge with CCPC, pp1592, 1598); a compare.
+    - **Each row says why ArduPilot's path is not affected,** quoting the ruling.
   - **CC1OF–CC4OF:** acknowledged by name, **A10** (`TVI-WO-0100b.rm0433.md` §4, granted 17:35Z). The stock model's overcapture matches silicon's, and ArduPilot's outputs never capture.
 - **The text is generated:** it is set in `tests/1302/fields.py`, and the table is regenerated from it; no rule or behaviour changed. Re-joined on this ledger (`spike/1205/data/main-63fe557+a10/`): TIM1 is 57 guarded and 19 acknowledged, with 0 findings.
 - **CC5IF/CC6IF on silicon** (setting at a compare with CCR5/CCR6 at reset 0) is inferred from p1597, not run.
+- **The adversarial pass corrected this text:** the first version said BIF/B2IF set "only" with BKE/BK2E (false: BG/B2G, p1567) and cited SBIF's sources to the wrong page.
 
 **Guarded on a sibling's case** (the adversarial pass's "sibling instance" question): 97 of the guarded rows above the cut are on an instance whose clause-6 sweep wrote another instance of the same guard. They are `usart2` 27 and `usart3` 27 (swept on `usart1`), `i2c2` 17 (`i2c1`), `spi2` 16 (`spi1`), `gpioPortB` 9 and `gpioPortD` 1 (`gpioPortA`).
 - **Each is guarded, not merely inferred.** The run binds the guard's type at that instance (the platform listing). The rule that refuses is the same code, reading the same `Fields` table by offset, with no per-instance branch for these fields.
@@ -82,7 +86,10 @@ As amended and ratified 2026-11-26: a planted monitor write proves a path whose 
 
 **The join:** 935 rows: guarded 612, acknowledged 254, inherited 69, findings 0.
 
-**Above the cut, nothing is open:** 412 rows and armed registers guarded, 241 acknowledged.
+**Above the cut, nothing is open.**
+- **653 rows:** 412 guarded, 241 acknowledged. 86 of the acknowledged carry a `stock-wrong` field, and 105 rest only on `inherited, unaudited (acknowledged by name)` fields (§1.4).
+- **97 armed registers outside every row:** 71 guarded, 26 acknowledged.
+- **The table below sums both:** 483 guarded, 267 acknowledged.
 
 | Family | Rows + armed registers | Guarded | Acknowledged | Open |
 |---|---|---|---|---|
@@ -90,7 +97,7 @@ As amended and ratified 2026-11-26: a planted monitor write proves a path whose 
 | **PWR** | 3 + 2 | **4** | **1** | **0** |
 | every other family | as §1.1, with TIM1's 19 acknowledged | | | 0 |
 
-- **DMAMUX1** (`GuardedSTM32H7_DMAMUX`, bound at `dmamux1` in the run): C0's `CxCR` by its own sweep, and C1–C7, C10 and C11 by C0's rows and sweep. The guard judges every `CxCR` by C0's rows (`GuardedSTM32H7_DMAMUX.cs` L375), so their evidence is C0's case, as with the DMA streams.
+- **DMAMUX1** (`GuardedSTM32H7_DMAMUX`, bound at `dmamux1` in the run): C0's `CxCR` by its own sweep, and C1–C7, C10 and C11 by C0's rows and sweep. The guard judges every `CxCR` by C0's rows (`GuardedSTM32H7_DMAMUX.cs` L391), so their evidence is C0's case, as with the DMA streams.
 - **PWR:** judged against **the platform the armed run boots**, not the board's.
   - That platform is Aethelgard 4400h's Sentinel-03, as rewritten by `replay-1301.sh`: the stock `pwr` cancelled (`pwr: @none`), and `tviburiPwr: Tviburi.GuardedSTM32H7_PWR @ sysbus 0x58024800 as "pwr"` with `revision: "V"`.
   - The board itself keeps the stock stub (`1308` Q17 (a)), so `pwr` is not in `scripts/guards`.
@@ -105,8 +112,12 @@ As amended and ratified 2026-11-26: a planted monitor write proves a path whose 
 - **So clause 6 is met for all eleven guards.**
 
 **Clause 1: met on post-`1308` `main`.**
-- **Guarded:** 412 rows and armed registers above the cut. 97 of them rest on a sibling instance's sweep, plus DMAMUX1's C1–C11 on C0's. Those are guarded by type, with the evidence from a sibling's case.
-- **Acknowledged by name:** 241, `TIMx_SR` included in full.
+- **Guarded:** 412 rows and 71 armed registers above the cut. Some are guarded by type, with the evidence from a sibling's case:
+  - 97 rows on a sibling instance's sweep;
+  - 9 DMA registers on stream 0's sweep (streams 1–7, and `dma2` on `dma1`'s);
+  - 9 DMAMUX1 channel registers on C0's.
+- **Every guarded row and register has a clause-6 case.** The join now fails one with none (its fourth change). It reads `adc-fieldsmonwrite` and `i2c-isrmonwrite`, which covered six ADC registers it had listed as "NO case".
+- **Acknowledged by name:** 241 rows and 26 registers, `TIMx_SR` included in full; but see §1.4.
 
 ## 2. Clause 2: same build, byte-identical ledgers; any overlay file changes the hash
 
@@ -179,7 +190,7 @@ As amended and ratified 2026-11-26: a planted monitor write proves a path whose 
 - **Committed mutants:** `N02-fieldAllowList`, `N03-noRegister` and `F03-sweepEnable` (`fields`); `C12-allowList` (RCC); `G07-fieldRow` (GPIO); `DM17-field` (DMA); `I207-allowList` (I2C); `AD26-field` (ADC); `A01-sel5` (`allowlist`).
 - **Mutants for the sweeps that had none** (granted by the architect, 17:02Z): `TM34-fieldsSweep`, `FL42-fieldsSweep`, `US63-fieldsSweep`, `I265-isrMonwrite` and `AD48-fieldsMonwrite`. Each makes the guard's `RefusedField` return false. Each is killed by its sweep (timer, flash and USART `fields`, `i2c-isrmonwrite`, `adc-fieldsmonwrite`).
   - **Before the grant,** the same mutation as a scratch run failed all 7 sweeps (`~/.cache/tvi-1205/c6mut.log`).
-  - **CI:** this PR's run (§8).
+  - **CI:** this PR's run (`TVI-WO-1205.FEEDBACK.md` §2).
 - **The skeptic:**
   - **A sweep that counts records without matching each to its write.** `1203` matched each record to its own write in `isrmonwrite` and `fieldsmonwrite`.
   - **A sweep that writes a sibling instance only.** Each sweep writes one instance by monitor, so another instance of the same guard type rests on the shared rule (§1's join names those rows).

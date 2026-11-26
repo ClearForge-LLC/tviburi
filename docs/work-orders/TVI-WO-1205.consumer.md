@@ -11,7 +11,7 @@
 | A1 | Pin the release by sha256 in its tools image, and record the model hash and the ledger hash in its trace header and verdict | R:190, R:195; arch `RUL-09` | `tviburi-release verify <dir> <hash>`: the manifest, overlay, ledger and constant agree (FB 1200) |
 | A2 | Hash the overlay file it `include`s against the manifest, and run Renode with the compiler cache off (`compiler-cache-enabled = False`); with the cache on, a `const` reports the previous release | R:192; arch `RUL-10` (e)–(g); FB 1150 | The manifest's `source` lines; the witness's `model_version` is the release hash (`identity`) |
 | A3 | Refuse a run with no load witness, a wrong release constant, or a recorded-mode witness (`mode: "recorded"`). A check that reads only the witness passes a recorded run and an edited model | R:192; arch `RUL-10`, `RUL-19`; FB 1150 | `tviburi-check` does exactly this (`unit`: R05, R07, R12) |
-| A4 | Carry the raised memory ceiling, 1.5 GiB (Aethelgard `RUL-13`, `AET-WO-2313`) | R:156, R:44 | The budget job's medians, at about 0.94 GiB on the fixture (#63's CI) |
+| A4 | Carry the raised memory ceiling, 1.5 GiB (Aethelgard `RUL-13`, `AET-WO-2313`) | R:156, R:44 | The budget job's medians, 941,656 KiB (0.90 GiB) on the fixture (#63's CI) |
 
 ## B. Emit the platform from the class map
 
@@ -25,6 +25,7 @@
 | B6 | Map each guard's `peripherals` kind (`GuardedSTM32F7_USART`, `GuardedSTM32H7_ADC`, …) in its class map, or its untrusted-tool stop fires | FB 1305, FB 1307 | The `class` lines name each guard type |
 | B7 | Repoint every `-> dmamux1@N` line its platforms carry (`spi1 DMARecieve -> @37`, `spi2 -> @39`, and `usart1 ReceiveDmaRequest -> @41`, which it must add: the replay's `ACCEPT_USART_DMA` stands in for Aethelgard `4400i`) to the DMAMUX1 guard's variable. Since `1308`, DMAMUX1 is cancelled and restated, so a line left on `dmamux1` binds to the cancelled entry with no error (`RUL-09` (b)) | R:165; FB 1308 §6; FB 1305; FB 1303.measure | `MANIFEST` `restate Miscellaneous.STM32_DMAMUX dmamux1`; `replay-1301.sh`'s DMA lines |
 | B8 | Drop its generated platforms' own PWR script (`AET-WO-4240v` D-3 (a)): the cancel removes it, and on the guarded twin the PWR guard wins. Its foreign platforms have no PWR model of their own | R:166; FB 1308 §6 | `MANIFEST` `restate Python.PythonPeripheral pwr`; the PWR guard's witness |
+| B9 | Expect three observable changes once the RCC is restated: `sysbus.rcc`'s access-log register names (restored by `1203`'s names), the stock RCC's warnings becoming sourceless (2,403 on ArduPilot's boot), and ArduPilot's `AHB2ENR` boot value changing to silicon's | R:172; FB 1300 | The boot block's `AHB2ENR`; `lognames` |
 
 ## C. Declare the board's properties
 
@@ -35,7 +36,7 @@
 | C3 | Declare an analog level for every ADC channel a run reads (`levels: "<ch>:<volts>"`), the battery's included. Without it, the armed run logs 805,530 `TVI-ADC-LEVEL` records and Renode aborts | R:133; FB 1307; FB 1100a F4 | The refusal; no witness field (row) |
 | C4 | Declare each board's pulls and external levels from its own solved topology (`external`, e.g. `"PB6:up PB7:up"`); `ACCEPT_EXTERNAL` stands in meanwhile | R:157; FB 1301a | The GPIO witness's `external` |
 | C5 | Declare the GPIO `package`, or the unbonded-pin rule does not run | R:148; FB 1301 | The GPIO witness's `package` (`none` today) |
-| C6 | For the flash guard: emit its `pwr` override on foreign platforms (else VOS is unknown); move the option bytes to `optionBytes` (the untyped block is E29) and correct bit 26; `AETHELGARD-ERASE` reads silicon's `PSIZE`; its flash write hook hides flash writes from the access log | FB 1304 | The flash guard's refusals; no check for the hook (row) |
+| C6 | For the flash guard: move the option bytes to `optionBytes` (the untyped block is E29), and correct bit 26; `AETHELGARD-ERASE` reads silicon's `PSIZE`; its flash write hook hides flash writes from the access log. `1304`'s "emit its `pwr` override on foreign platforms" is superseded since `1308`: the restated PWR guard answers VOS (B8) | FB 1304; FB 1308 §6 | The flash guard's refusals; no check for the hook (row) |
 
 ## D. Run Renode, read the records
 
@@ -61,12 +62,14 @@
 
 ## F. Update its own prose and expectations
 
-| # | The consumer must | Source |
-|---|---|---|
-| F1 | Drop "the twin never signals NACK" (`docs/architecture.md`, `cli/analog.rs`, `cli/README.md`, `aethelgard-svd-hal`, its ledger's I2C rows). ArduPilot runs about 0.46 s ahead on the guarded twin, and a faulted `sentinel-03` gives `i2c_timeout` where `1306` refused | R:131; FB 1306a |
-| F2 | Replace its ledger rows that say the twin "logs the write as an unhandled tag" | FB 1307 |
-| F3 | Know its switchable pull-down is open: a disabled output floats, Tviburi shows it low, and neither sees fitment | R:78 |
-| F4 | Correct its pin data where it comes from ST's open pin data: `DSIHOST_TE` (from ST's shared H747 file) and `SPDIFRX1_INn` are wrong there; no committed board uses either | R:150; FB 1301 |
+| # | The consumer must | Source | How it checks |
+|---|---|---|---|
+| F1 | Drop "the twin never signals NACK" (`docs/architecture.md`, `cli/analog.rs`, `cli/README.md`, `aethelgard-svd-hal`, its ledger's I2C rows). ArduPilot runs about 0.46 s ahead on the guarded twin, and a faulted `sentinel-03` gives `i2c_timeout` where `1306` refused | R:131; FB 1306a | No check (its own text) |
+| F2 | Replace its ledger rows that say the twin "logs the write as an unhandled tag" | FB 1307 | No check (its own text) |
+| F3 | Know its switchable pull-down is open: a disabled output floats, Tviburi shows it low, and neither sees fitment | R:78 | No check (its own text) |
+| F4 | Correct its pin data where it comes from ST's open pin data: `DSIHOST_TE` (from ST's shared H747 file) and `SPDIFRX1_INn` are wrong there; no committed board uses either | R:150; FB 1301 | No check (its own text) |
+| F5 | Update its ledger rows that call `TIMINGR`, `DNF` and `ANFOFF` "not stored (measured)" (`ledger.rs`:1133–1191) and `boot.rs`:1043's `unobservable` entry: the I2C guard stores and serves them | FB 1306 §4 | No check (its own text) |
+| F6 | Expect the I2C owned instance's WARNING and INFO lines ("Unhandled write …", "Slave address …") to lose their source name; none is parsed today | FB 1306 §4 | No check (row) |
 
 ## G. Carried over, not Phase 2 gate items
 
