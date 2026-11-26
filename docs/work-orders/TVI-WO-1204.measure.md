@@ -15,7 +15,7 @@
    - **Disposing a machine disposes every peripheral.** Each guard's `Dispose` calls `Records.End()` (`model/Refusal.cs` L103–108), which logs its `end` record through `owner.Log(Info, …)`.
 4. **With asynchronous logging, `Logger.Log` only enqueues** (`Logger.cs` L594–606: `entries.Add(entry)`). A background thread takes entries and writes them (L734–777).
    - Asynchronous logging is Renode's default: `use-synchronous-logging` defaults to `false` (L823). Tviburi's runner and tests run Renode with no `--config`, so they use it.
-5. **`ActualLogger.Dispose`** (L527–534) calls `StopLoggingThread` (L836–851: `stopThread = true; cancellationToken.Cancel(); loggingThread.Join()`).
+5. **`ActualLogger.Dispose`** (L527–534) calls `StopLoggingThread` (L861–876: `stopThread = true; cancellationToken.Cancel(); loggingThread.Join()`).
    - The thread's `entries.Take(cancellationToken.Token)` throws on cancel, and the loop breaks (L739–747) **with the queue undrained**.
    - Nothing flushes that logger again: step 1's `Logger.Dispose()` → `Flush()` flushes `CurrentEmulation`'s logger, which by then is the *new*, empty emulation's (L399–406).
 
