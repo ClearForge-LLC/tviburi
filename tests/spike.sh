@@ -15,7 +15,7 @@
 set -euo pipefail
 
 IMAGE=ghcr.io/clearforge-llc/aethelgard-tools@sha256:1e0ab105ec42bdba66b773464f0b6679d622e4afdafef30ec4931e4326f49c63
-ACCEPTANCE="unit modf modeled ardupilot generated field stable cfg2first iolock rmw forge stock-forge stock-modf nomark conditions fields load crash identity verify reproducible recorded allowlist"
+ACCEPTANCE="unit modf modeled ardupilot generated field stable cfg2first iolock rmw forge stock-forge stock-modf nomark conditions fields load crash identity verify reproducible manifest recorded allowlist"
 ADVERSARIAL="adv-removed adv-extra-arg adv-bad-variant adv-hook adv-loglevel adv-spray adv-noend adv-version adv-recorded adv-noname adv-release adv-cache"
 # TVI-WO-1300: the RCC guard's cases live in tests/1300/rcc.sh; each is a test here, rcc-<case>, run as part of the
 # acceptance group, so CI and tests/mutants.sh reach them.
@@ -458,6 +458,64 @@ t_verify() {
      && grep -q 'FAIL Tviburi.cs is not' '$work/verify/B.txt' && grep -q 'FAIL Tviburi.cs is not' '$work/verify/C.txt' \
      && grep -q 'FAIL MANIFEST sha256' '$work/verify/E.txt' && grep -q 'FAIL Tviburi.cs is not' '$work/verify/E2.txt' && grep -q 'FAIL Tviburi.cs' '$work/verify/D.txt' \
      && grep -qx F=1 '$work/verify.stdout' && grep -q \"FAIL LEDGER.jsonl's rows are not the manifest's\" '$work/verify/F.txt'"
+}
+
+t_manifest() { # TVI-WO-1203 (1): the MANIFEST restates onto a guard only an instance a committed replay has run under that guard
+  pod manifest "$src" -- sh -c '/repo/scripts/build-release >/dev/null'
+  # Re-derived here, not taken from the release program: each `restate T i` line's class guard G must be declared `as "i"` (or
+  # by variable) on a top-level, uncommented `<var>: G @` entry of a model/stm32h7-*-restate.repl.
+  check "the release builds; each instance it restates is declared under its class's guard by a committed model/stm32h7-*-restate.repl; the timers restate only timer1 and timer8, SPI restates none and retypes the consumer's spi1 and spi2" \
+    "[ \$rc = 0 ] && python3 -I - '$work/manifest/release/MANIFEST' '$src' <<'EOF'
+import glob, re, sys
+m = open(sys.argv[1]).read().splitlines()
+guard, restates, retypes = {}, [], []
+for l in m:
+    f = l.split(' ')
+    if f[0] == 'class': guard[f[1]] = f[2]
+    elif f[0] == 'restate': restates.append((f[1], f[2]))
+    elif f[0] == 'retype': retypes.append((f[1], f[2]))
+declared = set()
+for p in glob.glob(sys.argv[2] + '/model/stm32h7-*-restate.repl'):
+    for e in re.finditer(r'^(\w+): (Tviburi\.\w+) @ (?:[^\n]*? as \"(\w+)\"|\{\n(?:[ \t][^\n]*\n)*?[ \t]*\} as \"(\w+)\")', open(p).read(), re.M):
+        declared.add((e.group(2), e.group(3) or e.group(4) or e.group(1)))
+bad = [r for r in restates if (guard[r[0]], r[1]) not in declared]
+timers = sorted(i for t, i in restates if t == 'Timers.STM32_Timer')
+print('manifest:', len(restates), 'restated,', len(retypes), 'retyped; not run guarded:', bad)
+sys.exit(0 if not bad and restates and timers == ['timer1', 'timer8'] and not [r for r in restates if r[0] == 'SPI.STM32H7_SPI']
+         and retypes == [('SPI.STM32H7_SPI', 'spi1'), ('SPI.STM32H7_SPI', 'spi2')] else 1)
+EOF"
+  # Planted: timer5 named, which no restatement runs guarded; then the same with a commented-out restatement for it.
+  fixture manifest-timer5 tools/tviburi-release/pins.tsv $'Tviburi.GuardedSTM32_Timer\ttimer1 timer8' $'Tviburi.GuardedSTM32_Timer\ttimer1 timer5 timer8'
+  pod manifest-timer5 "$work/manifest-timer5.tree" -- sh -c '/repo/scripts/build-release'
+  check "planted: the class row names timer5, which no committed restatement runs guarded: the release refuses, naming it" \
+    "[ \$rc != 0 ] && grep -q 'restates timer5, which no committed restatement' '$work/manifest-timer5.stdout'"
+  fixture manifest-commented tools/tviburi-release/pins.tsv $'Tviburi.GuardedSTM32_Timer\ttimer1 timer8' $'Tviburi.GuardedSTM32_Timer\ttimer1 timer5 timer8'
+  printf '\n// tviburiTimer5: Tviburi.GuardedSTM32_Timer @ {\n//         sysbus 0x40000C00;\n//     } as "timer5"\n' >>"$work/manifest-commented.tree/model/stm32h7-timer-restate.repl"
+  pod manifest-commented "$work/manifest-commented.tree" -- sh -c '/repo/scripts/build-release'
+  check "planted: a commented-out restatement of timer5 does not qualify it: the release still refuses, naming it" \
+    "[ \$rc != 0 ] && grep -q 'restates timer5, which no committed restatement' '$work/manifest-commented.stdout'"
+  # A restatement qualifies only because the replay loads it: every one must be named in the committed replay.
+  check "every model/stm32h7-*-restate.repl is loaded by the committed replay, tests/1301/replay-1301.sh" \
+    '( for f in "$src"/model/stm32h7-*-restate.repl; do grep -qF "/repo/model/${f##*/}" "$src/tests/1301/replay-1301.sh" || exit 1; done )'
+  # SPI's instances are the consumer's (TVI-WO-1203 (1)): each `retype T i` qualifies when the consumer's committed platform
+  # (the ArduPilot fixture CI boots) declares `i: T @ {`, and the replay's own re-typing (its `sed -i 's/^…/…/'` lines,
+  # applied here to that platform) turns it into `i: G @ {`, G the class's guard.
+  check "each retyped instance is declared by the consumer's committed fixture platform and re-typed onto its guard by the replay's own rule" \
+    "python3 -I - '$work/manifest/release/MANIFEST' $src/tests/1301/fixtures/aet-1c32c8ea-ardupilot/varlib/*/tool/platform-booted.repl '$src/tests/1301/replay-1301.sh' <<'EOF'
+import re, sys
+m = [l.split(' ') for l in open(sys.argv[1]).read().splitlines()]
+guard = {f[1]: f[2] for f in m if f[0] == 'class'}
+retypes = [(f[1], f[2]) for f in m if f[0] == 'retype']
+plat = open(sys.argv[2]).read().splitlines()
+seds = re.findall(r\"sed -i 's/(\\^[^/]*)/([^/]*)/' \", open(sys.argv[3]).read())
+py = lambda e: e.replace('\\\\(', '(').replace('\\\\)', ')')
+out = plat
+for a, b in seds:
+    out = [re.sub(py(a), b.replace('\\\\1', r'\\g<1>'), l) for l in out]
+ok = bool(retypes) and all(('%s: %s @ {' % (i, t)) in plat and ('%s: %s @ {' % (i, guard[t])) in out for t, i in retypes)
+print('retypes', retypes, 'replay re-typing rules', len(seds), 'ok', ok)
+sys.exit(0 if ok else 1)
+EOF"
 }
 
 t_reproducible() {

@@ -34,7 +34,7 @@ mod tar;
 use json::Value;
 use ledger::{n, s, Row};
 use overlay::Source;
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 use std::fs;
 use std::path::Path;
 use std::process::ExitCode;
@@ -53,7 +53,8 @@ struct Pins {
     stock: Vec<stock::Pin>,
     /// (stock type, guard type)
     classes: Vec<(String, String)>,
-    /// A class row's fourth column, when it has one: the stock instances its guard restates, by name (TVI-WO-1303 Q9 (c)).
+    /// A class row's fourth column: the instances its guard takes over, by name (TVI-WO-1303 Q9 (c); required on every
+    /// class row since TVI-WO-1203 (1), so no guard is ever restated onto an instance by default).
     instances: BTreeMap<String, Vec<String>>,
 }
 
@@ -88,6 +89,9 @@ fn pins(repo: &Path) -> Result<Pins, String> {
                 p.stock.push(stock::Pin { sha256: f[1].into(), path: f[2].into() })
             }
             "class" => {
+                if f.len() != 4 {
+                    return Err(format!("{path}: the class row for {} names no instances: every class row names those its guard takes over (TVI-WO-1203)", f[2]));
+                }
                 if p.classes.iter().any(|c| c.0 == f[1] || c.1 == f[2]) {
                     return Err(format!("{path}: the class map names {} or {} twice", f[1], f[2]));
                 }
@@ -259,17 +263,56 @@ fn stock_rows(chain: &stock::Chain, pins: &Pins) -> Vec<Row> {
     rows
 }
 
-/// The stock instances a class row's guard restates: every one the pinned chain declares with its stock type, or, when the
-/// row names its instances, those, each of which the chain must declare with that type.
-fn restated<'a>(declared: &'a [(String, String, String)], stock_ty: &str, named: Option<&Vec<String>>) -> Result<Vec<(&'a str, &'a str)>, String> {
-    let all: Vec<(&str, &str)> = declared.iter().filter(|d| d.0 == stock_ty).map(|d| (d.1.as_str(), d.2.as_str())).collect();
-    let Some(names) = named else { return Ok(all) };
+/// What a class row's guard takes over (TVI-WO-1203 (1)), from the instances the row names:
+/// - `restate`: each named instance the pinned stock chain declares with the row's stock type, in the chain's order, with its
+///   file. The consumer cancels the stock entry and restates it onto the guard (RUL-09 (b)).
+/// - `retype`: each named instance the chain does not declare at all, in the row's order. The consumer declares it itself and
+///   changes its type (RUL-09 (b)'s other case); `tests/spike.sh manifest` checks each against the consumer's committed
+///   platform and the replay that re-types it.
+/// A name the chain declares with another stock type refuses.
+fn restated<'a>(declared: &'a [(String, String, String)], stock_ty: &str, names: &'a [String]) -> Result<(Vec<(&'a str, &'a str)>, Vec<&'a str>), String> {
     for n in names {
-        if !all.iter().any(|(i, _)| i == n) {
-            return Err(format!("the class row for {stock_ty} names {n}, which the pinned stock chain does not declare as {stock_ty}"));
+        if let Some(d) = declared.iter().find(|d| &d.1 == n && d.0 != stock_ty) {
+            return Err(format!("the class row for {stock_ty} names {n}, which the pinned stock chain declares as {}", d.0));
         }
     }
-    Ok(all.into_iter().filter(|(i, _)| names.iter().any(|n| n == i)).collect())
+    let restates = declared.iter().filter(|d| d.0 == stock_ty && names.contains(&d.1)).map(|d| (d.1.as_str(), d.2.as_str())).collect();
+    let retypes = names.iter().filter(|n| !declared.iter().any(|d| &d.1 == *n)).map(String::as_str).collect();
+    Ok((restates, retypes))
+}
+
+/// Every (guard type, instance) that a committed restatement runs guarded (TVI-WO-1203 (1)): the files
+/// `model/stm32h7-*-restate.repl`, which every replay loads (tests/1301/replay-1301.sh; `tests/spike.sh manifest` checks
+/// that it loads each). An entry is a top-level line `<var>: Tviburi.<Type> @ …`, named by its `as "<name>"`, on that line or on
+/// the `}` line that closes it, else by `<var>`. Comment lines (`//`) are never entries, so a commented-out restatement does
+/// not qualify an instance.
+fn declared_guarded(files: &[Source]) -> Result<BTreeSet<(String, String)>, String> {
+    let mut out = BTreeSet::new();
+    for f in files.iter().filter(|f| f.path.starts_with("model/stm32h7-") && f.path.ends_with("-restate.repl")) {
+        let lines: Vec<&str> = overlay::text(f)?.lines().collect();
+        for (i, l) in lines.iter().enumerate() {
+            if l.starts_with(char::is_whitespace) || l.starts_with("//") {
+                continue;
+            }
+            let Some((var, rest)) = l.split_once(": ") else { continue };
+            let Some(ty) = rest.strip_suffix(" @ {").or_else(|| rest.split_once(" @ ").map(|x| x.0)) else { continue };
+            if !ty.starts_with("Tviburi.") || var.is_empty() || !var.bytes().all(|b| b.is_ascii_alphanumeric() || b == b'_') {
+                continue;
+            }
+            let quoted = |t: &str| t.split_once(" as \"").and_then(|x| x.1.split_once('"')).map(|x| x.0.to_string());
+            let mut name = quoted(l);
+            for m in &lines[i + 1..] {
+                if name.is_some() || !(m.starts_with(char::is_whitespace) || m.starts_with('}')) {
+                    break;
+                }
+                if m.trim_start().starts_with('}') {
+                    name = quoted(m);
+                }
+            }
+            out.insert((ty.to_string(), name.unwrap_or_else(|| var.to_string())));
+        }
+    }
+    Ok(out)
 }
 
 /// Every instance a model row with `guarded_by` lists is one the manifest restates for that stock type (ruled
@@ -325,6 +368,8 @@ fn build(repo: &Path, renode: &Path, out: &Path) -> Result<(String, String), Str
     overlay::check_template(&template)?;
     let body = overlay::body(&models)?;
 
+    // What the committed restatements run guarded, read before the model files become sources (TVI-WO-1203 (1)).
+    let guarded = declared_guarded(&model_files)?;
     // The class map: each guard declared in exactly one model file, with a table the ledger can read.
     let mut rows = Vec::new();
     for (_, guard) in &pins.classes {
@@ -363,8 +408,17 @@ fn build(repo: &Path, renode: &Path, out: &Path) -> Result<(String, String), Str
     }
     for (stock_ty, guard) in &pins.classes {
         m += &format!("class {stock_ty} {guard}\n");
-        for (inst, file) in restated(&chain.declared, stock_ty, pins.instances.get(guard))? {
+        let names = pins.instances.get(guard).ok_or(format!("the class row for {guard} names no instances"))?;
+        let (restates, retypes) = restated(&chain.declared, stock_ty, names)?;
+        for (inst, file) in restates {
+            // TVI-WO-1203 (1): restated onto a guard only where a committed restatement runs it under that guard.
+            if !guarded.contains(&(guard.clone(), inst.to_string())) {
+                return Err(format!("the class row for {guard} restates {inst}, which no committed restatement (model/stm32h7-*-restate.repl) runs under {guard}"));
+            }
             m += &format!("restate {stock_ty} {inst} {file}\n");
+        }
+        for inst in retypes {
+            m += &format!("retype {stock_ty} {inst}\n");
         }
     }
     for src in &sources {
@@ -687,11 +741,36 @@ mod tests {
     fn a_class_row_naming_its_instances_restates_only_those() {
         let d = |t: &str, i: &str| (t.to_string(), i.to_string(), "platforms/cpus/stm32h7.repl".to_string());
         let declared = vec![d("DMA.STM32DMA", "dma2"), d("DMA.STM32DMA", "dma1"), d("Timers.STM32_Timer", "timer1")];
-        let all = restated(&declared, "DMA.STM32DMA", None).unwrap();
-        assert_eq!(all.iter().map(|x| x.0).collect::<Vec<_>>(), ["dma2", "dma1"]);
-        let one = restated(&declared, "DMA.STM32DMA", Some(&vec!["dma1".to_string()])).unwrap();
-        assert_eq!(one.iter().map(|x| x.0).collect::<Vec<_>>(), ["dma1"]);
-        assert!(restated(&declared, "DMA.STM32DMA", Some(&vec!["timer1".to_string()])).unwrap_err().contains("does not declare"));
+        let names = |v: &[&str]| v.iter().map(|x| x.to_string()).collect::<Vec<_>>();
+        let both = names(&["dma1", "dma2"]);
+        let (r, t) = restated(&declared, "DMA.STM32DMA", &both).unwrap();
+        assert_eq!((r.iter().map(|x| x.0).collect::<Vec<_>>(), t), (vec!["dma2", "dma1"], vec![]));
+        let one = names(&["dma1"]);
+        assert_eq!(restated(&declared, "DMA.STM32DMA", &one).unwrap().0.iter().map(|x| x.0).collect::<Vec<_>>(), ["dma1"]);
+        // A name the chain does not declare is the consumer's own instance: retyped, never restated.
+        let consumer = names(&["spi1", "dma1"]);
+        let (r, t) = restated(&declared, "DMA.STM32DMA", &consumer).unwrap();
+        assert_eq!((r.len(), t), (1, vec!["spi1"]));
+        let other = names(&["timer1"]);
+        assert!(restated(&declared, "DMA.STM32DMA", &other).unwrap_err().contains("declares as Timers.STM32_Timer"));
+    }
+
+    #[test]
+    fn a_committed_restatement_is_read_by_its_as_name_and_a_comment_or_another_file_never_qualifies() {
+        let f = |path: &str, text: &str| Source { path: path.into(), bytes: text.as_bytes().to_vec() };
+        let files = vec![
+            f("model/stm32h7-timer-restate.repl", "timer1: @none\ntviburiTimer1: Tviburi.GuardedSTM32_Timer @ {\n        sysbus 0x40010000;\n    } as \"timer1\"\n\n// tviburiTimer5: Tviburi.GuardedSTM32_Timer @ {\n//    } as \"timer5\"\n"),
+            f("model/stm32h7-rcc-restate.repl", "tviburiRcc: Tviburi.GuardedSTM32H7_RCC @ sysbus 0x58024400 as \"rcc\"\nadc3: @ {\n    tviburiRcc RegistrationPeripheralAlias.ADC3\n}\n"),
+            f("model/tviburi-nucleo-h753zi.repl", "spi4: Tviburi.GuardedSTM32H7_SPI @ {\n    sysbus 0x40013400\n}\n"),
+            f("model/stm32h7-x-restate.repl", "tviburiSpi2: Tviburi.GuardedSTM32H7_SPI @ {\n    sysbus 0x40003800\n}\n"),
+        ];
+        let g = declared_guarded(&files).unwrap();
+        let has = |t: &str, i: &str| g.contains(&(t.to_string(), i.to_string()));
+        assert!(has("Tviburi.GuardedSTM32_Timer", "timer1") && has("Tviburi.GuardedSTM32H7_RCC", "rcc"));
+        assert!(has("Tviburi.GuardedSTM32H7_SPI", "tviburiSpi2"), "no `as`: named by its variable");
+        assert!(!has("Tviburi.GuardedSTM32_Timer", "timer5"), "a commented-out restatement");
+        assert!(!has("Tviburi.GuardedSTM32H7_SPI", "spi4"), "a platform that is not a restatement");
+        assert_eq!(g.len(), 3);
     }
 
     #[test]
