@@ -1,14 +1,15 @@
 #!/bin/bash
 # tests/1204/teardown.sh — TVI-WO-1204 (2): N clean quits of the runner's own run.resc (scripts/tviburi-spike's, variant
 # "modeled") under load, each required to write every guard's end record. Runs INSIDE the pinned image, the tree at /repo and an
-# empty /out. LOAD busy loops run beside the quits (default 3 x nproc). Renode runs
+# empty /out. LOAD busy loops run beside the quits (default 12, the load measured in the FEEDBACK). Renode runs
 # with no --config, as the runner does: asynchronous logging, Renode's default, the configuration the race needs (TVI-WO-1204
 # measure §1). Writes /out/teardown.tsv (run, renode exit, end records, witnesses, load). Exit 0 only if the runner's run passes
 # and every later run exits 0 and writes, in its log file and on its console, one witness and one end record for each guard.
 set -u
-N=${N:-15}; LOAD=${LOAD:-$((3 * $(nproc)))}
+N=${N:-15}; LOAD=${LOAD:-12}
 # The runner's own run (unloaded) builds the firmware, the check and the release, and leaves its run.resc in /out: quit 1 of N.
-/repo/scripts/tviburi-spike modeled >/out/runner.txt 2>&1
+/repo/scripts/tviburi-spike modeled >/tmp/runner.txt 2>&1   # not in /out: the runner needs it empty
+cp /tmp/runner.txt /out/runner.txt
 grep -q '^VERDICT PASS' /out/runner.txt || first=1
 guards=$(/repo/scripts/guards | wc -w)
 for k in $(seq "$LOAD"); do ( while :; do :; done ) & done
