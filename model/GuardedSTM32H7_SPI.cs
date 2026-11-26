@@ -357,9 +357,11 @@ namespace Antmicro.Renode.Peripherals.Tviburi
             return true;
         }
 
-        // The write rules after TVI-SPI-ORDER, in order: true if the write was refused.
+        // The write rules after TVI-SPI-ORDER, in order: true if the write was refused. Enforcing, the first that fires; recorded, every
+        // one (model/Refusal.cs).
         private bool RefusedWrite(long offset, uint value)
         {
+            var fired = false;
             switch(offset)
             {
             case Cfg2Offset:
@@ -374,15 +376,15 @@ namespace Antmicro.Renode.Peripherals.Tviburi
                             : "CFG2 written after IOLOCK was written, where the twin cannot say whether silicon holds the lock: the write that set it also enabled the SPI, or a mode fault was possible (an active MODF blocks IOLOCK), or SPE has since gone from 1 to 0, which clears IOLOCK on silicon and is not modeled",
                         "RM0433 Rev 9 §50.11.1 p2215 (CR1.IOLOCK), p2217 (SPE); §50.11.4 p2221 (CFG2 write protection); §50.11.6 p2225 (MODF)",
                         State(), offset, value, 32);
-                    return true;
+                    fired = true;
                 }
-                if((cr1 & Cr1Spe) != 0 && value != cfg2)
+                if(records.Evaluates(fired) && (cr1 & Cr1Spe) != 0 && value != cfg2)
                 {
                     records.Refuse("TVI-SPI-CFG2-SPE", PredictedFault, "SPI_CFG2", "CR1.SPE (bit 0) = 1",
                         "CFG2 written while the SPI is enabled: silicon write-protects CFG2 when SPE=1 and keeps the old value; the guard's copy would take it",
                         "RM0433 Rev 9 §50.11.1 p2217 (SPE); §50.11.4 p2221 (CFG2 write protection)",
                         State(), offset, value, 32);
-                    return true;
+                    fired = true;
                 }
                 break;
             case Cfg1Offset:
@@ -395,7 +397,7 @@ namespace Antmicro.Renode.Peripherals.Tviburi
                             : "CFG1's TXDMAEN or RXDMAEN changed while the SPI is enabled: silicon takes them, but the stock model drops the whole CFG1 write while SPE=1 (STM32H7_SPI.cs L329)",
                         "RM0433 Rev 9 §50.11.1 p2217 (SPE); §50.11.3 p2218 (CFG1 write protection)",
                         State(), offset, value, 32);
-                    return true;
+                    fired = true;
                 }
                 break;
             case I2sCfgrOffset:
@@ -405,25 +407,20 @@ namespace Antmicro.Renode.Peripherals.Tviburi
                         "I2S/PCM mode selected: the guard models SPI mode only, where I2SMOD must be kept at 0",
                         "RM0433 Rev 9 §50.11.14 p2230 (\"kept at 0 in SPI mode\"), p2232 (I2SMOD, bit 0); §50.4.9 p2171 step 2(f)",
                         State(), offset, value, 32);
-                    return true;
+                    fired = true;
                 }
                 break;
             }
-            if(RefusedField(offset, value))
+            fired |= records.Evaluates(fired) && RefusedField(offset, value);
+            if(!records.Evaluates(fired) || offset != Cr1Offset || (value & Cr1Spe) == 0)
             {
-                return true;
+                return fired;
             }
-            if(offset != Cr1Offset || (value & Cr1Spe) == 0)
-            {
-                return false;
-            }
-            if(!EnablePasses(value))
-            {
-                return true;
-            }
+            fired |= !EnablePasses(value);
             // A start: SPE rising, or CSTART rising with SPE (TVI-WO-1300a (2); CSTART with SPE = 0 is TVI-SPI-ORDER's).
             var starts = (cr1 & Cr1Spe) == 0 || ((value & Cr1Cstart) != 0 && (base.ReadDoubleWord(Cr1Offset) & Cr1Cstart) == 0);
-            return starts && RefusedKernel(value);
+            fired |= records.Evaluates(fired) && starts && RefusedKernel(value);
+            return fired;
         }
 
         // TVI-SPI-ENABLE (TVI-WO-1300a (1)): any access while the RCC guard's copy of this SPI's bus-clock enable is 0.
@@ -529,6 +526,7 @@ namespace Antmicro.Renode.Peripherals.Tviburi
         // At a CR1 write with SPE=1: DSIZE, then TVI-SPI-MODF (the current state, MASTER known, the history).
         private bool EnablePasses(uint newCr1)
         {
+            var passes = true;   // recorded, the frame size and the truth table are both evaluated (model/Refusal.cs)
             var dsize = cfg1 & Cfg1Dsize;
             if(dsize != DsizeModeled)
             {
@@ -536,7 +534,11 @@ namespace Antmicro.Renode.Peripherals.Tviburi
                     "CR1.SPE set with a frame size other than 8 bits: 00000 is acknowledged only at rest (written while disabled, as ArduPilot's spi_lld_stop does), and the stock model's other frame sizes are not acknowledged",
                     "RM0433 Rev 9 §50.11.3 p2220 (DSIZE); allow-list row SPI_CFG1.DSIZE (TVI-WO-0100b.rm0433.md §2, §4 A6)",
                     State(), Cr1Offset, newCr1, 32);
-                return false;
+                if(!records.Evaluates(true))
+                {
+                    return false;
+                }
+                passes = false;
             }
             // MASTER unknown first: if a mode fault cleared MASTER, no branch of the truth table applies.
             var failure = masterUnknown ? new Branch(Unmodeled, "CFG2.MASTER unknown: IFCR.MODFC written after a master state other than the passing one, and CFG2 not written since",
@@ -551,7 +553,7 @@ namespace Antmicro.Renode.Peripherals.Tviburi
             }
             if(failure == null)
             {
-                return true;
+                return passes;
             }
             records.Refuse(Modf, failure.Kind, "SPI_CR1 / SPI_CFG2", failure.Bit, failure.Condition, failure.Citation,
                 State(), Cr1Offset, newCr1, 32);

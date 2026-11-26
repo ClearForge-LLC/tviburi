@@ -729,6 +729,13 @@ t_recorded() {
   check "recorded: refused accesses go on (CFG2's copy reads 0x02000000; the refused SR read is the stock value); every rule per access: the 32-bit TXDR write (8-bit frames) records TVI-SPI-WIDTH and TVI-SPI-ORDER" \
     "[ \"\$(grep -A1 -x READ-CFG2 <<<\"\$console\" | tail -n1)\" = 0x02000000 ] && grep -A1 -x READ-SR <<<\"\$console\" | tail -n1 | grep -qv '^0x00000000\$' \
      && spi1_records recorded-monitor '[(r[\"tviburi\"], r.get(\"rule\"), r.get(\"access\", {}).get(\"offset\")) for r in recs] == [(\"witness\", None, None), (\"would-refuse\", \"TVI-SPI-FIELD\", \"0xC\"), (\"would-refuse\", \"TVI-SPI-WIDTH\", \"0x20\"), (\"would-refuse\", \"TVI-SPI-ORDER\", \"0x20\"), (\"would-refuse\", \"TVI-SPI-ORDER\", \"0x0\"), (\"would-refuse\", \"TVI-SPI-READ\", \"0x14\"), (\"end\", None, None)]'"
+  # Every rule inside the write chain too (model/Refusal.cs; TVI-WO-1204 adversarial pass): SPE set on the reset SPI, a slave with
+  # SPI123SEL on pll1_q_ck and PLL1 off, breaks the enable's truth table (TVI-SPI-MODF) and has no kernel clock (TVI-SPI-KERNEL).
+  printf '%s\n' 'include @/repo/scripts/prelude.resc' 'sysbus WriteDoubleWord 0x580244F0 0x1000' 'sysbus WriteDoubleWord 0x40013000 0x1' 'echo "TVIBURI-END"' 'quit' \
+    >"$work/recorded-write.resc"
+  renode_in recorded-write "$work/recorded.tree" /cases/r.resc -v "$work/recorded-write.resc:/cases/r.resc:ro,Z"
+  check "recorded: SPE set on the reset SPI (a slave; no kernel clock) records TVI-SPI-MODF and TVI-SPI-KERNEL, both at that CR1 write" \
+    "spi1_records recorded-write '[(r[\"tviburi\"], r.get(\"rule\"), r.get(\"access\", {}).get(\"offset\")) for r in recs] == [(\"witness\", None, None), (\"would-refuse\", \"TVI-SPI-MODF\", \"0x0\"), (\"would-refuse\", \"TVI-SPI-KERNEL\", \"0x0\"), (\"end\", None, None)]'"
 }
 
 # --- Adversarial (WO §5): a refusal or a missing witness that still passes; a firmware-written
