@@ -15,7 +15,7 @@
 set -euo pipefail
 
 IMAGE=ghcr.io/clearforge-llc/aethelgard-tools@sha256:1e0ab105ec42bdba66b773464f0b6679d622e4afdafef30ec4931e4326f49c63
-ACCEPTANCE="unit modf modeled ardupilot generated field stable cfg2first iolock rmw forge stock-forge stock-modf nomark conditions fields load crash identity verify reproducible recorded allowlist"
+ACCEPTANCE="unit modf modeled ardupilot generated field stable cfg2first iolock rmw forge stock-forge stock-modf modf-page removed-console crash-console crash-runner nomark conditions fields load crash identity verify reproducible manifest lognames recorded allowlist"
 ADVERSARIAL="adv-removed adv-extra-arg adv-bad-variant adv-hook adv-loglevel adv-spray adv-noend adv-version adv-recorded adv-noname adv-release adv-cache"
 # TVI-WO-1300: the RCC guard's cases live in tests/1300/rcc.sh; each is a test here, rcc-<case>, run as part of the
 # acceptance group, so CI and tests/mutants.sh reach them.
@@ -237,6 +237,102 @@ t_stock-modf() {
   [ -d "$work/stock.tree" ] || fixture stock model/tviburi-nucleo-h753zi.repl "$guarded_spi1" "$stock_spi1"
   run stock-modf modf "$work/stock.tree"
   check "unguarded stock model at SPI1 does not PASS the MODF firmware (1)" '[ $rc -eq 1 ]'
+  # Gate clause 4's stock half, by what it claims (TVI-WO-1203 (3)): stock Renode runs the MODF firmware past the faulting
+  # write to its end (the after-the-last-write marker, Renode exit 0), and the run fails only because no guard witnessed it.
+  check "stock Renode passes the MODF path: its two writes are the MODF firmware's (CFG2 = MASTER|SSM, then CR1 = SPE with SSI = 0, p2184's trigger), the firmware reaches its end marker 0xAF7E0002 with Renode exit 0, and the run's only problems are spi1's missing witness and end (gate clause 4)" \
+    "grep -qx 'VERDICT FAIL (check exit 1, renode exit 0, after-marker=0xAF7E0002)' '$work/stock-modf.stdout' \
+     && [ \"\$(grep '^PROBLEM' '$work/stock-modf.stdout' | cut -d: -f1-2 | paste -sd'|')\" = 'PROBLEM spi1: no load witness|PROBLEM spi1: no end record' ] \
+     && [ \"\$(grep -a 'spi1: \[cpu: [^]]*\] Write' '$work/stock-modf/renode-log.txt' | sed 's/.*Write[A-Za-z0-9]* to \(0x[0-9A-F]*\) .*value \(0x[0-9A-F]*\)\$/\1=\2/' | paste -sd' ')\" = '0xC=0x4400000 0x0=0x1' ]"
+}
+
+t_modf-page() {
+  # Gate clause 4's page match, by a test (TVI-WO-1203 (3)): the MODF refusal's claims, each against the held RM0433 Rev 9 text's
+  # own lines on p2184 (tests/1203/rm0433-rev9-p2184.txt, regenerated and compared with the held text by
+  # tests/1203/rm0433-p2184.sh): its section, its trigger, and the three effects its condition names.
+  run modf-page modf
+  check "the MODF refusal's citation, trigger and three effects each match RM0433 Rev 9 p2184's own text, its section heading and the page's footer (gate clause 4)" \
+    "[ \$rc -eq 3 ] && python3 -I - '$work/modf-page.stdout' '$src/tests/1203/rm0433-rev9-p2184.txt' <<'EOF'
+import json, re, sys
+r = [json.loads(l[8:]) for l in open(sys.argv[1]) if l.startswith('REFUSAL ')][0]
+lines = [l for l in open(sys.argv[2], encoding='utf-8').read().splitlines() if not l.startswith('#')]
+page = ' '.join(' '.join(lines).split())
+pairs = [(r['citation'], 'RM0433 Rev 9 §50.5.2 p2184', page, '50.5.2 SPI error flags'),
+         (r['bit'], 'CR1.SSI (bit 12) = 0', page, 'SSI bit in slave select software mode) pulled low'),
+         (r['condition'], 'SSM=1, SSI=0', page, 'Mode fault occurs when the master device'),
+         (r['condition'], 'sets SR.MODF', page, 'The MODF bit is set'),
+         (r['condition'], 'forces CR1.SPE to 0', page, 'The SPE bit is forced to zero'),
+         (r['condition'], 'clears CFG2.MASTER', page, 'The MASTER bit is cleared')]
+bad = [(c, p) for rec, c, pg, p in pairs if c not in rec or p not in pg]
+foot = re.fullmatch(r'\s*2184/3329\s+RM0433 Rev 9\s*', lines[-1])
+print('modf-page:', r['rule'], r['kind'], 'unmatched', bad, 'footer', bool(foot))
+sys.exit(0 if r['rule'] == 'TVI-SPI-MODF' and r['kind'] == 'predicted-fault' and not bad and foot else 1)
+EOF"
+}
+
+# Gate clause 3's cells in Aethelgard's console framing (TVI-WO-1203 (2)): the firmware on a tree's board under Aethelgard's
+# committed renode.config (the fixture's, RUL-11 (a): the virtual stamp, one space), the console captured, and the records-only
+# check run on that console, never on the log file.
+aet_cfg=$(ls -d "$src"/tests/1301/fixtures/aet-1c32c8ea-ardupilot/varlib/*/tool)
+aet_console() { # aet_console <name> <tree> <variant> [kill]: kill: SIGKILL Renode once spi1's witness is on the console
+  pod "$1" "$2" -v "$aet_cfg/renode.config:/cfg/renode.config:ro,Z" -e VARIANT="$3" -e KILL="${4:-}" -- bash -c '
+    export PATH=/opt/cargo/bin:$PATH RUSTUP_HOME=/opt/rustup CARGO_HOME=/out/cargo-home
+    v=$(/repo/scripts/build-release) || exit 9
+    cargo build --quiet --offline --locked --manifest-path /repo/tools/tviburi-check/Cargo.toml --target-dir /out/target || exit 8
+    vs="modeled modf cfg2first iolock forge spray rmw ardupilot generated field"
+    rustc --edition 2021 --target thumbv7em-none-eabihf -C opt-level=s -C panic=abort -C debuginfo=0 --cfg "path=\"$VARIANT\"" \
+      --check-cfg "cfg(path, values(\"${vs// /\",\"}\"))" -C link-arg=-T/repo/firmware/link.x -o /out/fw.elf /repo/firmware/spi1.rs || exit 7
+    mkdir -p /tmp/aet && cp /cfg/renode.config /tmp/aet/renode.config
+    sed -i "s|^history-path = .*|history-path = /tmp/aet/history|" /tmp/aet/renode.config
+    printf "include @/repo/scripts/prelude.resc\nsysbus LoadELF @/out/fw.elf\ncpu VectorTableOffset 0x08000000\nemulation RunFor \"0.001\"\necho \"TVIBURI-END\"\nquit\n" >/out/run.resc
+    if [ -n "$KILL" ]; then
+      # R3 (ruled 10:15Z): the killed run never reaches quit first. The firmware spins after its last write (firmware/spi1.rs
+      # ends in a loop), and 100 s of virtual time takes far longer than the 0.1 s the poll needs to see the witness.
+      printf "include @/repo/scripts/prelude.resc\nsysbus LoadELF @/out/fw.elf\ncpu VectorTableOffset 0x08000000\nemulation RunFor \"100\"\n" >/out/run.resc
+      renode --config /tmp/aet/renode.config --disable-gui --console --plain /out/run.resc </dev/null >/out/renode.out 2>&1 & pid=$!
+      for i in $(seq 1200); do grep -aq "^.\?\[[0-9:.]*\] \[INFO\] spi1: {\"tviburi\":\"witness\".*}.\?$" /out/renode.out && { echo witness-seen-before-kill; break; }; sleep 0.1; done
+      kill -9 $pid; wait $pid; echo "renode-exit=$?"
+    else
+      timeout 120 renode --config /tmp/aet/renode.config --disable-gui --console --plain /out/run.resc </dev/null >/out/renode.out 2>&1
+      echo "renode-exit=$?"
+    fi
+    /out/target/debug/tviburi-check "$v" /out/renode.out spi1 rcc gpioPortA gpioPortB gpioPortC gpioPortD gpioPortE gpioPortF gpioPortG gpioPortH gpioPortI gpioPortJ gpioPortK timer1 timer8 dma1 dma2 flashController usart1 usart2 usart3 uart4 uart5 usart6 uart7 uart8 i2c1 i2c2 i2c3 adcM1S2 adc3'
+}
+aet_framed() { # aet_framed <name> <source>: a witness of <source> on the console in Aethelgard's framing (the check read that framing)
+  grep -aq "^.\?\[[0-9][0-9]:[0-9][0-9]:[0-9][0-9]\.[0-9]\{9\}\] \[INFO\] $2: {\"tviburi\":\"witness\"" "$work/$1/renode.out"
+}
+
+t_removed-console() {
+  # A removed guard (spi1 stock, as in stock-forge), at the runner and at the records-only check reading Aethelgard's console.
+  [ -d "$work/stock.tree" ] || fixture stock model/tviburi-nucleo-h753zi.repl "$guarded_spi1" "$stock_spi1"
+  run removed-runner modeled "$work/stock.tree"
+  check "removed guard, at Tviburi's runner: the modeled path does not PASS (1), no load witness for spi1" \
+    "[ \$rc -eq 1 ] && grep -q '^PROBLEM spi1: no load witness' '$work/removed-runner.stdout'"
+  aet_console removed-console "$work/stock.tree" modeled
+  check "removed guard, at the records-only check on Aethelgard's console (virtual stamp, one space): CHECK FAIL, and its only problems are spi1's missing witness and end, so every other guard's witness and end were read from that framing; Renode exit 0 (gate clause 3)" \
+    "grep -qx 'renode-exit=0' '$work/removed-console.stdout' && grep -qx 'CHECK FAIL' '$work/removed-console.stdout' \
+     && [ \"\$(grep '^PROBLEM' '$work/removed-console.stdout' | cut -d: -f1-2 | paste -sd'|')\" = 'PROBLEM spi1: no load witness|PROBLEM spi1: no end record' ] \
+     && aet_framed removed-console rcc && ! grep -aq 'spi1: {\"tviburi\"' '$work/removed-console/renode.out'"
+}
+
+t_crash-console() {
+  # A crash: Renode killed (SIGKILL, exit 137) once spi1's witness is on Aethelgard's console, and the check on that console.
+  aet_console crash-console "$src" modeled kill
+  check "crash, at the records-only check on Aethelgard's console: Renode killed (137) by the case once spi1's witness was on the console (seen before the kill, not after 120 s), which the check reads; CHECK FAIL, no end record (gate clause 3)" \
+    "grep -qx 'witness-seen-before-kill' '$work/crash-console.stdout' && grep -qx 'renode-exit=137' '$work/crash-console.stdout' && aet_framed crash-console spi1 && grep -qx 'CHECK FAIL' '$work/crash-console.stdout' \
+     && grep -q '^PROBLEM spi1: no end record' '$work/crash-console.stdout' && ! grep -q '^PROBLEM spi1: no load witness' '$work/crash-console.stdout'"
+}
+
+t_crash-runner() {
+  # A crash at Tviburi's own runner, unchanged: the board's prelude hooks spi1's first write to kill Renode (SIGKILL) there,
+  # after every witness and before any end record. The hook flushes the logger first: the log file is written in blocks, and a
+  # kill with the witnesses still buffered would fail the run on "no load witness", a removed guard's reason, not a crash's.
+  # The runner must not PASS, and must report Renode's 137, not a timeout's 124.
+  fixture crash-runner scripts/prelude.resc "$prelude_line" "$prelude_line
+sysbus SetHookBeforePeripheralWrite spi1 \"(__import__('Antmicro.Renode.Logging').Renode.Logging.Logger.Flush(), __import__('os').kill(__import__('os').getpid(), 9))\""
+  run crash-runner modeled "$work/crash-runner.tree"
+  check "crash, at Tviburi's runner: Renode killed at spi1's first write (exit 137, not a timeout), after its witness: the run does not PASS (1); the check on its log finds no end record (gate clause 3)" \
+    "[ \$rc -eq 1 ] && grep -qx 'VERDICT FAIL (check exit 1, renode exit 137, after-marker=none)' '$work/crash-runner.stdout' \
+     && grep -q '^PROBLEM spi1: no end record' '$work/crash-runner.stdout' && ! grep -q '^PROBLEM spi1: no load witness' '$work/crash-runner.stdout'"
 }
 
 t_nomark() {
@@ -458,6 +554,97 @@ t_verify() {
      && grep -q 'FAIL Tviburi.cs is not' '$work/verify/B.txt' && grep -q 'FAIL Tviburi.cs is not' '$work/verify/C.txt' \
      && grep -q 'FAIL MANIFEST sha256' '$work/verify/E.txt' && grep -q 'FAIL Tviburi.cs is not' '$work/verify/E2.txt' && grep -q 'FAIL Tviburi.cs' '$work/verify/D.txt' \
      && grep -qx F=1 '$work/verify.stdout' && grep -q \"FAIL LEDGER.jsonl's rows are not the manifest's\" '$work/verify/F.txt'"
+}
+
+t_manifest() { # TVI-WO-1203 (1): the MANIFEST restates or retypes onto a guard only an instance a committed replay runs under it
+  # The release program is the check (RUL-14; R1, ruled 2026-11-26T10:15Z): it refuses a restated instance no committed
+  # model/stm32h7-*-restate.repl declares under its guard, a restatement the committed replay does not load, and a retyped
+  # instance the consumer's committed platform does not declare or the replay does not re-type. Here: it passes on this tree,
+  # and refuses each planted break by name.
+  pod manifest "$src" -- sh -c '/repo/scripts/build-release >/dev/null'
+  check "the release builds, restating and retyping onto guards (each instance checked by the release program itself)" \
+    "[ \$rc = 0 ] && grep -q '^restate ' '$work/manifest/release/MANIFEST' && grep -q '^retype ' '$work/manifest/release/MANIFEST'"
+  local row=$'Tviburi.GuardedSTM32_Timer\ttimer1 timer8\t-' spi=$'Tviburi.GuardedSTM32H7_SPI\t-\tspi1 spi2'
+  planted() { # planted <name> <file> <old> <new> <expected message>: a tree with one edit, whose release must refuse by that message
+    fixture "manifest-$1" "$2" "$3" "$4"
+    pod "manifest-$1" "$work/manifest-$1.tree" -- sh -c '/repo/scripts/build-release'
+    [ "$rc" != 0 ] && grep -qF -- "$5" "$work/manifest-$1.stdout"
+  }
+  check "planted: the class row names timer5, which no committed restatement runs guarded: the release refuses, naming it" \
+    "planted timer5 tools/tviburi-release/pins.tsv \"\$row\" $'Tviburi.GuardedSTM32_Timer\ttimer1 timer5 timer8\t-' 'restates timer5, which no committed restatement'"
+  # timer5 again, with every form of a restatement that Renode would not load as the guard: commented out (block and one line), its
+  # `as` in a trailing comment, an entry cancelled after, and a variable that is not one identifier (adversarial pass, 2a).
+  fixture manifest-commented tools/tviburi-release/pins.tsv "$row" $'Tviburi.GuardedSTM32_Timer\ttimer1 timer5 timer8\t-'
+  printf '%s\n' '' '// tviburiTimer5: Tviburi.GuardedSTM32_Timer @ {' '//         sysbus 0x40000C00;' '//     } as "timer5"' \
+    '// tviburiTimer5: Tviburi.GuardedSTM32_Timer @ sysbus 0x40000C00 as "timer5"' \
+    'tviburiTimer5: Tviburi.GuardedSTM32_Timer @ sysbus 0x40000C00 // as "timer5"' \
+    'tviburiTim5: Tviburi.GuardedSTM32_Timer @ sysbus 0x40000C00 as "timer5"' 'tviburiTim5: @none' \
+    'tviburi Timer5: Tviburi.GuardedSTM32_Timer @ sysbus 0x40000C00 as "timer5"' \
+    >>"$work/manifest-commented.tree/model/stm32h7-timer-restate.repl"
+  pod manifest-commented "$work/manifest-commented.tree" -- sh -c '/repo/scripts/build-release'
+  check "planted: a restatement of timer5 commented out (block, one line), with its name only in a comment, cancelled after, or under a variable that is not one identifier, does not qualify it: the release refuses, naming it" \
+    "[ \$rc != 0 ] && grep -q 'restates timer5, which no committed restatement' '$work/manifest-commented.stdout'"
+  fixture manifest-block tools/tviburi-release/pins.tsv "$row" $'Tviburi.GuardedSTM32_Timer\ttimer1 timer5 timer8\t-'
+  printf '%s\n' '/*' 'tviburiTimer5: Tviburi.GuardedSTM32_Timer @ sysbus 0x40000C00 as "timer5"' '*/' \
+    >>"$work/manifest-block.tree/model/stm32h7-timer-restate.repl"
+  pod manifest-block "$work/manifest-block.tree" -- sh -c '/repo/scripts/build-release'
+  check "planted: a restatement inside a block comment: the release refuses the file by name" \
+    "[ \$rc != 0 ] && grep -q 'stm32h7-timer-restate.repl: a block comment' '$work/manifest-block.stdout'"
+  check "planted: a name the pinned chain does not declare (timer05) in the stock column: the release refuses it (adversarial pass, 2d)" \
+    "planted typo tools/tviburi-release/pins.tsv \"\$row\" $'Tviburi.GuardedSTM32_Timer\ttimer1 timer05 timer8\t-' 'names timer05, which the pinned stock chain does not declare'"
+  check "planted: a class row naming timer1 twice: the release refuses it" \
+    "planted dup tools/tviburi-release/pins.tsv \"\$row\" $'Tviburi.GuardedSTM32_Timer\ttimer1 timer8 timer1\t-' 'class row names timer1 twice'"
+  # R1: a consumer instance qualifies by the consumer's committed platform and the replay's re-typing rule, case-sensitively.
+  check "planted: spi3 as the consumer's, which the committed fixture does not declare: the release refuses, naming it (R1)" \
+    "planted spi3 tools/tviburi-release/pins.tsv \"\$spi\" $'Tviburi.GuardedSTM32H7_SPI\t-\tspi1 spi2 spi3' 'retypes spi3, which no committed replay runs'"
+  check "planted: Spi1 as the consumer's, which differs from the fixture's spi1 only by case: the release refuses, naming it (R1)" \
+    "planted Spi1 tools/tviburi-release/pins.tsv \"\$spi\" $'Tviburi.GuardedSTM32H7_SPI\t-\tspi1 spi2 Spi1' 'retypes Spi1, which no committed replay runs'"
+  # A restatement the committed replay does not load: the DMA guard's `cat`, commented out.
+  check "planted: the replay's cat of model/stm32h7-dma-restate.repl commented out: the release refuses the restatement by name" \
+    "planted unloaded tests/1301/replay-1301.sh '    { echo; cat /repo/model/stm32h7-dma-restate.repl; echo' '#    { echo; cat /repo/model/stm32h7-dma-restate.repl; echo' 'model/stm32h7-dma-restate.repl: no committed replay loads it'"
+  # Every restatement is its generator's output from the pinned stm32h7.repl, byte for byte: so its addresses, registrations
+  # and names are the stock entry's, not a hand edit's (adversarial pass, 2b).
+  pod manifest-regen "$src" -- sh -c 'f=/opt/renode/platforms/cpus/stm32h7.repl; for g in /repo/model/stm32h7-*-restate.awk; do
+      n=${g##*/}; awk -v sha=$(sha256sum $f | cut -c1-64) -f "$g" $f > "/out/${n%.awk}.repl" || exit 1; done'
+  check "every model/stm32h7-*-restate.repl regenerates from its model/stm32h7-*-restate.awk and the pinned stm32h7.repl, byte for byte, and none lacks a generator" \
+    '[ $rc = 0 ] && ( for f in "$src"/model/stm32h7-*-restate.repl; do cmp -s "$f" "$work/manifest-regen/${f##*/}" || exit 1; done )'
+}
+
+t_lognames() {
+  # TVI-WO-1203 (5): the access log names every register of the RCC and DMA guards, as it does a stock model's, never
+  # `unknown`. Every offset of each guard's Fields table (DMA's stream rows at all eight streams) is read by the monitor
+  # with LogPeripheralAccess on and DMA1 clocked (locked, a read is the bus's warning, not an access line).
+  need_check
+  python3 -I - "$src" >"$work/lognames.reads" <<'EOF'
+import re, sys
+for path, base, inst in (('model/GuardedSTM32H7_RCC.cs', 0x58024400, 'rcc'), ('model/GuardedSTM32DMA.cs', 0x40020000, 'dma1')):
+    text = open(sys.argv[1] + '/' + path).read()
+    table = text[text.index('private static readonly Row[] Fields ='):]
+    offs = sorted({int(m.group(1), 16) for m in re.finditer(r'R\("\w+", (0x[0-9A-F]+),', table)})
+    if inst == 'dma1':
+        offs = sorted({o + 0x18 * k for o in offs for k in range(8 if 0x10 <= o < 0x28 else 1)})
+    names = {int(v, 16): n for n, v in re.findall(r'^\s+(\w+) = (0x[0-9A-F]+),$', text[text.index('private enum Registers'):text.index('private enum Registers') + 6000].split('}')[0], re.M)}
+    offs = sorted(set(offs) | set(names))   # and every offset the enum names (the RCC's C1_ aliases, adversarial pass 1f)
+    for o in offs:
+        print('%s 0x%X %s 0x%08X' % (inst, o, names.get(o, '-'), base + o))
+EOF
+  { echo "include @/repo/scripts/prelude.resc"; echo "sysbus WriteDoubleWord 0x580244D8 0x1"
+    echo "sysbus LogPeripheralAccess sysbus.rcc true"; echo "sysbus LogPeripheralAccess sysbus.dma1 true"
+    awk '{print "sysbus ReadDoubleWord " $4}' "$work/lognames.reads"; echo 'echo "TVIBURI-END"'; echo quit; } >"$work/lognames.resc"
+  renode_in lognames "$src" /cases/lognames.resc -v "$work/lognames.resc:/cases/lognames.resc:ro,Z"
+  check "every RCC and DMA guard register is named in the access log, the name its enum gives it, never unknown: each Fields offset read once by the monitor (TVI-WO-1203 (5))" \
+    "python3 -I - '$work/lognames.reads' '$work/lognames/renode-log.txt' <<'EOF'
+import re, sys
+want = [l.split() for l in open(sys.argv[1])]
+got = {}
+for l in open(sys.argv[2], errors='replace'):
+    m = re.search(r'\] (rcc|dma1): (?:\[cpu: [^\]]*\] )?Read\w* from (0x[0-9A-F]+) \(([^)]*)\)', l)
+    if m: got.setdefault((m.group(1), int(m.group(2), 16)), m.group(3))
+bad = [(i, o, n, got.get((i, int(o, 16)))) for i, o, n, a in want if n == '-' or got.get((i, int(o, 16))) != n]
+unknown = [k for k, v in got.items() if v == 'unknown']
+print('lognames:', len(want), 'offsets,', len(got), 'logged,', 'mismatched', bad[:5], 'unknown', unknown[:5])
+sys.exit(0 if len(want) > 120 and not bad and not unknown else 1)
+EOF"
 }
 
 t_reproducible() {

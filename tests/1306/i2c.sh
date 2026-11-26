@@ -12,9 +12,9 @@ set -euo pipefail
 
 here=$(cd "$(dirname "$0")/../.." && pwd)
 IMAGE=$(sed -n 's/^IMAGE=//p' "$here/tests/spike.sh")
-CASES="config timingrpe timingrsame timingroff dnfpe anfoff clearfield ap absentnext absent icrres field width read kernel reset resetok startoff txdroff empty midstart midcr2 txdrread stopidle startstop stalestop blindclear softreset clock registrations recorded rccreset unheld clocklost absentname fields ledger regen nack nacktime nackpll nackirq nackstop nackpe nacktransfer nacktxdr nackclock"
+CASES="config timingrpe timingrsame timingroff dnfpe anfoff clearfield ap absentnext absent icrres field width read kernel reset resetok startoff txdroff empty midstart midcr2 txdrread stopidle startstop stalestop blindclear softreset clock registrations recorded rccreset unheld clocklost absentname fields ledger regen nack nacktime nackpll nackirq nackstop nackpe nacktransfer nacktxdr nackclock isrmonwrite"
 GUARDS="spi1 rcc gpioPortA gpioPortB gpioPortC gpioPortD gpioPortE gpioPortF gpioPortG gpioPortH gpioPortI gpioPortJ gpioPortK timer1 timer8 dma1 dma2 flashController usart1 usart2 usart3 uart4 uart5 usart6 uart7 uart8 i2c1 i2c2 i2c3 adcM1S2 adc3"
-MONITOR="clock registrations recorded rccreset unheld clocklost absentname fields ledger regen nacktime nackpll"
+MONITOR="clock registrations recorded rccreset unheld clocklost absentname fields ledger regen nacktime nackpll isrmonwrite"
 CUSTOM="nackirq"   # a firmware case whose monitor lines are its own (TVI-WO-1306a)
 PATHS=$(for c in $CASES; do case " $MONITOR " in *" $c "*) ;; *) printf '"%s",' "$c" ;; esac; done | sed 's/,$//')
 scratch=${TVIBURI_SCRATCH:-$HOME/.cache/tviburi}
@@ -237,6 +237,13 @@ EOF
     n=$(printf '%s\n' "${lines[@]}" | grep -vc ' 0x0$\| 0x40005400 0x1$\| 0x40005404 0x220EC$')
     check "fields: every field allowed only at 0 ($n), written its widest value with PE = 0, records one TVI-I2C-FIELD naming it, unmodeled; nothing else is recorded" \
       "[ \$rc = 1 ] && [ $n -ge 40 ] && logged fields 'len(recs) == $n and all(r[\"rule\"] == \"TVI-I2C-FIELD\" and r[\"kind\"] == \"unmodeled\" for r in recs) and len({(r[\"register\"], r[\"bit\"].split(\" \")[0]) for r in recs}) == $n'" ;;
+  isrmonwrite)
+    # Gate clause 6's two I2C rows that the fields sweep leaves out, because it skips ISR (TVI-WO-1203 (4)): ISR.TXE and ISR.TXIS,
+    # each allowed only at 0 (p2011). Each is written 1 by a monitor write (pc none), with PE = 0, recorded. Each must record
+    # one TVI-I2C-FIELD, unmodeled, naming the field it wrote, matched to that write by its value.
+    PLATFORM_SED=$rec run_case isrmonwrite - "$clk" 'sysbus WriteDoubleWord 0x40005418 0x1' 'sysbus WriteDoubleWord 0x40005418 0x2'
+    check "isrmonwrite: ISR.TXE = 1, then ISR.TXIS = 1, each a monitor write with PE = 0, record one TVI-I2C-FIELD each, unmodeled, naming the field that write set (p2011; TVI-WO-1203 (4))" \
+      "logged isrmonwrite '[(r[\"rule\"], r[\"kind\"], r[\"register\"], r[\"bit\"].split(\" \")[0], int(r[\"access\"][\"value\"], 16), r[\"access\"][\"pc\"]) for r in recs] == [(\"TVI-I2C-FIELD\", \"unmodeled\", \"I2C_ISR\", \"TXE\", 1, \"none\"), (\"TVI-I2C-FIELD\", \"unmodeled\", \"I2C_ISR\", \"TXIS\", 2, \"none\")]'" ;;
   ledger)
     mkdir -p "$work/ledger"
     rc=0; container -v "$src:/repo:ro,Z" -v "$work/ledger:/out:Z" "$IMAGE" sh -c '/repo/scripts/build-release /repo /out/release >/dev/null' </dev/null >"$work/ledger.stdout" 2>&1 || rc=$?

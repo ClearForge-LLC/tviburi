@@ -271,7 +271,7 @@ DM31-reset	model/GuardedSTM32DMA.cs	            inner.Reset();\n            Rese
 DM32-clockReg	model/stm32h7-dma-restate.repl	        tviburiRcc RegistrationPeripheralAlias.DMA1\n	(empty)	dma-clock
 DM33-regen	tests/1303/fields.py	"00 only: a stock tag; burst transfers are not modeled", 662),\n        (reg, off, sec, "PBURST	"00 only: a stock tag; bursts are not modeled", 662),\n        (reg, off, sec, "PBURST	dma-regen
 DM34-restateGen	model/stm32h7-dma-restate.awk	    print "    dmamux: dmamux1"	    print "    dmamux:  dmamux1"	dma-restate
-DM35-instances	tools/tviburi-release/src/main.rs	Ok(all.into_iter().filter(|(i, _)| names.iter().any(|n| n == i)).collect())	Ok(all)	unit
+DM35-instances	tools/tviburi-release/src/main.rs	.filter(|d| d.0 == stock_ty && names.contains(&d.1))	.filter(|d| d.0 == stock_ty)	unit
 DM36-reload	model/GuardedSTM32DMA.cs	var reload = Items(s) == 0 && programmed[s] != 0;	var reload = false;	dma-reload
 DM37-restart	model/GuardedSTM32DMA.cs	var restart = state == Completed && r == CrOffset && (word & EnBit) != 0 && programmed[s] != 0;	var restart = false;	dma-reassert
 DM38-size	model/GuardedSTM32DMA.cs	if(((word >> 11) & 3) != ((word >> 13) & 3))	if(false)	dma-sizes
@@ -546,3 +546,13 @@ HZ21-flashJudged	model/GuardedSTM32H7_Flash.cs	var now = c.Hz + " " + c.Note;	va
 HZ22-flashBus	model/GuardedSTM32H7_Flash.cs	var hz = rcc.BusHz("rcc_hclk", out var why);	var hz = rcc.BusHz("sys_ck", out var why);	flash-prescaler
 HZ23-cfgOn	model/GuardedSTM32H7_RCC.cs	cfgUnknown[n] |= src || (PllOn(n) && ((old ^ value) & mask) != 0);	cfgUnknown[n] |= src;	usart-hzcfgon
 HZ24-cfgUse	model/GuardedSTM32H7_RCC.cs	if(cfgUnknown[n])	if(false)	usart-hzcfgon
+MF01-restated	tools/tviburi-release/src/main.rs	if !guarded.contains(&(guard.clone(), inst.to_string())) {	if false {	manifest
+MF02-bareVar	tools/tviburi-release/src/main.rs	 || var.is_empty() || !var.bytes().all(|b| b.is_ascii_alphanumeric() || b == b'_')	(empty)	manifest
+MF03-stockTypo	tools/tviburi-release/src/main.rs	        if !declared.iter().any(|d| &d.1 == n && d.0 == stock_ty) {	        if false {	manifest
+MF04-lineComment	tools/tviburi-release/src/main.rs	.map(|l| l.split("//").next().unwrap_or("").trim_end())	.map(|l| l.trim_end())	manifest
+MF05-cancel	tools/tviburi-release/src/main.rs	                entries.retain(|e| e.0 != var);\n	(empty)	manifest
+MF06-blockComment	tools/tviburi-release/src/main.rs	        if text.contains("/*") {	        if false {	manifest
+MF07-consumerStock	tools/tviburi-release/src/main.rs	        if let Some(d) = declared.iter().find(|d| &d.1 == n) {	        if let Some(d) = declared.iter().find(|d| &d.1 == n).filter(|_| false) {	unit
+MF08-twice	tools/tviburi-release/src/main.rs	                if let Some(d) = all.iter().find(|n| all.iter().filter(|m| m == n).count() > 1) {	                if let Some(d) = all.iter().find(|_| false) {	manifest
+MF09-consumerRun	tools/tviburi-release/src/main.rs	if !consumer_run_guarded(	if false && !consumer_run_guarded(	manifest
+MF10-loaded	tools/tviburi-release/src/main.rs	if !loaded_by_replay(	if false && !loaded_by_replay(	manifest
