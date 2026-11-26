@@ -637,6 +637,12 @@ RM04-hsePlaceholder	model/GuardedSTM32H7_RCC.cs	(mode == Records.RecordedMode ? 
 I264-recNackStopf	model/GuardedSTM32F7_I2C.cs	                            nackStopf = true;\n	(empty)	i2c-recnack
 RM05-spiKernelEvery	model/GuardedSTM32H7_SPI.cs	fired |= records.Evaluates(fired) && starts && RefusedKernel(value);	fired |= !fired && starts && RefusedKernel(value);	recorded
 PW38-recordedEveryRule	model/GuardedSTM32H7_RCC.cs	            fired |= records.Evaluates(fired) && RefusedClockLoss(offset, b, value);	            fired |= !fired && RefusedClockLoss(offset, b, value);	pwr-bothrec
-# TVI-WO-2100 (Q25; ruled 2026-11-26T18:38Z): the release's assemblies' sha256s, one mutant per check.
+# TVI-WO-2100 (Q23 (B), Q25; ruled 2026-11-26T18:38Z): the release's property rows against the guards' constructors, and its assemblies' sha256s, one mutant per check.
+RP01-propNoRow	tools/tviburi-release/src/props.rs	            if !rows.iter().any(|r| &r.guard == guard && r.name == p.name) {	            if false {	unit
+RP02-propNoParam	tools/tviburi-release/src/props.rs	let Some(param) = param else {\n            return Err(	let Some(param) = param else {\n            continue;\n            return Err(	unit
+RP03-propGuard	tools/tviburi-release/src/props.rs	peripherals.iter().filter(|p| p.0 == r.guard).flat_map(	peripherals.iter().filter(|_| true).flat_map(	unit
+RP04-propOptional	tools/tviburi-release/src/props.rs	if !r.required && !param.has_default {	if false {	unit
+RP05-busInterface	tools/tviburi-release/src/props.rs	    bases.iter().any(|b| BUS_INTERFACES.contains(&b.as_str()))	    false && bases.iter().any(|b| BUS_INTERFACES.contains(&b.as_str()))	unit
+RP06-propLines	tools/tviburi-release/src/main.rs	    for p in &pins.props {\n        m += &format!(	    for p in pins.props.iter().take(0) {\n        m += &format!(	manifest
 RA01-asmSha	tools/tviburi-release/src/main.rs	        if got != *pin {	        if false {	adv-release
 RA02-buildLineSha	tools/tviburi-release/src/main.rs	m += &format!("build {asm} {b} {sha}\\n");	m += &format!("build {asm} {b}\\n");	manifest

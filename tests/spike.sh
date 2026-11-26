@@ -570,9 +570,10 @@ t_manifest() { # TVI-WO-1203 (1): the MANIFEST restates or retypes onto a guard 
   pod manifest "$src" -- sh -c '/repo/scripts/build-release >/dev/null'
   check "the release builds, restating and retyping onto guards (each instance checked by the release program itself)" \
     "[ \$rc = 0 ] && grep -q '^restate ' '$work/manifest/release/MANIFEST' && grep -q '^retype ' '$work/manifest/release/MANIFEST'"
-  # TVI-WO-2100 Q25: each build line with its assembly's sha256.
-  check "the MANIFEST (format 2) carries each build line with its string and sha256" \
-    "grep -qx 'tviburi-release-manifest 2' '$work/manifest/release/MANIFEST' \
+  # TVI-WO-2100 Q23 (B), Q25: every property row, in pins.tsv's order, and each build line with its assembly's sha256.
+  check "the MANIFEST carries every property row of pins.tsv in its order, and each build line its string and sha256" \
+    "[ \"\$(sed -n 's/^property /property\t/p' '$work/manifest/release/MANIFEST')\" = \"\$(grep '^property' '$src/tools/tviburi-release/pins.tsv' | sed 's/\t/ /2g')\" ] \
+     && [ \$(grep -c '^property ' '$work/manifest/release/MANIFEST') -gt 30 ] && grep -qx 'tviburi-release-manifest 2' '$work/manifest/release/MANIFEST' \
      && [ \"\$(grep '^build ' '$work/manifest/release/MANIFEST')\" = \"\$(grep '^build' '$src/tools/tviburi-release/pins.tsv' | tr '\t' ' ')\" ] \
      && [ \$(grep -cE '^build [a-z]+ [^ ]+ [0-9a-f]{64}\$' '$work/manifest/release/MANIFEST') = 2 ]"
   local row=$'Tviburi.GuardedSTM32_Timer\ttimer1 timer8\t-' spi=$'Tviburi.GuardedSTM32H7_SPI\t-\tspi1 spi2'
@@ -610,6 +611,22 @@ t_manifest() { # TVI-WO-1203 (1): the MANIFEST restates or retypes onto a guard 
     "planted spi3 tools/tviburi-release/pins.tsv \"\$spi\" $'Tviburi.GuardedSTM32H7_SPI\t-\tspi1 spi2 spi3' 'retypes spi3, which no committed replay runs'"
   check "planted: Spi1 as the consumer's, which differs from the fixture's spi1 only by case: the release refuses, naming it (R1)" \
     "planted Spi1 tools/tviburi-release/pins.tsv \"\$spi\" $'Tviburi.GuardedSTM32H7_SPI\t-\tspi1 spi2 Spi1' 'retypes Spi1, which no committed replay runs'"
+  # TVI-WO-2100 Q23 (B): the property rows against the guards' constructors, read from model/*.cs.
+  local prow=$'property\tTviburi.GuardedSTM32H7_PWR\trevision\trequired\t'
+  check "planted (R3): the PWR guard's revision row commented out: the release refuses, naming the class map's guard and its parameter" \
+    "planted norow tools/tviburi-release/pins.tsv \"\$prow\" \"# \$prow\" 'Tviburi.GuardedSTM32H7_PWR, a guard of the class map: its constructor parameter revision has no property row'"
+  check "planted (R2): a row naming revisions, which the PWR guard does not take: the release refuses the row by name" \
+    "planted noparam tools/tviburi-release/pins.tsv \"\$prow\" $'property\tTviburi.GuardedSTM32H7_PWR\trevisions\trequired\t' 'the property row Tviburi.GuardedSTM32H7_PWR revisions names no public constructor parameter'"
+  check "planted: the timer's frequency, which has no C# default, declared optional: the release refuses the row by name" \
+    "planted nodefault tools/tviburi-release/pins.tsv $'property\tTviburi.GuardedSTM32_Timer\tfrequency\trequired' $'property\tTviburi.GuardedSTM32_Timer\tfrequency\toptional' 'Tviburi.GuardedSTM32_Timer frequency is optional, but the parameter has no C# default'"
+  # R1: a peripheral Tviburi class the class map does not name (a bus interface in its base list) with a parameter and no row;
+  # and Records, a helper with no bus interface, needs none (the tree builds above).
+  fixture manifest-extra tools/tviburi-release/pins.tsv "$row" "$row"
+  printf '%s\n' 'namespace Antmicro.Renode.Peripherals.Tviburi' '{' '    public class TviburiExtra : IBytePeripheral' '    {' \
+    '        public TviburiExtra(IMachine machine, string mode = Records.Enforcing) { }' '    }' '}' >"$work/manifest-extra.tree/model/TviburiExtra.cs"
+  pod manifest-extra "$work/manifest-extra.tree" -- sh -c '/repo/scripts/build-release'
+  check "planted (R1): a peripheral Tviburi class outside the class map, its parameter with no row: the release refuses, naming the class and the parameter" \
+    "[ \$rc != 0 ] && grep -qF 'Tviburi.TviburiExtra, a peripheral Tviburi class: its public constructor parameter mode has no property row' '$work/manifest-extra.stdout'"
   # A restatement the committed replay does not load: the DMA guard's `cat`, commented out.
   check "planted: the replay's cat of model/stm32h7-dma-restate.repl commented out: the release refuses the restatement by name" \
     "planted unloaded tests/1301/replay-1301.sh '    { echo; cat /repo/model/stm32h7-dma-restate.repl; echo' '#    { echo; cat /repo/model/stm32h7-dma-restate.repl; echo' 'model/stm32h7-dma-restate.repl: no committed replay loads it'"

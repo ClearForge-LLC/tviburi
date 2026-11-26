@@ -6,8 +6,8 @@
 //!                                    with the release hash;
 //!         TviburiRelease.cs.template the release constant's template;
 //!         MANIFEST                   the build strings with each assembly's sha256 (checked against <renode-root>),
-//!                                    the stock pins, the class map, the sha256 of every source and released file,
-//!                                    and the two excluded files with how each is checked.
+//!                                    the stock pins, the class map, the guards' properties, the sha256 of every
+//!                                    source and released file, and the two excluded files with how each is checked.
 //!                                    The release hash is the sha256 of its bytes;
 //!         LEDGER.jsonl               the gap ledger, whose first line names the release hash;
 //!         tviburi-release.tar        those four files, with fixed order and metadata.
@@ -28,6 +28,7 @@ mod json;
 mod fields;
 mod ledger;
 mod overlay;
+mod props;
 mod sha256;
 mod stock;
 mod tar;
@@ -47,8 +48,8 @@ const LEDGER: &str = "LEDGER.jsonl";
 const TARBALL: &str = "tviburi-release.tar";
 const TOOL: &str = "tools/tviburi-release";
 const BENCH: &str = "model/bench-checks.tsv";
-/// 2 since TVI-WO-2100 (Q25): a `build` line carries its assembly's sha256 after the string, so a format-1 reader taking
-/// the rest of the line as the string would misread it.
+/// 2 since TVI-WO-2100 (Q23, Q25): a `build` line carries its assembly's sha256 after the string, so a format-1 reader taking
+/// the rest of the line as the string would misread it; and the `property` lines are new.
 const MANIFEST_FORMAT: &str = "tviburi-release-manifest 2";
 /// The committed replay (TVI-WO-1203 (1)): it loads every restatement and re-types the consumer's instances; a release
 /// source, since the release reads it.
@@ -68,6 +69,8 @@ struct Pins {
     instances: BTreeMap<String, Vec<String>>,
     /// A class row's fifth column: the consumer's own instances it retypes (TVI-WO-1203 (1); `-` for none).
     consumer: BTreeMap<String, Vec<String>>,
+    /// The `property` rows, in pins.tsv's order (TVI-WO-2100 Q23 (B)).
+    props: Vec<props::Prop>,
 }
 
 /// 64 lowercase hex digits.
@@ -95,11 +98,11 @@ fn tsv<'a>(path: &str, text: &'a str, min: usize, max: usize) -> Result<Vec<Vec<
 fn pins(repo: &Path) -> Result<Pins, String> {
     let path = format!("{TOOL}/pins.tsv");
     let src = Source { path: path.clone(), bytes: fs::read(repo.join(&path)).map_err(|e| format!("{path}: {e}"))? };
-    let mut p = Pins { builds: vec![], stock: vec![], classes: vec![], instances: BTreeMap::new(), consumer: BTreeMap::new() };
+    let mut p = Pins { builds: vec![], stock: vec![], classes: vec![], instances: BTreeMap::new(), consumer: BTreeMap::new(), props: vec![] };
     for f in tsv(&path, overlay::text(&src)?, 3, 5)? {
         let width = match f[0] {
             "build" => 4,
-            "class" => 5,
+            "class" | "property" => 5,
             _ => 3,
         };
         if f.len() != width && f[0] != "class" {
@@ -107,6 +110,12 @@ fn pins(repo: &Path) -> Result<Pins, String> {
         }
         match f[0] {
             "build" if hex64(f[3]) => p.builds.push((f[1].into(), f[2].into(), f[3].into())),
+            "property" => {
+                if !f[1].starts_with("Tviburi.") || !matches!(f[3], "required" | "optional") || !f[4].bytes().all(|b| (0x20..0x7f).contains(&b)) {
+                    return Err(format!("{path}: a property row is `property <Tviburi. guard> <name> required|optional <ASCII meaning>`: {}", f.join(" ")));
+                }
+                p.props.push(props::Prop { guard: f[1].into(), name: f[2].into(), required: f[3] == "required", meaning: f[4].into() });
+            }
             "stock" if hex64(f[1]) => {
                 p.stock.push(stock::Pin { sha256: f[1].into(), path: f[2].into() })
             }
@@ -484,6 +493,31 @@ fn assembly(asm: &str) -> &'static str {
     if asm == "renode" { "Renode.dll" } else { "Infrastructure.dll" }
 }
 
+/// Every peripheral Tviburi class, with its public constructor's properties (TVI-WO-2100 Q23 (B)): each guard of the class map,
+/// and every other class a model file declares whose base list names a bus-peripheral interface; as (guard type, in the class
+/// map, parameters).
+fn peripherals(models: &[&Source], pins: &Pins) -> Result<Vec<(String, bool, Vec<props::Param>)>, String> {
+    let mut out: Vec<(String, bool, Vec<props::Param>)> = Vec::new();
+    for m in models {
+        let t = overlay::text(m)?;
+        for (class, bases) in props::classes(t) {
+            let guard = format!("Tviburi.{class}");
+            let mapped = pins.classes.iter().any(|c| c.1 == guard);
+            if !(mapped || props::names_bus_interface(&bases)) {
+                continue;
+            }
+            if out.iter().any(|p| p.0 == guard) {
+                return Err(format!("{guard}: declared twice in model/"));
+            }
+            out.push((guard, mapped, props::constructor(&m.path, t, &class)?));
+        }
+    }
+    if let Some(g) = pins.classes.iter().find(|c| !out.iter().any(|p| p.0 == c.1)) {
+        return Err(format!("{}: the class map's guard has no declaration this release reads its constructor from", g.1));
+    }
+    Ok(out)
+}
+
 fn build(repo: &Path, renode: &Path, out: &Path) -> Result<(String, String), String> {
     let pins = pins(repo)?;
     // TVI-WO-2100 Q25: a release is built only against the assemblies its `build` rows name, by sha256.
@@ -500,6 +534,7 @@ fn build(repo: &Path, renode: &Path, out: &Path) -> Result<(String, String), Str
     let template = Source { path: template_path.clone(), bytes: fs::read(repo.join(&template_path)).map_err(|e| format!("{template_path}: {e}"))? };
     overlay::check_template(&template)?;
     let body = overlay::body(&models)?;
+    props::check(&peripherals(&models, &pins)?, &pins.props)?;
 
     // What the committed restatements run guarded, read before the model files become sources (TVI-WO-1203 (1)), and the
     // committed replay that loads them and the consumer's platform it re-types (R1); both are sources.
@@ -551,6 +586,7 @@ fn build(repo: &Path, renode: &Path, out: &Path) -> Result<(String, String), Str
 
     let mut m = format!("{MANIFEST_FORMAT}\n");
     m += "sources every file the release reads is a source line, its generator included, so that one release hash names one overlay and one ledger (northstar invariant 3)\n";
+    m += "properties each property line is one public constructor parameter of a guard, in pins.tsv's order, which the consumer's platform declares by that name on the guard's entry: required, without it the guard refuses or the platform does not load; optional, its meaning says what absence does (Renode supplies the first parameter, machine, itself)\n";
     for (asm, b, sha) in &pins.builds {
         m += &format!("build {asm} {b} {sha}\n");
     }
@@ -578,6 +614,9 @@ fn build(repo: &Path, renode: &Path, out: &Path) -> Result<(String, String), Str
             }
             m += &format!("retype {stock_ty} {inst}\n");
         }
+    }
+    for p in &pins.props {
+        m += &format!("property {} {} {} {}\n", p.guard, p.name, if p.required { "required" } else { "optional" }, p.meaning);
     }
     for src in &sources {
         m += &format!("source {} {}\n", sha256::hex(&src.bytes), src.path);
