@@ -89,7 +89,7 @@ renode_in() { # renode_in <name> <tree> <resc> [podman args...]: the release, Re
   local name=$1 tree=$2 resc=$3; shift 3
   pod "$name" "$tree" -v "$work/check-build:/check:ro,Z" "$@" -- sh -c "v=\$(/repo/scripts/build-release) || exit 9; \
     timeout 120 renode --disable-gui --console --plain $resc </dev/null >/out/renode.out 2>&1; \
-    echo renode-exit=\$?; /check/debug/tviburi-check \$v /out/renode-log.txt spi1 rcc gpioPortA gpioPortB gpioPortC gpioPortD gpioPortE gpioPortF gpioPortG gpioPortH gpioPortI gpioPortJ gpioPortK timer1 timer8 dma1 dma2 flashController usart1 usart2 usart3 uart4 uart5 usart6 uart7 uart8 i2c1 i2c2 i2c3 adcM1S2 adc3"
+    echo renode-exit=\$?; /check/debug/tviburi-check \$v /out/renode-log.txt spi1 rcc gpioPortA gpioPortB gpioPortC gpioPortD gpioPortE gpioPortF gpioPortG gpioPortH gpioPortI gpioPortJ gpioPortK timer1 timer8 dma1 dma2 flashController usart1 usart2 usart3 uart4 uart5 usart6 uart7 uart8 i2c1 i2c2 i2c3 adcM1S2 adc3 dmamux1"
 }
 
 version_of() { # version_of <name>: the release hash of the release a run built, sha256:<hex>
@@ -395,7 +395,7 @@ t_crash() {
     # malformed (TVI-WO-1304: after the DMA and flash witnesses, spi1'"'"'s line straddled a block on every run)
     for i in $(seq 600); do grep -q "spi1: {\"tviburi\":\"witness\".*}\$" /out/renode-log.txt 2>/dev/null && break; sleep 0.1; done
     kill -9 $pid; wait $pid; echo renode-exit=$?
-    /check/debug/tviburi-check $v /out/renode-log.txt spi1 rcc gpioPortA gpioPortB gpioPortC gpioPortD gpioPortE gpioPortF gpioPortG gpioPortH gpioPortI gpioPortJ gpioPortK timer1 timer8 dma1 dma2 flashController usart1 usart2 usart3 uart4 uart5 usart6 uart7 uart8 i2c1 i2c2 i2c3 adcM1S2 adc3'
+    /check/debug/tviburi-check $v /out/renode-log.txt spi1 rcc gpioPortA gpioPortB gpioPortC gpioPortD gpioPortE gpioPortF gpioPortG gpioPortH gpioPortI gpioPortJ gpioPortK timer1 timer8 dma1 dma2 flashController usart1 usart2 usart3 uart4 uart5 usart6 uart7 uart8 i2c1 i2c2 i2c3 adcM1S2 adc3 dmamux1'
   check "a simulator killed after its witness does not PASS (1, no end record, the witness seen)" \
     "grep -qx 'renode-exit=137' '$work/crash.stdout' && grep -qx 'CHECK FAIL' '$work/crash.stdout' \
      && grep -q '^PROBLEM spi1: no end record' '$work/crash.stdout' && ! grep -q '^PROBLEM spi1: no load witness' '$work/crash.stdout'"
@@ -413,7 +413,7 @@ t_identity() {
   pod id-empty "$src" -v "$work/check-build:/check:ro,Z" -- sh -c 'v=$(/repo/scripts/build-release) || exit 9
     printf "include @/repo/scripts/prelude.resc\nquit\n" >/out/empty.resc; cd /out
     env -i /opt/renode/renode --disable-gui --console --plain /out/empty.resc </dev/null >/out/renode.out 2>&1
-    /check/debug/tviburi-check $v /out/renode-log.txt spi1 rcc gpioPortA gpioPortB gpioPortC gpioPortD gpioPortE gpioPortF gpioPortG gpioPortH gpioPortI gpioPortJ gpioPortK timer1 timer8 dma1 dma2 flashController usart1 usart2 usart3 uart4 uart5 usart6 uart7 uart8 i2c1 i2c2 i2c3 adcM1S2 adc3'
+    /check/debug/tviburi-check $v /out/renode-log.txt spi1 rcc gpioPortA gpioPortB gpioPortC gpioPortD gpioPortE gpioPortF gpioPortG gpioPortH gpioPortI gpioPortJ gpioPortK timer1 timer8 dma1 dma2 flashController usart1 usart2 usart3 uart4 uart5 usart6 uart7 uart8 i2c1 i2c2 i2c3 adcM1S2 adc3 dmamux1'
   check "the witness's version is the same with TVIBURI_MODEL_DIR at another directory (and the run PASSes), and with an empty environment" \
     "grep -qx 'VERDICT PASS' '$work/id-otherdir.stdout' && [ \$(version_of id-otherdir) = $v ] && spi1_records id-otherdir 'recs[0][\"model_version\"] == \"$v\"' \
      && [ \$(version_of id-empty) = $v ] && spi1_records id-empty 'recs[0][\"tviburi\"] == \"witness\" and recs[0][\"model_version\"] == \"$v\"'"
@@ -558,9 +558,9 @@ t_adv-version() {
   need_check
   pod adv-version "$src" -v "$work/check-build:/check:ro,Z" -v "$work/modeled:/run:ro,Z" -- sh -c '
     v=sha256:$(sha256sum </run/release/MANIFEST | cut -c1-64); w=sha256:$(printf %064d 0)
-    /check/debug/tviburi-check "$v" /run/renode-log.txt spi1 rcc gpioPortA gpioPortB gpioPortC gpioPortD gpioPortE gpioPortF gpioPortG gpioPortH gpioPortI gpioPortJ gpioPortK timer1 timer8 dma1 dma2 flashController usart1 usart2 usart3 uart4 uart5 usart6 uart7 uart8 i2c1 i2c2 i2c3 adcM1S2 adc3 >/dev/null; echo right=$?
-    /check/debug/tviburi-check "$w" /run/renode-log.txt spi1 rcc gpioPortA gpioPortB gpioPortC gpioPortD gpioPortE gpioPortF gpioPortG gpioPortH gpioPortI gpioPortJ gpioPortK timer1 timer8 dma1 dma2 flashController usart1 usart2 usart3 uart4 uart5 usart6 uart7 uart8 i2c1 i2c2 i2c3 adcM1S2 adc3 >/dev/null; echo wrong=$?
-    /check/debug/tviburi-check /run/renode-log.txt spi1 rcc gpioPortA gpioPortB gpioPortC gpioPortD gpioPortE gpioPortF gpioPortG gpioPortH gpioPortI gpioPortJ gpioPortK timer1 timer8 dma1 dma2 flashController usart1 usart2 usart3 uart4 uart5 usart6 uart7 uart8 i2c1 i2c2 i2c3 adcM1S2 adc3 >/dev/null; echo none=$?
+    /check/debug/tviburi-check "$v" /run/renode-log.txt spi1 rcc gpioPortA gpioPortB gpioPortC gpioPortD gpioPortE gpioPortF gpioPortG gpioPortH gpioPortI gpioPortJ gpioPortK timer1 timer8 dma1 dma2 flashController usart1 usart2 usart3 uart4 uart5 usart6 uart7 uart8 i2c1 i2c2 i2c3 adcM1S2 adc3 dmamux1 >/dev/null; echo right=$?
+    /check/debug/tviburi-check "$w" /run/renode-log.txt spi1 rcc gpioPortA gpioPortB gpioPortC gpioPortD gpioPortE gpioPortF gpioPortG gpioPortH gpioPortI gpioPortJ gpioPortK timer1 timer8 dma1 dma2 flashController usart1 usart2 usart3 uart4 uart5 usart6 uart7 uart8 i2c1 i2c2 i2c3 adcM1S2 adc3 dmamux1 >/dev/null; echo wrong=$?
+    /check/debug/tviburi-check /run/renode-log.txt spi1 rcc gpioPortA gpioPortB gpioPortC gpioPortD gpioPortE gpioPortF gpioPortG gpioPortH gpioPortI gpioPortJ gpioPortK timer1 timer8 dma1 dma2 flashController usart1 usart2 usart3 uart4 uart5 usart6 uart7 uart8 i2c1 i2c2 i2c3 adcM1S2 adc3 dmamux1 >/dev/null; echo none=$?
     /check/debug/tviburi-check "$v" /run/renode-log.txt spi2 >/run-unnamed.txt; echo unnamed=$?; grep -c "not named" /run-unnamed.txt'
   check "the check passes the modeled run only with its expected version: wrong (1) and none (1) fail (gate clause 7)" \
     "grep -qx right=0 '$work/adv-version.stdout' && grep -qx wrong=1 '$work/adv-version.stdout' && grep -qx none=1 '$work/adv-version.stdout'"

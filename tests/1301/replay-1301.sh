@@ -129,6 +129,15 @@ for i in "${!args[@]}"; do
         echo
       done; } >> "$plat"
   fi
+  # TVI-WO-1308: a tree with the DMAMUX1 restatement gets it last (after the DMA and ADC restatements, whose guards it
+  # updates), with its mode. DMAMUX1 is cancelled and restated (ruled 2026-11-26T09:31Z Q1), so the consumer's own
+  # `-> dmamux1@N` lines (spi1/spi2's DMARecieve) and the USART block's ReceiveDmaRequest lines above, which would bind to the
+  # cancelled entry with no error, are repointed onto the guard's variable. A tree without it replays as before.
+  if [ -f /repo/model/stm32h7-dmamux-restate.repl ]; then
+    sed -i 's/-> dmamux1@/-> tviburiDmamux1@/g' "$plat"
+    { echo; cat /repo/model/stm32h7-dmamux-restate.repl; echo
+      printf 'tviburiDmamux1:\n    mode: "%s"\n\n' "${ACCEPT_MODE:-recorded}"; } >> "$plat"
+  fi
   args[$((i + 1))]=${c/'mach create; '/'include @/tmp/release/Tviburi.cs; mach create; '}
 done
 printf '%s\n' "${args[@]}" > /out/$n-$mode.argv.txt

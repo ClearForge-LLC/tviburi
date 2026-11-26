@@ -12,7 +12,7 @@ set -euo pipefail
 here=$(cd "$(dirname "$0")/../.." && pwd)
 IMAGE=$(sed -n 's/^IMAGE=//p' "$here/tests/spike.sh")
 CASES="config m1ue over8ue psue psoff stopue reinit reinitstop disable same ap width tdrbyte read field nine kernel clock rxoff idle idleframe idlere dmarx fields ledger registrations recorded reset config2 regen brr0 brr8 brrheld overrun idlekernel idlenorule idlenone idlehse hzcsi hzsyscsi hzsyshse hzvcol hzwide hzdivr hzpllon hzvcoh hzrge hzpll3q hzport hzcsiref hzcfgon hzbyte"
-GUARDS="spi1 rcc gpioPortA gpioPortB gpioPortC gpioPortD gpioPortE gpioPortF gpioPortG gpioPortH gpioPortI gpioPortJ gpioPortK timer1 timer8 dma1 dma2 flashController usart1 usart2 usart3 uart4 uart5 usart6 uart7 uart8 i2c1 i2c2 i2c3 adcM1S2 adc3"
+GUARDS="spi1 rcc gpioPortA gpioPortB gpioPortC gpioPortD gpioPortE gpioPortF gpioPortG gpioPortH gpioPortI gpioPortJ gpioPortK timer1 timer8 dma1 dma2 flashController usart1 usart2 usart3 uart4 uart5 usart6 uart7 uart8 i2c1 i2c2 i2c3 adcM1S2 adc3 dmamux1"
 MONITOR="clock rxoff idle idleframe idlere dmarx fields ledger registrations recorded reset config2 regen brrheld overrun idlekernel idlenone idlehse hzcsi hzsyscsi hzsyshse hzvcol hzwide hzport hzpllon hzcsiref hzbyte"
 PATHS=$(for c in $CASES; do case " $MONITOR " in *" $c "*) ;; *) printf '"%s",' "$c" ;; esac; done | sed 's/,$//')
 PATHS="$PATHS,\"hzcsi\",\"hzsyscsi\",\"hzsyshse\",\"hzvcol\",\"hzwide\",\"hzpllon\",\"hzcsiref\""   # TVI-WO-1300c: firmware run with monitor lines after it
@@ -93,7 +93,7 @@ idleat() { bit "$(readout "$1" "$2"20)" 4 0 && bit "$(readout "$1" "$2"40)" 4 1;
 bit() { python3 -I -c 'import sys; sys.exit(0 if int(sys.argv[1], 16) >> int(sys.argv[2]) & 1 == int(sys.argv[3]) else 1)' "$@"; }   # bit <hex> <n> <0|1>
 marks=('echo "TVIBURI-MARK-AFTER"' 'sysbus ReadDoubleWord 0x20000104' 'echo "R-READ"' 'sysbus ReadDoubleWord 0x20000108' 'echo "R-READ2"' 'sysbus ReadDoubleWord 0x2000010C')
 clk='sysbus WriteDoubleWord 0x580244F0 0x10'   # USART1EN (p470): an unclocked port is locked on the bus (TVI-WO-1300a)
-rx='/^tviburiUsart1:$/a\    ReceiveDmaRequest -> dmamux1@41'   # the consumer's request line (Aethelgard AET-WO-4400i), on the guard
+rx='/^tviburiUsart1:$/a\    ReceiveDmaRequest -> tviburiDmamux1@41'   # the consumer's request line (Aethelgard AET-WO-4400i), on the guard; onto DMAMUX1's guard (TVI-WO-1308 Q1)
 
 for t in ${TVIBURI_TESTS:-$CASES}; do
   case " $MONITOR " in *" $t "*) mon=1 ;; *) mon=0 ;; esac
