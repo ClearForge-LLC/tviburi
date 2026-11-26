@@ -138,7 +138,9 @@ As amended and ratified 2026-11-26: a planted monitor write proves a path whose 
   - Guards and cases: SPI `fields`, RCC `rcc-fields`, GPIO `gpio-fields`, timer `timer-fields`, DMA `dma-fields`, flash `flash-fields`, USART `usart-fields`, I2C `i2c-fields` and `i2c-isrmonwrite`, ADC `adc-fields` and `adc-fieldsmonwrite`.
   - `1203` closed the 20 rows `1100a` found unproven.
 - **Committed mutants:** `N02-fieldAllowList`, `N03-noRegister` and `F03-sweepEnable` (`fields`); `C12-allowList` (RCC); `G07-fieldRow` (GPIO); `DM17-field` (DMA); `I207-allowList` (I2C); `AD26-field` (ADC); `A01-sel5` (`allowlist`).
-- **No committed mutant names the timer, flash or USART sweeps, or `1203`'s two monwrite cases.** So this WO ran one each as a scratch mutant, nothing committed: the guard's `RefusedField` made to return false at entry, then its sweep run. **Each sweep failed, 7 of 7:** timer `fields`, flash `fields`, USART `fields`, I2C `fields` and `isrmonwrite`, ADC `fields` and `fieldsmonwrite` (`~/.cache/tvi-1205/c6mut.log`; harness `~/.cache/tvi-1205/h/c6mut.sh`). So none is vacuous. That they have no committed mutant is a row (`tests/` is outside this WO's fence).
+- **Mutants for the sweeps that had none** (granted by the architect, 17:02Z): `TM34-fieldsSweep`, `FL42-fieldsSweep`, `US63-fieldsSweep`, `I265-isrMonwrite` and `AD48-fieldsMonwrite`. Each makes the guard's `RefusedField` return false. Each is killed by its sweep (timer, flash and USART `fields`, `i2c-isrmonwrite`, `adc-fieldsmonwrite`).
+  - **Before the grant,** the same mutation as a scratch run failed all 7 sweeps (`~/.cache/tvi-1205/c6mut.log`).
+  - **CI:** this PR's run (§8).
 - **The skeptic:**
   - **A sweep that counts records without matching each to its write.** `1203` matched each record to its own write in `isrmonwrite` and `fieldsmonwrite`.
   - **A sweep that writes a sibling instance only.** Each sweep writes one instance by monitor, so another instance of the same guard type rests on the shared rule (§1's join names those rows).
