@@ -34,7 +34,7 @@
 
 **(3) The consumer's checklist,** 37 items in six groups plus five carried over.
 - Each cites its source and says how the release lets the consumer check it, or "no check" (a row).
-- `docs/work-orders/TVI-WO-1205.coverage.sh`: all 55 roadmap lines naming the consumer are cited or excused, with 0 uncovered.
+- `spike/1205/coverage.sh docs/roadmap.md docs/work-orders/TVI-WO-1205.consumer.md spike/1205/data/consumer-not.tsv`: all 55 roadmap lines naming the consumer are cited or excused, with 0 uncovered.
 
 **(4) The verdict:** one page.
 
@@ -105,7 +105,7 @@ Reduction pass (diff): −32 net · 1 duplicate removed · 0 dead paths removed 
 ## 5. Findings and rows
 
 - **R1. `join.py`'s R3 regex** matches any "ruled <timestamp>" text. Today it moves one row (`PWR_CR3.Res6`). A later ledger row that quotes a ruling while describing a refusal could be promoted; the rule applies only where a row would otherwise count for nothing.
-- **R2. `consumer-coverage.sh` matches by line.** A roadmap line carrying several obligations passes with one citation (R:172 did, A8).
+- **R2. `spike/1205/coverage.sh` matches by line.** A roadmap line carrying several obligations passes with one citation (R:172 did, A8).
 - **R3. The checklist cites roadmap lines by number.** A roadmap edit shifts them: #67 shifted all of them, remapped here by exact text.
 - **R4. CC5IF/CC6IF on silicon** (setting at a compare with CCR5/CCR6 at 0) is inferred from p1597, not run.
 - **R5. 1305a FEEDBACK's "hseFrequency defaults to 8 MHz"** is stale: superseded by 1300b (4). For the architect's docs PR.

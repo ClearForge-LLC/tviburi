@@ -79,4 +79,4 @@
 - **The ELF source:** if `aethelgard-ardupilot` stops reproducing `a799dfb6…`, committing the ELF is Scotty's call (R:154; FB 1307).
 - **Optional:** collect after its `include`, about 24 MiB of 36 is compile garbage (FB 1302).
 
-**Coverage check:** every roadmap line naming Aethelgard or the consumer is cited above or listed as not an obligation in `TVI-WO-1205.FEEDBACK.md` §3. The check is `docs/work-orders/TVI-WO-1205.coverage.sh`.
+**Coverage check:** every roadmap line naming Aethelgard or the consumer is cited above, or listed with the reason it is not an obligation in `spike/1205/data/consumer-not.tsv`. The check is `spike/1205/coverage.sh docs/roadmap.md docs/work-orders/TVI-WO-1205.consumer.md spike/1205/data/consumer-not.tsv`: 0 uncovered of 55 at `cd235c7`'s roadmap.
