@@ -31,7 +31,7 @@
 - **The replays:** the 14 boots, the fixture and the armed run give 0 records.
 - **The join after `1308`:** 935 rows: 612 guarded, 254 acknowledged, 69 inherited, 0 findings.
 - **Above the cut:** 653 rows (412 guarded, 241 acknowledged) and 97 armed registers outside rows (71, 26). Nothing is open in `1100a`'s sense.
-- **Clause 1, as Scotty ruled (22:53Z):** not met. 105 rows and 24 registers hold `inherited-unaudited` fields, which no longer count as acknowledged (`gate.md` §1.4).
+- **Clause 1, as Scotty ruled (relayed 22:53Z):** not met. 105 rows and 24 registers hold `inherited-unaudited` fields, which no longer count as acknowledged (`gate.md` §1.4).
 - **PWR** is judged on the replay's restated platform: Aethelgard 4400h's Sentinel-03, PWR restated with revision V by `tests/1301/replay-1301.sh`.
 
 **(3) The consumer's checklist,** 37 items in six groups plus five carried over.
@@ -88,7 +88,7 @@
   - 1306's stale Aethelgard ledger rows and unsourced lines (F5, F6).
   - C6 contradicted B8 after `1308`; A4's 0.94 GiB is 0.90; F lacked a check column.
 
-**Raised and ruled: the unaudited acknowledgements (18:49Z point 1).** 105 rows and 24 registers above the cut are acknowledged only through RUL-17's "inherited, unaudited (acknowledged by name)" class. The ruled cut counted that class as acknowledged; the 17:02Z reading does not. Scotty ruled (b) (22:53Z): they don't count, so clause 1 is not met. When filling the line I recounted from `main-5d4a61a`'s data: 105 and 24 reproduce. Three of the 24 registers also hold fields read another way, and are counted for their unread ones (`gate.md` §1.4).
+**Raised and ruled: the unaudited acknowledgements (18:49Z point 1).** 105 rows and 24 registers above the cut are acknowledged only through RUL-17's "inherited, unaudited (acknowledged by name)" class. The ruled cut counted that class as acknowledged; the 17:02Z reading does not. Scotty ruled (b) (relayed 22:53Z): they don't count, so clause 1 is not met. When filling the line I recounted from `main-5d4a61a`'s data: 105 and 24 reproduce. I also checked the passing side against amended `RUL-17`: every acknowledged item holds an `acknowledged` or `stock-wrong` field, except `PWR_CR3` (by R3) (`gate.md` §1.4).
 
 **Withstood:**
 - **Every case and mutant the gate names exists,** and its tests column matches.
@@ -116,6 +116,7 @@ Reduction pass (diff): −32 net · 1 duplicate removed · 0 dead paths removed 
 - **R5. 1305a FEEDBACK's "hseFrequency defaults to 8 MHz"** is stale: superseded by 1300b (4). For the architect's docs PR.
 - **R6. Clause 4's page check** runs in CI against the committed excerpt. Only a Furnace run checks the excerpt against the held manual (`1203` §5).
 - **R7. Clause 6's sweeps prove the guard enforces its table,** not that the table is right. Each row's rightness is its RM0433 citation, held by review.
+- **R8. For the architect: the roadmap's `1206` row and `TVI-WO-1206` say the 129 "rest only on" unaudited fields.** That holds for 104 rows. `I2C1.ICR`'s reserved row also holds a reserved field. 23 of the 24 registers hold other fields too, RCC `ResetStatus` an `(A<n>)` one (`gate.md` §1.4). The count is unchanged; the wording is in protected documents.
 
 ## 6. Gates
 
@@ -123,6 +124,6 @@ Reduction pass (diff): −32 net · 1 duplicate removed · 0 dead paths removed 
   - TIMx_SR (17:02Z);
   - CCxOF's form (17:35Z);
   - DMAMUX1's and PWR's sweep mutants (18:38Z);
-  - the unaudited acknowledgements and the per-case mutants (18:56Z; point 1 ruled (b) by Scotty, 22:53Z).
+  - the unaudited acknowledgements and the per-case mutants (18:56Z; point 1 ruled (b) by Scotty, relayed 22:53Z).
 - **The verdict is the WO's last stop.**
 - **Not merged by me.**

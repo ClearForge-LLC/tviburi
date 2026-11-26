@@ -15,7 +15,7 @@ How each clause is judged:
 
 **How a row is judged:**
 - **Guarded:** a guard refuses it by name (a refusal for a disallowed value, or a modeled field).
-- **Acknowledged:** a ledger row names its field (`RUL-17`).
+- **Acknowledged:** a ledger row names its field (`RUL-17`). For the gate's verdict, an `inherited-unaudited` field does not count (Scotty's ruling, §1.4).
 - **Anything else is open.**
 - **The method:** `1100a`'s, re-run unchanged on the later tree by `spike/1205/harness/pipeline.sh`. That is the armed run twice (the control, and one with every access logged) on Aethelgard `4400h`'s Sentinel-03 capture, 935 queue rows placed, each joined to the release's ledger and the guard bound at the instance.
 
@@ -129,12 +129,12 @@ As amended and ratified 2026-11-26: a planted monitor write proves a path whose 
 
 | | Above the cut | Holding an `inherited-unaudited` field | By instance |
 |---|---|---|---|
-| **Rows** | 653 (412 guarded, 241 acknowledged) | **105,** each that one field | USART1–3 19 each; GPIO A 10, B 9, E 3, D 1; I2C1 6, I2C2 4; TIM1 9; RCC 6 |
+| **Rows** | 653 (412 guarded, 241 acknowledged) | **105** | USART1–3 19 each; GPIO A 10, B 9, E 3, D 1; I2C1 6, I2C2 4; TIM1 9; RCC 6 |
 | **Armed registers outside rows** | 97 (71 guarded, 26 acknowledged) | **24** | RCC 13; USART1 2, USART2 1, USART3 2; TIM1 3; SPI1 1, SPI2 1; I2C1 1 |
 
-- **None of the 105 rows also carries a field read some other way.** Three of the 24 registers do: RCC `ResetStatus` (an `(A<n>)` field), and TIM1 `Control2` and `DmaOrInterruptEnable` (stock-undefined fields). Their unaudited fields are still unread, so they are counted.
+- **What else they hold:** 104 of the 105 rows are that one field. The other, `I2C1.ICR`'s reserved bits, also holds the reserved `Res0`. Of the 24 registers, only RCC `ResetStatus` also holds a read field (an `(A<n>)` one). TIM1 `Control2` and `DmaOrInterruptEnable` also hold stock-undefined fields, which the amended `RUL-17` does not count as read. Each item is counted for its unread fields.
 - **Off the cut, not counted:** dma2's `HIFCR` and five `SxCR` registers (path `other`: request none). They hold unaudited fields next to `stock, wrong` ones.
-- **The rest above the cut** (136 rows and 2 registers acknowledged, and every guarded item) is guarded, or acknowledged by a reading: an `(A<n>)` row, a `stock, wrong` or stock-undefined reason, a quoted ruling (R3), or a reserved, read-only or tag field.
+- **The rest above the cut** is guarded (412 rows, 71 registers), or acknowledged (136 rows, 2 registers). Checked against amended `RUL-17`, every acknowledged item but one holds an `acknowledged` or `stock-wrong` field, cited. The exception is `PWR_CR3`, which counts through `Res6`, acknowledged by a quoted ruling (R3, 18:38Z; `1308` Q7).
 
 **Clause 1: not met on post-`1308` `main`.** Nothing above the cut is open in `1100a`'s sense, but 129 items hold fields nobody has read against RM0433. `TVI-WO-1206` reads them, as `TIMx_SR` was read here (§1.1), and then re-judges this clause.
 
