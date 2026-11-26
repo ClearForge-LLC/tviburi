@@ -587,3 +587,31 @@ MF08-twice	tools/tviburi-release/src/main.rs	                if let Some(d) = al
 MF09-consumerRun	tools/tviburi-release/src/main.rs	if !consumer_run_guarded(	if false && !consumer_run_guarded(	manifest
 MF10-loaded	tools/tviburi-release/src/main.rs	if !loaded_by_replay(	if false && !loaded_by_replay(	manifest
 DX30-parMemory	model/GuardedSTM32H7_DMAMUX.cs	if(par < PeripheralsStart || par > PeripheralsEnd)	if(false)	dmamux-parmem
+PW01-lowerOnce	model/GuardedSTM32H7_PWR.cs	else if(lowerByte && written && low != (cr3 & 0xFF))	else if(false)	pwr-second pwr-reset
+PW02-invalidPair	model/GuardedSTM32H7_PWR.cs	else if(lowerByte && !written && (low & LdoenBit) >> 1 == (low & BypassBit))	else if(false)	pwr-invalid pwr-locked
+PW03-porReset	model/GuardedSTM32H7_PWR.cs	                vos = 1;\n	                vos = 1;\n                written = false;\n	pwr-reset
+PW04-recordedIgnore	model/GuardedSTM32H7_PWR.cs	the upper bytes go on as if no rule had fired\n                cr3 = (cr3 & 0xFF)	the upper bytes go on as if no rule had fired\n                cr3 = (word & Cr3Writable)	pwr-recorded
+PW05-vosEarly	model/GuardedSTM32H7_PWR.cs	if(!ActvosRdy)	if(false)	pwr-vosearly pwr-locked
+PW06-vosLower	model/GuardedSTM32H7_PWR.cs	if(ScaleOf(next) <= ScaleOf(vos))	if(true)	pwr-voslow
+PW07-dbp	model/GuardedSTM32H7_PWR.cs	if((cr1 & DbpBit) != 0 || (word & Cr2Writable) == (cr2 & Cr2Writable))	if(true)	pwr-cr2dbp
+PW08-brenAck	model/GuardedSTM32H7_PWR.cs	if(word == BrenBit && cr2 == 0)	if(false)	pwr-ap
+PW09-actvosRdy	model/GuardedSTM32H7_PWR.cs	private bool ActvosRdy => written && !locked;	private bool ActvosRdy => written && locked;	pwr-same pwr-ap
+PW10-nibble	model/GuardedSTM32H7_PWR.cs	NibbleQ11 = { 0, 15 };	NibbleQ11 = { 0 };	pwr-ap pwr-nibble
+PW11-revisionRequired	model/GuardedSTM32H7_PWR.cs	config = revision == "V" || revision == "Y" ? null	config = true ? null	pwr-norev
+PW12-revY	model/GuardedSTM32H7_PWR.cs	cr3 = revision == "Y" ? 0x06u : 0x46u;	cr3 = 0x46u;	pwr-revy
+PW13-limitEdge	model/GuardedSTM32H7_PWR.cs	clocks[i] <= max * 1e6	clocks[i] < max * 1e6	pwr-ap pwr-order
+PW14-footnoteNever	model/GuardedSTM32H7_PWR.cs	(scale == 3 && i >= 2 && !apbEnabled[i - 2])	(scale == 3 && i >= 2)	pwr-apbvos3
+PW15-footnoteAlways	model/GuardedSTM32H7_PWR.cs	 || (scale == 3 && i >= 2 && !apbEnabled[i - 2])	(empty)	pwr-apbvos3
+PW16-usb33rdy	model/GuardedSTM32H7_PWR.cs	case Cr3Offset: return cr3 | ((cr3 & Usb33denBit) != 0 ? Usb33rdyBit : 0);	case Cr3Offset: return cr3;	pwr-same
+PW17-readNoReg	model/GuardedSTM32H7_PWR.cs	if(!Fields.Any(f => f.Offset == b))	if(false)	pwr-read
+PW18-misaligned	model/GuardedSTM32H7_PWR.cs	if((offset & (width / 8 - 1)) == 0)	if(true)	pwr-misaligned
+PW19-subword	model/GuardedSTM32H7_PWR.cs	var word = width == 32 && shift == 0 ? value :	var word = true ? value :	pwr-byte
+PW20-revYBit6	model/GuardedSTM32H7_PWR.cs	if(b == Cr3Offset && Revision == "Y" && (word & Cr3Bit6) != 0)	if(false)	pwr-revy
+PW21-vos00	model/GuardedSTM32H7_PWR.cs	return v == 3 ? 1 : v == 2 ? 2 : 3;	return v == 3 ? 1 : v == 2 ? 2 : v == 1 ? 3 : 1;	pwr-flashvos3
+PW22-rccVos	model/GuardedSTM32H7_RCC.cs	if(after == null || after == before)	if(true)	pwr-clockfirst pwr-apbvos3
+PW23-rccNoGuard	model/GuardedSTM32H7_RCC.cs	            if(p == null)\n            {\n                return false;   // ruled 2026-11-26T11:06Z Q20 (A): not judged without a PWR guard\n            }\n            var revision = p.Revision;\n            var scale = p.Scale;\n            var held = p.ScaleCitation;	            var revision = p?.Revision ?? "V";\n            var scale = p?.Scale ?? 1;\n            var held = p?.ScaleCitation ?? "no PWR guard, judged at VOS1";	pwr-notjudged flash-order flash-clockfirst
+PW24-rccTrialSw	model/GuardedSTM32H7_RCC.cs	var sys = SysHz(b == CfgrOffset ? value & 7 : inner.ReadDoubleWord(CfgrOffset) >> 3 & 7, ref why);	var sys = SysHz(inner.ReadDoubleWord(CfgrOffset) >> 3 & 7, ref why);	pwr-clockfirst
+PW25-rccDbp	model/GuardedSTM32H7_RCC.cs	if(p == null || p.Dbp || value == Served(b))	if(true)	pwr-bdcr
+PW26-flashAsksPwr	model/GuardedSTM32H7_Flash.cs	if(guard != null)	if(false)	pwr-flashvos3
+MF11-cannedNamed	tools/tviburi-release/src/main.rs	c.2 == stock_ty && names.contains(&c.0) &&	c.2 == stock_ty &&	unit
+MF12-cannedRow	tools/tviburi-release/src/main.rs	let (restates, retypes) = restated(&declared, stock_ty, names, consumer)?;	let (restates, retypes) = restated(&chain.declared, stock_ty, names, consumer)?;	manifest pwr-ledger

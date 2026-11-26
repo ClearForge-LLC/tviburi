@@ -47,6 +47,9 @@ ACCEPTANCE="$ACCEPTANCE $(for c in $ADC_CASES; do printf 'adc-%s ' "$c"; done)"
 # TVI-WO-1308: the DMAMUX1 guard's cases live in tests/1308/dmamux.sh; each is a test here, dmamux-<case>, in the acceptance group.
 DMAMUX_CASES=$(sed -n 's/^CASES="\(.*\)"$/\1/p' "$(dirname "$0")/1308/dmamux.sh")
 ACCEPTANCE="$ACCEPTANCE $(for c in $DMAMUX_CASES; do printf 'dmamux-%s ' "$c"; done)"
+# TVI-WO-1308: the PWR guard's cases live in tests/1308/pwr.sh; each is a test here, pwr-<case>, in the acceptance group.
+PWR_CASES=$(sed -n 's/^CASES="\(.*\)"$/\1/p' "$(dirname "$0")/1308/pwr.sh")
+ACCEPTANCE="$ACCEPTANCE $(for c in $PWR_CASES; do printf 'pwr-%s ' "$c"; done)"
 ALL="$ACCEPTANCE $ADVERSARIAL"
 if [ "${TVIBURI_TESTS:-}" = list ]; then printf '%s\n' $ALL; exit 0; fi
 here=$(cd "$(dirname "$0")/.." && pwd)
@@ -948,6 +951,17 @@ t_dmamux() { # t_dmamux <case>: one case of tests/1308/dmamux.sh on this source,
   fails=$((fails + f))
 }
 for c in $DMAMUX_CASES; do eval "t_dmamux-$c() { t_dmamux $c; }"; done
+t_pwr() { # t_pwr <case>: one case of tests/1308/pwr.sh on this source, its ok/FAIL lines counted here (TVI-WO-1308)
+  local out trc=0
+  out=$(TVIBURI_TESTS="$1" TVIBURI_SCRATCH="$work" "$src/tests/1308/pwr.sh" "$src" 2>&1) || trc=$?
+  grep -E '^(ok|FAIL) ' <<<"$out" || true
+  local f; f=$(grep -c '^FAIL ' <<<"$out" || true)
+  if [ "$trc" -ne 0 ] && [ "$f" -eq 0 ]; then
+    echo "FAIL pwr-$1: tests/1308/pwr.sh exited $trc with no verdict"; f=1
+  fi
+  fails=$((fails + f))
+}
+for c in $PWR_CASES; do eval "t_pwr-$c() { t_pwr $c; }"; done
 
 for t in ${TVIBURI_TESTS:-acceptance}; do
   case "$t" in
