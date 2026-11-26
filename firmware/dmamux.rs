@@ -7,7 +7,8 @@
 //! TVI-WO-1308.measure.md §2.1); `en` sets EN by a read-modify-write, as ChibiOS does.
 //! CR values: P2M bytes MINC 0x400; M2P bytes MINC 0x440. An M2P stream here moves NDT = 0 items (nothing reaches the peripheral).
 //!   path="pair"     - DMA1 S0 P2M on channel 0 = 41 (usart1_rx_dma) with PAR = SPI1_RXDR: TVI-DMAMUX-PAIR, unmodeled, at the
-//!                     EN write (WO acceptance: a stream started on a channel whose route names another request).
+//!                     EN write (WO acceptance: a stream started on a channel whose route names another request). MARK_READ =
+//!                     S0CR after the EN write (reached only when dmamux1 is recorded: the stream starts, EN reads 1).
 //!   path="pairtx"   - DMA1 S0 M2P on 42 (usart1_tx_dma) with PAR = USART3_TDR: TVI-DMAMUX-PAIR, unmodeled.
 //!   path="routes"   - the armed run's ten streams on their channels and PARs (measure.md §2.1): DMA1 S0-S7 on C0-C7 = 41, 43,
 //!                     45, 9, 38, 42, 40, 46; DMA2 S2, S3 on C10, C11 = 39, 37: passes. MARK_READ = C11CR, MARK_READ2 = C3CR.
@@ -20,7 +21,7 @@
 //!                     the stream off: passes. MARK_READ = C0CR (43).
 //!   path="reserved" - C0CR = 54 (Reserved, Table 124 p697): TVI-DMAMUX-FIELD, unmodeled, at the write.
 //!   path="se"       - C0CR = 41 with SE (bit 16): TVI-DMAMUX-FIELD, unmodeled.
-//!   path="ge"       - RG0CR = GE (bit 16): TVI-DMAMUX-FIELD, unmodeled.
+//!   path="ge"       - RG3CR = GE (bit 16), judged by RG0CR's rows: TVI-DMAMUX-FIELD, unmodeled.
 //!   path="byte"     - a byte write of 41 to C2CR, a byte write of 0 to its third byte (merged into the word: 41 stays), and a
 //!                     half-word write of 43 to C1CR (p708), then S2 P2M on C2 with
 //!                     PAR = USART1_RDR: passes. MARK_READ = C1CR | C2CR << 8 (words), MARK_READ2 = C2CR's low byte, a byte read.
@@ -105,6 +106,7 @@ pub unsafe extern "C" fn reset() -> ! {
     {
         cfg(DMA1, 0, 0, 41, SPI1_RXDR, SRAM4, 4, P2M);
         en(DMA1, 0);
+        write_volatile(MARK_READ, r(s(DMA1, 0, CR)));
     }
     #[cfg(path = "pairtx")]
     {
@@ -167,7 +169,7 @@ pub unsafe extern "C" fn reset() -> ! {
     }
     #[cfg(path = "ge")]
     {
-        w(DMAMUX1 + 0x100, 1 << 16);
+        w(DMAMUX1 + 0x10C, 1 << 16);
     }
     #[cfg(path = "byte")]
     {

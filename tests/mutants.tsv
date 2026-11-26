@@ -558,8 +558,8 @@ DX08-fieldOff	model/GuardedSTM32H7_DMAMUX.cs	if(f.Offset != r || f.Allowed == nu
 DX09-seRow	model/GuardedSTM32H7_DMAMUX.cs	"SE", 16, 16, Zero,	"SE", 16, 16, Any,	dmamux-se
 DX10-geRow	model/GuardedSTM32H7_DMAMUX.cs	"GE", 16, 16, Zero,	"GE", 16, 16, Any,	dmamux-ge
 DX11-reservedId	model/GuardedSTM32H7_DMAMUX.cs	51, 52, 53, 55, 56,	51, 52, 53, 54, 55, 56,	dmamux-reserved
-DX12-rgMap	model/GuardedSTM32H7_DMAMUX.cs	return RgcrOffset;	return b;	dmamux-fields
-DX13-reservedBits	model/GuardedSTM32H7_DMAMUX.cs	"Res15_10", 15, 10, Zero,	"Res15_10", 15, 10, Any,	dmamux-fields
+DX12-rgMap	model/GuardedSTM32H7_DMAMUX.cs	return RgcrOffset;	return b;	dmamux-ge
+DX13-reservedBits	model/GuardedSTM32H7_DMAMUX.cs	"Res15_10", 15, 10, Zero,	"Res15_10", 15, 10, Any,	dmamux-ledger
 DX14-misaligned	model/GuardedSTM32H7_DMAMUX.cs	if((offset & (width / 8 - 1)) == 0)	if(true)	dmamux-misaligned
 DX15-read	model/GuardedSTM32H7_DMAMUX.cs	if(RowOffset(b) < 0)\n                {\n                    records.Refuse("TVI-DMAMUX-READ"	if(false)\n                {\n                    records.Refuse("TVI-DMAMUX-READ"	dmamux-read
 DX16-byteMerge	model/GuardedSTM32H7_DMAMUX.cs	var word = width == 32 && shift == 0 ? value :	var word = true ? value :	dmamux-byte
@@ -575,3 +575,4 @@ DX25-restateSpi4	model/stm32h7-dmamux-restate.repl	spi4:\n    DMARecieve -> tvib
 DX26-served	model/GuardedSTM32H7_DMAMUX.cs	return b < CxcrEnd ? ids[b / 4] : 0;	return 0;	dmamux-routes
 DX27-copy	model/GuardedSTM32H7_DMAMUX.cs	ids[b / 4] = word & IdMask;	(empty)	dmamux-routes
 DX28-boardMode	model/tviburi-nucleo-h753zi.repl	tviburiDmamux1:\n    mode: "enforcing"	tviburiDmamux1:\n    mode: "recorded"	dmamux-pair
+DX29-pairRecorded	model/GuardedSTM32H7_DMAMUX.cs	return !records.Recorded;	return true;	dmamux-pairrec

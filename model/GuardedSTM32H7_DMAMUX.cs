@@ -181,7 +181,8 @@ namespace Antmicro.Renode.Peripherals.Tviburi
         // ---- the DMA guard's one call (ruled Q3) ---------------------------------------------------------------
 
         // TVI-DMAMUX-PAIR: asked by the DMA guard at a stream's EN, for a stream whose request it raises or acknowledges, with
-        // the stream's PAR and its direction. True when it recorded a refusal (or a would-refuse).
+        // the stream's PAR and its direction. True when it refused, so that the DMA guard does not start the stream; false after
+        // a would-refuse (recorded mode, RUL-19: the access goes on as if no rule had fired).
         public bool RefusedPair(int channel, uint par, bool toMemory)
         {
             lock(sync)
@@ -210,7 +211,7 @@ namespace Antmicro.Renode.Peripherals.Tviburi
                     condition,
                     "RM0433 Rev 9 §17.3.2 Table 124 p697-698" + (p == null ? "" : "; " + p.Citation) + "; ruled 2026-11-26T09:31Z Q3",
                     State(), 4 * channel, id, 32);
-                return true;
+                return !records.Recorded;
             }
         }
 
