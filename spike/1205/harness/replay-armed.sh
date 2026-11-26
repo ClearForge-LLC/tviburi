@@ -15,7 +15,7 @@
 # value: no consumer property declares it). Without the level, main's ADC guard records TVI-ADC-LEVEL at every DR read.
 set -eu
 tree=$(cd "$1" && pwd); cap=$(cd "$2" && pwd); inj=$(cd "$3" && pwd); out=$4; name=$5; log=${6:-}
-mkdir -p "$out"; out=$(cd "$out" && pwd); h=$(cd "$(dirname "$0")" && pwd)
+mkdir -p "$out"; out=$(cd "$out" && pwd); h=$(cd "$(dirname "$0")/../../1100a/harness" && pwd)   # its inner.sh, unchanged
 IMAGE=$(sed -n 's/^IMAGE=//p' "$tree/tests/spike.sh")
 extra='include @/inj/inject.resc;'
 [ "$log" = log ] && extra="sysbus LogAllPeripheralsAccess true; $extra"
