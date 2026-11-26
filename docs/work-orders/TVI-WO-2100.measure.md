@@ -72,3 +72,40 @@ Image: `ghcr.io/clearforge-llc/aethelgard-tools@sha256:1e0ab105ec42…` — the 
 - **(B)** Keep the class map alone, and add only the per-guard property lines to the manifest (`property <guard> <name> required|optional <meaning>`). The consumer's emitter does (b) itself and supplies what each line names.
 
 I recommend **(B)**: it is the smallest change that closes the measured lack, and it keeps `RUL-09` as ruled. (A) is the cautious choice if Scotty wants the consumer's restatement checked byte for byte against Tviburi's.
+
+### 2.1 After Q23–Q25 (ruled 18:38Z): the rehearsal from the tarball alone, **green**
+
+**Built:**
+- `property` rows: 39, one per public constructor parameter of each of the 11 guards, checked against the C# source;
+- the `build` lines carry each assembly's sha256, and the build refuses a mismatched `Renode.dll` or `Infrastructure.dll`;
+- MANIFEST format 2.
+
+The release hash moves to `sha256:18ef6b10…9773` on `c7ef230`; no committed test pinned the old one. GPIO's two port-A/B reset values had no case; `spike/2100/gpio-reset.sh` adds `ospeedrreset` and `pupdrreset`, both refusing `TVI-GPIO-CONFIG`.
+
+**The rehearsal, run by a fresh worker behind a firewall.**
+- **What it could read:** the tarball, `RUL-07/09/10/11/12/19`, the image's stock files, the two captures and the board's consumer facts (revision V, the battery level, PB6/PB7 pull-ups, USART1's receive request 41).
+- **What it could not:** `model/`, `tests/`, `scripts/` or the replay harness.
+- **What it wrote:** the consumer's side, `spike/2100/consumer-platform.py` (the class map applied by (b), every `property` row supplied), `consumer-argv.py` and `consumer-boot.sh`.
+
+**Result on `c7ef230`'s release `sha256:18ef6b10…`:**
+
+| Run | `tviburi-check` (the release hash, the MANIFEST's 34 instances) | Enforcing witnesses | Ends | Refusals | Arms |
+|---|---|---|---|---|---|
+| ArduPilot's fixture | CHECK PASS | 34 | 34 | 0 | — |
+| The armed run | CHECK PASS | 34 | 34 | 0 | yes, from 9.332 s |
+
+`consumer-verify.sh` passes in a fresh directory with only the tarball.
+
+**Controls** (the first run, on the previous head): without the battery `levels`, the armed run refuses `TVI-ADC-LEVEL`, `unmodeled`. ArduPilot still arms after that enforcing refusal, so arming is not a gate; the records are (`RUL-08`).
+
+**The worker's ten findings, and what each became:**
+1. **GPIO reset values:** the rows said "the stock entry's", but no stock entry declares them; Tviburi's generator writes RM0433's (p541–542). **Corrected:** each row now states the value per port.
+2. **HSE:** neither capture declares one; a consumer fact (`1205`'s checklist).
+3. **`optionBytes`:** "the stock entry's init" was wrong; it is the consumer's own init word. **Corrected.**
+4. **The PWR stub's `size`, `initable` and `script`** have no rows. **Now stated:** the MANIFEST says a stock property with no row is not the guard's, and is dropped.
+5. **Connections** (USART1's `ReceiveDmaRequest -> …@41`) are the consumer's own wiring, with no row; a consumer fact (`1205`).
+6. **`RUL-09` (b) is silent on references from live entries:** other peripherals' `rcc` registrations, the timers' AF inputs, `spi4`, `crypto`. The worker repointed them as (b)'s trap implies. **A row for the architecture's wording** (a steering document, not this fence).
+7. **`frequency`:** the consumer's own value overrides the stock entry's, and must move onto the guard. **Corrected.**
+8. **ADC `levels`** named no instance of the ADC1/ADC2 pair. **Corrected:** the row names `adcM1S2` and `adc3`.
+9. **`package` "LQFP144"** is a consumer fact (the part's package).
+10. **The ledger misstates PWR.** Its 74 field rows are the guard's, but `pwr`'s only model-level row is the stub's `canned` row ("a stock Python script's fixed answers"), with no `guarded_by`. A consumer reading the ledger by its hash would think `pwr` is the stub. That is a release-program ledger change outside the widened fence: **Q26.**
