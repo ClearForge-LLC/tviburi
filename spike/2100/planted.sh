@@ -32,7 +32,7 @@ r tree "$w/a.tree" "$w/a" >/dev/null
 cp -r "$w/a.tree" "$w/b.tree"
 sed -i '0,/records runtime/s//records runtimE/' "$w/b.tree/model/Refusal.cs"
 r tree "$w/b.tree" "$w/b" >/dev/null
-expect P3-modelbyte "RELEASE FAIL: the two builds differ: tviburi-release.tar, differ: byte" "$(r compare "$w/a" "$w/b")"
+expect P3-modelbyte "RELEASE FAIL: the two builds differ:.* Tviburi.cs (differ: byte .*tviburi-release.tar (differ: byte" "$(r compare "$w/a" "$w/b")"
 # P4: verify given the wrong hash.
 expect P4-wronghash "RELEASE FAIL: verify against sha256:0000" "$(r verify "$w/a" "sha256:$(printf '%064d' 0)")"
 exit $ok

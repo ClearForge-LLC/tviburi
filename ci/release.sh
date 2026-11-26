@@ -13,7 +13,6 @@
 # Exit 0 only when every step held; 1 on a failed check (named); 2 on a usage error.
 set -euo pipefail
 . "$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)/tests/ci/common.sh"   # here, IMAGE, container(), scratch
-FILES="tviburi-release.tar MANIFEST Tviburi.cs TviburiRelease.cs.template LEDGER.jsonl"
 fail() { echo "RELEASE FAIL: $*"; exit 1; }
 jobs() { [ -n "${CARGO_BUILD_JOBS:-}" ] && printf -- '-e\nCARGO_BUILD_JOBS=%s\n' "$CARGO_BUILD_JOBS"; return 0; }
 
@@ -25,18 +24,20 @@ build_tree() { # build_tree TREE OUT: the tree's own scripts/build-release, in t
     2>"$out/build.err" | tail -n 1
 }
 
-compare() { # compare A B: every released file, byte for byte
-  local a=$1 b=$2 f
-  for f in $FILES; do
-    [ -f "$a/release/$f" ] && [ -f "$b/release/$f" ] || fail "$f missing from a build"
-    cmp "$a/release/$f" "$b/release/$f" >/dev/null || fail "the two builds differ: $f, $(cmp "$a/release/$f" "$b/release/$f" | sed 's/^[^ ]* [^ ]* //')"
+compare() { # compare A B: the two release directories' listings, then every file, byte for byte, the tarball last (it
+  # holds the others, so a difference inside it is named by the file that carries it)
+  local a=$1/release b=$2/release f d=""
+  [ "$(cd "$a" && ls -A)" = "$(cd "$b" && ls -A)" ] || fail "the two builds hold different files: $(cd "$a" && ls -A | tr '\n' ' ')/ $(cd "$b" && ls -A | tr '\n' ' ')"
+  for f in $(cd "$a" && ls -A | grep -vx tviburi-release.tar) tviburi-release.tar; do
+    cmp "$a/$f" "$b/$f" >/dev/null || d="$d $f ($(cmp "$a/$f" "$b/$f" | sed 's/^[^ ]* [^ ]* //'));"
   done
-  echo "the two builds are byte-identical: $FILES"
+  [ -z "$d" ] || fail "the two builds differ:$d"
+  echo "the two builds are byte-identical: $(cd "$a" && ls -A | tr '\n' ' ')"
 }
 
-verify() { # verify DIR PIN
-  local dir=$1 pin=$2 v
-  v=$(container -v "$dir:/rel:ro,Z" -v "$here:/repo:ro,Z" -v "$ci:/w:Z" "$IMAGE" sh -c "export PATH=/opt/cargo/bin:\$PATH \
+verify() { # verify DIR PIN [TREE]: the verifier built from TREE (the released commit's own tree; default this checkout)
+  local dir=$1 pin=$2 tree=${3:-$here} v
+  v=$(container -v "$dir:/rel:ro,Z" -v "$tree:/repo:ro,Z" -v "$ci:/w:Z" "$IMAGE" sh -c "export PATH=/opt/cargo/bin:\$PATH \
     RUSTUP_HOME=/opt/rustup CARGO_HOME=/w/cargo-home ${CARGO_BUILD_JOBS:+CARGO_BUILD_JOBS=$CARGO_BUILD_JOBS}
     cargo build --quiet --offline --locked --manifest-path /repo/tools/tviburi-release/Cargo.toml --target-dir /w/target &&
     /w/target/debug/tviburi-release verify /rel/release $pin" 2>&1) && { echo "$v" | tail -n 1; return 0; }
@@ -62,7 +63,7 @@ all() { # all COMMIT [MAIN]
   h2=$(build_tree "$ci/b.tree" "$ci/b") || fail "the second build failed: $(tail -n 3 "$ci/b/build.err")"
   [ "$h1" = "$h2" ] || fail "the two builds printed different hashes: $h1, $h2"
   compare "$ci/a" "$ci/b"
-  verify "$ci/a" "${RELEASE_PIN:-$h1}"
+  verify "$ci/a" "${RELEASE_PIN:-$h1}" "$ci/a.tree"
   mkdir -p "$out"
   for f in tviburi-release.tar MANIFEST LEDGER.jsonl; do cp "$ci/a/release/$f" "$out/$f"; done
   sha=$(sha256sum <"$out/tviburi-release.tar" | cut -c1-64)
@@ -75,7 +76,7 @@ all() { # all COMMIT [MAIN]
     echo "| tarball sha256 | \`sha256:$sha\` |"
     echo "| Renode build (MANIFEST) | \`$(sed -n 's/^build renode //p' "$out/MANIFEST")\` |"
     echo "| image | \`$IMAGE\` |"
-    echo; echo "Two builds byte-identical ($FILES); \`verify\` passed against \`${RELEASE_PIN:-$h1}\`."; } >"$out/summary.md"
+    echo; echo "Two builds byte-identical (every file in each); \`verify\` passed against \`${RELEASE_PIN:-$h1}\`."; } >"$out/summary.md"
   cat "$out/summary.md"
 }
 
