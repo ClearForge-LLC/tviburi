@@ -209,7 +209,7 @@ Of the 609 guarded rows:
 | 4 | 3 | sensor bus, command link | DMA1/DMA2 streams (SPI1/2, ADC1, USART1) | 59 + 21 | 37 | 43 | **0** | none |
 | 5 | 3 | sensor bus, command link | **DMAMUX1 routes** | 0 + 7 | 0 | 0 | **7 channels: C3, C4, C6, C10, C11 (sensor); C0, C5 (command)** | **a new DMAMUX1 guard,** one slice for all 16 channels. It answers `1303` §1.1's row: writes with the clocks off, sub-word writes dropped, sync/event/generator fields as tags, a `CxCR` rewrite under a live stream unseen |
 | 6 | 4a | clock tree | RCC other (PLLs, prescalers, `BDCR`), `FLASH.ACR` | 54 + 14 | 44 | 24 | **0** | none |
-| 7 | 4b | clock tree | **PWR** | 3 + 2 | 0 | 0 | **5: `CR1`, `CR2`, `CR3`, `CPUCR`, `D3CR` (`VOS` = 11)** | **a new PWR guard** over the stock canned stub (`stm32h7.repl` L728, "a stock Python script's fixed answers"): `VOS`, `LDOEN`/`SCUEN`, `ACTVOSRDY`/`VOSRDY`. One slice |
+| 7 | 4b | clock tree | **PWR** | 3 + 2 | 0 | 0 | **5: `CR1` (`DBP`, p305), `CR2`, `CR3` (`LDOEN`, `USB33DEN`, p308), `CPUCR`, `D3CR` (`VOS` = 11, Scale 1, p310)** | **a new PWR guard** over the stock canned stub (`stm32h7.repl` L728, "a stock Python script's fixed answers"): `VOS`, `LDOEN`/`SCUEN`, `ACTVOSRDY`/`VOSRDY`. One slice |
 | 8 | 4b | motor, sensor bus | GPIO other (`OTYPER`, `OSPEEDR`, `PUPDR`) | 64 + 0 | 41 | 23 | **0** | none |
 | 9 | 4b | sensor bus | SPI1/2, I2C1/2, ADC1 | 138 + 22 | 121 | 39 | **0** | none |
 | 10 | 4b | command link | USART1 | 54 + 2 | 29 | 27 | **0** | none |
@@ -232,7 +232,7 @@ Of the 609 guarded rows:
 - **Rows below it** are on paths the armed run does not take, or takes outside the four.
 
 **The cautious reader's alternative: the same cut plus TIM5.**
-- ChibiOS runs tickless on TIM5: B writes `CCR1` 258,850 times, with 128,191 distinct values, so every scheduler deadline is a TIM5 compare.
+- ChibiOS runs tickless on TIM5: B writes its `CCR1` 130,856 times, with 128,191 distinct values (258,850 writes to TIM5 in all), so every scheduler deadline is a TIM5 compare.
 - A stock-timer gap there, such as the period off by one or `CCxIF` set only with its interrupt enabled (both `stock-wrong` on TIM1, `1302`), shifts every loop rate the twin reports. It does so silently, on the path that flies first.
 - **Cost:** a third slice, the timer guard extended to the general-purpose timers TIM2–TIM5 (Table 342, p1695: a different register set from TIM1/TIM8). That also takes TIM2's 54 generated-board rows. About one guard's CI time and memory, by `1306a`–`1300c`'s pattern (+7–9 MiB at the median; about one shard).
 - **Why I do not recommend it:** TIM5 is ArduPilot's own timebase, and the twin's timing is instruction-accurate with named gaps, not cycle-accurate (northstar §5). A wrong tick changes when the firmware does things, not whether a path it takes is modeled. The four paths are where a false pass reaches a motor, a sensor reading or a command.
@@ -272,7 +272,7 @@ Of the 609 guarded rows:
   - Without `levels`, the ADC guard records `TVI-ADC-LEVEL` at every `DR` read: 805,530 in A0.
   - With the argv's own 16 s `RunFor` after the injection, Renode aborted (core dump) at 21.27 s with 6.65 GB resident.
   - The consumer has no property for the level (`1307` Q10, a row). An enforcing armed run through Aethelgard today would refuse at its first battery read.
-- **F5, the access log names `rcc`, `dma1`/`dma2` and `pwr` registers `unknown`.** `1305`'s nested-enum pattern was not carried to those wrappers. A consumer reading register names from the access log loses them there.
+- **F5, the access log names `rcc`, `dma1`/`dma2` and `pwr` registers `unknown`.** `1305`'s nested-enum pattern was not carried to the RCC and DMA wrappers. PWR is the stock stub, which has none. A consumer reading register names from the access log loses them there.
 - **F6, I2C2's reach differs between the guarded and the stock twin** (§2.1): the guard's NACK makes ChibiOS write `ICR`. Expected from `1306a`; recorded for whoever compares the two.
 - **F7, clause 4's stock half** passes on the missing witness, not on the firmware (§4). **F8, clauses 3 and 6** have the unproven cells §4 names.
 - **F9, one unrecorded container.** A one-line read-only `grep` of the stock `stm32h7.repl` ran with plain `podman run`, not `~/bin/capped-run`. It was a disclosed lapse, not repeated.
