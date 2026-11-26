@@ -69,11 +69,23 @@ def cls(reg, f, msb, lsb, reset):
             return ('Zero', U, '0 only: the stock model reserves the bit; COM and break are not modeled')
         return ('Zero', T, '0 only: a DMA request enable, a stock tag; DMA is the next 13NN')
     if reg == 'TIMx_SR':
+        # TVI-WO-1205, ruled 2026-11-26T17:02Z: each SR field read against ArduPilot's armed run (Aethelgard 4400h's Sentinel-03:
+        # SR written 0 three times, SR never read, DIER written 0, CCMR1/2 0x6868 (PWM 1, outputs), SMCR never written, BDTR
+        # 0x8000, CR2 0, EGR 0x1), the stock model (STM32_Timer.cs) and RM0433 Rev 9 §38.4.5 pp1596-1597.
+        ap = "ArduPilot's path is not affected: its armed run writes SR = 0, never reads SR and enables no TIM1 interrupt or DMA request (DIER = 0) (TVI-WO-1205, ruled 2026-11-26T17:02Z)"
         if re.fullmatch(r'UIF|CC[1-4]IF', base):
-            return ('Any', sw('the stock model sets UIF at UG only with UIE = 1, and CCxIF at a compare only with CCxIE = 1 (STM32_Timer.cs L283, L132-134); silicon sets them regardless (p1597), so a firmware that polls them reads 0 in the twin'), 'the stock model: cleared by writing 0, a 1 changes nothing (rc_w0)')
-        if re.fullmatch(r'TIF|CC[1-4]OF', base):
+            return ('Any', sw('the stock model sets UIF at UG only with UIE = 1, and CCxIF at a compare only with CCxIE = 1 (STM32_Timer.cs L283, L132-134); silicon sets them regardless (p1597), so a firmware that polls them reads 0 in the twin. ' + ap), 'the stock model: cleared by writing 0, a 1 changes nothing (rc_w0)')
+        if base == 'TIF':
+            return ('Any', sw('the stock model sets TIF at a trigger only with TIE = 1 (STM32_Timer.cs L656-658); silicon sets it at every TRG event while the slave mode controller is enabled (p1597), so a firmware that polls it reads 0 in the twin. ' + ap + '; it never writes SMCR, so no trigger event occurs on silicon either'), 'the stock model: cleared by writing 0, a 1 changes nothing (rc_w0)')
+        if re.fullmatch(r'CC[1-4]OF', base):
             return ('Any', I, 'the stock model: flags cleared by writing 0, a 1 changes nothing (rc_w0)')
-        return ('Any', T, 'reads 0 and is never set (COM, break, system break and channels 5-6 are refused or unrouted); a write of 0 or 1 changes nothing (rc_w0)')
+        if base in ('CC5IF', 'CC6IF'):
+            return ('Any', sw('the twin reads ' + base + ' 0: the stock model has no channels 5 and 6. Silicon sets it at a compare match (p1596, "Refer to CC1IF"; p1597), and CCR5/CCR6 reset to 0, so on silicon it sets at every counter match with 0 (inferred from p1597, not run). ' + ap), 'reads 0 and is never set (channels 5-6 are refused or unrouted); a write of 0 or 1 changes nothing (rc_w0)')
+        why = {'BIF': 'silicon sets BIF only while the break input is enabled (BKE = 1) and active (p1597)',
+               'B2IF': 'silicon sets B2IF only while the break 2 input is enabled (BK2E = 1) and active (p1596)',
+               'SBIF': 'silicon sets SBIF at a system break input (p1596), whose sources (a clock failure, a lockup, a PVD or RAM ECC event) the twin does not model',
+               'COMIF': 'silicon sets COMIF only at a COM event: COMG written 1, or a trigger with CCPC = 1 (p1597)'}[base]
+        return ('Any', T, 'reads 0 and is never set: break, break 2, system break and COM are not modeled; ' + why + '. ArduPilot\'s armed run sets none (BDTR = 0x8000: MOE only; CR2 = 0; EGR = UG only); a write of 0 or 1 changes nothing (rc_w0)')
     if reg == 'TIMx_EGR':
         if base == 'UG':
             return ('Any', I, 'the stock model: reinitialises the counter (STM32_Timer.cs L266-295); probed (T1, the control)')
