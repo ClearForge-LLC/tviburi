@@ -301,6 +301,9 @@ import re, subprocess, sys
 rows = subprocess.run([sys.executable, '-I', sys.argv[2], sys.argv[1]], capture_output=True, text=True, check=True).stdout.splitlines()
 arrays = {m.group(1): [int(x) for x in m.group(2).split(',')]
           for m in re.finditer(r'private static readonly uint\[\] (\w+) = \{([^}]*)\};', open(sys.argv[3]).read())}
+# The probes come from the guard's own arrays, so the arrays are first held to the manual's sets, or nothing is probed and the
+# case fails (adversarial pass, 1c): SQx and AWD1CH a channel 0-19 (p1012, p1023-1026), PRESC 0000-1011 (p1039).
+assert arrays.get('Channels') == list(range(20)) and arrays.get('Prescalers') == list(range(12)), "the guard's allowed sets are not the manual's"
 reset = {0x08: 0x20000000, 0x0C: 0x80000000, 0x24: 0x03FFFFFF, 0xB4: 0x03FFFFFF, 0xBC: 0x03FFFFFF}
 for l in rows:
     m = re.match(r'\s*R\("(ADCx?_\w+)", (0x[0-9A-F]+), "[^"]*", "(\w+)", (\d+), (\d+), (\w+),', l)

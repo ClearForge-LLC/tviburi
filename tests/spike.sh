@@ -239,8 +239,10 @@ t_stock-modf() {
   check "unguarded stock model at SPI1 does not PASS the MODF firmware (1)" '[ $rc -eq 1 ]'
   # Gate clause 4's stock half, by what it claims (TVI-WO-1203 (3)): stock Renode runs the MODF firmware past the faulting
   # write to its end (the after-the-last-write marker, Renode exit 0), and the run fails only because no guard witnessed it.
-  check "stock Renode passes the MODF path: the firmware reaches its end marker 0xAF7E0002 with Renode exit 0; the run fails only on the missing witness (gate clause 4)" \
-    "grep -qx 'VERDICT FAIL (check exit 1, renode exit 0, after-marker=0xAF7E0002)' '$work/stock-modf.stdout' && grep -q '^PROBLEM spi1: no load witness' '$work/stock-modf.stdout'"
+  check "stock Renode passes the MODF path: its two writes are the MODF firmware's (CFG2 = MASTER|SSM, then CR1 = SPE with SSI = 0, p2184's trigger), the firmware reaches its end marker 0xAF7E0002 with Renode exit 0, and the run's only problems are spi1's missing witness and end (gate clause 4)" \
+    "grep -qx 'VERDICT FAIL (check exit 1, renode exit 0, after-marker=0xAF7E0002)' '$work/stock-modf.stdout' \
+     && [ \"\$(grep '^PROBLEM' '$work/stock-modf.stdout' | cut -d: -f1-2 | paste -sd'|')\" = 'PROBLEM spi1| no load witness|PROBLEM spi1| no end record' ] \
+     && [ \"\$(grep -a 'spi1: \[cpu: [^]]*\] Write' '$work/stock-modf/renode-log.txt' | sed 's/.*Write[A-Za-z0-9]* to \(0x[0-9A-F]*\) .*value \(0x[0-9A-F]*\)\$/\1=\2/' | paste -sd' ')\" = '0xC=0x4400000 0x0=0x1' ]"
 }
 
 t_modf-page() {
@@ -284,7 +286,7 @@ aet_console() { # aet_console <name> <tree> <variant> [kill]: kill: SIGKILL Reno
     printf "include @/repo/scripts/prelude.resc\nsysbus LoadELF @/out/fw.elf\ncpu VectorTableOffset 0x08000000\nemulation RunFor \"0.001\"\necho \"TVIBURI-END\"\nquit\n" >/out/run.resc
     if [ -n "$KILL" ]; then
       renode --config /tmp/aet/renode.config --disable-gui --console --plain /out/run.resc </dev/null >/out/renode.out 2>&1 & pid=$!
-      for i in $(seq 1200); do grep -aq "^.\?\[[0-9:.]*\] \[INFO\] spi1: {\"tviburi\":\"witness\".*}.\?$" /out/renode.out && break; sleep 0.1; done
+      for i in $(seq 1200); do grep -aq "^.\?\[[0-9:.]*\] \[INFO\] spi1: {\"tviburi\":\"witness\".*}.\?$" /out/renode.out && { echo witness-seen-before-kill; break; }; sleep 0.1; done
       kill -9 $pid; wait $pid; echo "renode-exit=$?"
     else
       timeout 120 renode --config /tmp/aet/renode.config --disable-gui --console --plain /out/run.resc </dev/null >/out/renode.out 2>&1
@@ -312,8 +314,8 @@ t_removed-console() {
 t_crash-console() {
   # A crash: Renode killed (SIGKILL, exit 137) once spi1's witness is on Aethelgard's console, and the check on that console.
   aet_console crash-console "$src" modeled kill
-  check "crash, at the records-only check on Aethelgard's console: Renode killed (137, not a timeout) after spi1's witness, which the check reads; CHECK FAIL, no end record (gate clause 3)" \
-    "grep -qx 'renode-exit=137' '$work/crash-console.stdout' && aet_framed crash-console spi1 && grep -qx 'CHECK FAIL' '$work/crash-console.stdout' \
+  check "crash, at the records-only check on Aethelgard's console: Renode killed (137) by the case once spi1's witness was on the console (seen before the kill, not after 120 s), which the check reads; CHECK FAIL, no end record (gate clause 3)" \
+    "grep -qx 'witness-seen-before-kill' '$work/crash-console.stdout' && grep -qx 'renode-exit=137' '$work/crash-console.stdout' && aet_framed crash-console spi1 && grep -qx 'CHECK FAIL' '$work/crash-console.stdout' \
      && grep -q '^PROBLEM spi1: no end record' '$work/crash-console.stdout' && ! grep -q '^PROBLEM spi1: no load witness' '$work/crash-console.stdout'"
 }
 
@@ -326,7 +328,7 @@ t_crash-runner() {
 sysbus SetHookBeforePeripheralWrite spi1 \"(__import__('Antmicro.Renode.Logging').Renode.Logging.Logger.Flush(), __import__('os').kill(__import__('os').getpid(), 9))\""
   run crash-runner modeled "$work/crash-runner.tree"
   check "crash, at Tviburi's runner: Renode killed at spi1's first write (exit 137, not a timeout), after its witness: the run does not PASS (1); the check on its log finds no end record (gate clause 3)" \
-    "[ \$rc -eq 1 ] && grep -q '^VERDICT FAIL (check exit 1, renode exit 137, ' '$work/crash-runner.stdout' \
+    "[ \$rc -eq 1 ] && grep -qx 'VERDICT FAIL (check exit 1, renode exit 137, after-marker=none)' '$work/crash-runner.stdout' \
      && grep -q '^PROBLEM spi1: no end record' '$work/crash-runner.stdout' && ! grep -q '^PROBLEM spi1: no load witness' '$work/crash-runner.stdout'"
 }
 
@@ -599,15 +601,17 @@ EOF"
   check "planted: the class row names timer5, which no committed restatement runs guarded: the release refuses, naming it" \
     "[ \$rc != 0 ] && grep -q 'restates timer5, which no committed restatement' '$work/manifest-timer5.stdout'"
   # Planted: timer5 again, with every form of a restatement that Renode would not load as the guard: commented out (block and
-  # one line), its `as` in a trailing comment, and an entry cancelled after (adversarial pass, 2a).
+  # one line), its `as` in a trailing comment, an entry cancelled after, and a variable that is not one identifier
+  # (adversarial pass, 2a).
   fixture manifest-commented tools/tviburi-release/pins.tsv "$row" $'Tviburi.GuardedSTM32_Timer\ttimer1 timer5 timer8\t-'
   printf '%s\n' '' '// tviburiTimer5: Tviburi.GuardedSTM32_Timer @ {' '//         sysbus 0x40000C00;' '//     } as "timer5"' \
     '// tviburiTimer5: Tviburi.GuardedSTM32_Timer @ sysbus 0x40000C00 as "timer5"' \
     'tviburiTimer5: Tviburi.GuardedSTM32_Timer @ sysbus 0x40000C00 // as "timer5"' \
     'tviburiTim5: Tviburi.GuardedSTM32_Timer @ sysbus 0x40000C00 as "timer5"' 'tviburiTim5: @none' \
+    'tviburi Timer5: Tviburi.GuardedSTM32_Timer @ sysbus 0x40000C00 as "timer5"' \
     >>"$work/manifest-commented.tree/model/stm32h7-timer-restate.repl"
   pod manifest-commented "$work/manifest-commented.tree" -- sh -c '/repo/scripts/build-release'
-  check "planted: a restatement of timer5 commented out (block, one line), with its name only in a comment, or cancelled after, does not qualify it: the release refuses, naming it" \
+  check "planted: a restatement of timer5 commented out (block, one line), with its name only in a comment, cancelled after, or under a variable that is not one identifier, does not qualify it: the release refuses, naming it" \
     "[ \$rc != 0 ] && grep -q 'restates timer5, which no committed restatement' '$work/manifest-commented.stdout'"
   # Planted: a restatement inside a block comment, which cannot be read line by line: the release refuses the file.
   fixture manifest-block tools/tviburi-release/pins.tsv "$row" $'Tviburi.GuardedSTM32_Timer\ttimer1 timer5 timer8\t-'
@@ -685,6 +689,7 @@ for path, base, inst in (('model/GuardedSTM32H7_RCC.cs', 0x58024400, 'rcc'), ('m
     if inst == 'dma1':
         offs = sorted({o + 0x18 * k for o in offs for k in range(8 if 0x10 <= o < 0x28 else 1)})
     names = {int(v, 16): n for n, v in re.findall(r'^\s+(\w+) = (0x[0-9A-F]+),$', text[text.index('private enum Registers'):text.index('private enum Registers') + 6000].split('}')[0], re.M)}
+    offs = sorted(set(offs) | set(names))   # and every offset the enum names (the RCC's C1_ aliases, adversarial pass 1f)
     for o in offs:
         print('%s 0x%X %s 0x%08X' % (inst, o, names.get(o, '-'), base + o))
 EOF
@@ -703,7 +708,7 @@ for l in open(sys.argv[2], errors='replace'):
 bad = [(i, o, n, got.get((i, int(o, 16)))) for i, o, n, a in want if n == '-' or got.get((i, int(o, 16))) != n]
 unknown = [k for k, v in got.items() if v == 'unknown']
 print('lognames:', len(want), 'offsets,', len(got), 'logged,', 'mismatched', bad[:5], 'unknown', unknown[:5])
-sys.exit(0 if len(want) > 100 and not bad and not unknown else 1)
+sys.exit(0 if len(want) > 120 and not bad and not unknown else 1)
 EOF"
 }
 
