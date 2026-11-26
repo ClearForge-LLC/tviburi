@@ -250,7 +250,7 @@ for t in ${TVIBURI_TESTS:-$CASES}; do
   ledger)
     mkdir -p "$work/ledger"
     rc=0; container -v "$src:/repo:ro,Z" -v "$work/ledger:/out:Z" "$IMAGE" sh -c '/repo/scripts/build-release /repo /out/release >/dev/null' </dev/null >"$work/ledger.stdout" 2>&1 || rc=$?
-    check "ledger: the release carries the RCC guard's 677 field rows; each acknowledged row cites TVI-WO-1300.rm0433.md §8, never 0100b's; the RCC bench rows R1-R11 are in it, with the (rule, bit) the cases emit (RUL-18), R11 the VCOL acknowledgement's (TVI-WO-1300c Q1)" \
+    check "ledger: the release carries the RCC guard's 677 field rows; each acknowledged row cites TVI-WO-1300.rm0433.md §8, never 0100b's; the RCC bench rows R1-R12 are in it, with the (rule, bit) the cases emit (RUL-18), R11 the VCOL acknowledgement's (TVI-WO-1300c Q1)" \
       "[ \$rc = 0 ] && python3 -I -c '
 import json, sys
 rows = [json.loads(l) for l in open(sys.argv[1]).read().splitlines()[1:]]
@@ -262,8 +262,8 @@ pairs = sorted((r[\"rule\"], r[\"bit\"]) for r in rcc if r[\"row\"] == \"bench\"
 want = sorted([(\"TVI-RCC-KERNEL\", \"RCC_D2CCIP1R.SPI123SEL = 000\"), (\"TVI-RCC-KERNEL\", \"RCC_D2CCIP1R.SPI123SEL = 100\"), (\"TVI-RCC-PLL\", \"DIVP1EN/DIVQ1EN/DIVR1EN\"),
   (\"TVI-RCC-CLOCK\", \"RCC_CR.PLL1ON (bit 24) = 0\"), (\"TVI-RCC-CLOCK\", \"RCC_D2CCIP1R.SPI123SEL (14:12) = 001\"), (\"TVI-RCC-CLOCK\", \"RCC_APB2ENR.SPI1EN (bit 12) = 0\"),
   (\"TVI-RCC-CLOCK\", \"RCC_CR.HSEON (bit 16) = 0\"), (\"TVI-RCC-CLOCK\", \"RCC_D1CCIPR.CKPERSEL (29:28) = 01\"), (\"TVI-RCC-PLL\", \"DIVN1/DIVP1/DIVQ1/DIVR1\"),
-  (\"TVI-RCC-PLL-REF\", \"PLL1ON (bit 24) = 1\"), (\"KernelHz (VCOL above 2 MHz, acknowledged by name)\", \"RCC_PLLCFGR.PLL2VCOSEL (bit 5) = 1\")])
-sys.exit(0 if len(f) == 677 and a and all(r[\"reason\"].startswith(\"TVI-WO-1300.rm0433.md §8 A\") for r in a) and b == sorted(\"R%d\" % i for i in range(1, 12)) and pairs == want else 1)
+  (\"TVI-RCC-PLL-REF\", \"PLL1ON (bit 24) = 1\"), (\"KernelHz (VCOL above 2 MHz, acknowledged by name)\", \"RCC_PLLCFGR.PLL2VCOSEL (bit 5) = 1\"), (\"TVI-RCC-VOS\", \"APB1 (rcc_pclk1) above VOS3\")])
+sys.exit(0 if len(f) == 677 and a and all(r[\"reason\"].startswith(\"TVI-WO-1300.rm0433.md §8 A\") for r in a) and b == sorted(\"R%d\" % i for i in range(1, 13)) and pairs == want else 1)
 ' '$work/ledger/release/LEDGER.jsonl'" ;;
   alias17c)
     run_case alias17c - 'echo "R-17C"' 'sysbus ReadDoubleWord 0x5802457C'

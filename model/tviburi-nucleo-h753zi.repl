@@ -13,6 +13,7 @@ using "./stm32h7-flash-restate.repl"
 using "./stm32h7-usart-restate.repl"
 using "./stm32h7-i2c-restate.repl"
 using "./stm32h7-adc-restate.repl"
+using "./stm32h7-dmamux-restate.repl"
 
 // The guard's mode (RUL-19), and the stock board's `rcc: hseFrequency: 8_000_000` restated on the guard: that update
 // lands on the cancelled stock entry (TVI-WO-1300.rm0433.md §6.4).
@@ -150,3 +151,9 @@ tviburiAdc12:
 tviburiAdc3:
     mode: "enforcing"
     revision: "V"
+
+// TVI-WO-1308: DMAMUX1 is guarded (stm32h7-dmamux-restate.repl cancels the stock entry, declares the guard as "dmamux1" and
+// restates every reference to it onto the guard; it loads after the DMA and ADC restatements, whose guards it updates). Its
+// mode (RUL-19).
+tviburiDmamux1:
+    mode: "enforcing"

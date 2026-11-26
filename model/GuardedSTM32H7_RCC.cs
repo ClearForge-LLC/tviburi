@@ -57,6 +57,17 @@
 //                   DIVM1 = 0, divides by zero). unmodeled.
 //   TVI-RCC-FIELD   the allow-list (`Fields`): a write that gives any field a value the model does not implement,
 //                   or a write to an offset with no register. unmodeled.
+//   TVI-RCC-DBP     (TVI-WO-1308, ruled 2026-11-26T09:31Z Q10) an RCC_BDCR write that changes it while the PWR guard's
+//                   PWR_CR1.DBP = 0: "After a system reset, the RCC_BDCR register is write-protected" (p427), and RM0433 never
+//                   says what a protected write does. unmodeled. With no PWR guard on the platform, the stock pwr stub reads DBP = 1.
+//   TVI-RCC-VOS     (TVI-WO-1308, ruled Q9; 11:06Z Q20 (A)) a write (RCC_CR, CFGR, D1-D3CFGR, PLLCKSELR, PLLCFGR, PLL1DIVR, or an
+//                   APB enable) after which the CPU, AHB or an APB clock is above DS12117 Rev 10 Table 111 p210's limit for the
+//                   scale the PWR guard holds ("the voltage scaling shall be changed before increasing the system frequency",
+//                   p310; "otherwise the system might be unreliable", p286). predicted-fault; unmodeled where only VOS0 (VOS1 with
+//                   SYSCFG_PWRCR.ODEN, p280-281, which the twin cannot read) would hold the clocks and the LDO is on (VOS0 "is
+//                   available only when the LDO regulator is ON", DS12117 p210 note 4). Also unmodeled: a write that changes sys_ck
+//                   while the PWR guard's ACTVOSRDY = 0 (CR3 "shall be written before changing ... ck_sys clock frequency", p308;
+//                   Run*, p262). Judged only on a platform with a PWR guard: with none, not judged at all.
 //   TVI-RCC-CLOCK   (TVI-WO-1300a (3); 1300b (2)) a write after which a guarded peripheral that runs (an SPI with SPE = 1, or a
 //                   USART guard with UE = 1, ruled 2026-11-25T03:03Z Q2) loses the
 //                   kernel clock it had, by the query on the state the write leaves: a source oscillator or PLLxON cleared,
@@ -277,7 +288,12 @@ namespace Antmicro.Renode.Peripherals.Tviburi
         // sys_ck by SWS (p393): the HSI, the CSI, the HSE or PLL1's P output.
         private double? SysHz(ref string why)
         {
-            var sws = inner.ReadDoubleWord(CfgrOffset) >> 3 & 7;
+            return SysHz(inner.ReadDoubleWord(CfgrOffset) >> 3 & 7, ref why);
+        }
+
+        // sys_ck with a given SWS: the stock model's, or during TVI-RCC-VOS's trial the SW a CFGR write switches to.
+        private double? SysHz(uint sws, ref string why)
+        {
             var sys = sws == 0 ? Hsi() : sws == 1 ? CsiFrequency : sws == 2 ? (double?)HseFrequency : sws == 3 ? PllHz(1, 'p', ref why) : null;
             if(sys == null)
             {
@@ -376,6 +392,63 @@ namespace Antmicro.Renode.Peripherals.Tviburi
                 return null;
             }
             return vco / (div + 1);
+        }
+
+        // TVI-WO-1308 (ruled 2026-11-26T09:31Z Q9): the bus clocks now, in Hz, for the PWR guard's VOS rule: CPU (rcc_c_ck = sys_ck /
+        // D1CPRE, p394), AHB (rcc_hclk = rcc_c_ck / HPRE, p395), APB1-APB4 (rcc_pclk1/2 by D2PPRE1/2, p396; rcc_pclk3 by D1PPRE,
+        // p395; rcc_pclk4 by D3PPRE, p397); `apbEnabled`, per APB bus, whether one of its peripherals is enabled (RCC_APB1LENR or
+        // APB1HENR, APB2ENR, APB3ENR, APB4ENR, p462-471). Null, with the reason, where sys_ck has no frequency rule. It changes nothing.
+        public double[] BusClocks(out bool[] apbEnabled, out string why)
+        {
+            return Clocks(-1, 0, out apbEnabled, out why, out var _);
+        }
+
+        // The bus clocks as BusClocks gives them, after a write of `value` at `b` (none for b = -1): the write's copy, RCC_PLLxDIVR
+        // and RCC_CR (as the stock model keeps it) taken for the trial and restored, as TVI-RCC-CLOCK's trial does; CFGR's SW as the
+        // new SWS (TVI-RCC-SW has passed: its target runs); D1CFGR, D2CFGR and D3CFGR as written.
+        private double[] Clocks(long b, uint value, out bool[] apbEnabled, out string why, out double? sysHz)
+        {
+            var savedCopy = b >= 0 && copies.TryGetValue(b, out var c) ? c : (uint?)null;
+            var savedDivr = b >= 0 && divr.TryGetValue(b, out var d) ? d : (uint?)null;
+            try
+            {
+                if(savedCopy != null)
+                {
+                    copies[b] = value;
+                }
+                if(savedDivr != null)
+                {
+                    divr[b] = value;
+                }
+                crAfter = b == CrOffset ? KeptCr(value) : (uint?)null;
+                apbEnabled = new[] { Copy(0x0E8) != 0 || Copy(0x0EC) != 0, Copy(0x0F0) != 0, Copy(0x0E4) != 0, Copy(0x0F4) != 0 };
+                why = "sys_ck";
+                var sys = SysHz(b == CfgrOffset ? value & 7 : inner.ReadDoubleWord(CfgrOffset) >> 3 & 7, ref why);
+                sysHz = sys;
+                if(sys == null)
+                {
+                    return null;
+                }
+                var d1 = b == 0x018 ? value : inner.ReadDoubleWord(0x018);
+                var d2 = b == 0x01C ? value : inner.ReadDoubleWord(0x01C);
+                var d3 = b == 0x020 ? value : inner.ReadDoubleWord(0x020);
+                var cpu = sys.Value / Prescaler(d1 >> 8 & 0xF);
+                var ahb = cpu / Prescaler(d1 & 0xF);
+                Func<uint, double> apb = x => ahb / ((x & 4) == 0 ? 1 : 2 << (int)(x & 3));   // 0xx /1; 100-111 /2-/16
+                return new[] { cpu, ahb, apb(d2 >> 4 & 7), apb(d2 >> 8 & 7), apb(d1 >> 4 & 7), apb(d3 >> 4 & 7) };
+            }
+            finally
+            {
+                if(savedCopy is uint sc)
+                {
+                    copies[b] = sc;
+                }
+                if(savedDivr is uint sd)
+                {
+                    divr[b] = sd;
+                }
+                crAfter = default(uint?);
+            }
         }
 
         // D1CPRE and HPRE (pp. 394-395): 0xxx /1; 1000-1011 /2-/16; 1100-1111 /64-/512.
@@ -529,9 +602,14 @@ namespace Antmicro.Renode.Peripherals.Tviburi
                     return;
                 }
             }
-            else if(RefusedField(b, b, word) && !records.Recorded)
+            else
             {
-                return;
+                var fired = RefusedField(b, b, word);
+                fired |= records.Evaluates(fired) && RefusedDbp(offset, b, word, width);   // every rule in recorded mode (model/Refusal.cs)
+                if(fired && !records.Recorded)
+                {
+                    return;
+                }
             }
             Pass(b, word);
         }
@@ -584,6 +662,8 @@ namespace Antmicro.Renode.Peripherals.Tviburi
             fired |= records.Evaluates(fired) && RefusedPllReference(b, value);
             fired |= records.Evaluates(fired) && RefusedSwitch(b, value);
             fired |= records.Evaluates(fired) && RefusedField(offset, b, value);
+            fired |= records.Evaluates(fired) && RefusedDbp(offset, b, value, 32);
+            fired |= records.Evaluates(fired) && RefusedVos(offset, b, value);
             fired |= records.Evaluates(fired) && RefusedClockLoss(offset, b, value);
             return fired;
         }
@@ -823,6 +903,68 @@ namespace Antmicro.Renode.Peripherals.Tviburi
                 }
             }
             return false;
+        }
+
+        // TVI-RCC-DBP (TVI-WO-1308, ruled 2026-11-26T09:31Z Q10): an RCC_BDCR write that changes it while the PWR guard's DBP = 0.
+        private bool RefusedDbp(long offset, long b, uint value, int width)
+        {
+            var p = b == BdcrOffset ? Pwr() : null;
+            if(p == null || p.Dbp || value == Served(b))
+            {
+                return false;   // no PWR guard (the stock stub reads DBP = 1), DBP = 1, or a write that changes nothing (RUL-18 as amended)
+            }
+            records.Refuse("TVI-RCC-DBP", Unmodeled, RegisterAt(offset), "RCC_BDCR with PWR_CR1.DBP = 0",
+                "RCC_BDCR written 0x" + value.ToString("X8") + " (it holds 0x" + Served(b).ToString("X8") + ") while PWR_CR1.DBP = 0: \"After a system reset, the RCC_BDCR register is write-protected\", and RM0433 never says what a protected write does, so the twin cannot say what silicon holds",
+                "RM0433 Rev 9 §8.7.26 p427; §6.8.1 p305 (DBP); TVI-WO-1308, ruled 2026-11-26T09:31Z Q10", State(), offset, value, width);
+            return true;
+        }
+
+        // TVI-RCC-VOS (TVI-WO-1308, ruled 2026-11-26T09:31Z Q9, 11:06Z Q20 (A)): a write after which the CPU, AHB or an APB clock is
+        // above DS12117 Rev 10 p210's limit for the scale the PWR guard holds. Judged only on a platform with a PWR guard; with none,
+        // not judged at all. At a write that changes the verdict (a new excess, or the same with other clocks); a clock with no
+        // frequency rule (sys_ck's source gives none) is not judged here.
+        private bool RefusedVos(long offset, long b, uint value)
+        {
+            if(!VosOffsets.Contains(b))
+            {
+                return false;
+            }
+            var p = Pwr();
+            if(p == null)
+            {
+                return false;   // ruled 2026-11-26T11:06Z Q20 (A): not judged without a PWR guard
+            }
+            var revision = p.Revision;
+            var scale = p.Scale;
+            var held = p.ScaleCitation;
+            var c0 = Clocks(-1, 0, out var apb0, out var _, out var sys0);
+            var c1 = Clocks(b, value, out var apb1, out var _, out var sys1);
+            if(!p.ActvosReady && sys1 != sys0)
+            {
+                // TVI-WO-1308 adversarial pass: sys_ck changed in Run* mode, before a valid supply configuration (p308, p262).
+                records.Refuse("TVI-RCC-VOS", Unmodeled, RegisterAt(offset), "sys_ck before the supply configuration",
+                    "sys_ck changed from " + (sys0?.ToString() ?? "no known frequency") + " to " + (sys1?.ToString() ?? "no known frequency") + " Hz while PWR_CSR1.ACTVOSRDY = 0 (no valid supply configuration written): "
+                        + "PWR_CR3's lower byte \"shall be written before changing VOS level or ck_sys clock frequency\" (p308), and until ACTVOSRDY the system is in Run* mode (p262); no page says what silicon does with the change",
+                    "RM0433 Rev 9 §6.8.4 p308; §6.4.1 p262; TVI-WO-1308 adversarial pass", State(), offset, value, 32);
+                return true;
+            }
+            var before = GuardedSTM32H7_PWR.Exceeds(revision, c0, apb0, scale, p.LdoOn, out var _);
+            var after = GuardedSTM32H7_PWR.Exceeds(revision, c1, apb1, scale, p.LdoOn, out var kind);
+            if(after == null || after == before)
+            {
+                return false;
+            }
+            records.Refuse("TVI-RCC-VOS", kind, RegisterAt(offset), after.Split(new[] { " at " }, StringSplitOptions.None)[0] + " above VOS" + scale,
+                "after this write, " + after + "; the scale: " + held
+                    + ": \"When increasing the performance, the voltage scaling shall be changed before increasing the system frequency\" (p310), \"otherwise the system might be unreliable\" (p286)",
+                "RM0433 Rev 9 §6.8.6 p310; §6.6.4 p286; " + GuardedSTM32H7_PWR.LimitsCitation + "; TVI-WO-1308, ruled 2026-11-26T09:31Z Q9",
+                State(), offset, value, 32);
+            return true;
+        }
+
+        private GuardedSTM32H7_PWR Pwr()
+        {
+            return pwr ?? (pwr = host.GetPeripheralsOfType<GuardedSTM32H7_PWR>().FirstOrDefault());
         }
 
         // TVI-RCC-CLOCK (TVI-WO-1300a (3); ruled 17:16Z): a write after which a guarded peripheral that runs (an SPI with SPE = 1)
@@ -1237,6 +1379,10 @@ namespace Antmicro.Renode.Peripherals.Tviburi
         // Per PLL (1-3): DIVMn, PLLSRC, PLLnRGE or PLLnVCOSEL written while it ran (p347): its frequency no longer known.
         private bool[] cfgUnknown = new bool[4];
         private uint? crAfter;
+        private GuardedSTM32H7_PWR pwr;
+        // TVI-RCC-VOS: the writes that can change a bus clock or an APB bus's enables (RCC_CR, CFGR, D1-D3CFGR, PLLCKSELR, PLLCFGR,
+        // PLL1DIVR, APB3ENR, APB1LENR, APB1HENR, APB2ENR, APB4ENR).
+        private static readonly long[] VosOffsets = { CrOffset, CfgrOffset, 0x018, 0x01C, 0x020, PllckselrOffset, PllcfgrOffset, Pll1divrOffset, 0x0E4, 0x0E8, 0x0EC, 0x0F0, 0x0F4 };
         private readonly Records records;
         private readonly MuxState[] muxes;
         private Dictionary<long, uint> copies;
@@ -1581,17 +1727,17 @@ namespace Antmicro.Renode.Peripherals.Tviburi
             R("RCC_CICR", 0x068, "§8.7.25", "LSERDYC", 1, 1, Zero, "tag", "its reset value (stock tag)", 426),
             R("RCC_CICR", 0x068, "§8.7.25", "LSIRDYC", 0, 0, Zero, "tag", "its reset value (stock tag)", 426),
             R("RCC_BDCR", 0x070, "§8.7.26", "Res31_17", 31, 17, Zero, "reserved", "reserved: dropped, reads its reset value", 427),
-            R("RCC_BDCR", 0x070, "§8.7.26", "BDRST", 16, 16, Zero, "inherited, unaudited (acknowledged by name)", "its reset value only: RCC_BDCR is write-protected after a system reset until PWR_CR1.DBP = 1 (p427), which the twin does not model, and the RTC's kernel clock (RTCSEL) is not modeled", 427),
-            R("RCC_BDCR", 0x070, "§8.7.26", "RTCEN", 15, 15, new uint[] { 0, 1 }, "inherited, unaudited (acknowledged by name)", "the guard's copy, served on read: 0 from construction (a backup domain reset, p427, p334), kept across a machine reset (p427); it gates rtc_ck only (p366), which has no source while RTCSEL = 00 (\"No clock\", p427), and the RTC's registers follow RCC_APB4ENR.RTCAPBEN (p471), so `rtc` is never locked by it; RCC_BDCR's write protection (PWR_CR1.DBP, p427) is not modeled: the twin's PWR is a canned stub that reads DBP = 1 (acknowledged by name) (TVI-WO-1300b, ruled 2026-11-25T03:03Z Q4)", 427),
+            R("RCC_BDCR", 0x070, "§8.7.26", "BDRST", 16, 16, Zero, "inherited, unaudited (acknowledged by name)", "its reset value only: the RTC's kernel clock (RTCSEL) is not modeled; RCC_BDCR is write-protected after a system reset until PWR_CR1.DBP = 1 (p427): with a PWR guard on the platform, a write that changes RCC_BDCR while its DBP = 0 refuses TVI-RCC-DBP, unmodeled (TVI-WO-1308, ruled 2026-11-26T09:31Z Q10); with none, the stock pwr stub reads DBP = 1", 427),
+            R("RCC_BDCR", 0x070, "§8.7.26", "RTCEN", 15, 15, new uint[] { 0, 1 }, "inherited, unaudited (acknowledged by name)", "the guard's copy, served on read: 0 from construction (a backup domain reset, p427, p334), kept across a machine reset (p427); it gates rtc_ck only (p366), which has no source while RTCSEL = 00 (\"No clock\", p427), and the RTC's registers follow RCC_APB4ENR.RTCAPBEN (p471), so `rtc` is never locked by it; RCC_BDCR's write protection (PWR_CR1.DBP, p427): with a PWR guard on the platform, a write that changes RCC_BDCR while its DBP = 0 refuses TVI-RCC-DBP, unmodeled (TVI-WO-1308, ruled 2026-11-26T09:31Z Q10); with none, the stock pwr stub reads DBP = 1 and the write is taken (acknowledged by name) (TVI-WO-1300b, ruled 2026-11-25T03:03Z Q4)", 427),
             R("RCC_BDCR", 0x070, "§8.7.26", "Res14_10", 14, 10, Zero, "reserved", "reserved: dropped, reads its reset value", 427),
-            R("RCC_BDCR", 0x070, "§8.7.26", "RTCSEL", 9, 8, Zero, "inherited, unaudited (acknowledged by name)", "its reset value only: RCC_BDCR is write-protected after a system reset until PWR_CR1.DBP = 1 (p427), which the twin does not model, and the RTC's kernel clock (RTCSEL) is not modeled", 427),
+            R("RCC_BDCR", 0x070, "§8.7.26", "RTCSEL", 9, 8, Zero, "inherited, unaudited (acknowledged by name)", "its reset value only: the RTC's kernel clock (RTCSEL) is not modeled; RCC_BDCR is write-protected after a system reset until PWR_CR1.DBP = 1 (p427): with a PWR guard on the platform, a write that changes RCC_BDCR while its DBP = 0 refuses TVI-RCC-DBP, unmodeled (TVI-WO-1308, ruled 2026-11-26T09:31Z Q10); with none, the stock pwr stub reads DBP = 1", 427),
             R("RCC_BDCR", 0x070, "§8.7.26", "Res7", 7, 7, Zero, "reserved", "reserved: dropped, reads its reset value", 427),
             R("RCC_BDCR", 0x070, "§8.7.26", "LSECSSD", 6, 6, Any, "read-only", "ignored (read-only; stock tag)", 428),
-            R("RCC_BDCR", 0x070, "§8.7.26", "LSECSSON", 5, 5, Zero, "inherited, unaudited (acknowledged by name)", "its reset value only: RCC_BDCR is write-protected after a system reset until PWR_CR1.DBP = 1 (p427), which the twin does not model, and the RTC's kernel clock (RTCSEL) is not modeled", 428),
-            R("RCC_BDCR", 0x070, "§8.7.26", "LSEDRV", 4, 3, Zero, "inherited, unaudited (acknowledged by name)", "its reset value only: RCC_BDCR is write-protected after a system reset until PWR_CR1.DBP = 1 (p427), which the twin does not model, and the RTC's kernel clock (RTCSEL) is not modeled", 428),
-            R("RCC_BDCR", 0x070, "§8.7.26", "LSEBYP", 2, 2, Zero, "inherited, unaudited (acknowledged by name)", "its reset value only: RCC_BDCR is write-protected after a system reset until PWR_CR1.DBP = 1 (p427), which the twin does not model, and the RTC's kernel clock (RTCSEL) is not modeled", 428),
+            R("RCC_BDCR", 0x070, "§8.7.26", "LSECSSON", 5, 5, Zero, "inherited, unaudited (acknowledged by name)", "its reset value only: the RTC's kernel clock (RTCSEL) is not modeled; RCC_BDCR is write-protected after a system reset until PWR_CR1.DBP = 1 (p427): with a PWR guard on the platform, a write that changes RCC_BDCR while its DBP = 0 refuses TVI-RCC-DBP, unmodeled (TVI-WO-1308, ruled 2026-11-26T09:31Z Q10); with none, the stock pwr stub reads DBP = 1", 428),
+            R("RCC_BDCR", 0x070, "§8.7.26", "LSEDRV", 4, 3, Zero, "inherited, unaudited (acknowledged by name)", "its reset value only: the RTC's kernel clock (RTCSEL) is not modeled; RCC_BDCR is write-protected after a system reset until PWR_CR1.DBP = 1 (p427): with a PWR guard on the platform, a write that changes RCC_BDCR while its DBP = 0 refuses TVI-RCC-DBP, unmodeled (TVI-WO-1308, ruled 2026-11-26T09:31Z Q10); with none, the stock pwr stub reads DBP = 1", 428),
+            R("RCC_BDCR", 0x070, "§8.7.26", "LSEBYP", 2, 2, Zero, "inherited, unaudited (acknowledged by name)", "its reset value only: the RTC's kernel clock (RTCSEL) is not modeled; RCC_BDCR is write-protected after a system reset until PWR_CR1.DBP = 1 (p427): with a PWR guard on the platform, a write that changes RCC_BDCR while its DBP = 0 refuses TVI-RCC-DBP, unmodeled (TVI-WO-1308, ruled 2026-11-26T09:31Z Q10); with none, the stock pwr stub reads DBP = 1", 428),
             R("RCC_BDCR", 0x070, "§8.7.26", "LSERDY", 1, 1, Any, "read-only", "ignored (read-only; stock computed-read)", 428),
-            R("RCC_BDCR", 0x070, "§8.7.26", "LSEON", 0, 0, Zero, "inherited, unaudited (acknowledged by name)", "its reset value only: RCC_BDCR is write-protected after a system reset until PWR_CR1.DBP = 1 (p427), which the twin does not model, and the RTC's kernel clock (RTCSEL) is not modeled", 428),
+            R("RCC_BDCR", 0x070, "§8.7.26", "LSEON", 0, 0, Zero, "inherited, unaudited (acknowledged by name)", "its reset value only: the RTC's kernel clock (RTCSEL) is not modeled; RCC_BDCR is write-protected after a system reset until PWR_CR1.DBP = 1 (p427): with a PWR guard on the platform, a write that changes RCC_BDCR while its DBP = 0 refuses TVI-RCC-DBP, unmodeled (TVI-WO-1308, ruled 2026-11-26T09:31Z Q10); with none, the stock pwr stub reads DBP = 1", 428),
             R("RCC_CSR", 0x074, "§8.7.27", "Res31_2", 31, 2, Zero, "reserved", "reserved: dropped, reads its reset value", 429),
             R("RCC_CSR", 0x074, "§8.7.27", "LSIRDY", 1, 1, Any, "read-only", "ignored (read-only; stock computed-read)", 429),
             R("RCC_CSR", 0x074, "§8.7.27", "LSION", 0, 0, Any, "inherited, unaudited (acknowledged by name)", "the stock model (stored): stored (local var)", 429),

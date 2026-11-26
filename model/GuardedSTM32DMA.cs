@@ -748,6 +748,7 @@ namespace Antmicro.Renode.Peripherals.Tviburi
                         + "; the twin cannot say what silicon moves when",
                     "RM0433 Rev 9 §17.3.2 Table 124 p697-698; TVI-WO-1303.measure.md §2.2, §5 Q5 (c)");
             }
+            refused |= raised.Contains(id) && dmamux is GuardedSTM32H7_DMAMUX g && g.RefusedPair(ch, inner.ReadDoubleWord(StreamBase(s) + ParOffset), p2m, offset, word, inner.ReadDoubleWord(StreamBase(s) + NdtrOffset));   // TVI-WO-1308 Q3: PAR against the route
             return refused;
         }
 

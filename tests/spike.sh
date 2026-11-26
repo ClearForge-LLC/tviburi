@@ -44,6 +44,12 @@ ACCEPTANCE="$ACCEPTANCE $(for c in $I2C_CASES; do printf 'i2c-%s ' "$c"; done)"
 # TVI-WO-1307: the ADC guard's cases live in tests/1307/adc.sh; each is a test here, adc-<case>, in the acceptance group.
 ADC_CASES=$(sed -n 's/^CASES="\(.*\)"$/\1/p' "$(dirname "$0")/1307/adc.sh")
 ACCEPTANCE="$ACCEPTANCE $(for c in $ADC_CASES; do printf 'adc-%s ' "$c"; done)"
+# TVI-WO-1308: the DMAMUX1 guard's cases live in tests/1308/dmamux.sh; each is a test here, dmamux-<case>, in the acceptance group.
+DMAMUX_CASES=$(sed -n 's/^CASES="\(.*\)"$/\1/p' "$(dirname "$0")/1308/dmamux.sh")
+ACCEPTANCE="$ACCEPTANCE $(for c in $DMAMUX_CASES; do printf 'dmamux-%s ' "$c"; done)"
+# TVI-WO-1308: the PWR guard's cases live in tests/1308/pwr.sh; each is a test here, pwr-<case>, in the acceptance group.
+PWR_CASES=$(sed -n 's/^CASES="\(.*\)"$/\1/p' "$(dirname "$0")/1308/pwr.sh")
+ACCEPTANCE="$ACCEPTANCE $(for c in $PWR_CASES; do printf 'pwr-%s ' "$c"; done)"
 ALL="$ACCEPTANCE $ADVERSARIAL"
 if [ "${TVIBURI_TESTS:-}" = list ]; then printf '%s\n' $ALL; exit 0; fi
 here=$(cd "$(dirname "$0")/.." && pwd)
@@ -990,6 +996,18 @@ t_adc() { # t_adc <case>: one case of tests/1307/adc.sh on this source, its ok/F
   fails=$((fails + f))
 }
 for c in $ADC_CASES; do eval "t_adc-$c() { t_adc $c; }"; done
+t_1308() { # t_1308 <suite> <case>: one case of tests/1308/<suite>.sh on this source, its ok/FAIL lines counted here (TVI-WO-1308)
+  local out trc=0
+  out=$(TVIBURI_TESTS="$2" TVIBURI_SCRATCH="$work" "$src/tests/1308/$1.sh" "$src" 2>&1) || trc=$?
+  grep -E '^(ok|FAIL) ' <<<"$out" || true
+  local f; f=$(grep -c '^FAIL ' <<<"$out" || true)
+  if [ "$trc" -ne 0 ] && [ "$f" -eq 0 ]; then
+    echo "FAIL $1-$2: tests/1308/$1.sh exited $trc with no verdict"; f=1
+  fi
+  fails=$((fails + f))
+}
+for c in $DMAMUX_CASES; do eval "t_dmamux-$c() { t_1308 dmamux $c; }"; done
+for c in $PWR_CASES; do eval "t_pwr-$c() { t_1308 pwr $c; }"; done
 
 for t in ${TVIBURI_TESTS:-acceptance}; do
   case "$t" in

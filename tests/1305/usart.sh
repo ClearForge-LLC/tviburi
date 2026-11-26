@@ -93,7 +93,7 @@ idleat() { bit "$(readout "$1" "$2"20)" 4 0 && bit "$(readout "$1" "$2"40)" 4 1;
 bit() { python3 -I -c 'import sys; sys.exit(0 if int(sys.argv[1], 16) >> int(sys.argv[2]) & 1 == int(sys.argv[3]) else 1)' "$@"; }   # bit <hex> <n> <0|1>
 marks=('echo "TVIBURI-MARK-AFTER"' 'sysbus ReadDoubleWord 0x20000104' 'echo "R-READ"' 'sysbus ReadDoubleWord 0x20000108' 'echo "R-READ2"' 'sysbus ReadDoubleWord 0x2000010C')
 clk='sysbus WriteDoubleWord 0x580244F0 0x10'   # USART1EN (p470): an unclocked port is locked on the bus (TVI-WO-1300a)
-rx='/^tviburiUsart1:$/a\    ReceiveDmaRequest -> dmamux1@41'   # the consumer's request line (Aethelgard AET-WO-4400i), on the guard
+rx='/^tviburiUsart1:$/a\    ReceiveDmaRequest -> tviburiDmamux1@41'   # the consumer's request line (Aethelgard AET-WO-4400i), on the guard; onto DMAMUX1's guard (TVI-WO-1308 Q1)
 
 for t in ${TVIBURI_TESTS:-$CASES}; do
   case " $MONITOR " in *" $t "*) mon=1 ;; *) mon=0 ;; esac

@@ -12,17 +12,20 @@
 //   sys_ck / D1CPRE / HPRE, p395; Table 17's F_ACLK) at the voltage scale in force, at every ACR write and after every
 //   write the RCC guard passes that changes the clock (its one event, `Written`: ruled Q6). The clock is the RCC guard's
 //   BusHz("rcc_hclk"), the overlay's one frequency rule (TVI-WO-1300c, ruled 2026-11-26T04:03Z Q9), which logs nothing; the
-//   voltage scale from the pwr peripheral's PWR_D3CR.VOS (p310), read from the object at 0x58024818, which logs
-//   nothing (TVI-WO-1304.measure.md §2.3). A D3CR that reads VOS 00 (the stock stub drops every write) is "VOS unknown": decided at
-//   VOS1, the most permissive scale that can be known, so a mismatch only at VOS2/VOS3 passes, acknowledged in the
-//   ledger (ruled Q1). VOS0's SYSCFG_PWRCR.ODEN cannot be read, so an AXI clock above 225 MHz is unmodeled.
+//   voltage scale from the PWR guard's Scale where the platform has one (TVI-WO-1308, ruled 2026-11-26T11:06Z Q21), otherwise
+//   from the pwr peripheral's PWR_D3CR.VOS (p310), read from the object at 0x58024818, which logs nothing
+//   (TVI-WO-1304.measure.md §2.3). With no PWR guard, a D3CR that reads VOS 00 (the stock stub drops every write) is "VOS
+//   unknown": decided at VOS1, the most permissive scale that can be known, so a mismatch only at VOS2/VOS3 passes, acknowledged
+//   in the ledger and named in every record so decided (ruled Q1; TVI-WO-1308 Q17 Condition 1). VOS0's SYSCFG_PWRCR.ODEN cannot
+//   be read, so an AXI clock above 225 MHz is unmodeled.
 //   The programming delay (p164, Table 17): WRHIGHFREQ below Table 17's value at a program or erase start. One-sided:
 //   11 passes, read as at least as lax as 10, inferred, with no RM page (ruled Q2).
 //   Bank 2 as silicon locks it: the keys (p182, p163), a CR write while locked (p182; pp. 202-206, 226-229), PSIZE
 //   served as written (p228; Table 18 p164: no value is an error), SR read-only (p207, p230), OPTSR_CUR from the
 //   declared image (ruled Q3).
+// A VOS change the PWR guard takes (its `Written` event, TVI-WO-1308) is judged at that PWR_D3CR write, as an RCC write is.
 // Not seen: a store into a flash bank (the stock model hooks the CPU only while PG is set), so a store with PG = 0 and a
-// program over a programmed word are rows; a VOS write (a pwr write); the erase and program time (BSY, QW read 0).
+// program over a programmed word are rows; a VOS write with no PWR guard (a pwr script's); the erase and program time (BSY, QW read 0).
 //
 // Rules, in the order they are evaluated. A refused access is not passed to the stock model.
 //   TVI-LOAD          (Records) the guard did not load: every access refuses.
@@ -85,6 +88,7 @@ namespace Antmicro.Renode.Peripherals.Tviburi
             {
                 ((Machine)m).StateChanged -= FindRccAtStart;
                 Rcc();
+                Pwr();
             }
         }
 
@@ -408,9 +412,10 @@ namespace Antmicro.Renode.Peripherals.Tviburi
             if(why != null && why != waitWhy)
             {
                 fired = true;
-                records.Refuse("TVI-FLASH-WAIT", kind, "FLASH_ACR", "LATENCY = " + latency, why + (offset >= RccBase ? ", at the RCC write to 0x" + offset.ToString("X8") : ", at the FLASH_ACR write")
+                records.Refuse("TVI-FLASH-WAIT", kind, "FLASH_ACR", "LATENCY = " + latency, why + (offset == (long)PwrD3cr ? ", at the PWR_D3CR write (a VOS change: \"When decreasing performance, the system frequency shall first be decreased before changing the voltage scaling\", p310)"
+                    : offset >= RccBase ? ", at the RCC write to 0x" + offset.ToString("X8") : ", at the FLASH_ACR write")
                     + ": too few wait states for the clock fetch the wrong instructions or data (from memory; RM0433 says LATENCY \"must be correctly programmed\")",
-                    "RM0433 Rev 9 §4.3.8 Table 17 p160; p159-161 (the order: raise LATENCY before the clock, lower the clock before LATENCY)", State(), offset, value, width);
+                    "RM0433 Rev 9 §4.3.8 Table 17 p160; p159-161 (the order: raise LATENCY before the clock, lower the clock before LATENCY)" + (offset == (long)PwrD3cr ? "; §6.8.6 p310" : ""), State(), offset, value, width);
             }
             waitWhy = why;
             var programming = (base.ReadDoubleWord(Cr1) & PgBit) != 0 || (base.ReadDoubleWord(Cr2) & PgBit) != 0;
@@ -465,7 +470,7 @@ namespace Antmicro.Renode.Peripherals.Tviburi
         // The first row of `table` whose upper bound (MHz) at the scale covers the clock; VOS unknown is decided at VOS1.
         private static int Need(int[][] table, ClockNow c)
         {
-            var row = table[c.Vos == 0 ? 1 : c.Vos];
+            var row = table[c.Vos <= 0 ? 1 : c.Vos];
             for(var i = 0; i < row.Length; i++)
             {
                 if(c.Hz <= (ulong)row[i] * 1000000)
@@ -481,7 +486,8 @@ namespace Antmicro.Renode.Peripherals.Tviburi
         {
             var c = new ClockNow();
             c.Vos = Vos();
-            c.Scale = c.Vos == 0 ? "VOS unknown on this platform (PWR_D3CR reads VOS 00), decided at VOS1" : "VOS" + c.Vos;
+            c.Scale = c.Vos == 0 ? "VOS unknown on this platform (no PWR guard, and PWR_D3CR reads VOS 00; acknowledged), decided at VOS1"
+                : c.Vos < 0 ? "VOS unknown on this platform (no PWR guard, and no peripheral at PWR_D3CR; acknowledged), decided at VOS1" : "VOS" + c.Vos;
             var rcc = Rcc();
             if(rcc == null)
             {
@@ -504,17 +510,46 @@ namespace Antmicro.Renode.Peripherals.Tviburi
             return c;
         }
 
-        // PWR_D3CR.VOS (p310), as the scale's number: 11 Scale 1 is 1, 10 Scale 2 is 2, 01 Scale 3 is 3; 00 is 0, "unknown"
-        // (the stock stub reads 00 whatever was written).
+        // The voltage scale's number: the PWR guard's Scale where the platform has one (TVI-WO-1308, ruled 2026-11-26T11:06Z Q21);
+        // otherwise PWR_D3CR.VOS (p310) as the pwr peripheral serves it: 11 Scale 1 is 1, 10 Scale 2 is 2, 01 Scale 3 is 3; 00 is 0,
+        // "unknown" (the stock stub reads 00 whatever was written).
         private int Vos()
         {
+            var guard = Pwr();
+            if(guard != null)
+            {
+                return guard.Scale;
+            }
             var at = machine.SystemBus.WhatIsAt(PwrD3cr);
             if(!(at?.Peripheral is IDoubleWordPeripheral pwr))
             {
-                return 0;
+                return -1;   // nothing at PWR_D3CR: unknown, and named so
             }
             var scale = (int)(pwr.ReadDoubleWord((long)(PwrD3cr - at.RegistrationPoint.Range.StartAddress)) >> 14 & 3);
             return scale == 0 ? 0 : 4 - scale;
+        }
+
+        // The PWR guard, if the platform has one, and its event (TVI-WO-1308 adversarial pass): a VOS change it takes re-judges the
+        // wait states at that write, as an RCC write does. Subscribed when the machine first starts, or at the first scale read.
+        private GuardedSTM32H7_PWR Pwr()
+        {
+            if(pwrGuard == null)
+            {
+                pwrGuard = machine.GetPeripheralsOfType<GuardedSTM32H7_PWR>().FirstOrDefault();
+                if(pwrGuard != null)
+                {
+                    pwrGuard.Written += OnPwrWritten;
+                }
+            }
+            return pwrGuard;
+        }
+
+        private void OnPwrWritten(long offset, uint value)
+        {
+            if(offset == (long)(PwrD3cr - PwrBase))
+            {
+                OnRccWritten((long)PwrD3cr - RccBase, value);   // judged at the PWR_D3CR write's absolute address
+            }
         }
 
         private GuardedSTM32H7_RCC Rcc()
@@ -636,12 +671,14 @@ namespace Antmicro.Renode.Peripherals.Tviburi
         private readonly int[] key = { 0, 0 };
         private readonly bool[] keyLost = { false, false };
         private GuardedSTM32H7_RCC rcc;
+        private GuardedSTM32H7_PWR pwrGuard;
         private string waitWhy, progWhy, judgedClock;   // judgedClock: the AXI clock at the last RCC write judged (OnRccWritten)
         private string config;
 
         private const ulong FlashBase = 0x52002000;
         private const long RccBase = 0x58024400;
         private const ulong PwrD3cr = 0x58024818;
+        private const ulong PwrBase = 0x58024800;
         private const ulong MaxAclk = 225000000;
         private const uint Key1 = 0x45670123;
         private const uint Key2 = 0xCDEF89AB;
@@ -738,7 +775,7 @@ namespace Antmicro.Renode.Peripherals.Tviburi
         {
             R("FLASH_ACR", 0x000, "§4.9.1", "Reserved", 31, 6, Zero, "reserved", "reserved: dropped, reads 0", 201),
             R("FLASH_ACR", 0x000, "§4.9.1", "WRHIGHFREQ", 5, 4, Any, "modeled by the guard", "kept and served, also at 0x100 (p201); TVI-FLASH-PROG: at a program or erase start, a value below Table 17's for the AXI clock at the voltage scale is a predicted-fault (\"too tight\", p164; p160); 11 read as at least as lax as 10 is inferred, no RM page: it is the reset value (p201), and every ArduPilot H7 programs flash at it, field evidence, not a page (ruled 2026-11-24T15:50Z Q2)", 201),
-            R("FLASH_ACR", 0x000, "§4.9.1", "LATENCY", 3, 0, Latencies, "modeled by the guard", "kept and served, also at its bank 2 alias 0x100 (p201); TVI-FLASH-WAIT: wait states below Table 17's for the AXI clock at the voltage scale in force are a predicted-fault, at the write (ACR or RCC) that makes them so (p159-161); where PWR_D3CR reads VOS 00, decided at VOS1, the most permissive scale that can be known, so a mismatch only at VOS2/VOS3 passes, acknowledged (ruled 2026-11-24T15:50Z Q1): that is the stock stub, which drops every write, and also a firmware that writes VOS 00 itself on a pwr that stores it (\"Reserved (Scale 3 selected)\", p310), which the guard cannot tell from the stub without a name; a VOS write is not seen, so a mismatch it makes is judged at the next ACR or RCC clock write, or never; an AXI clock above 225 MHz is unmodeled (VOS0's ODEN cannot be read); 8-15 not modeled (p201 lists 0-7)", 201),
+            R("FLASH_ACR", 0x000, "§4.9.1", "LATENCY", 3, 0, Latencies, "modeled by the guard", "kept and served, also at its bank 2 alias 0x100 (p201); TVI-FLASH-WAIT: wait states below Table 17's for the AXI clock at the voltage scale in force are a predicted-fault, at the write (ACR or RCC) that makes them so (p159-161); the scale is the PWR guard's where the platform has one (TVI-WO-1308, ruled 2026-11-26T11:06Z Q21), otherwise PWR_D3CR read through the bus: where it reads VOS 00, decided at VOS1 and named in the record, the most permissive scale that can be known, so a mismatch only at VOS2/VOS3 passes, acknowledged (ruled 2026-11-24T15:50Z Q1): that is the stock stub, which drops every write, and also a firmware that writes VOS 00 itself on a pwr that stores it (\"Reserved (Scale 3 selected)\", p310), which the guard cannot tell from the stub without a name; with a PWR guard, a VOS change it takes is judged at that PWR_D3CR write (p310); with none, a VOS write is not seen, so a mismatch it makes is judged at the next ACR or RCC clock write, or never; with no peripheral at PWR_D3CR the record says so; an AXI clock above 225 MHz is unmodeled (VOS0's ODEN cannot be read); 8-15 not modeled (p201 lists 0-7)", 201),
             R("FLASH_KEYR1", 0x004, "§4.9.2", "KEY1R", 31, 0, Any, "modeled by the guard", "the unlock keys (p182): KEY1 then KEY2 unlock FLASH_CR1; a wrong key, a key while unlocked, a third key, another bank 1 register written between the two, or a key of less than 32 bits is TVI-FLASH-KEY, a predicted-fault (locked until reset with a bus error, p182, p163); write-only: a read is TVI-FLASH-READ", 202),
             R("FLASH_CR1", 0x00C, "§4.9.4", "Res31_29", 31, 29, Zero, "reserved", "reserved: dropped, reads 0", 203),
             R("FLASH_CR1", 0x00C, "§4.9.4", "CRCRDERRIE1", 28, 28, Zero, "inherited, unaudited (acknowledged by name)", "0 only: the flash interrupts are not audited", 203),
