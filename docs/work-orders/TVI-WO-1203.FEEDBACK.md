@@ -167,8 +167,8 @@ A fresh subagent (Opus) took the three attacks, read-only. It found real breaks;
 3. **No CI check asserts a witness per restated instance.** The budget counts at least one per boot. The replays here show 30–32, which fits every restated instance witnessing (30 plus the SPI ports each platform declares), but nothing pins it. A row: a per-instance witness check over the fixture boot.
 4. **The held RM0433 text cannot reach CI.** `modf-page` checks the committed excerpt, and only `tests/1203/rm0433-p2184.sh`, run where the text is held, ties the excerpt to it. A row if the architect wants it run on a schedule.
 5. **`crash-runner`'s first form showed the teardown race at a clean quit:** 29 of 31 end records lost. It failed closed. The existing row stands.
-7. **`1303`'s mutant `DM35-instances` was re-anchored** to `restated()`'s new filter (§7): an edit to a row outside this WO's own, made because (1) moved its text.
 6. **The DMA guard's access-log names for streams 1–7 differ from stock's** (`Stream1Configuration` where stock said `StreamFIFOControl+0x4`). No Tviburi test or replay read them. A consumer that compares stock and guarded access logs line for line would see it.
+7. **`1303`'s mutant `DM35-instances` was re-anchored** to `restated()`'s new filter (§7): an edit to a row outside this WO's own, made because (1) moved its text.
 
 ## 6. Reduction pass
 
