@@ -1,0 +1,19 @@
+# TVI-WO-1205: TIM1 accesses in the armed run B on main 5d4a61a (every access logged; spike/1205/harness/pipeline.sh). Generated from
+# ~/.cache/tvi-1205/post-work/arm/B.console.txt.gz. CPU read lines in the whole log: 5568732; TIM1 reads: 0.
+# access	offset	register (Renode name)	count	values
+Write	0x0	Control1	3	0x85 x2 0x0 x1
+Write	0x4	Control2	2	0x0 x2
+Write	0xC	DmaOrInterruptEnable	3	0x0 x3
+Write	0x10	Status	3	0x0 x3
+Write	0x14	EventGeneration	2	0x1 x2
+Write	0x18	CaptureOrCompareMode1	2	0x6868 x2
+Write	0x1C	CaptureOrCompareMode2	2	0x6868 x2
+Write	0x20	CaptureOrCompareEnable	2	0x1111 x2
+Write	0x28	Prescaler	2	0xC7 x2
+Write	0x2C	AutoReload	7	0x4E1F x5 0x9C3 x2
+Write	0x34	CaptureOrCompare1	3696	0x3E8 x1300 0x0 x1200 0x79D x97 0x44C x67 ...
+Write	0x38	CaptureOrCompare2	3696	0x3E8 x1300 0x0 x1200 0x79D x97 0x44C x67 ...
+Write	0x3C	CaptureOrCompare3	3696	0x3E8 x1300 0x0 x1200 0x79D x97 0x44C x67 ...
+Write	0x40	CaptureOrCompare4	3696	0x3E8 x1300 0x0 x1200 0x79D x97 0x44C x67 ...
+Write	0x44	BreakAndDeadTime	3	0x8000 x2 0x0 x1
+Write	0x54	Option+0x4	2	0x1016868 x2

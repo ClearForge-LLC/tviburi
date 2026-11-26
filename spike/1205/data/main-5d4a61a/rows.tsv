@@ -1,0 +1,936 @@
+# id	provenance	rank1100	class1100	instance	offset	lsb	width	address	placed_by
+RCC.D2CCIP1R.SPI45SEL@reset	1100	161	clocks	rcc	0x050	16	3	0x58024450	joined.tsv
+RCC.D2CCIP2R.I2C123SEL@reset	1100	162	clocks	rcc	0x054	12	2	0x58024454	joined.tsv
+RCC.D2CCIP2R.USART16SEL@reset	1100	163	clocks	rcc	0x054	3	3	0x58024454	joined.tsv
+RCC.D2CCIP2R.USART28SEL@reset	1100	164	clocks	rcc	0x054	0	3	0x58024454	joined.tsv
+RCC.D2CCIP1R.FDCANSEL	1100	166	clocks	rcc	0x050	28	2	0x58024450	joined.tsv
+RCC.D2CCIP1R.SPI45SEL	1100	171	clocks	rcc	0x050	16	3	0x58024450	joined.tsv
+RCC.AHB1LPENR.DMA2LPEN	ap5-only	-	-	rcc	0x100	1	1	0x58024500	cmsis
+RCC.AHB2LPENR.RNGLPEN	ap5-only	-	-	rcc	0x104	6	1	0x58024504	cmsis
+RCC.APB1LLPENR.SPI2LPEN	ap5-only	-	-	rcc	0x110	14	1	0x58024510	cmsis
+RCC.APB2LPENR.SPI1LPEN	ap5-only	-	-	rcc	0x118	12	1	0x58024518	cmsis
+RCC.APB2LPENR.undefined bits 0x8180000	ap5-only	-	-	rcc	0x118	0	32	0x58024518	cmsis
+RCC.D1CCIPR.QSPISEL	ap5-only	-	-	rcc	0x04C	4	2	0x5802444C	cmsis
+RCC.D2CCIP2R.CECSEL	ap5-only	-	-	rcc	0x054	22	2	0x58024454	cmsis
+RCC.D2CCIP2R.USBSEL	ap5-only	-	-	rcc	0x054	20	2	0x58024454	cmsis
+RCC.D3CCIPR.ADCSEL	ap5-only	-	-	rcc	0x058	16	2	0x58024458	cmsis
+RCC.D3CCIPR.I2C4SEL	ap5-only	-	-	rcc	0x058	8	2	0x58024458	cmsis
+RCC.D3CCIPR.SPI6SEL	ap5-only	-	-	rcc	0x058	28	2	0x58024458	cmsis
+RCC.APB1LENR.TIM2EN	1100	120	motor output	rcc	0x0E8	0	1	0x580244E8	joined.tsv
+RCC.D1CCIPR.CKPERSEL@reset	1100	159	clocks	rcc	0x04C	28	2	0x5802444C	joined.tsv
+RCC.D2CCIP1R.SPI123SEL@reset	1100	160	clocks	rcc	0x050	12	3	0x58024450	joined.tsv
+RCC.D2CCIP1R.DFSDM1SEL	1100	165	clocks	rcc	0x050	24	1	0x58024450	joined.tsv
+RCC.D2CCIP1R.SAI1SEL	1100	167	clocks	rcc	0x050	0	3	0x58024450	joined.tsv
+RCC.D2CCIP1R.SAI23SEL	1100	168	clocks	rcc	0x050	6	3	0x58024450	joined.tsv
+RCC.D2CCIP1R.SPDIFSEL	1100	169	clocks	rcc	0x050	20	2	0x58024450	joined.tsv
+RCC.D2CCIP1R.SPI123SEL	1100	170	clocks	rcc	0x050	12	3	0x58024450	joined.tsv
+RCC.D2CCIP1R.SWPSEL	1100	172	clocks	rcc	0x050	31	1	0x58024450	joined.tsv
+RCC.APB1LENR.I2C2EN	1100	173	clocks	rcc	0x0E8	22	1	0x580244E8	joined.tsv
+RCC.AHB4ENR.ADC3EN	1100	216	clocks	rcc	0x0E0	24	1	0x580244E0	joined.tsv
+RCC.AHB4ENR.GPIOCEN	1100	217	clocks	rcc	0x0E0	2	1	0x580244E0	joined.tsv
+RCC.AHB4ENR.GPIODEN	1100	218	clocks	rcc	0x0E0	3	1	0x580244E0	joined.tsv
+RCC.AHB4ENR.GPIOEEN	1100	219	clocks	rcc	0x0E0	4	1	0x580244E0	joined.tsv
+RCC.AHB4ENR.GPIOFEN	1100	220	clocks	rcc	0x0E0	5	1	0x580244E0	joined.tsv
+GPIOA.AFRH.AFSEL8	1100	47	motor output	gpioPortA	0x024	0	4	0x58020024	joined.tsv
+GPIOA.MODER.MODER8	1100	48	motor output	gpioPortA	0x000	16	2	0x58020000	joined.tsv
+GPIOA.AFRH.AFSEL9	1100	72	motor output	gpioPortA	0x024	4	4	0x58020024	joined.tsv
+GPIOA.MODER.MODER9	1100	73	motor output	gpioPortA	0x000	18	2	0x58020000	joined.tsv
+GPIOA.AFRH.AFSEL10	1100	111	motor output	gpioPortA	0x024	8	4	0x58020024	joined.tsv
+GPIOA.AFRH.AFSEL11	1100	112	motor output	gpioPortA	0x024	12	4	0x58020024	joined.tsv
+GPIOA.AFRL.AFSEL0	1100	113	motor output	gpioPortA	0x020	0	4	0x58020020	joined.tsv
+GPIOA.MODER.MODER0	1100	114	motor output	gpioPortA	0x000	0	2	0x58020000	joined.tsv
+GPIOA.MODER.MODER10	1100	115	motor output	gpioPortA	0x000	20	2	0x58020000	joined.tsv
+GPIOA.MODER.MODER11	1100	116	motor output	gpioPortA	0x000	22	2	0x58020000	joined.tsv
+GPIOA.AFRL.AFSEL1	1100	143	motor output	gpioPortA	0x020	4	4	0x58020020	joined.tsv
+GPIOA.MODER.MODER1	1100	144	motor output	gpioPortA	0x000	2	2	0x58020000	joined.tsv
+GPIOE.AFRH.AFSEL11	1100	149	motor output	gpioPortE	0x024	12	4	0x58021024	joined.tsv
+GPIOE.AFRH.AFSEL13	1100	150	motor output	gpioPortE	0x024	20	4	0x58021024	joined.tsv
+GPIOE.AFRH.AFSEL14	1100	151	motor output	gpioPortE	0x024	24	4	0x58021024	joined.tsv
+GPIOE.MODER.MODER11	1100	152	motor output	gpioPortE	0x000	22	2	0x58021000	joined.tsv
+GPIOE.MODER.MODER13	1100	153	motor output	gpioPortE	0x000	26	2	0x58021000	joined.tsv
+GPIOE.MODER.MODER14	1100	154	motor output	gpioPortE	0x000	28	2	0x58021000	joined.tsv
+GPIOA.AFRL.AFSEL5	1100	283	sensor buses	gpioPortA	0x020	20	4	0x58020020	joined.tsv
+GPIOA.AFRL.AFSEL6	1100	284	sensor buses	gpioPortA	0x020	24	4	0x58020020	joined.tsv
+GPIOA.MODER.MODER5	1100	285	sensor buses	gpioPortA	0x000	10	2	0x58020000	joined.tsv
+GPIOA.MODER.MODER6	1100	286	sensor buses	gpioPortA	0x000	12	2	0x58020000	joined.tsv
+GPIOB.AFRL.AFSEL6	1100	291	sensor buses	gpioPortB	0x020	24	4	0x58020420	joined.tsv
+GPIOB.AFRL.AFSEL7	1100	292	sensor buses	gpioPortB	0x020	28	4	0x58020420	joined.tsv
+GPIOB.MODER.MODER6	1100	293	sensor buses	gpioPortB	0x000	12	2	0x58020400	joined.tsv
+GPIOB.MODER.MODER7	1100	294	sensor buses	gpioPortB	0x000	14	2	0x58020400	joined.tsv
+GPIOA.AFRL.AFSEL7	1100	308	sensor buses	gpioPortA	0x020	28	4	0x58020020	joined.tsv
+GPIOA.MODER.MODER7	1100	309	sensor buses	gpioPortA	0x000	14	2	0x58020000	joined.tsv
+GPIOB.AFRH.AFSEL14	1100	348	sensor buses	gpioPortB	0x024	24	4	0x58020424	joined.tsv
+GPIOB.AFRH.AFSEL15	1100	349	sensor buses	gpioPortB	0x024	28	4	0x58020424	joined.tsv
+GPIOB.MODER.MODER14	1100	350	sensor buses	gpioPortB	0x000	28	2	0x58020400	joined.tsv
+GPIOB.MODER.MODER15	1100	351	sensor buses	gpioPortB	0x000	30	2	0x58020400	joined.tsv
+GPIOA.AFRH.AFSEL12	1100	385	sensor buses	gpioPortA	0x024	16	4	0x58020024	joined.tsv
+GPIOA.MODER.MODER12	1100	386	sensor buses	gpioPortA	0x000	24	2	0x58020000	joined.tsv
+GPIOB.AFRH.AFSEL10	1100	389	sensor buses	gpioPortB	0x024	8	4	0x58020424	joined.tsv
+GPIOB.AFRH.AFSEL11	1100	390	sensor buses	gpioPortB	0x024	12	4	0x58020424	joined.tsv
+GPIOB.MODER.MODER10	1100	391	sensor buses	gpioPortB	0x000	20	2	0x58020400	joined.tsv
+GPIOB.MODER.MODER11	1100	392	sensor buses	gpioPortB	0x000	22	2	0x58020400	joined.tsv
+GPIOB.AFRH.AFSEL13	1100	411	sensor buses	gpioPortB	0x024	20	4	0x58020424	joined.tsv
+GPIOB.AFRL.AFSEL5	1100	412	sensor buses	gpioPortB	0x020	20	4	0x58020420	joined.tsv
+GPIOB.MODER.MODER12	1100	413	sensor buses	gpioPortB	0x000	24	2	0x58020400	joined.tsv
+GPIOB.MODER.MODER13	1100	414	sensor buses	gpioPortB	0x000	26	2	0x58020400	joined.tsv
+GPIOB.MODER.MODER5	1100	415	sensor buses	gpioPortB	0x000	10	2	0x58020400	joined.tsv
+GPIOD.MODER.MODER14	1100	422	sensor buses	gpioPortD	0x000	28	2	0x58020C00	joined.tsv
+GPIOA.AFRL.AFSEL2	1100	559	the rest	gpioPortA	0x020	8	4	0x58020020	joined.tsv
+GPIOA.AFRL.AFSEL3	1100	560	the rest	gpioPortA	0x020	12	4	0x58020020	joined.tsv
+GPIOA.MODER.MODER2	1100	561	the rest	gpioPortA	0x000	4	2	0x58020000	joined.tsv
+GPIOA.MODER.MODER3	1100	562	the rest	gpioPortA	0x000	6	2	0x58020000	joined.tsv
+GPIOC.AFRH.AFSEL10	1100	656	the rest	gpioPortC	0x024	8	4	0x58020824	joined.tsv
+GPIOC.AFRH.AFSEL11	1100	657	the rest	gpioPortC	0x024	12	4	0x58020824	joined.tsv
+GPIOC.MODER.MODER10	1100	658	the rest	gpioPortC	0x000	20	2	0x58020800	joined.tsv
+GPIOC.MODER.MODER11	1100	659	the rest	gpioPortC	0x000	22	2	0x58020800	joined.tsv
+GPIOF.MODER.MODER3	1100	706	the rest	gpioPortF	0x000	6	2	0x58021400	joined.tsv
+DMA1.HIFCR.CDMEIF4	ap5-only	-	-	dma1	0x00C	2	1	0x4002000C	cmsis
+DMA1.HIFCR.CFEIF4	ap5-only	-	-	dma1	0x00C	0	1	0x4002000C	cmsis
+DMA1.HIFCR.CHTIF4	ap5-only	-	-	dma1	0x00C	4	1	0x4002000C	cmsis
+DMA1.HIFCR.CTEIF4	ap5-only	-	-	dma1	0x00C	3	1	0x4002000C	cmsis
+DMA1.LIFCR.CDMEIF0	ap5-only	-	-	dma1	0x008	2	1	0x40020008	cmsis
+DMA1.LIFCR.CDMEIF1	ap5-only	-	-	dma1	0x008	8	1	0x40020008	cmsis
+DMA1.LIFCR.CDMEIF2	ap5-only	-	-	dma1	0x008	18	1	0x40020008	cmsis
+DMA1.LIFCR.CDMEIF3	ap5-only	-	-	dma1	0x008	24	1	0x40020008	cmsis
+DMA1.LIFCR.CFEIF0	ap5-only	-	-	dma1	0x008	0	1	0x40020008	cmsis
+DMA1.LIFCR.CFEIF1	ap5-only	-	-	dma1	0x008	6	1	0x40020008	cmsis
+DMA1.LIFCR.CFEIF2	ap5-only	-	-	dma1	0x008	16	1	0x40020008	cmsis
+DMA1.LIFCR.CFEIF3	ap5-only	-	-	dma1	0x008	22	1	0x40020008	cmsis
+DMA1.LIFCR.CHTIF0	ap5-only	-	-	dma1	0x008	4	1	0x40020008	cmsis
+DMA1.LIFCR.CHTIF1	ap5-only	-	-	dma1	0x008	10	1	0x40020008	cmsis
+DMA1.LIFCR.CHTIF2	ap5-only	-	-	dma1	0x008	20	1	0x40020008	cmsis
+DMA1.LIFCR.CHTIF3	ap5-only	-	-	dma1	0x008	26	1	0x40020008	cmsis
+DMA1.LIFCR.CTEIF0	ap5-only	-	-	dma1	0x008	3	1	0x40020008	cmsis
+DMA1.LIFCR.CTEIF1	ap5-only	-	-	dma1	0x008	9	1	0x40020008	cmsis
+DMA1.LIFCR.CTEIF2	ap5-only	-	-	dma1	0x008	19	1	0x40020008	cmsis
+DMA1.LIFCR.CTEIF3	ap5-only	-	-	dma1	0x008	25	1	0x40020008	cmsis
+DMA2.LIFCR.CDMEIF1	ap5-only	-	-	dma2	0x008	8	1	0x40020408	cmsis
+DMA2.LIFCR.CFEIF1	ap5-only	-	-	dma2	0x008	6	1	0x40020408	cmsis
+DMA2.LIFCR.CHTIF1	ap5-only	-	-	dma2	0x008	10	1	0x40020408	cmsis
+DMA2.LIFCR.CTEIF1	ap5-only	-	-	dma2	0x008	9	1	0x40020408	cmsis
+TIM5.SR.Break 2 interrupt flag (B2IF)	ap5-only	-	-	timer5	0x010	8	1	0x40000C10	cmsis
+TIM5.SR.Break interrupt flag (BIF)	ap5-only	-	-	timer5	0x010	7	1	0x40000C10	cmsis
+TIM5.SR.COM interrupt flag (COMIF)	ap5-only	-	-	timer5	0x010	5	1	0x40000C10	cmsis
+TIM5.SR.RESERVED	ap5-only	-	-	timer5	0x010	14	18	0x40000C10	cmsis
+TIM5.SR.System Break interrupt flag (SBIF)	ap5-only	-	-	timer5	0x010	13	1	0x40000C10	cmsis
+TIM1.BDTR.AOE	1100	2	motor output	timer1	0x044	14	1	0x40010044	joined.tsv
+TIM1.BDTR.BK2E	1100	3	motor output	timer1	0x044	24	1	0x40010044	joined.tsv
+TIM1.BDTR.BK2F	1100	4	motor output	timer1	0x044	20	4	0x40010044	joined.tsv
+TIM1.BDTR.BK2P	1100	5	motor output	timer1	0x044	25	1	0x40010044	joined.tsv
+TIM1.BDTR.BKE	1100	6	motor output	timer1	0x044	12	1	0x40010044	joined.tsv
+TIM1.BDTR.BKF	1100	7	motor output	timer1	0x044	16	4	0x40010044	joined.tsv
+TIM1.BDTR.BKP	1100	8	motor output	timer1	0x044	13	1	0x40010044	joined.tsv
+TIM1.BDTR.DTG	1100	9	motor output	timer1	0x044	0	8	0x40010044	joined.tsv
+TIM1.BDTR.LOCK	1100	10	motor output	timer1	0x044	8	2	0x40010044	joined.tsv
+TIM1.BDTR.MOE	1100	11	motor output	timer1	0x044	15	1	0x40010044	joined.tsv
+TIM1.BDTR.OSSI	1100	12	motor output	timer1	0x044	10	1	0x40010044	joined.tsv
+TIM1.BDTR.OSSR	1100	13	motor output	timer1	0x044	11	1	0x40010044	joined.tsv
+TIM1.CCER.CC1NE	1100	14	motor output	timer1	0x020	2	1	0x40010020	joined.tsv
+TIM1.CCER.CC2NE	1100	15	motor output	timer1	0x020	6	1	0x40010020	joined.tsv
+TIM1.CCER.CC3NE	1100	16	motor output	timer1	0x020	10	1	0x40010020	joined.tsv
+TIM1.CCMR1.OC1CE	1100	17	motor output	timer1	0x018	7	1	0x40010018	joined.tsv
+TIM1.CCMR1.OC1FE	1100	18	motor output	timer1	0x018	2	1	0x40010018	joined.tsv
+TIM1.CCMR1.OC1M[3]	1100	19	motor output	timer1	0x018	16	1	0x40010018	joined.tsv
+TIM1.CCMR1.OC1PE	1100	20	motor output	timer1	0x018	3	1	0x40010018	joined.tsv
+TIM1.CCMR1.OC2CE	1100	21	motor output	timer1	0x018	15	1	0x40010018	joined.tsv
+TIM1.CCMR1.OC2FE	1100	22	motor output	timer1	0x018	10	1	0x40010018	joined.tsv
+TIM1.CCMR1.OC2M[3]	1100	23	motor output	timer1	0x018	24	1	0x40010018	joined.tsv
+TIM1.CCMR1.OC2PE	1100	24	motor output	timer1	0x018	11	1	0x40010018	joined.tsv
+TIM1.CCMR2.OC3CE	1100	25	motor output	timer1	0x01C	7	1	0x4001001C	joined.tsv
+TIM1.CCMR2.OC3FE	1100	26	motor output	timer1	0x01C	2	1	0x4001001C	joined.tsv
+TIM1.CCMR2.OC3M[3]	1100	27	motor output	timer1	0x01C	16	1	0x4001001C	joined.tsv
+TIM1.CCMR2.OC3PE	1100	28	motor output	timer1	0x01C	3	1	0x4001001C	joined.tsv
+TIM1.CCMR2.OC4CE	1100	29	motor output	timer1	0x01C	15	1	0x4001001C	joined.tsv
+TIM1.CCMR2.OC4FE	1100	30	motor output	timer1	0x01C	10	1	0x4001001C	joined.tsv
+TIM1.CCMR2.OC4M[3]	1100	31	motor output	timer1	0x01C	24	1	0x4001001C	joined.tsv
+TIM1.CCMR2.OC4PE	1100	32	motor output	timer1	0x01C	11	1	0x4001001C	joined.tsv
+TIM1.CR1.CKD	1100	33	motor output	timer1	0x000	8	2	0x40010000	joined.tsv
+TIM1.CR1.UIFREMAP	1100	34	motor output	timer1	0x000	11	1	0x40010000	joined.tsv
+TIM1.CCER.CC5E	1100	35	motor output	timer1	0x020	16	1	0x40010020	joined.tsv
+TIM1.CCER.CC5P	1100	36	motor output	timer1	0x020	17	1	0x40010020	joined.tsv
+TIM1.CCER.CC6E	1100	37	motor output	timer1	0x020	20	1	0x40010020	joined.tsv
+TIM1.CCER.CC6P	1100	38	motor output	timer1	0x020	21	1	0x40010020	joined.tsv
+TIM1.EGR.B2G	1100	39	motor output	timer1	0x014	8	1	0x40010014	joined.tsv
+TIM1.EGR.BG	1100	40	motor output	timer1	0x014	7	1	0x40010014	joined.tsv
+TIM1.EGR.CC1G	1100	41	motor output	timer1	0x014	1	1	0x40010014	joined.tsv
+TIM1.EGR.CC2G	1100	42	motor output	timer1	0x014	2	1	0x40010014	joined.tsv
+TIM1.EGR.CC3G	1100	43	motor output	timer1	0x014	3	1	0x40010014	joined.tsv
+TIM1.EGR.CC4G	1100	44	motor output	timer1	0x014	4	1	0x40010014	joined.tsv
+TIM1.EGR.COMG	1100	45	motor output	timer1	0x014	5	1	0x40010014	joined.tsv
+TIM1.EGR.TG	1100	46	motor output	timer1	0x014	6	1	0x40010014	joined.tsv
+TIM1.CCER.CC1E	1100	50	motor output	timer1	0x020	0	1	0x40010020	joined.tsv
+TIM1.CCER.CC1NP	1100	51	motor output	timer1	0x020	3	1	0x40010020	joined.tsv
+TIM1.CCER.CC1P	1100	52	motor output	timer1	0x020	1	1	0x40010020	joined.tsv
+TIM1.CCER.CC2E	1100	53	motor output	timer1	0x020	4	1	0x40010020	joined.tsv
+TIM1.CCER.CC2NP	1100	54	motor output	timer1	0x020	7	1	0x40010020	joined.tsv
+TIM1.CCER.CC2P	1100	55	motor output	timer1	0x020	5	1	0x40010020	joined.tsv
+TIM1.CCER.CC3E	1100	56	motor output	timer1	0x020	8	1	0x40010020	joined.tsv
+TIM1.CCER.CC3NP	1100	57	motor output	timer1	0x020	11	1	0x40010020	joined.tsv
+TIM1.CCER.CC3P	1100	58	motor output	timer1	0x020	9	1	0x40010020	joined.tsv
+TIM1.CCER.CC4E	1100	59	motor output	timer1	0x020	12	1	0x40010020	joined.tsv
+TIM1.CCER.CC4NP	1100	60	motor output	timer1	0x020	15	1	0x40010020	joined.tsv
+TIM1.CCER.CC4P	1100	61	motor output	timer1	0x020	13	1	0x40010020	joined.tsv
+TIM1.CCMR1.CC1S	1100	62	motor output	timer1	0x018	0	2	0x40010018	joined.tsv
+TIM1.CCMR1.CC2S	1100	63	motor output	timer1	0x018	8	2	0x40010018	joined.tsv
+TIM1.CCMR2.CC3S	1100	64	motor output	timer1	0x01C	0	2	0x4001001C	joined.tsv
+TIM1.CCMR2.CC4S	1100	65	motor output	timer1	0x01C	8	2	0x4001001C	joined.tsv
+TIM1.CR1.ARPE	1100	66	motor output	timer1	0x000	7	1	0x40010000	joined.tsv
+TIM1.CR1.CMS	1100	67	motor output	timer1	0x000	5	2	0x40010000	joined.tsv
+TIM1.CR1.DIR	1100	68	motor output	timer1	0x000	4	1	0x40010000	joined.tsv
+TIM1.CR1.UDIS	1100	69	motor output	timer1	0x000	1	1	0x40010000	joined.tsv
+TIM1.CR1.URS	1100	70	motor output	timer1	0x000	2	1	0x40010000	joined.tsv
+TIM2.CCER.CC1NE	1100	78	motor output	timer2	0x020	2	1	0x40000020	joined.tsv
+TIM2.CCER.CC2NE	1100	79	motor output	timer2	0x020	6	1	0x40000020	joined.tsv
+TIM2.CCER.CC3NE	1100	80	motor output	timer2	0x020	10	1	0x40000020	joined.tsv
+TIM2.CCMR1.OC1CE	1100	81	motor output	timer2	0x018	7	1	0x40000018	joined.tsv
+TIM2.CCMR1.OC1FE	1100	82	motor output	timer2	0x018	2	1	0x40000018	joined.tsv
+TIM2.CCMR1.OC1M[3]	1100	83	motor output	timer2	0x018	16	1	0x40000018	joined.tsv
+TIM2.CCMR1.OC1PE	1100	84	motor output	timer2	0x018	3	1	0x40000018	joined.tsv
+TIM2.CCMR1.OC2CE	1100	85	motor output	timer2	0x018	15	1	0x40000018	joined.tsv
+TIM2.CCMR1.OC2FE	1100	86	motor output	timer2	0x018	10	1	0x40000018	joined.tsv
+TIM2.CCMR1.OC2M[3]	1100	87	motor output	timer2	0x018	24	1	0x40000018	joined.tsv
+TIM2.CCMR1.OC2PE	1100	88	motor output	timer2	0x018	11	1	0x40000018	joined.tsv
+TIM2.CCMR2.OC3CE	1100	89	motor output	timer2	0x01C	7	1	0x4000001C	joined.tsv
+TIM2.CCMR2.OC3FE	1100	90	motor output	timer2	0x01C	2	1	0x4000001C	joined.tsv
+TIM2.CCMR2.OC3M[3]	1100	91	motor output	timer2	0x01C	16	1	0x4000001C	joined.tsv
+TIM2.CCMR2.OC3PE	1100	92	motor output	timer2	0x01C	3	1	0x4000001C	joined.tsv
+TIM2.CCMR2.OC4CE	1100	93	motor output	timer2	0x01C	15	1	0x4000001C	joined.tsv
+TIM2.CCMR2.OC4FE	1100	94	motor output	timer2	0x01C	10	1	0x4000001C	joined.tsv
+TIM2.CCMR2.OC4M[3]	1100	95	motor output	timer2	0x01C	24	1	0x4000001C	joined.tsv
+TIM2.CCMR2.OC4PE	1100	96	motor output	timer2	0x01C	11	1	0x4000001C	joined.tsv
+TIM2.CR1.CKD	1100	97	motor output	timer2	0x000	8	2	0x40000000	joined.tsv
+TIM2.CR1.UIFREMAP	1100	98	motor output	timer2	0x000	11	1	0x40000000	joined.tsv
+TIM2.CCER.CC5E	1100	99	motor output	timer2	0x020	16	1	0x40000020	joined.tsv
+TIM2.CCER.CC5P	1100	100	motor output	timer2	0x020	17	1	0x40000020	joined.tsv
+TIM2.CCER.CC6E	1100	101	motor output	timer2	0x020	20	1	0x40000020	joined.tsv
+TIM2.CCER.CC6P	1100	102	motor output	timer2	0x020	21	1	0x40000020	joined.tsv
+TIM2.EGR.B2G	1100	103	motor output	timer2	0x014	8	1	0x40000014	joined.tsv
+TIM2.EGR.BG	1100	104	motor output	timer2	0x014	7	1	0x40000014	joined.tsv
+TIM2.EGR.CC1G	1100	105	motor output	timer2	0x014	1	1	0x40000014	joined.tsv
+TIM2.EGR.CC2G	1100	106	motor output	timer2	0x014	2	1	0x40000014	joined.tsv
+TIM2.EGR.CC3G	1100	107	motor output	timer2	0x014	3	1	0x40000014	joined.tsv
+TIM2.EGR.CC4G	1100	108	motor output	timer2	0x014	4	1	0x40000014	joined.tsv
+TIM2.EGR.COMG	1100	109	motor output	timer2	0x014	5	1	0x40000014	joined.tsv
+TIM2.EGR.TG	1100	110	motor output	timer2	0x014	6	1	0x40000014	joined.tsv
+TIM2.CCER.CC1E	1100	121	motor output	timer2	0x020	0	1	0x40000020	joined.tsv
+TIM2.CCER.CC1NP	1100	122	motor output	timer2	0x020	3	1	0x40000020	joined.tsv
+TIM2.CCER.CC1P	1100	123	motor output	timer2	0x020	1	1	0x40000020	joined.tsv
+TIM2.CCER.CC2E	1100	124	motor output	timer2	0x020	4	1	0x40000020	joined.tsv
+TIM2.CCER.CC2NP	1100	125	motor output	timer2	0x020	7	1	0x40000020	joined.tsv
+TIM2.CCER.CC2P	1100	126	motor output	timer2	0x020	5	1	0x40000020	joined.tsv
+TIM2.CCER.CC3E	1100	127	motor output	timer2	0x020	8	1	0x40000020	joined.tsv
+TIM2.CCER.CC3NP	1100	128	motor output	timer2	0x020	11	1	0x40000020	joined.tsv
+TIM2.CCER.CC3P	1100	129	motor output	timer2	0x020	9	1	0x40000020	joined.tsv
+TIM2.CCER.CC4E	1100	130	motor output	timer2	0x020	12	1	0x40000020	joined.tsv
+TIM2.CCER.CC4NP	1100	131	motor output	timer2	0x020	15	1	0x40000020	joined.tsv
+TIM2.CCER.CC4P	1100	132	motor output	timer2	0x020	13	1	0x40000020	joined.tsv
+TIM2.CCMR1.CC1S	1100	133	motor output	timer2	0x018	0	2	0x40000018	joined.tsv
+TIM2.CCMR1.CC2S	1100	134	motor output	timer2	0x018	8	2	0x40000018	joined.tsv
+TIM2.CCMR2.CC3S	1100	135	motor output	timer2	0x01C	0	2	0x4000001C	joined.tsv
+TIM2.CCMR2.CC4S	1100	136	motor output	timer2	0x01C	8	2	0x4000001C	joined.tsv
+TIM2.CR1.ARPE	1100	137	motor output	timer2	0x000	7	1	0x40000000	joined.tsv
+TIM2.CR1.CMS	1100	138	motor output	timer2	0x000	5	2	0x40000000	joined.tsv
+TIM2.CR1.DIR	1100	139	motor output	timer2	0x000	4	1	0x40000000	joined.tsv
+TIM2.CR1.UDIS	1100	140	motor output	timer2	0x000	1	1	0x40000000	joined.tsv
+TIM2.CR1.URS	1100	141	motor output	timer2	0x000	2	1	0x40000000	joined.tsv
+RCC.CFGR.MCO1PRE	1100	176	clocks	rcc	0x010	18	4	0x58024410	joined.tsv
+RCC.CFGR.MCO2PRE	1100	178	clocks	rcc	0x010	25	4	0x58024410	joined.tsv
+RCC.CFGR.RTCPRE	1100	179	clocks	rcc	0x010	8	6	0x58024410	joined.tsv
+RCC.PLLCFGR.DIVP3EN	1100	189	clocks	rcc	0x02C	22	1	0x5802442C	joined.tsv
+RCC.PLLCFGR.PLL1FRACEN	1100	196	clocks	rcc	0x02C	0	1	0x5802442C	joined.tsv
+RCC.PLLCFGR.PLL1RGE	1100	197	clocks	rcc	0x02C	2	2	0x5802442C	joined.tsv
+RCC.PLLCFGR.PLL2FRACEN	1100	199	clocks	rcc	0x02C	4	1	0x5802442C	joined.tsv
+RCC.PLLCFGR.PLL2RGE	1100	200	clocks	rcc	0x02C	6	2	0x5802442C	joined.tsv
+RCC.PLLCFGR.PLL3FRACEN	1100	201	clocks	rcc	0x02C	8	1	0x5802442C	joined.tsv
+RCC.PLLCFGR.PLL3RGE	1100	202	clocks	rcc	0x02C	10	2	0x5802442C	joined.tsv
+RCC.PLLCFGR.PLL3VCOSEL	1100	203	clocks	rcc	0x02C	9	1	0x5802442C	joined.tsv
+RCC.AHB1RSTR.RESERVED	ap5-only	-	-	rcc	0x080	2	2	0x58024480	cmsis
+RCC.AHB1RSTR.undefined bits 0x81800010	ap5-only	-	-	rcc	0x080	0	32	0x58024480	cmsis
+RCC.AHB2RSTR.RESERVED	ap5-only	-	-	rcc	0x084	1	3	0x58024484	cmsis
+RCC.AHB3RSTR.RESERVED	ap5-only	-	-	rcc	0x07C	1	3	0x5802447C	cmsis
+RCC.AHB4RSTR.RESERVED	ap5-only	-	-	rcc	0x088	11	8	0x58024488	cmsis
+RCC.APB1HRSTR.RESERVED	ap5-only	-	-	rcc	0x094	0	1	0x58024494	cmsis
+RCC.APB1LRSTR.RESERVED	ap5-only	-	-	rcc	0x090	10	4	0x58024490	cmsis
+RCC.APB2RSTR.RESERVED	ap5-only	-	-	rcc	0x098	2	2	0x58024498	cmsis
+RCC.APB3RSTR.RESERVED	ap5-only	-	-	rcc	0x08C	0	3	0x5802448C	cmsis
+RCC.APB4RSTR.RESERVED	ap5-only	-	-	rcc	0x09C	0	1	0x5802449C	cmsis
+RCC.APB4RSTR.undefined bits 0x80000000	ap5-only	-	-	rcc	0x09C	0	32	0x5802449C	cmsis
+RCC.CR.D2CKRDY@reset	1100	158	clocks	rcc	0x000	15	1	0x58024400	joined.tsv
+RCC.CFGR.HRTIMSEL	1100	174	clocks	rcc	0x010	14	1	0x58024410	joined.tsv
+RCC.CFGR.MCO1	1100	175	clocks	rcc	0x010	22	3	0x58024410	joined.tsv
+RCC.CFGR.MCO2	1100	177	clocks	rcc	0x010	29	3	0x58024410	joined.tsv
+RCC.CFGR.STOPKERWUCK	1100	180	clocks	rcc	0x010	7	1	0x58024410	joined.tsv
+RCC.CFGR.STOPWUCK	1100	181	clocks	rcc	0x010	6	1	0x58024410	joined.tsv
+RCC.CR.CSIKERON	1100	182	clocks	rcc	0x000	9	1	0x58024400	joined.tsv
+RCC.CR.D1CKRDY	1100	183	clocks	rcc	0x000	14	1	0x58024400	joined.tsv
+RCC.CR.D2CKRDY	1100	184	clocks	rcc	0x000	15	1	0x58024400	joined.tsv
+RCC.CR.HSEBYP	1100	185	clocks	rcc	0x000	18	1	0x58024400	joined.tsv
+RCC.CR.HSIKERON	1100	186	clocks	rcc	0x000	1	1	0x58024400	joined.tsv
+RCC.PLLCFGR.DIVP1EN	1100	187	clocks	rcc	0x02C	16	1	0x5802442C	joined.tsv
+RCC.PLLCFGR.DIVP2EN	1100	188	clocks	rcc	0x02C	19	1	0x5802442C	joined.tsv
+RCC.PLLCFGR.DIVQ1EN	1100	190	clocks	rcc	0x02C	17	1	0x5802442C	joined.tsv
+RCC.PLLCFGR.DIVQ2EN	1100	191	clocks	rcc	0x02C	20	1	0x5802442C	joined.tsv
+RCC.PLLCFGR.DIVQ3EN	1100	192	clocks	rcc	0x02C	23	1	0x5802442C	joined.tsv
+RCC.PLLCFGR.DIVR1EN	1100	193	clocks	rcc	0x02C	18	1	0x5802442C	joined.tsv
+RCC.PLLCFGR.DIVR2EN	1100	194	clocks	rcc	0x02C	21	1	0x5802442C	joined.tsv
+RCC.PLLCFGR.DIVR3EN	1100	195	clocks	rcc	0x02C	24	1	0x5802442C	joined.tsv
+RCC.PLLCFGR.PLL1VCOSEL	1100	198	clocks	rcc	0x02C	1	1	0x5802442C	joined.tsv
+RCC.CFGR.SWS	1100	204	clocks	rcc	0x010	3	3	0x58024410	joined.tsv
+RCC.CR.CSIRDY	1100	205	clocks	rcc	0x000	8	1	0x58024400	joined.tsv
+RCC.CR.HSERDY	1100	206	clocks	rcc	0x000	17	1	0x58024400	joined.tsv
+RCC.CR.HSI48RDY	1100	207	clocks	rcc	0x000	13	1	0x58024400	joined.tsv
+RCC.CR.HSIDIVF	1100	208	clocks	rcc	0x000	5	1	0x58024400	joined.tsv
+RCC.CR.HSIRDY	1100	209	clocks	rcc	0x000	2	1	0x58024400	joined.tsv
+RCC.CR.PLL1RDY	1100	210	clocks	rcc	0x000	25	1	0x58024400	joined.tsv
+RCC.CR.PLL2RDY	1100	211	clocks	rcc	0x000	27	1	0x58024400	joined.tsv
+RCC.CR.PLL3RDY	1100	212	clocks	rcc	0x000	29	1	0x58024400	joined.tsv
+FLASH.ACR.LATENCY	1100	213	clocks	flashController	0x000	0	4	0x52002000	joined.tsv
+FLASH.ACR.WRHIGHFREQ	1100	214	clocks	flashController	0x000	4	2	0x52002000	joined.tsv
+RCC.PLLCFGR.PLL2VCOSEL	1100	215	clocks	rcc	0x02C	5	1	0x5802442C	joined.tsv
+GPIOB.OTYPER.OT6	1100	223	sensor buses	gpioPortB	0x004	6	1	0x58020404	joined.tsv
+GPIOB.OTYPER.OT7	1100	224	sensor buses	gpioPortB	0x004	7	1	0x58020404	joined.tsv
+SPI1.IFCR.CRCEC	1100	226	sensor buses	spi1	0x018	7	1	0x40013018	joined.tsv
+SPI1.IFCR.MODFC	1100	227	sensor buses	spi1	0x018	9	1	0x40013018	joined.tsv
+SPI1.IFCR.OVRC	1100	228	sensor buses	spi1	0x018	6	1	0x40013018	joined.tsv
+SPI1.IFCR.TIFREC	1100	229	sensor buses	spi1	0x018	8	1	0x40013018	joined.tsv
+SPI1.IFCR.TSERFC	1100	230	sensor buses	spi1	0x018	10	1	0x40013018	joined.tsv
+SPI1.IFCR.TXTFC	1100	231	sensor buses	spi1	0x018	4	1	0x40013018	joined.tsv
+SPI1.IFCR.UDRC	1100	232	sensor buses	spi1	0x018	5	1	0x40013018	joined.tsv
+I2C1.TIMINGR.SCLDEL	1100	254	sensor buses	i2c1	0x010	20	4	0x40005410	joined.tsv
+I2C1.TIMINGR.SCLH	1100	255	sensor buses	i2c1	0x010	8	8	0x40005410	joined.tsv
+I2C1.TIMINGR.SCLL	1100	256	sensor buses	i2c1	0x010	0	8	0x40005410	joined.tsv
+SPI1.CFG1.MBR	1100	261	sensor buses	spi1	0x008	28	3	0x40013008	joined.tsv
+SPI1.CFG2.SSOE	1100	274	sensor buses	spi1	0x00C	29	1	0x4001300C	joined.tsv
+SPI1.CR1.MASRX	1100	278	sensor buses	spi1	0x000	8	1	0x40013000	joined.tsv
+SPI2.IFCR.CRCEC	1100	316	sensor buses	spi2	0x018	7	1	0x40003818	joined.tsv
+SPI2.IFCR.MODFC	1100	317	sensor buses	spi2	0x018	9	1	0x40003818	joined.tsv
+SPI2.IFCR.OVRC	1100	318	sensor buses	spi2	0x018	6	1	0x40003818	joined.tsv
+SPI2.IFCR.TIFREC	1100	319	sensor buses	spi2	0x018	8	1	0x40003818	joined.tsv
+SPI2.IFCR.TSERFC	1100	320	sensor buses	spi2	0x018	10	1	0x40003818	joined.tsv
+SPI2.IFCR.TXTFC	1100	321	sensor buses	spi2	0x018	4	1	0x40003818	joined.tsv
+SPI2.IFCR.UDRC	1100	322	sensor buses	spi2	0x018	5	1	0x40003818	joined.tsv
+SPI2.CFG1.MBR	1100	326	sensor buses	spi2	0x008	28	3	0x40003808	joined.tsv
+SPI2.CFG2.SSOE	1100	339	sensor buses	spi2	0x00C	29	1	0x4000380C	joined.tsv
+SPI2.CR1.MASRX	1100	343	sensor buses	spi2	0x000	8	1	0x40003800	joined.tsv
+USART1.CR1.FIFOEN	1100	457	the rest	usart1	0x000	29	1	0x40011000	joined.tsv
+USART1.CR1.IDLEIE	1100	458	the rest	usart1	0x000	4	1	0x40011000	joined.tsv
+USART1.CR2.LBDIE	1100	476	the rest	usart1	0x004	6	1	0x40011004	joined.tsv
+FLASH.CCR1.CLR_CRCEND1	ap5-only	-	-	flashController	0x014	27	1	0x52002014	cmsis
+FLASH.CCR1.CLR_RDPERR1	ap5-only	-	-	flashController	0x014	23	1	0x52002014	cmsis
+FLASH.CCR1.CLR_RDSERR1	ap5-only	-	-	flashController	0x014	24	1	0x52002014	cmsis
+FLASH.CCR1.CLR_STRBERR1	ap5-only	-	-	flashController	0x014	19	1	0x52002014	cmsis
+FLASH.CCR1.CLR_WRPERR1	ap5-only	-	-	flashController	0x014	17	1	0x52002014	cmsis
+FLASH.CCR1.RESERVED	ap5-only	-	-	flashController	0x014	0	16	0x52002014	cmsis
+FLASH.CCR2.CLR_CRCEND2	ap5-only	-	-	flashController	0x114	27	1	0x52002114	cmsis
+FLASH.CCR2.CLR_RDPERR2	ap5-only	-	-	flashController	0x114	23	1	0x52002114	cmsis
+FLASH.CCR2.CLR_RDSERR2	ap5-only	-	-	flashController	0x114	24	1	0x52002114	cmsis
+FLASH.CCR2.CLR_STRBERR2	ap5-only	-	-	flashController	0x114	19	1	0x52002114	cmsis
+FLASH.CCR2.CLR_WRPERR2	ap5-only	-	-	flashController	0x114	17	1	0x52002114	cmsis
+FLASH.CCR2.RESERVED	ap5-only	-	-	flashController	0x114	0	16	0x52002114	cmsis
+FLASH.CR2.PSIZE2	ap5-only	-	-	flashController	0x10C	4	2	0x5200210C	cmsis
+FLASH.SR2.BSY2	ap5-only	-	-	flashController	0x110	0	1	0x52002110	cmsis
+FLASH.SR2.CRCEND2	ap5-only	-	-	flashController	0x110	27	1	0x52002110	cmsis
+FLASH.SR2.CRC_BUSY2	ap5-only	-	-	flashController	0x110	3	1	0x52002110	cmsis
+FLASH.SR2.QW2	ap5-only	-	-	flashController	0x110	2	1	0x52002110	cmsis
+FLASH.SR2.RDPERR2	ap5-only	-	-	flashController	0x110	23	1	0x52002110	cmsis
+FLASH.SR2.RDSERR2	ap5-only	-	-	flashController	0x110	24	1	0x52002110	cmsis
+FLASH.SR2.RESERVED	ap5-only	-	-	flashController	0x110	4	12	0x52002110	cmsis
+FLASH.SR2.STRBERR2	ap5-only	-	-	flashController	0x110	19	1	0x52002110	cmsis
+FLASH.SR2.WRPERR2	ap5-only	-	-	flashController	0x110	17	1	0x52002110	cmsis
+I2C1.CR1.ERRIE	ap5-only	-	-	i2c1	0x000	7	1	0x40005400	joined.tsv
+I2C1.ICR.RESERVED	ap5-only	-	-	i2c1	0x01C	0	3	0x4000541C	cmsis
+PWR.CR1.-	ap5-only	-	-	pwr	0x000	0	32	0x58024800	cmsis
+PWR.CR2.-	ap5-only	-	-	pwr	0x008	0	32	0x58024808	cmsis
+PWR.CR3.-	ap5-only	-	-	pwr	0x00C	0	32	0x5802480C	cmsis
+SPI1.IER.OVRIE	ap5-only	-	-	spi1	0x010	6	1	0x40013010	cmsis
+SPI1.IFCR.RESERVED	ap5-only	-	-	spi1	0x018	0	3	0x40013018	cmsis
+SPI2.IER.OVRIE	ap5-only	-	-	spi2	0x010	6	1	0x40003810	cmsis
+SPI2.IFCR.RESERVED	ap5-only	-	-	spi2	0x018	0	3	0x40003818	cmsis
+USART1.CR3.EIE	ap5-only	-	-	usart1	0x008	0	1	0x40011008	cmsis
+USART1.ICR.CMCF	ap5-only	-	-	usart1	0x020	17	1	0x40011020	cmsis
+USART1.ICR.CTSCF	ap5-only	-	-	usart1	0x020	9	1	0x40011020	cmsis
+USART1.ICR.EOBCF	ap5-only	-	-	usart1	0x020	12	1	0x40011020	cmsis
+USART1.ICR.FECF	ap5-only	-	-	usart1	0x020	1	1	0x40011020	cmsis
+USART1.ICR.IDLECF	ap5-only	-	-	usart1	0x020	4	1	0x40011020	cmsis
+USART1.ICR.LBDCF	ap5-only	-	-	usart1	0x020	8	1	0x40011020	cmsis
+USART1.ICR.NCF	ap5-only	-	-	usart1	0x020	2	1	0x40011020	cmsis
+USART1.ICR.ORECF	ap5-only	-	-	usart1	0x020	3	1	0x40011020	cmsis
+USART1.ICR.PECF	ap5-only	-	-	usart1	0x020	0	1	0x40011020	cmsis
+USART1.ICR.RESERVED	ap5-only	-	-	usart1	0x020	5	1	0x40011020	cmsis
+USART1.ICR.TCBGTCF	ap5-only	-	-	usart1	0x020	7	1	0x40011020	cmsis
+USART1.ICR.WUCF	ap5-only	-	-	usart1	0x020	20	1	0x40011020	cmsis
+dma1@0x10.DMEIE	ap5-only	-	-	dma1	0x010	1	1	0x40020010	renode offset
+dma1@0x10.TEIE	ap5-only	-	-	dma1	0x010	2	1	0x40020010	renode offset
+dma1@0x10.TRBUFF	ap5-only	-	-	dma1	0x010	20	1	0x40020010	renode offset
+dma1@0x24.FS	ap5-only	-	-	dma1	0x024	3	3	0x40020024	renode offset
+dma1@0x28.DMEIE	ap5-only	-	-	dma1	0x028	1	1	0x40020028	renode offset
+dma1@0x28.PL	ap5-only	-	-	dma1	0x028	16	2	0x40020028	renode offset
+dma1@0x28.TEIE	ap5-only	-	-	dma1	0x028	2	1	0x40020028	renode offset
+dma1@0x3C.FS	ap5-only	-	-	dma1	0x03C	3	3	0x4002003C	renode offset
+dma1@0x40.DMEIE	ap5-only	-	-	dma1	0x040	1	1	0x40020040	renode offset
+dma1@0x40.PL	ap5-only	-	-	dma1	0x040	16	2	0x40020040	renode offset
+dma1@0x40.TEIE	ap5-only	-	-	dma1	0x040	2	1	0x40020040	renode offset
+dma1@0x54.FS	ap5-only	-	-	dma1	0x054	3	3	0x40020054	renode offset
+dma1@0x58.DMEIE	ap5-only	-	-	dma1	0x058	1	1	0x40020058	renode offset
+dma1@0x58.PL	ap5-only	-	-	dma1	0x058	16	2	0x40020058	renode offset
+dma1@0x58.TEIE	ap5-only	-	-	dma1	0x058	2	1	0x40020058	renode offset
+dma1@0x6C.FS	ap5-only	-	-	dma1	0x06C	3	3	0x4002006C	renode offset
+dma1@0x70.DMEIE	ap5-only	-	-	dma1	0x070	1	1	0x40020070	renode offset
+dma1@0x70.TEIE	ap5-only	-	-	dma1	0x070	2	1	0x40020070	renode offset
+dma1@0x70.TRBUFF	ap5-only	-	-	dma1	0x070	20	1	0x40020070	renode offset
+dma1@0x84.FS	ap5-only	-	-	dma1	0x084	3	3	0x40020084	renode offset
+dma2@0x28.DMEIE	ap5-only	-	-	dma2	0x028	1	1	0x40020428	renode offset
+dma2@0x28.PL	ap5-only	-	-	dma2	0x028	16	2	0x40020428	renode offset
+dma2@0x28.TEIE	ap5-only	-	-	dma2	0x028	2	1	0x40020428	renode offset
+dma2@0x3C.FS	ap5-only	-	-	dma2	0x03C	3	3	0x4002043C	renode offset
+dwt@0xFB0.absent register	ap5-only	-	-	dwt	0xFB0	0	32	0xE0001FB0	renode offset
+nvic@0xF90.EN (TCM Enable)	ap5-only	-	-	nvic	0xF90	0	1	0xE000EF90	renode offset
+nvic@0xF94.EN (TCM Enable)	ap5-only	-	-	nvic	0xF94	0	1	0xE000EF94	renode offset
+GPIOA.OTYPER.OT8	1100	1	motor output	gpioPortA	0x004	8	1	0x58020004	joined.tsv
+GPIOA.OSPEEDR.OSPEED8	1100	49	motor output	gpioPortA	0x008	16	2	0x58020008	joined.tsv
+GPIOA.OTYPER.OT9	1100	71	motor output	gpioPortA	0x004	9	1	0x58020004	joined.tsv
+GPIOA.OSPEEDR.OSPEED9	1100	74	motor output	gpioPortA	0x008	18	2	0x58020008	joined.tsv
+GPIOA.OTYPER.OT0	1100	75	motor output	gpioPortA	0x004	0	1	0x58020004	joined.tsv
+GPIOA.OTYPER.OT10	1100	76	motor output	gpioPortA	0x004	10	1	0x58020004	joined.tsv
+GPIOA.OTYPER.OT11	1100	77	motor output	gpioPortA	0x004	11	1	0x58020004	joined.tsv
+GPIOA.OSPEEDR.OSPEED0	1100	117	motor output	gpioPortA	0x008	0	2	0x58020008	joined.tsv
+GPIOA.OSPEEDR.OSPEED10	1100	118	motor output	gpioPortA	0x008	20	2	0x58020008	joined.tsv
+GPIOA.OSPEEDR.OSPEED11	1100	119	motor output	gpioPortA	0x008	22	2	0x58020008	joined.tsv
+GPIOA.OTYPER.OT1	1100	142	motor output	gpioPortA	0x004	1	1	0x58020004	joined.tsv
+GPIOA.OSPEEDR.OSPEED1	1100	145	motor output	gpioPortA	0x008	2	2	0x58020008	joined.tsv
+GPIOE.OTYPER.OT11	1100	146	motor output	gpioPortE	0x004	11	1	0x58021004	joined.tsv
+GPIOE.OTYPER.OT13	1100	147	motor output	gpioPortE	0x004	13	1	0x58021004	joined.tsv
+GPIOE.OTYPER.OT14	1100	148	motor output	gpioPortE	0x004	14	1	0x58021004	joined.tsv
+GPIOE.OSPEEDR.OSPEED11	1100	155	motor output	gpioPortE	0x008	22	2	0x58021008	joined.tsv
+GPIOE.OSPEEDR.OSPEED13	1100	156	motor output	gpioPortE	0x008	26	2	0x58021008	joined.tsv
+GPIOE.OSPEEDR.OSPEED14	1100	157	motor output	gpioPortE	0x008	28	2	0x58021008	joined.tsv
+GPIOA.OTYPER.OT5	1100	221	sensor buses	gpioPortA	0x004	5	1	0x58020004	joined.tsv
+GPIOA.OTYPER.OT6	1100	222	sensor buses	gpioPortA	0x004	6	1	0x58020004	joined.tsv
+SPI1.CR2.TSER	1100	225	sensor buses	spi1	0x004	16	16	0x40013004	joined.tsv
+I2C1.CR2.HEAD10R	1100	233	sensor buses	i2c1	0x004	12	1	0x40005404	joined.tsv
+I2C1.CR2.NACK	1100	234	sensor buses	i2c1	0x004	15	1	0x40005404	joined.tsv
+I2C1.CR2.PECBYTE	1100	235	sensor buses	i2c1	0x004	26	1	0x40005404	joined.tsv
+I2C1.ICR.ALERTCF	1100	236	sensor buses	i2c1	0x01C	13	1	0x4000541C	joined.tsv
+I2C1.ICR.ARLOCF	1100	237	sensor buses	i2c1	0x01C	9	1	0x4000541C	joined.tsv
+I2C1.ICR.BERRCF	1100	238	sensor buses	i2c1	0x01C	8	1	0x4000541C	joined.tsv
+I2C1.ICR.NACKCF	1100	239	sensor buses	i2c1	0x01C	4	1	0x4000541C	joined.tsv
+I2C1.ICR.OVRCF	1100	240	sensor buses	i2c1	0x01C	10	1	0x4000541C	joined.tsv
+I2C1.ICR.PECCF	1100	241	sensor buses	i2c1	0x01C	11	1	0x4000541C	joined.tsv
+I2C1.ICR.TIMOUTCF	1100	242	sensor buses	i2c1	0x01C	12	1	0x4000541C	joined.tsv
+I2C1.CR1.ALERTEN	1100	243	sensor buses	i2c1	0x000	22	1	0x40005400	joined.tsv
+I2C1.CR1.ANFOFF	1100	244	sensor buses	i2c1	0x000	12	1	0x40005400	joined.tsv
+I2C1.CR1.DNF	1100	245	sensor buses	i2c1	0x000	8	4	0x40005400	joined.tsv
+I2C1.CR1.GCEN	1100	246	sensor buses	i2c1	0x000	19	1	0x40005400	joined.tsv
+I2C1.CR1.PECEN	1100	247	sensor buses	i2c1	0x000	23	1	0x40005400	joined.tsv
+I2C1.CR1.SBC	1100	248	sensor buses	i2c1	0x000	16	1	0x40005400	joined.tsv
+I2C1.CR1.SMBDEN	1100	249	sensor buses	i2c1	0x000	21	1	0x40005400	joined.tsv
+I2C1.CR1.SMBHEN	1100	250	sensor buses	i2c1	0x000	20	1	0x40005400	joined.tsv
+I2C1.CR1.TXDMAEN	1100	251	sensor buses	i2c1	0x000	14	1	0x40005400	joined.tsv
+I2C1.CR1.WUPEN	1100	252	sensor buses	i2c1	0x000	18	1	0x40005400	joined.tsv
+I2C1.TIMINGR.PRESC	1100	253	sensor buses	i2c1	0x010	28	4	0x40005410	joined.tsv
+I2C1.TIMINGR.SDADEL	1100	257	sensor buses	i2c1	0x010	16	4	0x40005410	joined.tsv
+SPI1.CFG1.CRCEN	1100	258	sensor buses	spi1	0x008	22	1	0x40013008	joined.tsv
+SPI1.CFG1.CRCSIZE	1100	259	sensor buses	spi1	0x008	16	5	0x40013008	joined.tsv
+SPI1.CFG1.FTHLV	1100	260	sensor buses	spi1	0x008	5	4	0x40013008	joined.tsv
+SPI1.CFG1.UDRCFG	1100	262	sensor buses	spi1	0x008	9	2	0x40013008	joined.tsv
+SPI1.CFG1.UDRDET	1100	263	sensor buses	spi1	0x008	11	2	0x40013008	joined.tsv
+SPI1.CFG2.AFCNTR	1100	264	sensor buses	spi1	0x00C	31	1	0x4001300C	joined.tsv
+SPI1.CFG2.COMM	1100	265	sensor buses	spi1	0x00C	17	2	0x4001300C	joined.tsv
+SPI1.CFG2.CPHA	1100	266	sensor buses	spi1	0x00C	24	1	0x4001300C	joined.tsv
+SPI1.CFG2.CPOL	1100	267	sensor buses	spi1	0x00C	25	1	0x4001300C	joined.tsv
+SPI1.CFG2.IOSWP	1100	268	sensor buses	spi1	0x00C	15	1	0x4001300C	joined.tsv
+SPI1.CFG2.MIDI	1100	269	sensor buses	spi1	0x00C	4	4	0x4001300C	joined.tsv
+SPI1.CFG2.MSSI	1100	270	sensor buses	spi1	0x00C	0	4	0x4001300C	joined.tsv
+SPI1.CFG2.SP	1100	271	sensor buses	spi1	0x00C	19	3	0x4001300C	joined.tsv
+SPI1.CFG2.SSIOP	1100	272	sensor buses	spi1	0x00C	28	1	0x4001300C	joined.tsv
+SPI1.CFG2.SSM	1100	273	sensor buses	spi1	0x00C	26	1	0x4001300C	joined.tsv
+SPI1.CFG2.SSOM	1100	275	sensor buses	spi1	0x00C	30	1	0x4001300C	joined.tsv
+SPI1.CR1.CRC33_17	1100	276	sensor buses	spi1	0x000	13	1	0x40013000	joined.tsv
+SPI1.CR1.HDDIR	1100	277	sensor buses	spi1	0x000	11	1	0x40013000	joined.tsv
+SPI1.CR1.RCRCINI	1100	279	sensor buses	spi1	0x000	14	1	0x40013000	joined.tsv
+SPI1.CR1.SSI	1100	280	sensor buses	spi1	0x000	12	1	0x40013000	joined.tsv
+SPI1.CR1.TCRCINI	1100	281	sensor buses	spi1	0x000	15	1	0x40013000	joined.tsv
+GPIOA.OSPEEDR.OSPEED5	1100	287	sensor buses	gpioPortA	0x008	10	2	0x58020008	joined.tsv
+GPIOA.OSPEEDR.OSPEED6	1100	288	sensor buses	gpioPortA	0x008	12	2	0x58020008	joined.tsv
+GPIOA.PUPDR.PUPD5	1100	289	sensor buses	gpioPortA	0x00C	10	2	0x5802000C	joined.tsv
+GPIOA.PUPDR.PUPD6	1100	290	sensor buses	gpioPortA	0x00C	12	2	0x5802000C	joined.tsv
+GPIOB.OSPEEDR.OSPEED6	1100	295	sensor buses	gpioPortB	0x008	12	2	0x58020408	joined.tsv
+GPIOB.OSPEEDR.OSPEED7	1100	296	sensor buses	gpioPortB	0x008	14	2	0x58020408	joined.tsv
+GPIOB.PUPDR.PUPD6	1100	297	sensor buses	gpioPortB	0x00C	12	2	0x5802040C	joined.tsv
+GPIOB.PUPDR.PUPD7	1100	298	sensor buses	gpioPortB	0x00C	14	2	0x5802040C	joined.tsv
+I2C1.CR1.PE	1100	299	sensor buses	i2c1	0x000	0	1	0x40005400	joined.tsv
+I2C1.CR2.ADD10	1100	300	sensor buses	i2c1	0x004	11	1	0x40005404	joined.tsv
+I2C1.CR2.AUTOEND	1100	301	sensor buses	i2c1	0x004	25	1	0x40005404	joined.tsv
+I2C1.CR2.RELOAD	1100	302	sensor buses	i2c1	0x004	24	1	0x40005404	joined.tsv
+I2C1.CR2.STOP	1100	303	sensor buses	i2c1	0x004	14	1	0x40005404	joined.tsv
+I2C1.ICR.ADDRCF	1100	304	sensor buses	i2c1	0x01C	3	1	0x4000541C	joined.tsv
+I2C1.ICR.STOPCF	1100	305	sensor buses	i2c1	0x01C	5	1	0x4000541C	joined.tsv
+SPI1.CFG2.MASTER	1100	306	sensor buses	spi1	0x00C	22	1	0x4001300C	joined.tsv
+GPIOA.OTYPER.OT7	1100	307	sensor buses	gpioPortA	0x004	7	1	0x58020004	joined.tsv
+GPIOA.OSPEEDR.OSPEED7	1100	310	sensor buses	gpioPortA	0x008	14	2	0x58020008	joined.tsv
+GPIOA.PUPDR.PUPD7	1100	311	sensor buses	gpioPortA	0x00C	14	2	0x5802000C	joined.tsv
+GPIOA.PUPDR.PUPD0	1100	312	sensor buses	gpioPortA	0x00C	0	2	0x5802000C	joined.tsv
+GPIOB.OTYPER.OT14	1100	313	sensor buses	gpioPortB	0x004	14	1	0x58020404	joined.tsv
+GPIOB.OTYPER.OT15	1100	314	sensor buses	gpioPortB	0x004	15	1	0x58020404	joined.tsv
+SPI2.CR2.TSER	1100	315	sensor buses	spi2	0x004	16	16	0x40003804	joined.tsv
+SPI2.CFG1.CRCEN	1100	323	sensor buses	spi2	0x008	22	1	0x40003808	joined.tsv
+SPI2.CFG1.CRCSIZE	1100	324	sensor buses	spi2	0x008	16	5	0x40003808	joined.tsv
+SPI2.CFG1.FTHLV	1100	325	sensor buses	spi2	0x008	5	4	0x40003808	joined.tsv
+SPI2.CFG1.UDRCFG	1100	327	sensor buses	spi2	0x008	9	2	0x40003808	joined.tsv
+SPI2.CFG1.UDRDET	1100	328	sensor buses	spi2	0x008	11	2	0x40003808	joined.tsv
+SPI2.CFG2.AFCNTR	1100	329	sensor buses	spi2	0x00C	31	1	0x4000380C	joined.tsv
+SPI2.CFG2.COMM	1100	330	sensor buses	spi2	0x00C	17	2	0x4000380C	joined.tsv
+SPI2.CFG2.CPHA	1100	331	sensor buses	spi2	0x00C	24	1	0x4000380C	joined.tsv
+SPI2.CFG2.CPOL	1100	332	sensor buses	spi2	0x00C	25	1	0x4000380C	joined.tsv
+SPI2.CFG2.IOSWP	1100	333	sensor buses	spi2	0x00C	15	1	0x4000380C	joined.tsv
+SPI2.CFG2.MIDI	1100	334	sensor buses	spi2	0x00C	4	4	0x4000380C	joined.tsv
+SPI2.CFG2.MSSI	1100	335	sensor buses	spi2	0x00C	0	4	0x4000380C	joined.tsv
+SPI2.CFG2.SP	1100	336	sensor buses	spi2	0x00C	19	3	0x4000380C	joined.tsv
+SPI2.CFG2.SSIOP	1100	337	sensor buses	spi2	0x00C	28	1	0x4000380C	joined.tsv
+SPI2.CFG2.SSM	1100	338	sensor buses	spi2	0x00C	26	1	0x4000380C	joined.tsv
+SPI2.CFG2.SSOM	1100	340	sensor buses	spi2	0x00C	30	1	0x4000380C	joined.tsv
+SPI2.CR1.CRC33_17	1100	341	sensor buses	spi2	0x000	13	1	0x40003800	joined.tsv
+SPI2.CR1.HDDIR	1100	342	sensor buses	spi2	0x000	11	1	0x40003800	joined.tsv
+SPI2.CR1.RCRCINI	1100	344	sensor buses	spi2	0x000	14	1	0x40003800	joined.tsv
+SPI2.CR1.SSI	1100	345	sensor buses	spi2	0x000	12	1	0x40003800	joined.tsv
+SPI2.CR1.TCRCINI	1100	346	sensor buses	spi2	0x000	15	1	0x40003800	joined.tsv
+GPIOB.OSPEEDR.OSPEED14	1100	352	sensor buses	gpioPortB	0x008	28	2	0x58020408	joined.tsv
+GPIOB.OSPEEDR.OSPEED15	1100	353	sensor buses	gpioPortB	0x008	30	2	0x58020408	joined.tsv
+GPIOB.PUPDR.PUPD14	1100	354	sensor buses	gpioPortB	0x00C	28	2	0x5802040C	joined.tsv
+GPIOB.PUPDR.PUPD15	1100	355	sensor buses	gpioPortB	0x00C	30	2	0x5802040C	joined.tsv
+SPI2.CFG2.MASTER	1100	356	sensor buses	spi2	0x00C	22	1	0x4000380C	joined.tsv
+GPIOA.OTYPER.OT12	1100	357	sensor buses	gpioPortA	0x004	12	1	0x58020004	joined.tsv
+GPIOB.OTYPER.OT10	1100	358	sensor buses	gpioPortB	0x004	10	1	0x58020404	joined.tsv
+GPIOB.OTYPER.OT11	1100	359	sensor buses	gpioPortB	0x004	11	1	0x58020404	joined.tsv
+GPIOA.OSPEEDR.OSPEED12	1100	387	sensor buses	gpioPortA	0x008	24	2	0x58020008	joined.tsv
+GPIOA.PUPDR.PUPD12	1100	388	sensor buses	gpioPortA	0x00C	24	2	0x5802000C	joined.tsv
+GPIOB.OSPEEDR.OSPEED10	1100	393	sensor buses	gpioPortB	0x008	20	2	0x58020408	joined.tsv
+GPIOB.OSPEEDR.OSPEED11	1100	394	sensor buses	gpioPortB	0x008	22	2	0x58020408	joined.tsv
+GPIOB.PUPDR.PUPD10	1100	395	sensor buses	gpioPortB	0x00C	20	2	0x5802040C	joined.tsv
+GPIOB.PUPDR.PUPD11	1100	396	sensor buses	gpioPortB	0x00C	22	2	0x5802040C	joined.tsv
+GPIOA.PUPDR.PUPD10	1100	404	sensor buses	gpioPortA	0x00C	20	2	0x5802000C	joined.tsv
+GPIOA.PUPDR.PUPD11	1100	405	sensor buses	gpioPortA	0x00C	22	2	0x5802000C	joined.tsv
+GPIOB.OTYPER.OT12	1100	406	sensor buses	gpioPortB	0x004	12	1	0x58020404	joined.tsv
+GPIOB.OTYPER.OT13	1100	407	sensor buses	gpioPortB	0x004	13	1	0x58020404	joined.tsv
+GPIOB.OTYPER.OT5	1100	408	sensor buses	gpioPortB	0x004	5	1	0x58020404	joined.tsv
+GPIOD.OTYPER.OT14	1100	409	sensor buses	gpioPortD	0x004	14	1	0x58020C04	joined.tsv
+GPIOA.PUPDR.PUPD1	1100	410	sensor buses	gpioPortA	0x00C	2	2	0x5802000C	joined.tsv
+GPIOB.OSPEEDR.OSPEED12	1100	416	sensor buses	gpioPortB	0x008	24	2	0x58020408	joined.tsv
+GPIOB.OSPEEDR.OSPEED13	1100	417	sensor buses	gpioPortB	0x008	26	2	0x58020408	joined.tsv
+GPIOB.OSPEEDR.OSPEED5	1100	418	sensor buses	gpioPortB	0x008	10	2	0x58020408	joined.tsv
+GPIOB.PUPDR.PUPD12	1100	419	sensor buses	gpioPortB	0x00C	24	2	0x5802040C	joined.tsv
+GPIOB.PUPDR.PUPD13	1100	420	sensor buses	gpioPortB	0x00C	26	2	0x5802040C	joined.tsv
+GPIOB.PUPDR.PUPD5	1100	421	sensor buses	gpioPortB	0x00C	10	2	0x5802040C	joined.tsv
+GPIOD.OSPEEDR.OSPEED14	1100	423	sensor buses	gpioPortD	0x008	28	2	0x58020C08	joined.tsv
+GPIOD.PUPDR.PUPD14	1100	424	sensor buses	gpioPortD	0x00C	28	2	0x58020C0C	joined.tsv
+GPIOA.OTYPER.OT13	1100	425	the rest	gpioPortA	0x004	13	1	0x58020004	joined.tsv
+GPIOA.OTYPER.OT14	1100	426	the rest	gpioPortA	0x004	14	1	0x58020004	joined.tsv
+GPIOA.OTYPER.OT15	1100	427	the rest	gpioPortA	0x004	15	1	0x58020004	joined.tsv
+GPIOA.OTYPER.OT2	1100	428	the rest	gpioPortA	0x004	2	1	0x58020004	joined.tsv
+GPIOA.OTYPER.OT3	1100	429	the rest	gpioPortA	0x004	3	1	0x58020004	joined.tsv
+GPIOA.OTYPER.OT4	1100	430	the rest	gpioPortA	0x004	4	1	0x58020004	joined.tsv
+GPIOB.OTYPER.OT0	1100	431	the rest	gpioPortB	0x004	0	1	0x58020404	joined.tsv
+GPIOB.OTYPER.OT1	1100	432	the rest	gpioPortB	0x004	1	1	0x58020404	joined.tsv
+GPIOB.OTYPER.OT2	1100	433	the rest	gpioPortB	0x004	2	1	0x58020404	joined.tsv
+GPIOB.OTYPER.OT3	1100	434	the rest	gpioPortB	0x004	3	1	0x58020404	joined.tsv
+GPIOB.OTYPER.OT4	1100	435	the rest	gpioPortB	0x004	4	1	0x58020404	joined.tsv
+GPIOB.OTYPER.OT8	1100	436	the rest	gpioPortB	0x004	8	1	0x58020404	joined.tsv
+GPIOB.OTYPER.OT9	1100	437	the rest	gpioPortB	0x004	9	1	0x58020404	joined.tsv
+SCB.CPACR.CP10	1100	438	the rest	nvic	0xD88	20	2	0xE000ED88	joined.tsv
+SCB.CPACR.CP11	1100	439	the rest	nvic	0xD88	22	2	0xE000ED88	joined.tsv
+GPIOA.PUPDR.PUPD13	1100	440	the rest	gpioPortA	0x00C	26	2	0x5802000C	joined.tsv
+GPIOA.PUPDR.PUPD14	1100	441	the rest	gpioPortA	0x00C	28	2	0x5802000C	joined.tsv
+GPIOA.PUPDR.PUPD15	1100	442	the rest	gpioPortA	0x00C	30	2	0x5802000C	joined.tsv
+GPIOA.PUPDR.PUPD2	1100	443	the rest	gpioPortA	0x00C	4	2	0x5802000C	joined.tsv
+GPIOA.PUPDR.PUPD3	1100	444	the rest	gpioPortA	0x00C	6	2	0x5802000C	joined.tsv
+GPIOA.PUPDR.PUPD4	1100	445	the rest	gpioPortA	0x00C	8	2	0x5802000C	joined.tsv
+GPIOB.PUPDR.PUPD0	1100	446	the rest	gpioPortB	0x00C	0	2	0x5802040C	joined.tsv
+GPIOB.PUPDR.PUPD1	1100	447	the rest	gpioPortB	0x00C	2	2	0x5802040C	joined.tsv
+GPIOB.PUPDR.PUPD2	1100	448	the rest	gpioPortB	0x00C	4	2	0x5802040C	joined.tsv
+GPIOB.PUPDR.PUPD3	1100	449	the rest	gpioPortB	0x00C	6	2	0x5802040C	joined.tsv
+GPIOB.PUPDR.PUPD4	1100	450	the rest	gpioPortB	0x00C	8	2	0x5802040C	joined.tsv
+GPIOB.PUPDR.PUPD8	1100	451	the rest	gpioPortB	0x00C	16	2	0x5802040C	joined.tsv
+GPIOB.PUPDR.PUPD9	1100	452	the rest	gpioPortB	0x00C	18	2	0x5802040C	joined.tsv
+USART1.CR1.CMIE	1100	453	the rest	usart1	0x000	14	1	0x40011000	joined.tsv
+USART1.CR1.DEAT	1100	454	the rest	usart1	0x000	21	5	0x40011000	joined.tsv
+USART1.CR1.DEDT	1100	455	the rest	usart1	0x000	16	5	0x40011000	joined.tsv
+USART1.CR1.EOBIE	1100	456	the rest	usart1	0x000	27	1	0x40011000	joined.tsv
+USART1.CR1.M0	1100	459	the rest	usart1	0x000	12	1	0x40011000	joined.tsv
+USART1.CR1.M1	1100	460	the rest	usart1	0x000	28	1	0x40011000	joined.tsv
+USART1.CR1.MME	1100	461	the rest	usart1	0x000	13	1	0x40011000	joined.tsv
+USART1.CR1.RXFFIE	1100	462	the rest	usart1	0x000	31	1	0x40011000	joined.tsv
+USART1.CR1.TXFEIE	1100	463	the rest	usart1	0x000	30	1	0x40011000	joined.tsv
+USART1.CR1.UESM	1100	464	the rest	usart1	0x000	1	1	0x40011000	joined.tsv
+USART1.CR1.WAKE	1100	465	the rest	usart1	0x000	11	1	0x40011000	joined.tsv
+USART1.CR2.ABREN	1100	466	the rest	usart1	0x004	20	1	0x40011004	joined.tsv
+USART1.CR2.ABRMODE	1100	467	the rest	usart1	0x004	21	2	0x40011004	joined.tsv
+USART1.CR2.ADD	1100	468	the rest	usart1	0x004	24	8	0x40011004	joined.tsv
+USART1.CR2.ADDM7	1100	469	the rest	usart1	0x004	4	1	0x40011004	joined.tsv
+USART1.CR2.CLKEN	1100	470	the rest	usart1	0x004	11	1	0x40011004	joined.tsv
+USART1.CR2.CPHA	1100	471	the rest	usart1	0x004	9	1	0x40011004	joined.tsv
+USART1.CR2.CPOL	1100	472	the rest	usart1	0x004	10	1	0x40011004	joined.tsv
+USART1.CR2.DATAINV	1100	473	the rest	usart1	0x004	18	1	0x40011004	joined.tsv
+USART1.CR2.DIS_NSS	1100	474	the rest	usart1	0x004	3	1	0x40011004	joined.tsv
+USART1.CR2.LBCL	1100	475	the rest	usart1	0x004	8	1	0x40011004	joined.tsv
+USART1.CR2.LBDL	1100	477	the rest	usart1	0x004	5	1	0x40011004	joined.tsv
+USART1.CR2.LINEN	1100	478	the rest	usart1	0x004	14	1	0x40011004	joined.tsv
+USART1.CR2.MSBFIRST	1100	479	the rest	usart1	0x004	19	1	0x40011004	joined.tsv
+USART1.CR2.RTOEN	1100	480	the rest	usart1	0x004	23	1	0x40011004	joined.tsv
+USART1.CR2.RXINV	1100	481	the rest	usart1	0x004	16	1	0x40011004	joined.tsv
+USART1.CR2.SLVEN	1100	482	the rest	usart1	0x004	0	1	0x40011004	joined.tsv
+USART1.CR2.SWAP	1100	483	the rest	usart1	0x004	15	1	0x40011004	joined.tsv
+USART1.CR2.TXINV	1100	484	the rest	usart1	0x004	17	1	0x40011004	joined.tsv
+USART1.CR1.OVER8	1100	485	the rest	usart1	0x000	15	1	0x40011000	joined.tsv
+USART1.CR1.PCE	1100	486	the rest	usart1	0x000	10	1	0x40011000	joined.tsv
+USART1.CR1.PEIE	1100	487	the rest	usart1	0x000	8	1	0x40011000	joined.tsv
+USART1.CR1.PS	1100	488	the rest	usart1	0x000	9	1	0x40011000	joined.tsv
+USART1.CR1.RTOIE	1100	489	the rest	usart1	0x000	26	1	0x40011000	joined.tsv
+USART1.CR1.RXNEIE_RXFNEIE	1100	490	the rest	usart1	0x000	5	1	0x40011000	joined.tsv
+USART1.CR1.TCIE	1100	491	the rest	usart1	0x000	6	1	0x40011000	joined.tsv
+USART1.CR1.TXEIE_TXFNFIE	1100	492	the rest	usart1	0x000	7	1	0x40011000	joined.tsv
+USART1.CR2.STOP	1100	493	the rest	usart1	0x004	12	2	0x40011004	joined.tsv
+GPIOA.PUPDR.PUPD9	1100	494	the rest	gpioPortA	0x00C	18	2	0x5802000C	joined.tsv
+GPIOA.OSPEEDR.OSPEED2	1100	563	the rest	gpioPortA	0x008	4	2	0x58020008	joined.tsv
+GPIOA.OSPEEDR.OSPEED3	1100	564	the rest	gpioPortA	0x008	6	2	0x58020008	joined.tsv
+GPIOA.PUPDR.PUPD8	1100	565	the rest	gpioPortA	0x00C	16	2	0x5802000C	joined.tsv
+GPIOC.OTYPER.OT0	1100	596	the rest	gpioPortC	0x004	0	1	0x58020804	joined.tsv
+GPIOC.OTYPER.OT1	1100	597	the rest	gpioPortC	0x004	1	1	0x58020804	joined.tsv
+GPIOC.OTYPER.OT10	1100	598	the rest	gpioPortC	0x004	10	1	0x58020804	joined.tsv
+GPIOC.OTYPER.OT11	1100	599	the rest	gpioPortC	0x004	11	1	0x58020804	joined.tsv
+GPIOC.OTYPER.OT12	1100	600	the rest	gpioPortC	0x004	12	1	0x58020804	joined.tsv
+GPIOC.OTYPER.OT13	1100	601	the rest	gpioPortC	0x004	13	1	0x58020804	joined.tsv
+GPIOC.OTYPER.OT14	1100	602	the rest	gpioPortC	0x004	14	1	0x58020804	joined.tsv
+GPIOC.OTYPER.OT15	1100	603	the rest	gpioPortC	0x004	15	1	0x58020804	joined.tsv
+GPIOC.OTYPER.OT2	1100	604	the rest	gpioPortC	0x004	2	1	0x58020804	joined.tsv
+GPIOC.OTYPER.OT3	1100	605	the rest	gpioPortC	0x004	3	1	0x58020804	joined.tsv
+GPIOC.OTYPER.OT4	1100	606	the rest	gpioPortC	0x004	4	1	0x58020804	joined.tsv
+GPIOC.OTYPER.OT5	1100	607	the rest	gpioPortC	0x004	5	1	0x58020804	joined.tsv
+GPIOC.OTYPER.OT6	1100	608	the rest	gpioPortC	0x004	6	1	0x58020804	joined.tsv
+GPIOC.OTYPER.OT7	1100	609	the rest	gpioPortC	0x004	7	1	0x58020804	joined.tsv
+GPIOC.OTYPER.OT8	1100	610	the rest	gpioPortC	0x004	8	1	0x58020804	joined.tsv
+GPIOC.OTYPER.OT9	1100	611	the rest	gpioPortC	0x004	9	1	0x58020804	joined.tsv
+GPIOD.OTYPER.OT0	1100	612	the rest	gpioPortD	0x004	0	1	0x58020C04	joined.tsv
+GPIOD.OTYPER.OT1	1100	613	the rest	gpioPortD	0x004	1	1	0x58020C04	joined.tsv
+GPIOD.OTYPER.OT10	1100	614	the rest	gpioPortD	0x004	10	1	0x58020C04	joined.tsv
+GPIOD.OTYPER.OT11	1100	615	the rest	gpioPortD	0x004	11	1	0x58020C04	joined.tsv
+GPIOD.OTYPER.OT12	1100	616	the rest	gpioPortD	0x004	12	1	0x58020C04	joined.tsv
+GPIOD.OTYPER.OT13	1100	617	the rest	gpioPortD	0x004	13	1	0x58020C04	joined.tsv
+GPIOD.OTYPER.OT15	1100	618	the rest	gpioPortD	0x004	15	1	0x58020C04	joined.tsv
+GPIOD.OTYPER.OT2	1100	619	the rest	gpioPortD	0x004	2	1	0x58020C04	joined.tsv
+GPIOD.OTYPER.OT3	1100	620	the rest	gpioPortD	0x004	3	1	0x58020C04	joined.tsv
+GPIOD.OTYPER.OT4	1100	621	the rest	gpioPortD	0x004	4	1	0x58020C04	joined.tsv
+GPIOD.OTYPER.OT5	1100	622	the rest	gpioPortD	0x004	5	1	0x58020C04	joined.tsv
+GPIOD.OTYPER.OT6	1100	623	the rest	gpioPortD	0x004	6	1	0x58020C04	joined.tsv
+GPIOD.OTYPER.OT7	1100	624	the rest	gpioPortD	0x004	7	1	0x58020C04	joined.tsv
+GPIOD.OTYPER.OT8	1100	625	the rest	gpioPortD	0x004	8	1	0x58020C04	joined.tsv
+GPIOD.OTYPER.OT9	1100	626	the rest	gpioPortD	0x004	9	1	0x58020C04	joined.tsv
+GPIOE.OTYPER.OT0	1100	627	the rest	gpioPortE	0x004	0	1	0x58021004	joined.tsv
+GPIOE.OTYPER.OT1	1100	628	the rest	gpioPortE	0x004	1	1	0x58021004	joined.tsv
+GPIOE.OTYPER.OT10	1100	629	the rest	gpioPortE	0x004	10	1	0x58021004	joined.tsv
+GPIOE.OTYPER.OT12	1100	630	the rest	gpioPortE	0x004	12	1	0x58021004	joined.tsv
+GPIOE.OTYPER.OT15	1100	631	the rest	gpioPortE	0x004	15	1	0x58021004	joined.tsv
+GPIOE.OTYPER.OT2	1100	632	the rest	gpioPortE	0x004	2	1	0x58021004	joined.tsv
+GPIOE.OTYPER.OT3	1100	633	the rest	gpioPortE	0x004	3	1	0x58021004	joined.tsv
+GPIOE.OTYPER.OT4	1100	634	the rest	gpioPortE	0x004	4	1	0x58021004	joined.tsv
+GPIOE.OTYPER.OT5	1100	635	the rest	gpioPortE	0x004	5	1	0x58021004	joined.tsv
+GPIOE.OTYPER.OT6	1100	636	the rest	gpioPortE	0x004	6	1	0x58021004	joined.tsv
+GPIOE.OTYPER.OT7	1100	637	the rest	gpioPortE	0x004	7	1	0x58021004	joined.tsv
+GPIOE.OTYPER.OT8	1100	638	the rest	gpioPortE	0x004	8	1	0x58021004	joined.tsv
+GPIOE.OTYPER.OT9	1100	639	the rest	gpioPortE	0x004	9	1	0x58021004	joined.tsv
+GPIOF.OTYPER.OT0	1100	640	the rest	gpioPortF	0x004	0	1	0x58021404	joined.tsv
+GPIOF.OTYPER.OT1	1100	641	the rest	gpioPortF	0x004	1	1	0x58021404	joined.tsv
+GPIOF.OTYPER.OT10	1100	642	the rest	gpioPortF	0x004	10	1	0x58021404	joined.tsv
+GPIOF.OTYPER.OT11	1100	643	the rest	gpioPortF	0x004	11	1	0x58021404	joined.tsv
+GPIOF.OTYPER.OT12	1100	644	the rest	gpioPortF	0x004	12	1	0x58021404	joined.tsv
+GPIOF.OTYPER.OT13	1100	645	the rest	gpioPortF	0x004	13	1	0x58021404	joined.tsv
+GPIOF.OTYPER.OT14	1100	646	the rest	gpioPortF	0x004	14	1	0x58021404	joined.tsv
+GPIOF.OTYPER.OT15	1100	647	the rest	gpioPortF	0x004	15	1	0x58021404	joined.tsv
+GPIOF.OTYPER.OT2	1100	648	the rest	gpioPortF	0x004	2	1	0x58021404	joined.tsv
+GPIOF.OTYPER.OT3	1100	649	the rest	gpioPortF	0x004	3	1	0x58021404	joined.tsv
+GPIOF.OTYPER.OT4	1100	650	the rest	gpioPortF	0x004	4	1	0x58021404	joined.tsv
+GPIOF.OTYPER.OT5	1100	651	the rest	gpioPortF	0x004	5	1	0x58021404	joined.tsv
+GPIOF.OTYPER.OT6	1100	652	the rest	gpioPortF	0x004	6	1	0x58021404	joined.tsv
+GPIOF.OTYPER.OT7	1100	653	the rest	gpioPortF	0x004	7	1	0x58021404	joined.tsv
+GPIOF.OTYPER.OT8	1100	654	the rest	gpioPortF	0x004	8	1	0x58021404	joined.tsv
+GPIOF.OTYPER.OT9	1100	655	the rest	gpioPortF	0x004	9	1	0x58021404	joined.tsv
+GPIOC.OSPEEDR.OSPEED10	1100	660	the rest	gpioPortC	0x008	20	2	0x58020808	joined.tsv
+GPIOC.OSPEEDR.OSPEED11	1100	661	the rest	gpioPortC	0x008	22	2	0x58020808	joined.tsv
+GPIOC.PUPDR.PUPD0	1100	662	the rest	gpioPortC	0x00C	0	2	0x5802080C	joined.tsv
+GPIOC.PUPDR.PUPD1	1100	663	the rest	gpioPortC	0x00C	2	2	0x5802080C	joined.tsv
+GPIOC.PUPDR.PUPD10	1100	664	the rest	gpioPortC	0x00C	20	2	0x5802080C	joined.tsv
+GPIOC.PUPDR.PUPD11	1100	665	the rest	gpioPortC	0x00C	22	2	0x5802080C	joined.tsv
+GPIOC.PUPDR.PUPD12	1100	666	the rest	gpioPortC	0x00C	24	2	0x5802080C	joined.tsv
+GPIOC.PUPDR.PUPD13	1100	667	the rest	gpioPortC	0x00C	26	2	0x5802080C	joined.tsv
+GPIOC.PUPDR.PUPD14	1100	668	the rest	gpioPortC	0x00C	28	2	0x5802080C	joined.tsv
+GPIOC.PUPDR.PUPD15	1100	669	the rest	gpioPortC	0x00C	30	2	0x5802080C	joined.tsv
+GPIOC.PUPDR.PUPD2	1100	670	the rest	gpioPortC	0x00C	4	2	0x5802080C	joined.tsv
+GPIOC.PUPDR.PUPD3	1100	671	the rest	gpioPortC	0x00C	6	2	0x5802080C	joined.tsv
+GPIOC.PUPDR.PUPD4	1100	672	the rest	gpioPortC	0x00C	8	2	0x5802080C	joined.tsv
+GPIOC.PUPDR.PUPD5	1100	673	the rest	gpioPortC	0x00C	10	2	0x5802080C	joined.tsv
+GPIOC.PUPDR.PUPD6	1100	674	the rest	gpioPortC	0x00C	12	2	0x5802080C	joined.tsv
+GPIOC.PUPDR.PUPD7	1100	675	the rest	gpioPortC	0x00C	14	2	0x5802080C	joined.tsv
+GPIOC.PUPDR.PUPD8	1100	676	the rest	gpioPortC	0x00C	16	2	0x5802080C	joined.tsv
+GPIOC.PUPDR.PUPD9	1100	677	the rest	gpioPortC	0x00C	18	2	0x5802080C	joined.tsv
+GPIOD.PUPDR.PUPD0	1100	678	the rest	gpioPortD	0x00C	0	2	0x58020C0C	joined.tsv
+GPIOD.PUPDR.PUPD1	1100	679	the rest	gpioPortD	0x00C	2	2	0x58020C0C	joined.tsv
+GPIOD.PUPDR.PUPD10	1100	680	the rest	gpioPortD	0x00C	20	2	0x58020C0C	joined.tsv
+GPIOD.PUPDR.PUPD11	1100	681	the rest	gpioPortD	0x00C	22	2	0x58020C0C	joined.tsv
+GPIOD.PUPDR.PUPD12	1100	682	the rest	gpioPortD	0x00C	24	2	0x58020C0C	joined.tsv
+GPIOD.PUPDR.PUPD13	1100	683	the rest	gpioPortD	0x00C	26	2	0x58020C0C	joined.tsv
+GPIOD.PUPDR.PUPD15	1100	684	the rest	gpioPortD	0x00C	30	2	0x58020C0C	joined.tsv
+GPIOD.PUPDR.PUPD2	1100	685	the rest	gpioPortD	0x00C	4	2	0x58020C0C	joined.tsv
+GPIOD.PUPDR.PUPD3	1100	686	the rest	gpioPortD	0x00C	6	2	0x58020C0C	joined.tsv
+GPIOD.PUPDR.PUPD4	1100	687	the rest	gpioPortD	0x00C	8	2	0x58020C0C	joined.tsv
+GPIOD.PUPDR.PUPD5	1100	688	the rest	gpioPortD	0x00C	10	2	0x58020C0C	joined.tsv
+GPIOD.PUPDR.PUPD6	1100	689	the rest	gpioPortD	0x00C	12	2	0x58020C0C	joined.tsv
+GPIOD.PUPDR.PUPD7	1100	690	the rest	gpioPortD	0x00C	14	2	0x58020C0C	joined.tsv
+GPIOD.PUPDR.PUPD8	1100	691	the rest	gpioPortD	0x00C	16	2	0x58020C0C	joined.tsv
+GPIOD.PUPDR.PUPD9	1100	692	the rest	gpioPortD	0x00C	18	2	0x58020C0C	joined.tsv
+GPIOE.PUPDR.PUPD0	1100	693	the rest	gpioPortE	0x00C	0	2	0x5802100C	joined.tsv
+GPIOE.PUPDR.PUPD1	1100	694	the rest	gpioPortE	0x00C	2	2	0x5802100C	joined.tsv
+GPIOE.PUPDR.PUPD10	1100	695	the rest	gpioPortE	0x00C	20	2	0x5802100C	joined.tsv
+GPIOE.PUPDR.PUPD12	1100	696	the rest	gpioPortE	0x00C	24	2	0x5802100C	joined.tsv
+GPIOE.PUPDR.PUPD15	1100	697	the rest	gpioPortE	0x00C	30	2	0x5802100C	joined.tsv
+GPIOE.PUPDR.PUPD2	1100	698	the rest	gpioPortE	0x00C	4	2	0x5802100C	joined.tsv
+GPIOE.PUPDR.PUPD3	1100	699	the rest	gpioPortE	0x00C	6	2	0x5802100C	joined.tsv
+GPIOE.PUPDR.PUPD4	1100	700	the rest	gpioPortE	0x00C	8	2	0x5802100C	joined.tsv
+GPIOE.PUPDR.PUPD5	1100	701	the rest	gpioPortE	0x00C	10	2	0x5802100C	joined.tsv
+GPIOE.PUPDR.PUPD6	1100	702	the rest	gpioPortE	0x00C	12	2	0x5802100C	joined.tsv
+GPIOE.PUPDR.PUPD7	1100	703	the rest	gpioPortE	0x00C	14	2	0x5802100C	joined.tsv
+GPIOE.PUPDR.PUPD8	1100	704	the rest	gpioPortE	0x00C	16	2	0x5802100C	joined.tsv
+GPIOE.PUPDR.PUPD9	1100	705	the rest	gpioPortE	0x00C	18	2	0x5802100C	joined.tsv
+GPIOF.PUPDR.PUPD0	1100	707	the rest	gpioPortF	0x00C	0	2	0x5802140C	joined.tsv
+GPIOF.PUPDR.PUPD1	1100	708	the rest	gpioPortF	0x00C	2	2	0x5802140C	joined.tsv
+GPIOF.PUPDR.PUPD10	1100	709	the rest	gpioPortF	0x00C	20	2	0x5802140C	joined.tsv
+GPIOF.PUPDR.PUPD11	1100	710	the rest	gpioPortF	0x00C	22	2	0x5802140C	joined.tsv
+GPIOF.PUPDR.PUPD12	1100	711	the rest	gpioPortF	0x00C	24	2	0x5802140C	joined.tsv
+GPIOF.PUPDR.PUPD13	1100	712	the rest	gpioPortF	0x00C	26	2	0x5802140C	joined.tsv
+GPIOF.PUPDR.PUPD14	1100	713	the rest	gpioPortF	0x00C	28	2	0x5802140C	joined.tsv
+GPIOF.PUPDR.PUPD15	1100	714	the rest	gpioPortF	0x00C	30	2	0x5802140C	joined.tsv
+GPIOF.PUPDR.PUPD2	1100	715	the rest	gpioPortF	0x00C	4	2	0x5802140C	joined.tsv
+GPIOF.PUPDR.PUPD3	1100	716	the rest	gpioPortF	0x00C	6	2	0x5802140C	joined.tsv
+GPIOF.PUPDR.PUPD4	1100	717	the rest	gpioPortF	0x00C	8	2	0x5802140C	joined.tsv
+GPIOF.PUPDR.PUPD5	1100	718	the rest	gpioPortF	0x00C	10	2	0x5802140C	joined.tsv
+GPIOF.PUPDR.PUPD6	1100	719	the rest	gpioPortF	0x00C	12	2	0x5802140C	joined.tsv
+GPIOF.PUPDR.PUPD7	1100	720	the rest	gpioPortF	0x00C	14	2	0x5802140C	joined.tsv
+GPIOF.PUPDR.PUPD8	1100	721	the rest	gpioPortF	0x00C	16	2	0x5802140C	joined.tsv
+GPIOF.PUPDR.PUPD9	1100	722	the rest	gpioPortF	0x00C	18	2	0x5802140C	joined.tsv
+SPI1.SR.MODF@reset	1100	282	sensor buses	spi1	0x014	9	1	0x40013014	joined.tsv
+SPI2.SR.MODF@reset	1100	347	sensor buses	spi2	0x014	9	1	0x40003814	joined.tsv
+I2C2.CR2.HEAD10R	1100	360	sensor buses	i2c2	0x004	12	1	0x40005804	joined.tsv
+I2C2.CR2.NACK	1100	361	sensor buses	i2c2	0x004	15	1	0x40005804	joined.tsv
+I2C2.CR2.PECBYTE	1100	362	sensor buses	i2c2	0x004	26	1	0x40005804	joined.tsv
+I2C2.ICR.ALERTCF	1100	363	sensor buses	i2c2	0x01C	13	1	0x4000581C	joined.tsv
+I2C2.ICR.ARLOCF	1100	364	sensor buses	i2c2	0x01C	9	1	0x4000581C	joined.tsv
+I2C2.ICR.BERRCF	1100	365	sensor buses	i2c2	0x01C	8	1	0x4000581C	joined.tsv
+I2C2.ICR.NACKCF	1100	366	sensor buses	i2c2	0x01C	4	1	0x4000581C	joined.tsv
+I2C2.ICR.OVRCF	1100	367	sensor buses	i2c2	0x01C	10	1	0x4000581C	joined.tsv
+I2C2.ICR.PECCF	1100	368	sensor buses	i2c2	0x01C	11	1	0x4000581C	joined.tsv
+I2C2.ICR.TIMOUTCF	1100	369	sensor buses	i2c2	0x01C	12	1	0x4000581C	joined.tsv
+I2C2.CR1.ALERTEN	1100	370	sensor buses	i2c2	0x000	22	1	0x40005800	joined.tsv
+I2C2.CR1.ANFOFF	1100	371	sensor buses	i2c2	0x000	12	1	0x40005800	joined.tsv
+I2C2.CR1.DNF	1100	372	sensor buses	i2c2	0x000	8	4	0x40005800	joined.tsv
+I2C2.CR1.GCEN	1100	373	sensor buses	i2c2	0x000	19	1	0x40005800	joined.tsv
+I2C2.CR1.PECEN	1100	374	sensor buses	i2c2	0x000	23	1	0x40005800	joined.tsv
+I2C2.CR1.SBC	1100	375	sensor buses	i2c2	0x000	16	1	0x40005800	joined.tsv
+I2C2.CR1.SMBDEN	1100	376	sensor buses	i2c2	0x000	21	1	0x40005800	joined.tsv
+I2C2.CR1.SMBHEN	1100	377	sensor buses	i2c2	0x000	20	1	0x40005800	joined.tsv
+I2C2.CR1.TXDMAEN	1100	378	sensor buses	i2c2	0x000	14	1	0x40005800	joined.tsv
+I2C2.CR1.WUPEN	1100	379	sensor buses	i2c2	0x000	18	1	0x40005800	joined.tsv
+I2C2.TIMINGR.PRESC	1100	380	sensor buses	i2c2	0x010	28	4	0x40005810	joined.tsv
+I2C2.TIMINGR.SCLDEL	1100	381	sensor buses	i2c2	0x010	20	4	0x40005810	joined.tsv
+I2C2.TIMINGR.SCLH	1100	382	sensor buses	i2c2	0x010	8	8	0x40005810	joined.tsv
+I2C2.TIMINGR.SCLL	1100	383	sensor buses	i2c2	0x010	0	8	0x40005810	joined.tsv
+I2C2.TIMINGR.SDADEL	1100	384	sensor buses	i2c2	0x010	16	4	0x40005810	joined.tsv
+I2C2.CR1.PE	1100	397	sensor buses	i2c2	0x000	0	1	0x40005800	joined.tsv
+I2C2.CR2.ADD10	1100	398	sensor buses	i2c2	0x004	11	1	0x40005804	joined.tsv
+I2C2.CR2.AUTOEND	1100	399	sensor buses	i2c2	0x004	25	1	0x40005804	joined.tsv
+I2C2.CR2.RELOAD	1100	400	sensor buses	i2c2	0x004	24	1	0x40005804	joined.tsv
+I2C2.CR2.STOP	1100	401	sensor buses	i2c2	0x004	14	1	0x40005804	joined.tsv
+I2C2.ICR.ADDRCF	1100	402	sensor buses	i2c2	0x01C	3	1	0x4000581C	joined.tsv
+I2C2.ICR.STOPCF	1100	403	sensor buses	i2c2	0x01C	5	1	0x4000581C	joined.tsv
+USART2.CR1.CMIE	1100	495	the rest	usart2	0x000	14	1	0x40004400	joined.tsv
+USART2.CR1.DEAT	1100	496	the rest	usart2	0x000	21	5	0x40004400	joined.tsv
+USART2.CR1.DEDT	1100	497	the rest	usart2	0x000	16	5	0x40004400	joined.tsv
+USART2.CR1.EOBIE	1100	498	the rest	usart2	0x000	27	1	0x40004400	joined.tsv
+USART2.CR1.FIFOEN	1100	499	the rest	usart2	0x000	29	1	0x40004400	joined.tsv
+USART2.CR1.IDLEIE	1100	500	the rest	usart2	0x000	4	1	0x40004400	joined.tsv
+USART2.CR1.M0	1100	501	the rest	usart2	0x000	12	1	0x40004400	joined.tsv
+USART2.CR1.M1	1100	502	the rest	usart2	0x000	28	1	0x40004400	joined.tsv
+USART2.CR1.MME	1100	503	the rest	usart2	0x000	13	1	0x40004400	joined.tsv
+USART2.CR1.RXFFIE	1100	504	the rest	usart2	0x000	31	1	0x40004400	joined.tsv
+USART2.CR1.TXFEIE	1100	505	the rest	usart2	0x000	30	1	0x40004400	joined.tsv
+USART2.CR1.UESM	1100	506	the rest	usart2	0x000	1	1	0x40004400	joined.tsv
+USART2.CR1.WAKE	1100	507	the rest	usart2	0x000	11	1	0x40004400	joined.tsv
+USART2.CR2.ABREN	1100	508	the rest	usart2	0x004	20	1	0x40004404	joined.tsv
+USART2.CR2.ABRMODE	1100	509	the rest	usart2	0x004	21	2	0x40004404	joined.tsv
+USART2.CR2.ADD	1100	510	the rest	usart2	0x004	24	8	0x40004404	joined.tsv
+USART2.CR2.ADDM7	1100	511	the rest	usart2	0x004	4	1	0x40004404	joined.tsv
+USART2.CR2.CLKEN	1100	512	the rest	usart2	0x004	11	1	0x40004404	joined.tsv
+USART2.CR2.CPHA	1100	513	the rest	usart2	0x004	9	1	0x40004404	joined.tsv
+USART2.CR2.CPOL	1100	514	the rest	usart2	0x004	10	1	0x40004404	joined.tsv
+USART2.CR2.DATAINV	1100	515	the rest	usart2	0x004	18	1	0x40004404	joined.tsv
+USART2.CR2.DIS_NSS	1100	516	the rest	usart2	0x004	3	1	0x40004404	joined.tsv
+USART2.CR2.LBCL	1100	517	the rest	usart2	0x004	8	1	0x40004404	joined.tsv
+USART2.CR2.LBDIE	1100	518	the rest	usart2	0x004	6	1	0x40004404	joined.tsv
+USART2.CR2.LBDL	1100	519	the rest	usart2	0x004	5	1	0x40004404	joined.tsv
+USART2.CR2.LINEN	1100	520	the rest	usart2	0x004	14	1	0x40004404	joined.tsv
+USART2.CR2.MSBFIRST	1100	521	the rest	usart2	0x004	19	1	0x40004404	joined.tsv
+USART2.CR2.RTOEN	1100	522	the rest	usart2	0x004	23	1	0x40004404	joined.tsv
+USART2.CR2.RXINV	1100	523	the rest	usart2	0x004	16	1	0x40004404	joined.tsv
+USART2.CR2.SLVEN	1100	524	the rest	usart2	0x004	0	1	0x40004404	joined.tsv
+USART2.CR2.SWAP	1100	525	the rest	usart2	0x004	15	1	0x40004404	joined.tsv
+USART2.CR2.TXINV	1100	526	the rest	usart2	0x004	17	1	0x40004404	joined.tsv
+USART3.CR1.CMIE	1100	527	the rest	usart3	0x000	14	1	0x40004800	joined.tsv
+USART3.CR1.DEAT	1100	528	the rest	usart3	0x000	21	5	0x40004800	joined.tsv
+USART3.CR1.DEDT	1100	529	the rest	usart3	0x000	16	5	0x40004800	joined.tsv
+USART3.CR1.EOBIE	1100	530	the rest	usart3	0x000	27	1	0x40004800	joined.tsv
+USART3.CR1.FIFOEN	1100	531	the rest	usart3	0x000	29	1	0x40004800	joined.tsv
+USART3.CR1.IDLEIE	1100	532	the rest	usart3	0x000	4	1	0x40004800	joined.tsv
+USART3.CR1.M0	1100	533	the rest	usart3	0x000	12	1	0x40004800	joined.tsv
+USART3.CR1.M1	1100	534	the rest	usart3	0x000	28	1	0x40004800	joined.tsv
+USART3.CR1.MME	1100	535	the rest	usart3	0x000	13	1	0x40004800	joined.tsv
+USART3.CR1.RXFFIE	1100	536	the rest	usart3	0x000	31	1	0x40004800	joined.tsv
+USART3.CR1.TXFEIE	1100	537	the rest	usart3	0x000	30	1	0x40004800	joined.tsv
+USART3.CR1.UESM	1100	538	the rest	usart3	0x000	1	1	0x40004800	joined.tsv
+USART3.CR1.WAKE	1100	539	the rest	usart3	0x000	11	1	0x40004800	joined.tsv
+USART3.CR2.ABREN	1100	540	the rest	usart3	0x004	20	1	0x40004804	joined.tsv
+USART3.CR2.ABRMODE	1100	541	the rest	usart3	0x004	21	2	0x40004804	joined.tsv
+USART3.CR2.ADD	1100	542	the rest	usart3	0x004	24	8	0x40004804	joined.tsv
+USART3.CR2.ADDM7	1100	543	the rest	usart3	0x004	4	1	0x40004804	joined.tsv
+USART3.CR2.CLKEN	1100	544	the rest	usart3	0x004	11	1	0x40004804	joined.tsv
+USART3.CR2.CPHA	1100	545	the rest	usart3	0x004	9	1	0x40004804	joined.tsv
+USART3.CR2.CPOL	1100	546	the rest	usart3	0x004	10	1	0x40004804	joined.tsv
+USART3.CR2.DATAINV	1100	547	the rest	usart3	0x004	18	1	0x40004804	joined.tsv
+USART3.CR2.DIS_NSS	1100	548	the rest	usart3	0x004	3	1	0x40004804	joined.tsv
+USART3.CR2.LBCL	1100	549	the rest	usart3	0x004	8	1	0x40004804	joined.tsv
+USART3.CR2.LBDIE	1100	550	the rest	usart3	0x004	6	1	0x40004804	joined.tsv
+USART3.CR2.LBDL	1100	551	the rest	usart3	0x004	5	1	0x40004804	joined.tsv
+USART3.CR2.LINEN	1100	552	the rest	usart3	0x004	14	1	0x40004804	joined.tsv
+USART3.CR2.MSBFIRST	1100	553	the rest	usart3	0x004	19	1	0x40004804	joined.tsv
+USART3.CR2.RTOEN	1100	554	the rest	usart3	0x004	23	1	0x40004804	joined.tsv
+USART3.CR2.RXINV	1100	555	the rest	usart3	0x004	16	1	0x40004804	joined.tsv
+USART3.CR2.SLVEN	1100	556	the rest	usart3	0x004	0	1	0x40004804	joined.tsv
+USART3.CR2.SWAP	1100	557	the rest	usart3	0x004	15	1	0x40004804	joined.tsv
+USART3.CR2.TXINV	1100	558	the rest	usart3	0x004	17	1	0x40004804	joined.tsv
+USART2.CR1.OVER8	1100	566	the rest	usart2	0x000	15	1	0x40004400	joined.tsv
+USART2.CR1.PCE	1100	567	the rest	usart2	0x000	10	1	0x40004400	joined.tsv
+USART2.CR1.PEIE	1100	568	the rest	usart2	0x000	8	1	0x40004400	joined.tsv
+USART2.CR1.PS	1100	569	the rest	usart2	0x000	9	1	0x40004400	joined.tsv
+USART2.CR1.RTOIE	1100	570	the rest	usart2	0x000	26	1	0x40004400	joined.tsv
+USART2.CR1.RXNEIE_RXFNEIE	1100	571	the rest	usart2	0x000	5	1	0x40004400	joined.tsv
+USART2.CR1.TCIE	1100	572	the rest	usart2	0x000	6	1	0x40004400	joined.tsv
+USART2.CR1.TXEIE_TXFNFIE	1100	573	the rest	usart2	0x000	7	1	0x40004400	joined.tsv
+USART2.CR2.STOP	1100	574	the rest	usart2	0x004	12	2	0x40004404	joined.tsv
+USART3.CR1.OVER8	1100	575	the rest	usart3	0x000	15	1	0x40004800	joined.tsv
+USART3.CR1.PCE	1100	576	the rest	usart3	0x000	10	1	0x40004800	joined.tsv
+USART3.CR1.PEIE	1100	577	the rest	usart3	0x000	8	1	0x40004800	joined.tsv
+USART3.CR1.PS	1100	578	the rest	usart3	0x000	9	1	0x40004800	joined.tsv
+USART3.CR1.RTOIE	1100	579	the rest	usart3	0x000	26	1	0x40004800	joined.tsv
+USART3.CR1.RXNEIE_RXFNEIE	1100	580	the rest	usart3	0x000	5	1	0x40004800	joined.tsv
+USART3.CR1.TCIE	1100	581	the rest	usart3	0x000	6	1	0x40004800	joined.tsv
+USART3.CR1.TXEIE_TXFNFIE	1100	582	the rest	usart3	0x000	7	1	0x40004800	joined.tsv
+USART3.CR2.STOP	1100	583	the rest	usart3	0x004	12	2	0x40004804	joined.tsv
+ADC3.CFGR.JQDIS	1100	584	the rest	adc3	0x00C	31	1	0x5802600C	joined.tsv
+ADC3.CR.ADCAL	1100	585	the rest	adc3	0x008	31	1	0x58026008	joined.tsv
+ADC3.SMPR1.SMP0	1100	586	the rest	adc3	0x014	0	3	0x58026014	joined.tsv
+ADC3.SMPR1.SMP1	1100	587	the rest	adc3	0x014	3	3	0x58026014	joined.tsv
+ADC3.SMPR1.SMP2	1100	588	the rest	adc3	0x014	6	3	0x58026014	joined.tsv
+ADC3.SMPR1.SMP3	1100	589	the rest	adc3	0x014	9	3	0x58026014	joined.tsv
+ADC3.SMPR1.SMP4	1100	590	the rest	adc3	0x014	12	3	0x58026014	joined.tsv
+ADC3.SMPR1.SMP5	1100	591	the rest	adc3	0x014	15	3	0x58026014	joined.tsv
+ADC3.SMPR1.SMP6	1100	592	the rest	adc3	0x014	18	3	0x58026014	joined.tsv
+ADC3.SMPR1.SMP7	1100	593	the rest	adc3	0x014	21	3	0x58026014	joined.tsv
+ADC3.SMPR1.SMP8	1100	594	the rest	adc3	0x014	24	3	0x58026014	joined.tsv
+ADC3.SMPR1.SMP9	1100	595	the rest	adc3	0x014	27	3	0x58026014	joined.tsv
+RCC.AHB1LPENR.ADC12LPEN	arm-only	-	-	rcc	0x100	5	1	0x58024500	cmsis
+RCC.AHB4LPENR.ADC3LPEN	arm-only	-	-	rcc	0x108	24	1	0x58024508	cmsis
+RCC.APB1LLPENR.USART2LPEN	arm-only	-	-	rcc	0x110	17	1	0x58024510	cmsis
+RCC.APB2LPENR.TIM1LPEN	arm-only	-	-	rcc	0x118	0	1	0x58024518	cmsis
+BDMA.IFCR.-	arm-only	-	-	bdma	0x004	0	32	0x58025404	cmsis
+DMA1.HIFCR.CDMEIF5	arm-only	-	-	dma1	0x00C	8	1	0x4002000C	cmsis
+DMA1.HIFCR.CDMEIF6	arm-only	-	-	dma1	0x00C	18	1	0x4002000C	cmsis
+DMA1.HIFCR.CDMEIF7	arm-only	-	-	dma1	0x00C	24	1	0x4002000C	cmsis
+DMA1.HIFCR.CFEIF5	arm-only	-	-	dma1	0x00C	6	1	0x4002000C	cmsis
+DMA1.HIFCR.CFEIF6	arm-only	-	-	dma1	0x00C	16	1	0x4002000C	cmsis
+DMA1.HIFCR.CFEIF7	arm-only	-	-	dma1	0x00C	22	1	0x4002000C	cmsis
+DMA1.HIFCR.CHTIF5	arm-only	-	-	dma1	0x00C	10	1	0x4002000C	cmsis
+DMA1.HIFCR.CHTIF6	arm-only	-	-	dma1	0x00C	20	1	0x4002000C	cmsis
+DMA1.HIFCR.CHTIF7	arm-only	-	-	dma1	0x00C	26	1	0x4002000C	cmsis
+DMA1.HIFCR.CTEIF5	arm-only	-	-	dma1	0x00C	9	1	0x4002000C	cmsis
+DMA1.HIFCR.CTEIF6	arm-only	-	-	dma1	0x00C	19	1	0x4002000C	cmsis
+DMA1.HIFCR.CTEIF7	arm-only	-	-	dma1	0x00C	25	1	0x4002000C	cmsis
+DMA2.LIFCR.CDMEIF2	arm-only	-	-	dma2	0x008	18	1	0x40020408	cmsis
+DMA2.LIFCR.CDMEIF3	arm-only	-	-	dma2	0x008	24	1	0x40020408	cmsis
+DMA2.LIFCR.CFEIF2	arm-only	-	-	dma2	0x008	16	1	0x40020408	cmsis
+DMA2.LIFCR.CFEIF3	arm-only	-	-	dma2	0x008	22	1	0x40020408	cmsis
+DMA2.LIFCR.CHTIF2	arm-only	-	-	dma2	0x008	20	1	0x40020408	cmsis
+DMA2.LIFCR.CHTIF3	arm-only	-	-	dma2	0x008	26	1	0x40020408	cmsis
+DMA2.LIFCR.CTEIF2	arm-only	-	-	dma2	0x008	19	1	0x40020408	cmsis
+DMA2.LIFCR.CTEIF3	arm-only	-	-	dma2	0x008	25	1	0x40020408	cmsis
+TIM1.CCMR3.absent register	arm-only	-	-	timer1	0x054	0	32	0x40010054	cmsis
+ADC1.CR.ADCAL	arm-only	-	-	adcM1S2	0x008	31	1	0x40022008	cmsis
+ADC1.SMPR2.SMP10	arm-only	-	-	adcM1S2	0x018	0	3	0x40022018	cmsis
+ADC3.PCSEL.PCSEL	arm-only	-	-	adc3	0x01C	0	20	0x5802601C	joined.tsv
+ADC3.SMPR2.RESERVED	arm-only	-	-	adc3	0x018	27	5	0x58026018	cmsis
+ADC3.SMPR2.SMP17	arm-only	-	-	adc3	0x018	21	3	0x58026018	cmsis
+ADC3.SMPR2.SMP18	arm-only	-	-	adc3	0x018	24	3	0x58026018	cmsis
+ADC3_COMMON.CCR.TSEN	arm-only	-	-	adc3	0x308	23	1	0x58026308	joined.tsv
+ADC3_COMMON.CCR.VBATEN	arm-only	-	-	adc3	0x308	24	1	0x58026308	joined.tsv
+ADC3_COMMON.CCR.VREFEN	arm-only	-	-	adc3	0x308	22	1	0x58026308	joined.tsv
+I2C2.CR1.ERRIE	arm-only	-	-	i2c2	0x000	7	1	0x40005800	joined.tsv
+USART2.CR3.EIE	arm-only	-	-	usart2	0x008	0	1	0x40004408	cmsis
+USART2.ICR.CMCF	arm-only	-	-	usart2	0x020	17	1	0x40004420	cmsis
+USART2.ICR.CTSCF	arm-only	-	-	usart2	0x020	9	1	0x40004420	cmsis
+USART2.ICR.EOBCF	arm-only	-	-	usart2	0x020	12	1	0x40004420	cmsis
+USART2.ICR.FECF	arm-only	-	-	usart2	0x020	1	1	0x40004420	cmsis
+USART2.ICR.IDLECF	arm-only	-	-	usart2	0x020	4	1	0x40004420	cmsis
+USART2.ICR.LBDCF	arm-only	-	-	usart2	0x020	8	1	0x40004420	cmsis
+USART2.ICR.NCF	arm-only	-	-	usart2	0x020	2	1	0x40004420	cmsis
+USART2.ICR.ORECF	arm-only	-	-	usart2	0x020	3	1	0x40004420	cmsis
+USART2.ICR.PECF	arm-only	-	-	usart2	0x020	0	1	0x40004420	cmsis
+USART2.ICR.RESERVED	arm-only	-	-	usart2	0x020	5	1	0x40004420	cmsis
+USART2.ICR.TCBGTCF	arm-only	-	-	usart2	0x020	7	1	0x40004420	cmsis
+USART2.ICR.WUCF	arm-only	-	-	usart2	0x020	20	1	0x40004420	cmsis
+USART3.CR3.EIE	arm-only	-	-	usart3	0x008	0	1	0x40004808	cmsis
+USART3.ICR.CMCF	arm-only	-	-	usart3	0x020	17	1	0x40004820	cmsis
+USART3.ICR.CTSCF	arm-only	-	-	usart3	0x020	9	1	0x40004820	cmsis
+USART3.ICR.EOBCF	arm-only	-	-	usart3	0x020	12	1	0x40004820	cmsis
+USART3.ICR.FECF	arm-only	-	-	usart3	0x020	1	1	0x40004820	cmsis
+USART3.ICR.IDLECF	arm-only	-	-	usart3	0x020	4	1	0x40004820	cmsis
+USART3.ICR.LBDCF	arm-only	-	-	usart3	0x020	8	1	0x40004820	cmsis
+USART3.ICR.NCF	arm-only	-	-	usart3	0x020	2	1	0x40004820	cmsis
+USART3.ICR.ORECF	arm-only	-	-	usart3	0x020	3	1	0x40004820	cmsis
+USART3.ICR.PECF	arm-only	-	-	usart3	0x020	0	1	0x40004820	cmsis
+USART3.ICR.RESERVED	arm-only	-	-	usart3	0x020	5	1	0x40004820	cmsis
+USART3.ICR.TCBGTCF	arm-only	-	-	usart3	0x020	7	1	0x40004820	cmsis
+USART3.ICR.WUCF	arm-only	-	-	usart3	0x020	20	1	0x40004820	cmsis
+bdma@0x94.-	arm-only	-	-	bdma	0x094	0	32	0x58025494	renode offset
+bdma@0x98.-	arm-only	-	-	bdma	0x098	0	32	0x58025498	renode offset
+bdma@0x9C.-	arm-only	-	-	bdma	0x09C	0	32	0x5802549C	renode offset
+bdma@0xA0.-	arm-only	-	-	bdma	0x0A0	0	32	0x580254A0	renode offset
+dma1@0x28.TRBUFF	arm-only	-	-	dma1	0x028	20	1	0x40020028	renode offset
+dma1@0x40.TRBUFF	arm-only	-	-	dma1	0x040	20	1	0x40020040	renode offset
+dma1@0x58.CIRC	arm-only	-	-	dma1	0x058	8	1	0x40020058	renode offset
+dma1@0x58.HTIE	arm-only	-	-	dma1	0x058	3	1	0x40020058	renode offset
+dma1@0x70.PL	arm-only	-	-	dma1	0x070	16	2	0x40020070	renode offset
+dma1@0x88.DMEIE	arm-only	-	-	dma1	0x088	1	1	0x40020088	renode offset
+dma1@0x88.TEIE	arm-only	-	-	dma1	0x088	2	1	0x40020088	renode offset
+dma1@0x88.TRBUFF	arm-only	-	-	dma1	0x088	20	1	0x40020088	renode offset
+dma1@0x9C.FS	arm-only	-	-	dma1	0x09C	3	3	0x4002009C	renode offset
+dma1@0xA0.DMEIE	arm-only	-	-	dma1	0x0A0	1	1	0x400200A0	renode offset
+dma1@0xA0.PL	arm-only	-	-	dma1	0x0A0	16	2	0x400200A0	renode offset
+dma1@0xA0.TEIE	arm-only	-	-	dma1	0x0A0	2	1	0x400200A0	renode offset
+dma1@0xB4.FS	arm-only	-	-	dma1	0x0B4	3	3	0x400200B4	renode offset
+dma1@0xB8.DMEIE	arm-only	-	-	dma1	0x0B8	1	1	0x400200B8	renode offset
+dma1@0xB8.TEIE	arm-only	-	-	dma1	0x0B8	2	1	0x400200B8	renode offset
+dma1@0xB8.TRBUFF	arm-only	-	-	dma1	0x0B8	20	1	0x400200B8	renode offset
+dma1@0xCC.FS	arm-only	-	-	dma1	0x0CC	3	3	0x400200CC	renode offset
+dma2@0x40.DMEIE	arm-only	-	-	dma2	0x040	1	1	0x40020440	renode offset
+dma2@0x40.PL	arm-only	-	-	dma2	0x040	16	2	0x40020440	renode offset
+dma2@0x40.TEIE	arm-only	-	-	dma2	0x040	2	1	0x40020440	renode offset
+dma2@0x54.FS	arm-only	-	-	dma2	0x054	3	3	0x40020454	renode offset
+dma2@0x58.DMEIE	arm-only	-	-	dma2	0x058	1	1	0x40020458	renode offset
+dma2@0x58.PL	arm-only	-	-	dma2	0x058	16	2	0x40020458	renode offset
+dma2@0x58.TEIE	arm-only	-	-	dma2	0x058	2	1	0x40020458	renode offset
+dma2@0x6C.FS	arm-only	-	-	dma2	0x06C	3	3	0x4002046C	renode offset

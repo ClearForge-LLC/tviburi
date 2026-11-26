@@ -1,0 +1,13 @@
+tier 1	RCC	clock tree,motor	rows 36 + registers 0	guarded 22	acknowledged 14	open 0	finding 0
+tier 2	GPIO	motor,sensor	rows 44 + registers 0	guarded 44	acknowledged 0	open 0	finding 0
+tier 3	DMA1/2 streams	command,sensor	rows 85 + registers 30	guarded 52	acknowledged 63	open 0	finding 0
+tier 3	DMAMUX1	command,sensor	rows 0 + registers 10	guarded 0	acknowledged 0	open 10	finding 0
+tier 3	TIM1	motor	rows 67 + registers 9	guarded 57	acknowledged 18	open 0	finding 1
+tier 4a	FLASH.ACR	clock tree	rows 2 + registers 0	guarded 2	acknowledged 0	open 0	finding 0
+tier 4a	RCC	clock tree	rows 52 + registers 19	guarded 43	acknowledged 28	open 0	finding 0
+tier 4b	ADC1	sensor	rows 2 + registers 19	guarded 21	acknowledged 0	open 0	finding 0
+tier 4b	GPIO	motor,sensor	rows 64 + registers 0	guarded 41	acknowledged 23	open 0	finding 0
+tier 4b	I2C1/2	sensor	rows 66 + registers 1	guarded 56	acknowledged 11	open 0	finding 0
+tier 4b	PWR	clock tree	rows 3 + registers 2	guarded 0	acknowledged 0	open 5	finding 0
+tier 4b	SPI1/2	sensor	rows 70 + registers 2	guarded 44	acknowledged 28	open 0	finding 0
+tier 4b	USART1-3	command	rows 162 + registers 5	guarded 87	acknowledged 80	open 0	finding 0

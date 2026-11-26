@@ -636,6 +636,11 @@ RM03-rccField	model/GuardedSTM32H7_RCC.cs	fired |= records.Evaluates(fired) && R
 RM04-hsePlaceholder	model/GuardedSTM32H7_RCC.cs	(mode == Records.RecordedMode ? RecordedHsePlaceholder : 0UL)	(mode == Records.RecordedMode ? 0UL : 0UL)	rcc-hsesw
 I264-recNackStopf	model/GuardedSTM32F7_I2C.cs	                            nackStopf = true;\n	(empty)	i2c-recnack
 RM05-spiKernelEvery	model/GuardedSTM32H7_SPI.cs	fired |= records.Evaluates(fired) && starts && RefusedKernel(value);	fired |= !fired && starts && RefusedKernel(value);	recorded
+TM34-fieldsSweep	model/GuardedSTM32_Timer.cs	        private bool RefusedField(long offset, long b, uint word, int width)\n        {\n	        private bool RefusedField(long offset, long b, uint word, int width)\n        {\n            return false;\n	timer-fields
+FL42-fieldsSweep	model/GuardedSTM32H7_Flash.cs	        private bool RefusedField(long offset, long b, uint word, int width)\n        {\n	        private bool RefusedField(long offset, long b, uint word, int width)\n        {\n            return false;\n	flash-fields
+US63-fieldsSweep	model/GuardedSTM32F7_USART.cs	        private bool RefusedField(long offset, uint word, int width)\n        {\n	        private bool RefusedField(long offset, uint word, int width)\n        {\n            return false;\n	usart-fields
+I265-isrMonwrite	model/GuardedSTM32F7_I2C.cs	        private bool RefusedField(long offset, uint word, int width)\n        {\n	        private bool RefusedField(long offset, uint word, int width)\n        {\n            return false;\n	i2c-isrmonwrite
+AD48-fieldsMonwrite	model/GuardedSTM32H7_ADC.cs	        private bool RefusedField(long b, uint word, int width)\n        {\n	        private bool RefusedField(long b, uint word, int width)\n        {\n            return false;\n	adc-fieldsmonwrite
 PW38-recordedEveryRule	model/GuardedSTM32H7_RCC.cs	            fired |= records.Evaluates(fired) && RefusedClockLoss(offset, b, value);	            fired |= !fired && RefusedClockLoss(offset, b, value);	pwr-bothrec
 # TVI-WO-2100 (Q23 (B), Q25; ruled 2026-11-26T18:38Z): the release's property rows against the guards' constructors, and its assemblies' sha256s, one mutant per check.
 RP01-propNoRow	tools/tviburi-release/src/props.rs	            if !rows.iter().any(|r| &r.guard == guard && r.name == p.name) {	            if false {	unit
@@ -662,3 +667,19 @@ AP11-propRowForm	tools/tviburi-release/src/main.rs	if !f[1].starts_with("Tviburi
 AP12-rowWidth	tools/tviburi-release/src/main.rs	if f.len() != width && f[0] != "class" {	if false {	unit
 AP13-guardUnread	tools/tviburi-release/src/main.rs	if let Some(g) = mapped.iter().find(|g| !names.contains(g)) {	if let Some(g) = mapped.iter().find(|_| false) {	unit
 AP14-declaredTwice	tools/tviburi-release/src/main.rs	.filter(|(d, _)| &d.0 == name).map(|(_, k)| *k).collect();	.filter(|(d, _)| &d.0 == name).take(1).map(|(_, k)| *k).collect();	unit
+DX34-fieldsSweep	model/GuardedSTM32H7_DMAMUX.cs	        private bool RefusedField(long b, uint word, int width)\n        {\n	        private bool RefusedField(long b, uint word, int width)\n        {\n            return false;\n	dmamux-fields
+PW39-fieldsSweep	model/GuardedSTM32H7_PWR.cs	        private bool RefusedField(long b, uint word, int width)\n        {\n	        private bool RefusedField(long b, uint word, int width)\n        {\n            return false;\n	pwr-fields
+R20-endRequiredCrash	tools/tviburi-check/src/main.rs	if !ch.end {	if false {	crash
+R21-endRequiredCrashConsole	tools/tviburi-check/src/main.rs	if !ch.end {	if false {	crash-console
+R22-endRequiredCrashRunner	tools/tviburi-check/src/main.rs	if !ch.end {	if false {	crash-runner
+R24-witnessRequiredRemovedConsole	tools/tviburi-check/src/main.rs	if !ch.witness {	if false {	removed-console
+R25-witnessRequiredStockForge	tools/tviburi-check/src/main.rs	if !ch.witness {	if false {	stock-forge
+R26-sourceFilterForge	tools/tviburi-check/src/main.rs	let Some(ch) = channels.get_mut(source) else {	let Some(ch) = channels.values_mut().next() else {	forge
+R28-sourceFilterSpray	tools/tviburi-check/src/main.rs	let Some(ch) = channels.get_mut(source) else {	let Some(ch) = channels.values_mut().next() else {	adv-spray
+R32-witnessModeRecorded	tools/tviburi-check/src/main.rs	} else if !matches!(record.get("mode"), Some(Value::Str(m)) if m == "enforcing") {	} else if false {	adv-recorded
+R33-refusedVerdictHook	tools/tviburi-check/src/main.rs	let verdict = if !refusals.is_empty() {	let verdict = if false {	adv-hook
+C36-fieldsSweep	model/GuardedSTM32H7_RCC.cs	        private bool RefusedField(long offset, long b, uint value)\n        {\n	        private bool RefusedField(long offset, long b, uint value)\n        {\n            return false;\n	rcc-fields
+G25-fieldsSweep	model/GuardedSTM32_GPIOPort.cs	        private bool RefusedField(long offset, long b, uint word, int width)\n        {\n	        private bool RefusedField(long offset, long b, uint word, int width)\n        {\n            return false;\n	gpio-fields
+DM72-fieldsSweep	model/GuardedSTM32DMA.cs	        private bool RefusedField(long offset, long r, uint word, int width, int s)\n        {\n	        private bool RefusedField(long offset, long r, uint word, int width, int s)\n        {\n            return false;\n	dma-fields
+I266-fieldsSweep	model/GuardedSTM32F7_I2C.cs	        private bool RefusedField(long offset, uint word, int width)\n        {\n	        private bool RefusedField(long offset, uint word, int width)\n        {\n            return false;\n	i2c-fields
+AD49-fieldsSweep	model/GuardedSTM32H7_ADC.cs	        private bool RefusedField(long b, uint word, int width)\n        {\n	        private bool RefusedField(long b, uint word, int width)\n        {\n            return false;\n	adc-fields
