@@ -546,3 +546,32 @@ HZ21-flashJudged	model/GuardedSTM32H7_Flash.cs	var now = c.Hz + " " + c.Note;	va
 HZ22-flashBus	model/GuardedSTM32H7_Flash.cs	var hz = rcc.BusHz("rcc_hclk", out var why);	var hz = rcc.BusHz("sys_ck", out var why);	flash-prescaler
 HZ23-cfgOn	model/GuardedSTM32H7_RCC.cs	cfgUnknown[n] |= src || (PllOn(n) && ((old ^ value) & mask) != 0);	cfgUnknown[n] |= src;	usart-hzcfgon
 HZ24-cfgUse	model/GuardedSTM32H7_RCC.cs	if(cfgUnknown[n])	if(false)	usart-hzcfgon
+# TVI-WO-1308: the DMAMUX1 guard (tests/1308/dmamux.sh), one mutant per rule and per restated reference.
+DX01-pairOff	model/GuardedSTM32H7_DMAMUX.cs	if(p != null && p.Address == par)	if(true)	dmamux-pair dmamux-pairtx
+DX02-pairCall	model/GuardedSTM32DMA.cs	refused |= raised.Contains(id) && dmamux is GuardedSTM32H7_DMAMUX g	refused |= false && dmamux is GuardedSTM32H7_DMAMUX g	dmamux-pair
+DX03-pairAddress	model/GuardedSTM32H7_DMAMUX.cs	new Pair(41, "usart1_rx_dma", true, 0x40011024,	new Pair(41, "usart1_rx_dma", true, 0x40011028,	dmamux-routes
+DX04-pairDirection	model/GuardedSTM32H7_DMAMUX.cs	new Pair(38, "spi1_tx_dma", false,	new Pair(38, "spi1_tx_dma", true,	dmamux-pairs
+DX05-liveOff	model/GuardedSTM32H7_DMAMUX.cs	var state = StreamState(ch);\n            if(state == 0)	var state = StreamState(ch);\n            if(true)	dmamux-live
+DX06-liveSame	model/GuardedSTM32H7_DMAMUX.cs	if(id == ids[ch])	if(false)	dmamux-livesame
+DX07-liveRunningOnly	model/GuardedSTM32H7_DMAMUX.cs	var state = StreamState(ch);\n            if(state == 0)	var state = StreamState(ch);\n            if(state != 1)	dmamux-livedone
+DX08-fieldOff	model/GuardedSTM32H7_DMAMUX.cs	if(f.Offset != r || f.Allowed == null || f.Allowed.Contains(f.Of(word)))	if(true)	dmamux-se
+DX09-seRow	model/GuardedSTM32H7_DMAMUX.cs	"SE", 16, 16, Zero,	"SE", 16, 16, Any,	dmamux-se
+DX10-geRow	model/GuardedSTM32H7_DMAMUX.cs	"GE", 16, 16, Zero,	"GE", 16, 16, Any,	dmamux-ge
+DX11-reservedId	model/GuardedSTM32H7_DMAMUX.cs	51, 52, 53, 55, 56,	51, 52, 53, 54, 55, 56,	dmamux-reserved
+DX12-rgMap	model/GuardedSTM32H7_DMAMUX.cs	return RgcrOffset;	return b;	dmamux-fields
+DX13-reservedBits	model/GuardedSTM32H7_DMAMUX.cs	"Res15_10", 15, 10, Zero,	"Res15_10", 15, 10, Any,	dmamux-fields
+DX14-misaligned	model/GuardedSTM32H7_DMAMUX.cs	if((offset & (width / 8 - 1)) == 0)	if(true)	dmamux-misaligned
+DX15-read	model/GuardedSTM32H7_DMAMUX.cs	if(RowOffset(b) < 0)\n                {\n                    records.Refuse("TVI-DMAMUX-READ"	if(false)\n                {\n                    records.Refuse("TVI-DMAMUX-READ"	dmamux-read
+DX16-byteMerge	model/GuardedSTM32H7_DMAMUX.cs	var word = width == 32 && shift == 0 ? value :	var word = true ? value :	dmamux-byte
+DX17-clock	model/GuardedSTM32H7_DMAMUX.cs	return (Rcc().ReadDoubleWord(Ahb1enrOffset) & (Dma1En | Dma2En)) != 0;	return true;	dmamux-clock
+DX18-clockOne	model/GuardedSTM32H7_DMAMUX.cs	& (Dma1En | Dma2En)) != 0;	& Dma1En) != 0;	dmamux-clockone
+DX19-rst	model/GuardedSTM32H7_DMAMUX.cs	(value & (Dma1Rst | Dma2Rst)) != 0	(value & Dma2Rst) != 0	dmamux-rst
+DX20-resetCopy	model/GuardedSTM32H7_DMAMUX.cs	Array.Clear(ids, 0, ids.Length);	(empty)	dmamux-reset
+DX21-resetStock	model/GuardedSTM32H7_DMAMUX.cs	base.Reset();\n                Array.Clear	Array.Clear	dmamux-reset
+DX22-recorded	model/GuardedSTM32H7_DMAMUX.cs	if(refused && !records.Recorded)\n                {\n                    return;\n                }\n                Pass(b, word);	if(refused)\n                {\n                    return;\n                }\n                Pass(b, word);	dmamux-recorded
+DX23-config	model/GuardedSTM32H7_DMAMUX.cs	if(Rcc() == null)	if(false)	dmamux-norcc
+DX24-restateGen	model/stm32h7-dmamux-restate.awk	print "    OutDMA -> tviburiDmamux1@77"	print "    OutDMA -> tviburiDmamux1@78"	dmamux-regen
+DX25-restateSpi4	model/stm32h7-dmamux-restate.repl	spi4:\n    DMARecieve -> tviburiDmamux1@83\n	(empty)	dmamux-registrations
+DX26-served	model/GuardedSTM32H7_DMAMUX.cs	return b < CxcrEnd ? ids[b / 4] : 0;	return 0;	dmamux-routes
+DX27-copy	model/GuardedSTM32H7_DMAMUX.cs	ids[b / 4] = word & IdMask;	(empty)	dmamux-routes
+DX28-boardMode	model/tviburi-nucleo-h753zi.repl	tviburiDmamux1:\n    mode: "enforcing"	tviburiDmamux1:\n    mode: "recorded"	dmamux-pair
