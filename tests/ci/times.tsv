@@ -218,7 +218,6 @@ case	dma-offset	6.0
 case	dma-offsetndt	5.9
 case	dma-reflect	6.0
 case	dma-regen	0.0
-case	dma-restate	0.1
 case	flash-order	6.5
 case	flash-clockfirst	6.6
 case	flash-lowerfast	6.4

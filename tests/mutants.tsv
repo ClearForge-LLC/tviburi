@@ -270,7 +270,7 @@ DM30-recordedKeep	model/GuardedSTM32DMA.cs	            word = (word & ~mask) | (
 DM31-reset	model/GuardedSTM32DMA.cs	            inner.Reset();\n            ResetCopies();	            inner.Reset();	dma-reset
 DM32-clockReg	model/stm32h7-dma-restate.repl	        tviburiRcc RegistrationPeripheralAlias.DMA1\n	(empty)	dma-clock
 DM33-regen	tests/1303/fields.py	"00 only: a stock tag; burst transfers are not modeled", 662),\n        (reg, off, sec, "PBURST	"00 only: a stock tag; bursts are not modeled", 662),\n        (reg, off, sec, "PBURST	dma-regen
-DM34-restateGen	model/stm32h7-dma-restate.awk	    print "    dmamux: dmamux1"	    print "    dmamux:  dmamux1"	dma-restate
+DM34-restateGen	model/stm32h7-dma-restate.awk	    print "    dmamux: dmamux1"	    print "    dmamux:  dmamux1"	manifest
 DM35-instances	tools/tviburi-release/src/main.rs	.filter(|d| d.0 == stock_ty && names.contains(&d.1))	.filter(|d| d.0 == stock_ty)	unit
 DM36-reload	model/GuardedSTM32DMA.cs	var reload = Items(s) == 0 && programmed[s] != 0;	var reload = false;	dma-reload
 DM37-restart	model/GuardedSTM32DMA.cs	var restart = state == Completed && r == CrOffset && (word & EnBit) != 0 && programmed[s] != 0;	var restart = false;	dma-reassert
@@ -305,7 +305,7 @@ FL28-wrhOneSided	model/GuardedSTM32H7_Flash.cs	if(wrh < need)	if(wrh != need)	fl
 FL29-config	model/GuardedSTM32H7_Flash.cs	if(optionBytes < -1 || optionBytes > 0xFFFFFFFFL)	if(false)	flash-config
 FL30-ledgerLatency	model/GuardedSTM32H7_Flash.cs	"LATENCY", 3, 0, Latencies,	"LATENCY", 3, 0, Any,	flash-ledger flash-regen
 FL31-bank	model/GuardedSTM32H7_Flash.cs	return b >= 0x100 ? 1 : 0;	return 0;	flash-keytwice
-FL32-restate	model/stm32h7-flash-restate.repl	    -> nvic@4\n	(empty)	flash-regen
+FL32-restate	model/stm32h7-flash-restate.repl	    -> nvic@4\n	(empty)	manifest
 FL34-locking	model/GuardedSTM32H7_Flash.cs	var locking = !locked && (word & LockBit) != 0;	var locking = false;	flash-locking
 FL35-latchWhy	model/GuardedSTM32H7_Flash.cs	if(why != null && why != waitWhy)	if(why != null && waitWhy == null)	flash-worse
 FL36-keyLost	model/GuardedSTM32H7_Flash.cs	                else if(keyLost[k])\n	                else if(false)\n	flash-recorded
@@ -340,7 +340,7 @@ US24-requestRdr	model/GuardedSTM32F7_USART.cs	                var v = inner.Read
 US25-requestDmar	model/GuardedSTM32F7_USART.cs	                cr3 = word;\n                inner.WriteDoubleWord(offset, word);\n                Request();	                cr3 = word;\n                inner.WriteDoubleWord(offset, word);	usart-dmarx
 US26-config	model/GuardedSTM32F7_USART.cs	            if(lowPowerMode)	            if(false)	usart-config2
 US27-names	model/GuardedSTM32F7_USART.cs	            ControlRegister1 = 0x0,	            ControlRegisterOne = 0x0,	usart-registrations
-US28-restate	model/stm32h7-usart-restate.repl	    IRQ -> exti@26\n	(empty)	usart-regen
+US28-restate	model/stm32h7-usart-restate.repl	    IRQ -> exti@26\n	(empty)	manifest
 US29-fieldsM1	tests/1305/fields.py	'M1': ('Zero', T,	'M1': ('Any', T,	usart-regen usart-ledger
 US30-classRow	tools/tviburi-release/pins.tsv	Tviburi.GuardedSTM32F7_USART\tusart1 usart2	Tviburi.GuardedSTM32F7_USART\tusart2	usart-ledger
 US31-bench	model/bench-checks.tsv	Tviburi.GuardedSTM32F7_USART\tU1\t	Tviburi.GuardedSTM32F7_USART\tU2\t	usart-ledger
@@ -422,7 +422,7 @@ I230-runningName	model/GuardedSTM32F7_I2C.cs	public string RunningName => "PE";	
 I231-lockedWhileOff	model/GuardedSTM32H7_RCC.cs	            foreach(var g in guarded.Values)\n	            foreach(var g in guarded.Values.Cast<IPeripheral>().Concat(watched.Values))\n	i2c-clock
 I232-accessNames	model/GuardedSTM32F7_I2C.cs	            Timing = 0x10,	            TimingX = 0x10,	i2c-registrations
 I233-classRow	tools/tviburi-release/pins.tsv	Tviburi.GuardedSTM32F7_I2C\ti2c1 i2c2 i2c3	Tviburi.GuardedSTM32F7_I2C\ti2c1 i2c2	i2c-ledger
-I234-restateSet	model/stm32h7-i2c-restate.awk	/^i2c[123]: I2C	/^i2c[12]: I2C	i2c-regen
+I234-restateSet	model/stm32h7-i2c-restate.awk	/^i2c[123]: I2C	/^i2c[12]: I2C	manifest
 I235-sensorsShared	model/GuardedSTM32F7_I2C.cs	.SetValue(inner, ChildCollection);	.SetValue(inner, new Dictionary<int, II2CPeripheral>());	i2c-config
 I236-completionTracked	model/GuardedSTM32F7_I2C.cs	                Open();   // as in Read\n	(empty)	i2c-blindclear
 I237-reservedNotServed	model/GuardedSTM32F7_I2C.cs	cr1 = word & Cr1Defined;	cr1 = word;	i2c-recorded
@@ -498,7 +498,7 @@ AD39-recorded	model/GuardedSTM32H7_ADC.cs	                Pass(b, word);\n      
 AD40-adc12Bit	model/GuardedSTM32H7_RCC.cs	["adc12"] = new ClockedPeripheral(AdcMux, 0x0D8, 5,	["adc12"] = new ClockedPeripheral(AdcMux, 0x0D8, 4,	adc-query
 AD41-adcMux	model/GuardedSTM32H7_RCC.cs	"pll2_p_ck", "pll3_r_ck", "per_ck", "disabled");	"pll2_p_ck", "pll3_r_ck", "hsi_ker_ck", "disabled");	adc-query
 AD42-classRow	tools/tviburi-release/pins.tsv	Tviburi.GuardedSTM32H7_ADC\tadc3 adcM1S2	Tviburi.GuardedSTM32H7_ADC\tadc3	adc-ledger
-AD43-restateName	model/stm32h7-adc-restate.awk	v = name == "adc3" ? "tviburiAdc3" : "tviburiAdc12"	v = name == "adc3" ? "tviburiAdc12" : "tviburiAdc3"	adc-regen
+AD43-restateName	model/stm32h7-adc-restate.awk	v = name == "adc3" ? "tviburiAdc3" : "tviburiAdc12"	v = name == "adc3" ? "tviburiAdc12" : "tviburiAdc3"	manifest
 AD44-fieldsClass	tests/1307/fields.py	'EXTEN': ('Zero', G,	'EXTEN': ('Any', G,	adc-regen
 AD45-rateStale	model/GuardedSTM32H7_ADC.cs	rateStale |= (cr & AdstartBit) != 0;	rateStale |= false;	adc-rccchange adc-rccboost
 AD46-internal	model/GuardedSTM32H7_ADC.cs	if(Name == "adc3" && ch >= 17 && (regs[CcrOffset] & (1u << (41 - ch))) == 0)	if(false)	adc-internal

@@ -269,11 +269,8 @@ sys.exit(0 if ok else 1)
 ' '$work/ledger/release/LEDGER.jsonl' '$work/ledger/release/MANIFEST' '$src/model/GuardedSTM32F7_I2C.cs'" ;;
   regen)
     rc=0; python3 -I "$src/tests/1306/fields.py" "$src/tests/1306/data/rm0433-rev9-i2c-fields.tsv" > "$work/fields.cs" || rc=$?
-    mkdir -p "$work/regen"
-    container -v "$src:/repo:ro,Z" -v "$work/regen:/out:Z" "$IMAGE" sh -c 'awk -v sha=$(sha256sum /opt/renode/platforms/cpus/stm32h7.repl | cut -c1-64) \
-      -f /repo/model/stm32h7-i2c-restate.awk /opt/renode/platforms/cpus/stm32h7.repl > /out/restate.repl' </dev/null >"$work/regen.stdout" 2>&1 || rc=$?
-    check "regen: the guard's Fields table regenerates from tests/1306/data by tests/1306/fields.py, and the restatement from the pinned stm32h7.repl, byte for byte (RUL-16)" \
-      "[ \$rc = 0 ] && sed -n '/^        private static readonly Row\[\] Fields =$/,/^        };$/p' '$src/model/GuardedSTM32F7_I2C.cs' | sed '1,2d;\$d' | cmp -s - '$work/fields.cs' && cmp -s '$work/regen/restate.repl' '$src/model/stm32h7-i2c-restate.repl'" ;;
+    check "regen: the guard's Fields table regenerates from tests/1306/data by tests/1306/fields.py, byte for byte (RUL-16); its restatement is tests/spike.sh manifest's (TVI-WO-1204 (6))" \
+      "[ \$rc = 0 ] && sed -n '/^        private static readonly Row\[\] Fields =$/,/^        };$/p' '$src/model/GuardedSTM32F7_I2C.cs' | sed '1,2d;\$d' | cmp -s - '$work/fields.cs'" ;;
   nack) check "nack (TVI-WO-1306a acceptance, the planted firmware): a write START with AUTOEND = 1 to 0x31, no device: ISR 0x1 at the START, polled to NACKF (0x11: STOPF not yet), to STOPF (0x31), and ICR = 0x30 clears both (0x1), the guard's NACKCF not handed to the stock tag (no 'Unhandled write ... NACKCF'); no record (p1975, p2011, p2012). Its timing: nacktime" \
     "passes nack && [ \"\$(readout nack READ)\" = 0x00000001 ] && [ \"\$(readout nack READ2)\" = 0x00000011 ] && [ \"\$(readout nack READ3)\" = 0x00000031 ] && [ \"\$(readout nack READ4)\" = 0x00000001 ] && ! grep -q 'NACKCF' '$work/nack/renode.out'" ;;
   nacktime)

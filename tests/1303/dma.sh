@@ -10,8 +10,8 @@ set -euo pipefail
 
 here=$(cd "$(dirname "$0")/../.." && pwd)
 IMAGE=$(sed -n 's/^IMAGE=//p' "$here/tests/spike.sh")
-CASES="axi tcm itcm partcm below wrap unmapped ndt0 reload reassert sizes fth fthzero reloadtcm en enoff done same disable width read field msize16 route0 route54 mux shared sharedx request txother usart23 fields ledger registrations irq config recorded reset clock offset offsetndt reflect regen restate circ circoff circen circodd htie circm2p circm2m adc adcoff htien tcie circhi circrec"
-MONITOR="fields ledger registrations irq config recorded reset clock offset offsetndt reflect regen restate circ circoff tcie circhi circrec"
+CASES="axi tcm itcm partcm below wrap unmapped ndt0 reload reassert sizes fth fthzero reloadtcm en enoff done same disable width read field msize16 route0 route54 mux shared sharedx request txother usart23 fields ledger registrations irq config recorded reset clock offset offsetndt reflect regen circ circoff circen circodd htie circm2p circm2m adc adcoff htien tcie circhi circrec"
+MONITOR="fields ledger registrations irq config recorded reset clock offset offsetndt reflect regen circ circoff tcie circhi circrec"
 # The planted firmware's paths: every case but the monitor-driven ones.
 PATHS=$(for c in $CASES; do case " $MONITOR " in *" $c "*) ;; *) printf '"%s",' "$c" ;; esac; done | sed 's/,$//')
 scratch=${TVIBURI_SCRATCH:-$HOME/.cache/tviburi}
@@ -363,12 +363,6 @@ tviburiDma2:\
     rc=0; python3 -I "$src/tests/1303/fields.py" > "$work/fields.cs" || rc=$?
     check "regen: the guard's Fields table regenerates from tests/1303/fields.py, byte for byte (RUL-16)" \
       "[ \$rc = 0 ] && sed -n '/^        private static readonly Row\[\] Fields =$/,/^        };$/p' '$src/model/GuardedSTM32DMA.cs' | sed '1,2d;\$d' | cmp -s - '$work/fields.cs'" ;;
-  restate)
-    mkdir -p "$work/restate"
-    container -v "$src:/repo:ro,Z" -v "$work/restate:/out:Z" "$IMAGE" sh -c 'f=/opt/renode/platforms/cpus/stm32h7.repl;
-      awk -v sha=$(sha256sum $f | cut -c1-64) -f /repo/model/stm32h7-dma-restate.awk $f > /out/restate.repl' </dev/null >"$work/restate.stdout" 2>&1 || true
-    check "restate: model/stm32h7-dma-restate.repl regenerates from the pinned stm32h7.repl by its generator, byte for byte" \
-      "cmp -s '$work/restate/restate.repl' '$src/model/stm32h7-dma-restate.repl'" ;;
   *) echo "unknown case: $t" >&2; exit 2 ;;
   esac
 done
