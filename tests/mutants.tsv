@@ -644,3 +644,22 @@ AD48-fieldsMonwrite	model/GuardedSTM32H7_ADC.cs	        private bool RefusedFiel
 PW38-recordedEveryRule	model/GuardedSTM32H7_RCC.cs	            fired |= records.Evaluates(fired) && RefusedClockLoss(offset, b, value);	            fired |= !fired && RefusedClockLoss(offset, b, value);	pwr-bothrec
 DX34-fieldsSweep	model/GuardedSTM32H7_DMAMUX.cs	        private bool RefusedField(long b, uint word, int width)\n        {\n	        private bool RefusedField(long b, uint word, int width)\n        {\n            return false;\n	dmamux-fields
 PW39-fieldsSweep	model/GuardedSTM32H7_PWR.cs	        private bool RefusedField(long b, uint word, int width)\n        {\n	        private bool RefusedField(long b, uint word, int width)\n        {\n            return false;\n	pwr-fields
+R20-endRequiredCrash	tools/tviburi-check/src/main.rs	if !ch.end {	if false {	crash
+R21-endRequiredCrashConsole	tools/tviburi-check/src/main.rs	if !ch.end {	if false {	crash-console
+R22-endRequiredCrashRunner	tools/tviburi-check/src/main.rs	if !ch.end {	if false {	crash-runner
+R23-witnessRequiredRemoved	tools/tviburi-check/src/main.rs	if !ch.witness {	if false {	adv-removed
+R24-witnessRequiredRemovedConsole	tools/tviburi-check/src/main.rs	if !ch.witness {	if false {	removed-console
+R25-witnessRequiredStockForge	tools/tviburi-check/src/main.rs	if !ch.witness {	if false {	stock-forge
+R26-sourceFilterForge	tools/tviburi-check/src/main.rs	let Some(ch) = channels.get_mut(source) else {	let Some(ch) = channels.values_mut().next() else {	forge
+R27-sourceFilterStockForge	tools/tviburi-check/src/main.rs	let Some(ch) = channels.get_mut(source) else {	let Some(ch) = channels.values_mut().next() else {	stock-forge
+R28-sourceFilterSpray	tools/tviburi-check/src/main.rs	let Some(ch) = channels.get_mut(source) else {	let Some(ch) = channels.values_mut().next() else {	adv-spray
+R29-unframedForge	tools/tviburi-check/src/main.rs	if line.contains("{\\"tviburi\\"") {	if false {	forge
+R30-unframedStockForge	tools/tviburi-check/src/main.rs	if line.contains("{\\"tviburi\\"") {	if false {	stock-forge
+R31-unframedSpray	tools/tviburi-check/src/main.rs	if line.contains("{\\"tviburi\\"") {	if false {	adv-spray
+R32-witnessModeRecorded	tools/tviburi-check/src/main.rs	} else if !matches!(record.get("mode"), Some(Value::Str(m)) if m == "enforcing") {	} else if false {	adv-recorded
+R33-refusedVerdictHook	tools/tviburi-check/src/main.rs	let verdict = if !refusals.is_empty() {	let verdict = if false {	adv-hook
+C36-fieldsSweep	model/GuardedSTM32H7_RCC.cs	        private bool RefusedField(long offset, long b, uint value)\n        {\n	        private bool RefusedField(long offset, long b, uint value)\n        {\n            return false;\n	rcc-fields
+G25-fieldsSweep	model/GuardedSTM32_GPIOPort.cs	        private bool RefusedField(long offset, long b, uint word, int width)\n        {\n	        private bool RefusedField(long offset, long b, uint word, int width)\n        {\n            return false;\n	gpio-fields
+DM72-fieldsSweep	model/GuardedSTM32DMA.cs	        private bool RefusedField(long offset, long r, uint word, int width, int s)\n        {\n	        private bool RefusedField(long offset, long r, uint word, int width, int s)\n        {\n            return false;\n	dma-fields
+I266-fieldsSweep	model/GuardedSTM32F7_I2C.cs	        private bool RefusedField(long offset, uint word, int width)\n        {\n	        private bool RefusedField(long offset, uint word, int width)\n        {\n            return false;\n	i2c-fields
+AD49-fieldsSweep	model/GuardedSTM32H7_ADC.cs	        private bool RefusedField(long b, uint word, int width)\n        {\n	        private bool RefusedField(long b, uint word, int width)\n        {\n            return false;\n	adc-fields
