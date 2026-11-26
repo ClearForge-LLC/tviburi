@@ -156,6 +156,9 @@ namespace Antmicro.Renode.Peripherals.Tviburi
             {
                 return null;
             }
+            // Whole hertz (B1): input / DIVM x DIVN / DIVP in doubles errs far below 1 Hz (16 MHz / 7 x 350 / 2 is 400000000.00000006),
+            // so an exact limit passes; an overage under 0.5 Hz, reachable only through FRACN, passes too.
+            clocks = clocks.Select(c => Math.Round(c, MidpointRounding.AwayFromZero)).ToArray();
             for(var i = 0; i < BusNames.Length; i++)
             {
                 var max = table[scale][i];

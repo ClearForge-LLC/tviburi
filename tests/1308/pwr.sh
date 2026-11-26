@@ -12,7 +12,7 @@ set -euo pipefail
 
 here=$(cd "$(dirname "$0")/../.." && pwd)
 IMAGE=$(sed -n 's/^IMAGE=//p' "$here/tests/spike.sh")
-CASES="second same ap gen order clockfirst invalid vosearly voslow cr2dbp bdcr bdcrok flashvos3 apbvos3 vos0 revy200 flashlow clockearly vos0byp bdcrbyte noclock nopwr notjudged reset recorded locked nibble norev revy byte misaligned read addr norcc registrations fields ledger regen"
+CASES="second same ap gen order clockfirst invalid vosearly voslow cr2dbp bdcr bdcrok flashvos3 apbvos3 vos0 revy200 hse400 hse400v3 hse25 flashlow clockearly vos0byp bdcrbyte noclock nopwr notjudged reset recorded locked nibble norev revy byte misaligned read addr norcc registrations fields ledger regen"
 BOARD_GUARDS="spi1 rcc gpioPortA gpioPortB gpioPortC gpioPortD gpioPortE gpioPortF gpioPortG gpioPortH gpioPortI gpioPortJ gpioPortK timer1 timer8 dma1 dma2 flashController usart1 usart2 usart3 uart4 uart5 usart6 uart7 uart8 i2c1 i2c2 i2c3 adcM1S2 adc3 dmamux1"
 MONITOR="reset recorded locked nibble norev revy byte misaligned read addr norcc registrations fields ledger regen"
 PATHS=$(for c in $CASES; do case " $MONITOR " in *" $c "*) ;; *) printf '"%s",' "$c" ;; esac; done | sed 's/,$//')
@@ -120,6 +120,10 @@ for t in ${TVIBURI_TESTS:-$CASES}; do
       PLATFORM_SED='/^tviburiFlash:$/{n;s/enforcing/recorded/}' run_case noclock noclock 'emulation RunFor "0.01"' "${marks[@]}" "${reads[@]}"
     elif [ "$t" = nopwr ]; then
       NOPWR=1 PLATFORM_SED='$a pwr: @none' run_case nopwr nopwr 'emulation RunFor "0.01"' "${marks[@]}"
+    elif [ "$t" = hse400 ] || [ "$t" = hse400v3 ]; then
+      PLATFORM_SED=$hse16 run_case "$t" "$t" 'emulation RunFor "0.01"' "${marks[@]}"
+    elif [ "$t" = hse25 ]; then
+      PLATFORM_SED='s/^    hseFrequency: 8000000$/    hseFrequency: 25000000/' run_case hse25 hse25 'emulation RunFor "0.01"' "${marks[@]}"
     elif [ "$t" = notjudged ]; then
       NOPWR=1 run_case notjudged notjudged 'emulation RunFor "0.01"' "${marks[@]}"
     else
@@ -171,6 +175,12 @@ for t in ${TVIBURI_TESTS:-$CASES}; do
       "[ \$rc = 3 ] && logged noclock 'len(recs) == 1 and recs[0][\"rule\"] == \"TVI-PWR-VOS\" and recs[0][\"kind\"] == \"unmodeled\" and \"cannot be computed\" in recs[0][\"condition\"] and recs[0][\"access\"][\"pc\"] != \"none\"' && [ \"\$(readout noclock D3CR)\" = 0x0000E000 ]" ;;
   nopwr) check "nopwr: with nothing at PWR_D3CR (no pwr at all), LATENCY 1 at 200 MHz refuses TVI-FLASH-WAIT, decided at VOS1, its record saying no peripheral is at PWR_D3CR (not that it reads VOS 00)" \
       "refuses nopwr TVI-FLASH-WAIT predicted-fault '\"no peripheral at PWR_D3CR\" in r[\"condition\"] and \"reads VOS 00\" not in r[\"condition\"]' flashController" ;;
+  hse400) check "hse400 (B1): HSE 16 MHz / 7 x 350 / 2 = 400 MHz exactly at Scale 1, AHB 200, APB 100 (Scale 1's limits, p210) passes: each bus clock is compared in whole hertz; CFGR reads SWS = PLL1" \
+      "passes hse400 && [ \"\$(readout hse400 READ)\" = 0x0000001B ]" ;;
+  hse400v3) check "hse400v3 (B1): the same sys_ck with D1CPRE /2 at Scale 3: CPU 200, AHB 100, every APB 50 with RTCAPBEN enabled (Scale 3's limits, p210) passes" \
+      "passes hse400v3 && [ \"\$(readout hse400v3 READ)\" = 0x0000001B ]" ;;
+  hse25) check "hse25 (B1): HSE 25 MHz / 11 x 352 / 2 = 400 MHz exactly at Scale 1, AHB 200, APB 100 passes" \
+      "passes hse25 && [ \"\$(readout hse25 READ)\" = 0x0000001B ]" ;;
   notjudged) check "notjudged (ruled Q20 (A)): on the board with no PWR guard, sys_ck 400 MHz, AHB 200 and every APB 200 MHz (above every scale's limit, p210) are not judged: no TVI-RCC-VOS, no record; CFGR reads SWS = PLL1 (0x1B), D1CFGR 0x08 (read by the firmware, not a record)" \
       "passes notjudged && logged notjudged 'len(recs) == 0' rcc && [ \"\$(readout notjudged READ)\" = 0x0000001B ] && [ \"\$(readout notjudged READ2)\" = 0x00000008 ]" ;;
   reset)

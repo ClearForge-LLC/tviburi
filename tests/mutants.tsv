@@ -627,3 +627,4 @@ PW35-pwrAddr	model/GuardedSTM32H7_PWR.cs	if(start != PwrBase)	if(false)	pwr-addr
 PW36-noPwrNamed	model/GuardedSTM32H7_Flash.cs	return -1;   // nothing at PWR_D3CR: unknown, and named so	return 0;	pwr-nopwr
 DX31-dmamuxAddr	model/GuardedSTM32H7_DMAMUX.cs	if(start != Dmamux1Base)	if(false)	dmamux-addr
 DX32-pairAccess	model/GuardedSTM32H7_DMAMUX.cs	State(), crOffset, crValue, 32);	State(), 4 * channel, id, 32);	dmamux-pair
+PW37-wholeHertz	model/GuardedSTM32H7_PWR.cs	            clocks = clocks.Select(c => Math.Round(c, MidpointRounding.AwayFromZero)).ToArray();\n	(empty)	pwr-hse400 pwr-hse400v3 pwr-hse25

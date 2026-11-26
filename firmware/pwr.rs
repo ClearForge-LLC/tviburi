@@ -43,6 +43,10 @@
 //!                      frequency rule) switched in, then VOS lowered to Scale 3: TVI-PWR-VOS, unmodeled (the clocks cannot be computed).
 //!   path="nopwr"     - (no pwr at all on the platform) LATENCY 1, then an AXI clock of 200 MHz: TVI-FLASH-WAIT, decided at VOS1, its
 //!                      record naming no peripheral at PWR_D3CR.
+//!   path="hse400"    - (hseFrequency 16 MHz) CR3, VOS1, PLL1 from the HSE: 16 / 7 x 350 / 2 = 400 MHz exactly, AHB 200, every APB 100:
+//!                      Scale 1's limits exactly (the twin's double is 400000000.00000006 before rounding): passes. MARK_READ = CFGR.
+//!   path="hse400v3"  - the same sys_ck with D1CPRE /2 at Scale 3: CPU 200, AHB 100, every APB 50 (RTCAPBEN enabled): passes.
+//!   path="hse25"     - (hseFrequency 25 MHz) CR3, VOS1, 25 / 11 x 352 / 2 = 400 MHz exactly, AHB 200, APB 100: passes.
 //!   path="notjudged" - (a platform with no PWR guard, ruled Q20 (A)) sys_ck to 400 MHz, AHB 200, every APB 200 MHz, above every
 //!                      scale's limit, LATENCY 2: no TVI-RCC-VOS, passes. MARK_READ = CFGR (SWS = PLL1), MARK_READ2 = D1CFGR.
 #![no_std]
@@ -97,6 +101,20 @@ unsafe fn pllp(divn: u32, divp: u32, d1: u32, d2: u32, d3: u32) {
     w(RCC + 0x2C, 0x01FF_000C);                           // PLLCFGR: PLL1RGE = 11, 8-16 MHz (p400-402)
     w(RCC + 0x30, 0x0101_0000 | (divp << 9) | (divn - 1)); // PLL1DIVR: DIVP1, DIVN1 (p403-404)
     w(RCC, r(RCC) | 1 << 24);                             // PLL1ON (p385)
+    while r(RCC) >> 25 & 1 == 0 {}
+}
+
+// PLL1 from the HSE (HSEON, HSERDY, p384): DIVM1, PLLSRC = HSE, PLL1RGE = 01 for a 2-4 MHz reference (p401-402), DIVN1, DIVP1 /2.
+unsafe fn hsepll(divm: u32, divn: u32, d1: u32, d2: u32, d3: u32) {
+    w(RCC, r(RCC) | 1 << 16);
+    while r(RCC) >> 17 & 1 == 0 {}
+    w(RCC + 0x18, d1);
+    w(RCC + 0x1C, d2);
+    w(RCC + 0x20, d3);
+    w(RCC + 0x28, (r(RCC + 0x28) & !0x3F3) | (divm << 4) | 2);
+    w(RCC + 0x2C, 0x01FF_0004);
+    w(RCC + 0x30, 0x0101_0200 | (divn - 1));
+    w(RCC, r(RCC) | 1 << 24);
     while r(RCC) >> 25 & 1 == 0 {}
 }
 
@@ -308,6 +326,35 @@ pub unsafe extern "C" fn reset() -> ! {
         while r(ACR) & 0xF != 1 {}
         pll(50, 0x08, 0x440, 0x40);   // 400 MHz; AXI 200
         switch(3);
+    }
+    #[cfg(path = "hse400")]
+    {
+        supply(0x02);
+        vos(3);
+        w(ACR, 0x32);
+        while r(ACR) & 0xF != 2 {}
+        hsepll(7, 350, 0x48, 0x440, 0x40);
+        switch(3);
+        write_volatile(MARK_READ, r(RCC + 0x10));
+    }
+    #[cfg(path = "hse400v3")]
+    {
+        supply(0x02);
+        w(ACR, 0x32);
+        while r(ACR) & 0xF != 2 {}
+        hsepll(7, 350, 0x848, 0x440, 0x40);
+        switch(3);
+        write_volatile(MARK_READ, r(RCC + 0x10));
+    }
+    #[cfg(path = "hse25")]
+    {
+        supply(0x02);
+        vos(3);
+        w(ACR, 0x32);
+        while r(ACR) & 0xF != 2 {}
+        hsepll(11, 352, 0x48, 0x440, 0x40);
+        switch(3);
+        write_volatile(MARK_READ, r(RCC + 0x10));
     }
     #[cfg(path = "notjudged")]
     {
