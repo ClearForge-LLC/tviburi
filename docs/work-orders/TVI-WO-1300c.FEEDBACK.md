@@ -27,7 +27,7 @@ The guards' code: **+210, −315, net −105**. `rcc-onehome` proves that no mod
 | VCOH with a reference below 2 MHz (p346, p347) | Q1 (c) | `usart-hzvcoh` | `HZ02` |
 | VCOL above 2 MHz with its VCO in VCOL's range: acknowledged by name (ChibiOS `hal_lld_type1.h` L1834–1837), bench row **R11** | Q1 (c) | `usart-hzvcol` (ArduPilot's PLL2, 72 MHz) | `HZ03` |
 | `pll1_p_ck` with `DIVP1` = 0 or an even value (an odd divisor; p404, Figure 47 p346) | Q7 | `flash-divp1zero`, `flash-divp1odd`; `usart-idlenone` path 7 | `HZ04`, `HZ05` |
-| `pll3_q_ck` on a USART | Q10 | `usart-hzpll3q` | `HZ10` |
+| `pll3_q_ck` on a USART | Q10 | `usart-hzpll3q`; `usart-hzbyte` (at a byte) | `HZ10`; `US51` |
 | a PLL's `DIVM`, `PLLSRC`, `RGE` or `VCOSEL` written while it runs (p347, p398–399) | adversarial pass (§4, A1) | `usart-hzcfgon` | `HZ23`, `HZ24` |
 | the dead `DIVN` ≥ 3 test (unreachable through the VCO range) | removed | — | — |
 
@@ -70,8 +70,8 @@ The four `LPEN` rows' `detail` now resolves to a §8 that names them: one line i
 
 | Clause | Result |
 |---|---|
-| Every committed case passes; any change named in the ruling | every suite on the build (`build1/`): rcc 74, usart 49 (+`hzcsiref`, `hzcfgon` later), i2c 47, adc 46, flash 39, gpio 51, timer 37, dma 57, `spike.sh` 76. Five failures, all the teardown race (no end record at load 12–19): `adc-revy`, `-overrun`, `-rccreset`, `gpio-otyper`; each passed on rerun. The changes are §1's, each ruled |
-| The 14 generated boots, the fixture and the armed run: boot blocks byte-identical, no new records, the armed run arms | **line-for-line identical to `main`** on all 16 (every console line but the model hash, `PerformanceInMips` excluded; `h/ident.py`); the armed run arms at 9.332 s on both |
+| Every committed case passes; any change named in the ruling | every suite on the final head (`build2/`): rcc 74, usart 52, i2c 47, adc 46, flash 39, gpio 51, timer 37, dma 57, `spike.sh` 76. Eight failed at load 13–20 with no end record (the teardown race): `rcc-clocked`, `usart-config`, `-reinit`, `i2c-anfoff`, `-nacktime`, `-timingroff`, `timer-halfhigh`, `-tim8`. Each passed on rerun. The changes are §1's, each ruled |
+| The 14 generated boots, the fixture and the armed run: boot blocks byte-identical, no new records, the armed run arms | the 14 boots and the fixture are **line-for-line identical to `main`** (model hash and `PerformanceInMips` excluded; `h/ident.py`). The armed run has the same 530,239 records and the same content on every one of its 3,270,404 lines, and arms at 9.332 s, but **eight lines' virtual stamps move** (§3) |
 | A planted firmware for each source a copy answered differently, and for each (3) rule, reads the one answer | §1's tables |
 | No guard but the RCC guard reads an `RCC_PLL*` register or holds a PLL rule | `rcc-onehome`; mutant `HZ16` |
 | The budget | §7 |
@@ -79,7 +79,15 @@ The four `LPEN` rows' `detail` now resolves to a §8 that names them: one line i
 
 ## 3. The replays
 
-The measurement's shadow showed every frequency identical across copies on all 16 (measure §2.2). On the branch (commit `2289921`, before the adversarial fix, which no replay reaches), every console is identical to `main`'s (`ident-branch.txt`). That includes the flash guard's new trigger, a change of the AXI clock instead of a write to one of seven registers. Rerun on the final head: §7.
+The measurement's shadow showed every frequency identical across copies on all 16 (measure §2.2).
+- **At `2289921`** (the build before the adversarial fix): every console is identical to `main`'s on all 16 (`ident-branch.txt`). That includes the flash guard's new trigger, a change of the AXI clock instead of a write to one of seven registers.
+- **At the final head:** the 14 boots and the fixture are still identical. In the armed run, **eight stock `spi2` "Unhandled write … MASRX" warnings** (10.548 s to 13.884 s) carry virtual stamps 200–220 ns later than `main`'s. Every other line, every line's content, and every record (530,239) are identical, and the run arms at 9.332 s.
+- **What I measured about it:**
+  - `main` replayed twice is identical, and the final head replayed twice is identical, so it is deterministic.
+  - A comment-only change to `2289921` does not move it.
+  - With either half of the adversarial fix removed (the mark set in `Pass`, or its use in `PllHz`), the replay is identical to `main`.
+  - With both present and the mark's setting logged, the log shows the mark is **never set** in this run: ArduPilot writes `PLLCKSELR` and `PLLCFGR` before any PLL runs.
+- **So no model decision differs.** The eight stamps follow the compiled overlay's shape. I have not explained the mechanism (the stamp of a stock model's warning, taken mid-quantum). This is reported, not hidden: a consumer that compares stamps would see it, and the WO's "boot blocks byte-identical" holds, since the armed run's monitor output is identical.
 
 ## 4. Adversarial pass
 
@@ -109,6 +117,16 @@ Reduction pass (diff): **−105 net in the guards** · 4 duplicates removed (the
 
 ## 7. Gates
 
-- **Mutants:** (pending)
-- **Memory:** (pending)
+- **Mutants:** run with `tests/mutants.sh` as CI's shard does, on the committed head. **163 of 163 killed:**
+  - the 24 new rows (`HZ01`–`HZ24`);
+  - every remaining USART, ADC and flash row;
+  - `I257`–`I259` and `C03`, whose anchors sit beside the changes.
+
+  **One survived the first run:** `US51-idleFrame` (the "no rule at a byte" refusal), whose only killer was `idlenone`'s `csi_ker_ck` byte, and the union times that byte now. New behaviour had masked an old mutant. Case `usart-hzbyte` (a byte after the mux moved to a running `pll3_q_ck`, no rule on a USART) now kills it. That needed a fresh machine: the RCC guard keeps a mux's input across machine Reset, so a `pll3_q_ck` path inside `idlenone` stranded its later paths.
+
+  **Retired with the copies they tested:**
+  - ruled (Q8 (i)): `US52`–`US59`, `US63`–`US68`;
+  - with the same code, named here: `US60` (the USART's machine-reset mirror), `FL05`–`FL07`, `FL33`, `FL39` (the flash guard's `Div`, `Pll1`, its `sys_ck` switch, its register list, its `D1CPRE` division; Q9 (a)).
+- **Memory:** `tests/1301/ci-memory.sh 189214b HEAD`, eleven boots a side, interleaved, on Furnace (load 11–23): **PASS**, medians `main` 1,055,224 KiB, branch 1,054,424 KiB, **−0.8 MiB**; every boot counted, the largest branch boot 1,111,872 KiB. P5 predicted ±5 MiB. CI judges it again.
+- **Route:** `tests/ci/route.sh origin/main` passes its inventory (the new citation row).
 - **CI:** (pending)
