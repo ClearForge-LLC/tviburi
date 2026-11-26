@@ -15,37 +15,43 @@
   - A later `<var>: @none` cancels the entry.
   - A file holding a `/*` block comment refuses.
 
-**How a consumer's declared instance qualifies** (WO (1)'s question)
+**How a consumer's declared instance qualifies** (WO (1)'s question; built in the release program, per the architect's R1 of 10:15Z)
 - It goes in the fifth column, must not be declared by the pinned chain, and is `retype`d: a new MANIFEST line.
-- It qualifies when the consumer's committed platform (the ArduPilot fixture CI boots, `tests/1301/fixtures/aet-1c32c8ea-ardupilot/`) declares it with the stock type, and the committed replay's own re-typing rule turns it into the guard.
+- **The release refuses it unless** the consumer's committed platform (the ArduPilot fixture CI boots, `tests/1301/fixtures/aet-1c32c8ea-ardupilot/varlib/<capture>/tool/platform-booted.repl`) declares `<name>: <stock type> @ {`, and one of the committed replay's re-typing rules (`sed -i 's/^\(<pattern>\): <stock> @ {/\1: <guard> @ {/'`, uncommented) turns it into the guard.
+  - Names compare case-sensitively.
+  - The pattern matcher reads only literal characters and `[0-9]*`, so an unread pattern qualifies nothing.
 - Today these are SPI's `spi1` and `spi2`, the only instances any replay runs on the SPI guard.
 
 **A restatement qualifies only because a replay runs it**
-- `manifest` requires every `model/stm32h7-*-restate.repl` to be loaded by `tests/1301/replay-1301.sh`: an uncommented `cat` of that file, either unconditional or under an `if [ -f … ]` naming that same file.
-- It also requires each file to regenerate from its committed `model/stm32h7-*-restate.awk` and the pinned `stm32h7.repl`, byte for byte, which fixes its addresses and registrations to the stock entry's.
+- **The release refuses a `model/stm32h7-*-restate.repl` that `tests/1301/replay-1301.sh` does not load:** an uncommented `cat` of that file, either unconditional or under the nearest `if [ -f … ]` naming that same file.
+- **`manifest` regenerates each file** from its committed `model/stm32h7-*-restate.awk` and the pinned `stm32h7.repl`, byte for byte, which fixes its addresses and registrations to the stock entry's.
+- **The replay and the fixture platform are now release sources,** because the release reads them (invariant 3). A change to either moves the release hash.
 - This is how `1308` adds DMAMUX1 and PWR: a class row, a restate file and its generator, and a replay block (told on the bus at `01ab3a5`, and again for the five-column form).
 
 **The records that move, and only these** (no stop)
 - **MANIFEST:**
+  - two `source` lines added (the replay, the fixture platform);
   - `restate SPI.STM32H7_SPI spi4` removed;
   - `restate Timers.STM32_Timer` removed for `timer2`–`timer7` and `timer12`–`timer17`;
   - `retype SPI.STM32H7_SPI spi1` and `spi2` added.
 - **The ledger's model rows:**
   - SPI's row (`spi4`) loses `guarded_by`;
   - the timer row splits into `guarded` (`timer1` and `timer8`, with `guarded_by`) and `unguarded` (the other twelve).
-- **The release hash:** `8e4a1f4b…` at `main`, `84590455…` at this PR's head. (5)'s enums and the source comments also move it.
+- **The release hash:** `8e4a1f4b…` at `main`, `292249cf…` at this PR's head. (5)'s enums, the source comments and the two new sources also move it.
 - **No other committed record names those hashes or rows** (`git grep`), apart from `1100a`'s historical records.
 
 **Proof**
-- `manifest`: ten checks. The six planted ones:
+- **The release program is the check.** `manifest` shows that it passes on this tree and refuses each planted break by name, nine of them:
   - `timer5` named;
   - `timer5` "restated" by every form Renode would not load as the guard (commented-out block and one line, a name only in a trailing comment, an entry cancelled after, a variable that is not one identifier);
   - a `/*` block;
   - a typo (`timer05`);
   - a duplicate;
-  - (with the four positive checks: the release passes, every file regenerates, every file is loaded, every retype is the consumer's).
-- The release's unit tests: 20, two of them new.
-- **Mutants `MF01`–`MF08`, each killed:**
+  - `spi3` and `Spi1` as the consumer's (R1);
+  - the replay's `cat` of the DMA restatement commented out.
+- **`manifest` also regenerates every restate file.** Its earlier Python re-derivation and hard-coded instance lists are deleted (R1, `RUL-14`).
+- **The release's unit tests:** 21, three of them new.
+- **Mutants `MF01`–`MF10`, each killed:**
   - `MF07` by the unit tests;
   - the others by a planted case.
 
@@ -53,10 +59,11 @@
 
 - **`removed-console`:** a removed guard (spi1 stock).
   - At the runner: FAIL, no load witness.
-  - At the records-only check reading a console captured under Aethelgard's committed `renode.config` (the fixture's: the virtual stamp, one space): CHECK FAIL, with spi1's the only missing witness.
-  - So the check read that framing: the other guards' witnesses are found, and are framed as RUL-11 (a) says.
+  - At the records-only check reading a console captured under Aethelgard's committed `renode.config` (the fixture's: the virtual stamp, one space): CHECK FAIL.
+  - Its problems are pinned to exactly spi1's missing witness and end (R2), so every other guard's witness and end were read from that framing.
 - **`crash-console`:** Renode SIGKILLed by the case once spi1's witness is on that console.
   - The case records that the witness was seen before the kill, so a 120 s expiry can't pass as a crash.
+  - **R3:** the killed run has no `quit`, and the firmware spins (`firmware/spi1.rs` ends in a loop) through a 100 s `RunFor`, so Renode cannot quit cleanly before the kill.
   - Exit 137.
   - The witness is read; no end record.
 - **`crash-runner`:** Tviburi's runner, unchanged. A hook at spi1's first write kills Renode (`os.kill(getpid(), 9)`), after a logger flush.
@@ -79,11 +86,11 @@
 
 ### (4) Clause 6's 20 rows, each refused by a case matched to its own write
 
-- **`i2c-isrmon`:** `ISR.TXE`, `ISR.TXIS`.
-- **`adc-fieldsmon`:** `SQ1`–`SQ16`, `AWD1CH`, `PRESC`.
+- **`i2c-isrmonwrite`:** `ISR.TXE`, `ISR.TXIS`.
+- **`adc-fieldsmonwrite`:** `SQ1`–`SQ16`, `AWD1CH`, `PRESC`.
   - Each takes its smallest disallowed value from the guard's own arrays.
   - The arrays are first held to the manual's sets (a channel 0–19, p1012 and pp1023–1026; `PRESC` 0000–1011, p1039), so a widened or narrowed set fails the case.
-- Both are monitor writes (`pc: none`), as their names say, recorded. Each record is a `would-refuse` naming the field its write set, in order, matched by value. The sweeps' count-only check (`1100a` D1-3) is not repeated.
+- Both are monitor writes (`pc: none`), recorded. Their names say "monwrite" (driven by a monitor write), because all 20 rows are software-writable: firmware could reach every one (renamed from `isrmon`/`fieldsmon` at the architect's review). Each record is a `would-refuse` naming the field its write set, in order, matched by value. The sweeps' count-only check (`1100a` D1-3) is not repeated.
 - **No row needed a rule change:** both guards refused all 20 as they stand.
 
 ### (5) The access log names every RCC and DMA guard register
@@ -97,8 +104,8 @@
 
 | Criterion | Where |
 |---|---|
-| The manifest check refuses a planted restatement; `main`'s manifest passes after (1) | `manifest` (§1 (1)); `MF01`–`MF08` killed |
-| Every clause-3 cell, the clause-4 halves and the 20 clause-6 rows are CI cases, run in a shard and named in the aggregate | `removed-console`, `crash-console`, `crash-runner`, `stock-modf`, `modf-page`, `i2c-isrmon`, `adc-fieldsmon`. Each ran in a shard of CI run 45792417151 and is in `times.tsv` |
+| The manifest check refuses a planted restatement; `main`'s manifest passes after (1) | `manifest` (§1 (1)); `MF01`–`MF10` killed |
+| Every clause-3 cell, the clause-4 halves and the 20 clause-6 rows are CI cases, run in a shard and named in the aggregate | `removed-console`, `crash-console`, `crash-runner`, `stock-modf`, `modf-page`, `i2c-isrmonwrite`, `adc-fieldsmonwrite`. Each ran in a shard of CI run 45792417151 and is in `times.tsv` |
 | The 14 boots, the fixture and the armed run: no new record, and the armed run arms | §1.1 below |
 | CI green, the budget judged; rows re-weighed from this run | See §7, CI |
 
@@ -145,7 +152,7 @@ A fresh subagent (Opus) took the three attacks, read-only. It found real breaks;
 **Tried and not broken**
 - Every case fails safe when its regex matches nothing.
 - The console cases prove the check read Aethelgard's framing.
-- `isrmon`'s and `fieldsmon`'s records match their writes by value and order.
+- `isrmonwrite`'s and `fieldsmonwrite`'s records match their writes by value and order.
 - The excerpt is p2184's own text.
 - Rust and Python agree on all eight committed restate files.
 - The MANIFEST's 30 restates equal the declared set.
@@ -169,6 +176,9 @@ A fresh subagent (Opus) took the three attacks, read-only. It found real breaks;
 5. **`crash-runner`'s first form showed the teardown race at a clean quit:** 29 of 31 end records lost. It failed closed. The existing row stands.
 6. **The DMA guard's access-log names for streams 1–7 differ from stock's** (`Stream1Configuration` where stock said `StreamFIFOControl+0x4`). No Tviburi test or replay read them. A consumer that compares stock and guarded access logs line for line would see it.
 7. **`1303`'s mutant `DM35-instances` was re-anchored** to `restated()`'s new filter (§7): an edit to a row outside this WO's own, made because (1) moved its text.
+8. **Clause 6's 20 rows, enforcing and firmware-driven** (the architect, 10:15Z): today each is a recorded-mode `would-refuse` driven by a monitor write. A row for enforcing-mode refusals driven by planted firmware, one per row.
+9. **`modf-page` pairs the record's claims with the page's phrases by hand** (six pairs). A wrong pairing would pass, so a reviewer reads the pairs.
+10. **`lognames` checks the log against this PR's own enums.** It proves "named, never `unknown`", not that a name is RM0433's or stock's; the RCC enum is stock's by reflection, the DMA's streams 1–7 are named in its pattern.
 
 ## 6. Reduction pass
 
@@ -183,10 +193,11 @@ Run twice, before and after the adversarial corrections:
 ## 7. Gates
 
 - **Order:** (1) first, pushed at `01ab3a5` and told on the bus; then (4), (2)/(3), (5); then the adversarial pass, the reduction pass, and this file.
+- **The architect's review (10:15Z), one push:** R1 (the consumer check in the release program, the Python and the hard-coded lists deleted), R2 (`removed-console`'s problem set pinned), R3 (`crash-console`'s run cannot reach `quit`), R4 (the `pins.tsv` header), and the renames to `…monwrite`. The three new rows are in §5 (items 8–10).
 - **Containers:** one at a time, `~/bin/capped-run`, `nice -n 10`, `--network none`, `free -g` checked before heavy runs.
 - **Local runs on the final tree:**
   - `manifest`, `unit`, `stock-modf`, `modf-page`, `removed-console`, `crash-console`, `crash-runner`, `lognames`, `i2c-isrmon` and `adc-fieldsmon` pass;
-  - `MF01`–`MF08` killed.
+  - `MF01`–`MF10` killed.
 - **Route:** `tests/ci/route.sh origin/main` passes (inventory 0 failures, `class=code`, `budget=yes`). Re-run after this file is committed.
 - **CI, run 45792417151 at `97acfe4`:**
   - route, budget, budget-tests and nine shards green;
