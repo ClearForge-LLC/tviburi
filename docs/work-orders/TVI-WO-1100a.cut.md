@@ -1,6 +1,6 @@
 # The `OQ-03` cut: one page for Scotty's ruling (TVI-WO-1100a)
 
-**The decision:** which of the twin's unmodeled paths must refuse before Phase 1 closes (Phase 1 exit gate, clause 1), and which wait for Phase 4's bench. Proposed from data on 2026-11-26; **not ruled**. The evidence is `TVI-WO-1100a.measure.md`.
+**The decision:** which of the twin's unmodeled paths must refuse before Phase 1 closes (Phase 1 exit gate, clause 1), and which wait for Phase 4's bench. Proposed from data on 2026-11-26. **Ruled by Scotty, 2026-11-26: the recommended cut.** The evidence is `TVI-WO-1100a.measure.md`.
 
 **The measurement:** unmodified ArduPilot on Aethelgard's Sentinel-03, armed over MAVLink and driving its motors, on today's twin (`main` `39e51af`). It arms at 9.3 s with no record from any guard, once its battery voltage is declared, which no consumer property does yet. Of the 935 queue rows, 610 are **guarded**, 253 **acknowledged by name** in the ledger, 72 **inherited and unaudited**, and 0 unreached.
 
