@@ -47,6 +47,8 @@
 //                     fault; the twin pairs each request with its own peripheral and was never checked on another pairing.
 //                     unmodeled. A PAR in memory, paced by the request, passes: silicon moves it, and the stock model moves it
 //                     exactly. A PAR in a gap Table 8 reserves inside that region is judged too: it is no data register.
+//                     With PINC = 1 the stream walks PAR + k x PSIZE (k < NDTR), and each of those addresses is judged as PAR
+//                     is, so NDTR > 1 refuses, naming the first address that leaves the data register (ruled Q22 (a)).
 //                     A route the platform cannot raise stays the DMA guard's TVI-DMA-REQUEST/ROUTE.
 // Enforcing: the first rule that fires refuses the access. Recorded mode (RUL-19): every rule is evaluated and records what it
 // finds, and the access goes on to the stock model as if none had fired (the clock still drops it: that is the model).
@@ -188,8 +190,10 @@ namespace Antmicro.Renode.Peripherals.Tviburi
         // TVI-DMAMUX-PAIR: asked by the DMA guard at a stream's EN, for a stream whose request it raises or acknowledges, with
         // the stream's PAR and its direction, and the access being judged: the DMA_SxCR write that sets EN (its offset in the DMA
         // controller and the value written), which the record locates. True when it refused, so that the DMA guard does not start the
-        // stream; false after a would-refuse (recorded mode, RUL-19: the access goes on as if no rule had fired).
-        public bool RefusedPair(int channel, uint par, bool toMemory, long crOffset, uint crValue)
+        // stream; false after a would-refuse (recorded mode, RUL-19: the access goes on as if no rule had fired). With PINC = 1 the
+        // stream walks PAR + k x PSIZE for k < NDTR (§15.5.5 p663 PINC, PSIZE; §15.5.6 p665 NDT; ruled 2026-11-26T16:31Z Q22 (a)),
+        // and every one of those addresses must be the data register, as PAR is judged: NDTR > 1 always leaves it.
+        public bool RefusedPair(int channel, uint par, bool toMemory, long crOffset, uint crValue, uint ndtr)
         {
             lock(sync)
             {
@@ -199,7 +203,10 @@ namespace Antmicro.Renode.Peripherals.Tviburi
                 }
                 var id = ids[channel];
                 var p = Pairs.FirstOrDefault(x => x.Id == id && x.ToMemory == toMemory);
-                if(p != null && p.Address == par)
+                var items = ndtr & 0xFFFF;
+                var step = (crValue & PincBit) != 0 ? 1u << (int)((crValue >> PsizeShift) & 3) : 0;
+                var leaves = p != null && p.Address == par && step != 0 && items > 1 ? par + step : (uint?)null;   // k = 1, the first to leave
+                if(p != null && p.Address == par && leaves == null)
                 {
                     return false;
                 }
@@ -212,11 +219,20 @@ namespace Antmicro.Renode.Peripherals.Tviburi
                         + "), whose data register is " + p.Register + " at 0x" + p.Address.ToString("X8") + ", with PAR = 0x" + par.ToString("X8")
                         + ": silicon paces the stream by that request and moves " + (toMemory ? "from" : "to") + " PAR as written, which no page calls a fault, "
                         + "but the twin pairs each request only with its own peripheral's data register and cannot say what this stream moves when";
+                if(leaves != null)
+                {
+                    condition = stream + " enabled " + dir + " through DMAMUX1 channel " + channel + ", which routes request " + id + " (" + p.Request
+                        + "), with PAR = " + p.Register + " at 0x" + par.ToString("X8") + " but PINC = 1, PSIZE " + step + " byte(s) and NDTR " + items
+                        + ": the span leaves the data register at 0x" + leaves.Value.ToString("X8") + " (PAR + " + step + "), up to 0x" + (par + step * (items - 1)).ToString("X8")
+                        + "; the twin pairs each request only with its own peripheral's data register and cannot say what this stream moves there";
+                }
                 condition += " (at DMA" + (channel / 8 + 1) + "_S" + channel % 8 + "CR's EN write)";
                 records.Refuse("TVI-DMAMUX-PAIR", Unmodeled, "DMAMUX1_C" + channel + "CR",
-                    "DMAREQ_ID = " + id + (p == null ? "" : " (" + p.Request + ")") + " with DMA" + (channel / 8 + 1) + "_S" + channel % 8 + "PAR = 0x" + par.ToString("X8"),
+                    "DMAREQ_ID = " + id + (p == null ? "" : " (" + p.Request + ")") + " with DMA" + (channel / 8 + 1) + "_S" + channel % 8 + "PAR = 0x" + par.ToString("X8")
+                        + (leaves == null ? "" : ", PINC = 1, NDTR = " + items),
                     condition,
-                    "RM0433 Rev 9 §17.3.2 Table 124 p697-698" + (p == null ? "" : "; " + p.Citation) + "; Table 7 p130 (the peripherals' region); ruled 2026-11-26T09:31Z Q3, 10:43Z Q18 (b)",
+                    "RM0433 Rev 9 §17.3.2 Table 124 p697-698" + (p == null ? "" : "; " + p.Citation) + "; Table 7 p130 (the peripherals' region)"
+                        + (leaves == null ? "" : "; §15.5.5 p663 (PINC, PSIZE), §15.5.6 p665 (NDT)") + "; ruled 2026-11-26T09:31Z Q3, 10:43Z Q18 (b), 16:31Z Q22 (a)",
                     State(), crOffset, crValue, 32);
                 return !records.Recorded;
             }
@@ -464,6 +480,8 @@ namespace Antmicro.Renode.Peripherals.Tviburi
         private const ulong Dmamux1Base = 0x40020800;
         private const uint PeripheralsStart = 0x40000000;   // Table 7 p130: "Peripherals (refer to Table 8)"
         private const uint PeripheralsEnd = 0x5FFFFFFF;
+        private const uint PincBit = 1u << 9;          // DMA_SxCR.PINC (§15.5.5 p663)
+        private const int PsizeShift = 11;             // DMA_SxCR.PSIZE, bits 12:11 (p663)
         private const long CxcrEnd = 0x040;
         private const long CsrOffset = 0x080;
         private const long CfrOffset = 0x084;

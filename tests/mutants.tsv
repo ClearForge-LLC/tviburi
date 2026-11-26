@@ -547,8 +547,8 @@ HZ22-flashBus	model/GuardedSTM32H7_Flash.cs	var hz = rcc.BusHz("rcc_hclk", out v
 HZ23-cfgOn	model/GuardedSTM32H7_RCC.cs	cfgUnknown[n] |= src || (PllOn(n) && ((old ^ value) & mask) != 0);	cfgUnknown[n] |= src;	usart-hzcfgon
 HZ24-cfgUse	model/GuardedSTM32H7_RCC.cs	if(cfgUnknown[n])	if(false)	usart-hzcfgon
 # TVI-WO-1308: the DMAMUX1 guard (tests/1308/dmamux.sh), one mutant per rule and per restated reference.
-DX01-pairOff	model/GuardedSTM32H7_DMAMUX.cs	if(p != null && p.Address == par)	if(true)	dmamux-pair dmamux-pairtx
-DX02-pairCall	model/GuardedSTM32DMA.cs	refused |= raised.Contains(id) && dmamux is GuardedSTM32H7_DMAMUX g	refused |= false && dmamux is GuardedSTM32H7_DMAMUX g	dmamux-pair
+DX01-pairOff	model/GuardedSTM32H7_DMAMUX.cs	if(p != null && p.Address == par && leaves == null)	if(true)	dmamux-pair dmamux-pairtx
+DX02-pairCall	model/GuardedSTM32DMA.cs	refused |= raised.Contains(id) && dmamux is GuardedSTM32H7_DMAMUX g && g.RefusedPair(ch, inner.ReadDoubleWord(StreamBase(s) + ParOffset), p2m, offset, word, inner.ReadDoubleWord(StreamBase(s) + NdtrOffset));	refused |= false && dmamux is GuardedSTM32H7_DMAMUX g && g.RefusedPair(ch, inner.ReadDoubleWord(StreamBase(s) + ParOffset), p2m, offset, word, inner.ReadDoubleWord(StreamBase(s) + NdtrOffset));	dmamux-pair
 DX03-pairAddress	model/GuardedSTM32H7_DMAMUX.cs	new Pair(41, "usart1_rx_dma", true, 0x40011024,	new Pair(41, "usart1_rx_dma", true, 0x40011028,	dmamux-routes
 DX04-pairDirection	model/GuardedSTM32H7_DMAMUX.cs	new Pair(38, "spi1_tx_dma", false,	new Pair(38, "spi1_tx_dma", true,	dmamux-pairs
 DX05-liveOff	model/GuardedSTM32H7_DMAMUX.cs	var state = StreamState(ch);\n            if(state == 0)	var state = StreamState(ch);\n            if(true)	dmamux-live
@@ -628,3 +628,4 @@ PW36-noPwrNamed	model/GuardedSTM32H7_Flash.cs	return -1;   // nothing at PWR_D3C
 DX31-dmamuxAddr	model/GuardedSTM32H7_DMAMUX.cs	if(start != Dmamux1Base)	if(false)	dmamux-addr
 DX32-pairAccess	model/GuardedSTM32H7_DMAMUX.cs	State(), crOffset, crValue, 32);	State(), 4 * channel, id, 32);	dmamux-pair
 PW37-wholeHertz	model/GuardedSTM32H7_PWR.cs	            clocks = clocks.Select(c => Math.Round(c, MidpointRounding.AwayFromZero)).ToArray();\n	(empty)	pwr-hse400 pwr-hse400v3 pwr-hse25
+DX31-pairSpan	model/GuardedSTM32H7_DMAMUX.cs	&& step != 0 && items > 1 ? par + step : (uint?)null;	&& false ? par + step : (uint?)null;	dmamux-pinc

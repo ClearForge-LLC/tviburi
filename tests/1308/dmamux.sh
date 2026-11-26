@@ -11,7 +11,7 @@ set -euo pipefail
 
 here=$(cd "$(dirname "$0")/../.." && pwd)
 IMAGE=$(sed -n 's/^IMAGE=//p' "$here/tests/spike.sh")
-CASES="pair pairrec pairtx parmem routes fixture live livedone livesame reserved se ge byte misaligned read clock clockone rst rstroute reset recorded norcc addr registrations fields pairs ledger regen"
+CASES="pair pairrec pairtx pinc pinc1 parmem routes fixture live livedone livesame reserved se ge byte misaligned read clock clockone rst rstroute reset recorded norcc addr registrations fields pairs ledger regen"
 GUARDS="spi1 rcc gpioPortA gpioPortB gpioPortC gpioPortD gpioPortE gpioPortF gpioPortG gpioPortH gpioPortI gpioPortJ gpioPortK timer1 timer8 dma1 dma2 flashController usart1 usart2 usart3 uart4 uart5 usart6 uart7 uart8 i2c1 i2c2 i2c3 adcM1S2 adc3 dmamux1"
 MONITOR="misaligned read clock clockone rst rstroute reset recorded norcc addr registrations fields pairs ledger regen"
 PATHS=$(for c in $CASES; do case " $MONITOR " in *" $c "*) ;; *) printf '"%s",' "$c" ;; esac; done | sed 's/,$//')
@@ -129,6 +129,10 @@ for t in ${TVIBURI_TESTS:-$CASES}; do
       "[ \$rc = 1 ] && logged pairrec 'len(recs) == 1 and recs[0][\"tviburi\"] == \"would-refuse\" and recs[0][\"rule\"] == \"TVI-DMAMUX-PAIR\"' && after pairrec && [ \"\$(readout pairrec READ)\" = 0x00000401 ]" ;;
   parmem) check "parmem (ruled Q18 (b)): a stream on 41 (usart1_rx_dma) with PAR in AXI SRAM (0x24000000), paced by the request, passes: EN reads 1, and a request on input 41 moves the byte at 0x24000000 into SRAM4 (NDTR 4 -> 3)" \
       "passes parmem && [ \"\$(readout parmem READ)\" = 0x00000401 ] && [ \"\$(readout parmem NDTR)\" = 0x00000003 ] && [ \$(( \$(readout parmem DST) & 0xFF )) = 165 ]" ;;
+  pinc) check "pinc (ruled Q22 (a)): a stream on 41 with PAR = USART1_RDR but PINC = 1, PSIZE word and NDTR 4 refuses TVI-DMAMUX-PAIR, unmodeled, located at the EN write (DMA1_S0CR), naming the first address the span leaves the data register at (0x40011028)" \
+      "refuses pinc TVI-DMAMUX-PAIR unmodeled 'r[\"bit\"] == \"DMAREQ_ID = 41 (usart1_rx_dma) with DMA1_S0PAR = 0x40011024, PINC = 1, NDTR = 4\" and \"leaves the data register at 0x40011028\" in r[\"condition\"] and r[\"access\"][\"offset\"] == \"0x10\" and r[\"access\"][\"value\"] == \"0x5601\" and \"p665\" in r[\"citation\"]' && records pinc 'len(recs) == 1'" ;;
+  pinc1) check "pinc1: the same stream with NDTR 1 (its span is USART1_RDR alone) passes; EN reads 1" \
+      "passes pinc1 && [ \"\$(readout pinc1 READ)\" = 0x00005601 ]" ;;
   pairtx) check "pairtx: a memory-to-peripheral stream on 42 (usart1_tx_dma) with PAR = USART3_TDR refuses TVI-DMAMUX-PAIR, unmodeled, naming USART1_TDR" \
       "refuses pairtx TVI-DMAMUX-PAIR unmodeled '\"USART1_TDR at 0x40011028\" in r[\"condition\"] and \"memory-to-peripheral\" in r[\"condition\"]'" ;;
   routes) check "routes: the armed run's ten streams (DMA1 S0-S7 on 41, 43, 45, 9, 38, 42, 40, 46; DMA2 S2, S3 on 39, 37), each PAR its request's data register, pass; C11CR reads 37 and C3CR 9 from the copy" \

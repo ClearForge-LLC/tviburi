@@ -10,6 +10,9 @@
 //!                     EN write (WO acceptance: a stream started on a channel whose route names another request). MARK_READ =
 //!                     S0CR after the EN write (reached only when dmamux1 is recorded: the stream starts, EN reads 1).
 //!   path="pairtx"   - DMA1 S0 M2P on 42 (usart1_tx_dma) with PAR = USART3_TDR: TVI-DMAMUX-PAIR, unmodeled.
+//!   path="pinc"     - DMA1 S0 P2M on 41 with PAR = USART1_RDR but PINC = 1, PSIZE = MSIZE = word, NDTR 4 (CR 0x5600): the span
+//!                     walks to 0x28 (TDR), 0x2C and 0x30: TVI-DMAMUX-PAIR, unmodeled, at the EN write (ruled Q22 (a)).
+//!   path="pinc1"    - the same with NDTR 1: the span is USART1_RDR alone: passes. MARK_READ = S0CR (EN = 1).
 //!   path="routes"   - the armed run's ten streams on their channels and PARs (measure.md §2.1): DMA1 S0-S7 on C0-C7 = 41, 43,
 //!                     45, 9, 38, 42, 40, 46; DMA2 S2, S3 on C10, C11 = 39, 37: passes. MARK_READ = C11CR, MARK_READ2 = C3CR.
 //!   path="fixture"  - the fixture's six (measure.md §2.1): C0 = 41, C1 = 38, C2 = 39, C3 = 40, C4 = 42 (DMA1 S0-S4), C9 = 37
@@ -108,6 +111,15 @@ pub unsafe extern "C" fn reset() -> ! {
     #[cfg(path = "pair")]
     {
         cfg(DMA1, 0, 0, 41, SPI1_RXDR, SRAM4, 4, P2M);
+        en(DMA1, 0);
+        write_volatile(MARK_READ, r(s(DMA1, 0, CR)));
+    }
+    #[cfg(any(path = "pinc", path = "pinc1"))]
+    {
+        #[cfg(path = "pinc")]
+        cfg(DMA1, 0, 0, 41, USART1_RDR, SRAM4, 4, 0x5600);
+        #[cfg(path = "pinc1")]
+        cfg(DMA1, 0, 0, 41, USART1_RDR, SRAM4, 1, 0x5600);
         en(DMA1, 0);
         write_volatile(MARK_READ, r(s(DMA1, 0, CR)));
     }
