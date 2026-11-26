@@ -174,6 +174,11 @@ def state_of(inst, off, lsb, width, mask=None):
             # Reading R2 (measure §1.3, after the data): a stock-wrong row whose ledger text names its ruling is acknowledged by name.
             m = re.search(r'(acknowledged by name[^;.]*|ruled 2026[^;.)]*|coordinated with Aethelgard[^;.]*)', r.get('detail', '') + ' ' + r['behaves_as'])
             s, ev, sc = 'acknowledged', '%s: stock-wrong, %s' % (loc, m.group(1)), 'acknowledged'
+        elif r['state'] == 'reserved' and re.search(r'acknowledged by name \(ruled 2026[^)]*\)', r['behaves_as']):
+            # Reading R3 (TVI-WO-1205, set after 1205's post-1308 data, as 1100a's R2 was after its own): a reserved row whose
+            # text quotes its ruling is acknowledged by name. One row meets it: PWR_CR3.Res6 (1308 Q7, ArduPilot's rev-V clear).
+            m = re.search(r'acknowledged by name \(ruled 2026[^)]*\)', r['behaves_as'])
+            s, ev, sc = 'acknowledged', '%s: reserved, %s' % (loc, m.group(0)), 'acknowledged'
         else:
             s, ev, sc = 'FINDING', '%s: state %s with allowed any' % (loc, r['state']), 'none'
         if rank[s] < rank[worst]: worst = s

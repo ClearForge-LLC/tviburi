@@ -1,7 +1,7 @@
 # TVI-WO-1205 (1), (2): Phase 1's exit gate, clause by clause, on `main`
 
 **Builder:** Claude (Opus 5.5), Furnace, 2026-11-26. **Branch:** `wo/tvi-1205-gate-judged`, from `main` `63fe557`.
-**Judged on:** `main` [sha] and its CI run [run] (every shard and the aggregate). Clause 1's final rows are on the post-`1308` `main` (§1.3).
+**Judged on:** `main` `63fe557` and its CI run 45858432173: every shard green, and the aggregate reads "1000 expected (446 cases, 554 mutants), 1000 ran across 10 shards, 0 failures". Clause 1's final rows are on the post-`1308` `main` (§1.3).
 **Evidence:** this file; `spike/1205/` (the queue join's scripts and data); `~/.cache/tvi-1205/` (the runs).
 
 How each clause is judged:

@@ -23,7 +23,8 @@
 | B4 | Register each USART guard on the RCC guard under its own name, or every access refuses `TVI-USART-CONFIG`; and its own `spi1`/`spi2` registrations name the guard | FB 1300b; FB 1300; R:164 | The refusal itself, at the first access |
 | B5 | Declare sensors `@ tviburiI2cN`, not `@ i2cN` (E39 on the guarded twin) | R:140; FB 1306 | Renode's load error |
 | B6 | Map each guard's `peripherals` kind (`GuardedSTM32F7_USART`, `GuardedSTM32H7_ADC`, …) in its class map, or its untrusted-tool stop fires | FB 1305, FB 1307 | The `class` lines name each guard type |
-| B7 | Wire `usart1`'s `ReceiveDmaRequest -> dmamux1@41` (the replay's `ACCEPT_USART_DMA` stands in for Aethelgard `4400i`), and keep `spi1 -> dmamux1@37` and `spi2 -> @39`. **After `1308`:** [DMAMUX1's consumer effect, written when #64 merges] | FB 1305; FB 1303.measure | `replay-1301.sh`'s DMA lines |
+| B7 | Repoint every `-> dmamux1@N` line its platforms carry (`spi1 DMARecieve -> @37`, `spi2 -> @39`, and `usart1 ReceiveDmaRequest -> @41`, which it must add: the replay's `ACCEPT_USART_DMA` stands in for Aethelgard `4400i`) to the DMAMUX1 guard's variable. Since `1308`, DMAMUX1 is cancelled and restated, so a line left on `dmamux1` binds to the cancelled entry with no error (`RUL-09` (b)) | FB 1308 §6; FB 1305; FB 1303.measure | `MANIFEST` `restate Miscellaneous.STM32_DMAMUX dmamux1`; `replay-1301.sh`'s DMA lines |
+| B8 | Drop its generated platforms' own PWR script (`AET-WO-4240v` D-3 (a)): the cancel removes it, and on the guarded twin the PWR guard wins. Its foreign platforms have no PWR model of their own | FB 1308 §6 | `MANIFEST` `restate Python.PythonPeripheral pwr`; the PWR guard's witness |
 
 ## C. Declare the board's properties
 
