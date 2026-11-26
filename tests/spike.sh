@@ -669,11 +669,12 @@ scripts_guards_alt() { "$src/scripts/guards" | tr ' ' '|'; }
 
 t_teardown() {
   # TVI-WO-1204 (2): the teardown race, fixed at its cause (measure §1: a clean quit tears down the old emulation's asynchronous
-  # logger with its queue undrained). 15 clean quits of the runner's own script (14 of them under load), each required to write every
-  # guard's end record (tests/1204/teardown.sh). Without the flush in Records.End() a loaded quit lost one about 1 in 3 times.
+  # logger with its queue undrained), and made deterministic (architect 15:48Z): the runner's own run, then three quits with
+  # tests/1204/TeardownHold.cs holding the logging thread until the logger stops it, each required to write every guard's witness
+  # and end record (tests/1204/teardown.sh). Without the flush in Records.End() every held quit loses them all; no load is used.
   pod teardown "$src" -- bash /repo/tests/1204/teardown.sh
-  check "15 clean quits (14 under load) each write every guard's witness and end record, in the log file and on the console (TVI-WO-1204 (2))" \
-    "[ \$rc -eq 0 ] && grep -q '^teardown: 0 of 15 clean quits lost' '$work/teardown.stdout' && [ \"\$(awk 'NR > 1' '$work/teardown/teardown.tsv' | wc -l)\" = 14 ]"
+  check "the runner's quit and three held quits each write every guard's witness and end record, in the log file and on the console (TVI-WO-1204 (2))" \
+    "[ \$rc -eq 0 ] && grep -q '^teardown: 0 of 4 clean quits lost' '$work/teardown.stdout' && [ \"\$(awk 'NR > 1' '$work/teardown/teardown.tsv' | wc -l)\" = 3 ]"
 }
 
 t_witnessed() {
