@@ -124,4 +124,10 @@ A full pass (WO §5) by an independent reader, given the diff, the WO, the rulin
   - the active NACK, prototype C: +10.3 MiB at load 8.7 (PASS), but +34.0 and +42.2 MiB at load 15–19 (REFUSE);
   - `main` against itself at load 15: −2.2 MiB.
   - The cause is ArduPilot's own extra work in the window: about 38 % more, now that its probes end in microseconds.
-- **CI:** (pending at the push; added below when the first run ends).
+- **CI, the first run** (45736105847, at `be18d4e`): **green**.
+  - **The budget, in CI:** `MEDIANS main 785204 KiB, branch 794420 KiB, difference 9216 KiB (+9.0 MiB)`, **PASS**. Every branch boot was under 1,572,864 KiB. (`budget-tests`' own `+72.8 MiB` line is its planted refusal.)
+  - **The aggregate:** "949 expected (416 cases, 533 mutants), 949 ran across 10 shards, 0 failures".
+  - **`ci`'s wall:** 18.9 min (01:29:29Z → 01:48:24Z).
+  - **The shard jobs:** 11.5–16.9 min. The five on an AMD EPYC 7763 (shards 1, 2, 4, 6 and 10) took 15.3–16.9 min; the 6975P-C and 8370C ones 11.5–15.3 min.
+  - **Against the plan:** the longest, shard 6 (7763), ran 16.9 min against the 15.4 planned at 1.53, so this WO's items, weighed at the I2C means, are heavier than that. Re-weighing them from this run is a row for the next `times.tsv` re-weigh. It stays under 20 minutes.
+  - This commit adds only this section; the route reruns every shard on it.
