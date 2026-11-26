@@ -2,7 +2,7 @@
 
 Written as the consumer (standing in for Aethelgard) from the release tarball's MANIFEST, the pinned stock chain copied
 out of the consumer's tools image, and the consumer's own captured platform-booted.repl. It reads nothing else of
-Tviburi's. It applies the class map as architecture.md RUL-09 states it:
+Tviburi's. It applies the class map as the ruling RUL-09 states it:
   - each `restate` instance: cancel it (`<name>: @none`) and declare the guard at the stock registration, `as "<name>"`,
     restating the stock entry's registration, properties and connections (RUL-09 (b));
   - each `retype` instance: change the consumer's own entry's type string;
