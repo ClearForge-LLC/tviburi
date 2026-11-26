@@ -15,7 +15,7 @@
 set -euo pipefail
 
 IMAGE=ghcr.io/clearforge-llc/aethelgard-tools@sha256:1e0ab105ec42bdba66b773464f0b6679d622e4afdafef30ec4931e4326f49c63
-ACCEPTANCE="unit modf modeled ardupilot generated field stable cfg2first iolock rmw forge stock-forge stock-modf modf-page removed-console crash-console crash-runner nomark conditions fields load crash identity verify reproducible manifest recorded allowlist"
+ACCEPTANCE="unit modf modeled ardupilot generated field stable cfg2first iolock rmw forge stock-forge stock-modf modf-page removed-console crash-console crash-runner nomark conditions fields load crash identity verify reproducible manifest lognames recorded allowlist"
 ADVERSARIAL="adv-removed adv-extra-arg adv-bad-variant adv-hook adv-loglevel adv-spray adv-noend adv-version adv-recorded adv-noname adv-release adv-cache"
 # TVI-WO-1300: the RCC guard's cases live in tests/1300/rcc.sh; each is a test here, rcc-<case>, run as part of the
 # acceptance group, so CI and tests/mutants.sh reach them.
@@ -607,6 +607,42 @@ for a, b in seds:
 ok = bool(retypes) and all(('%s: %s @ {' % (i, t)) in plat and ('%s: %s @ {' % (i, guard[t])) in out for t, i in retypes)
 print('retypes', retypes, 'replay re-typing rules', len(seds), 'ok', ok)
 sys.exit(0 if ok else 1)
+EOF"
+}
+
+t_lognames() {
+  # TVI-WO-1203 (5): the access log names every register of the RCC and DMA guards, as it does a stock model's, never
+  # `unknown`. Every offset of each guard's Fields table (DMA's stream rows at all eight streams) is read by the monitor
+  # with LogPeripheralAccess on and DMA1 clocked (locked, a read is the bus's warning, not an access line).
+  need_check
+  python3 -I - "$src" >"$work/lognames.reads" <<'EOF'
+import re, sys
+for path, base, inst in (('model/GuardedSTM32H7_RCC.cs', 0x58024400, 'rcc'), ('model/GuardedSTM32DMA.cs', 0x40020000, 'dma1')):
+    text = open(sys.argv[1] + '/' + path).read()
+    table = text[text.index('private static readonly Row[] Fields ='):]
+    offs = sorted({int(m.group(1), 16) for m in re.finditer(r'R\("\w+", (0x[0-9A-F]+),', table)})
+    if inst == 'dma1':
+        offs = sorted({o + 0x18 * k for o in offs for k in range(8 if 0x10 <= o < 0x28 else 1)})
+    names = {int(v, 16): n for n, v in re.findall(r'^\s+(\w+) = (0x[0-9A-F]+),$', text[text.index('private enum Registers'):text.index('private enum Registers') + 6000].split('}')[0], re.M)}
+    for o in offs:
+        print('%s 0x%X %s 0x%08X' % (inst, o, names.get(o, '-'), base + o))
+EOF
+  { echo "include @/repo/scripts/prelude.resc"; echo "sysbus WriteDoubleWord 0x580244D8 0x1"
+    echo "sysbus LogPeripheralAccess sysbus.rcc true"; echo "sysbus LogPeripheralAccess sysbus.dma1 true"
+    awk '{print "sysbus ReadDoubleWord " $4}' "$work/lognames.reads"; echo 'echo "TVIBURI-END"'; echo quit; } >"$work/lognames.resc"
+  renode_in lognames "$src" /cases/lognames.resc -v "$work/lognames.resc:/cases/lognames.resc:ro,Z"
+  check "every RCC and DMA guard register is named in the access log, the name its enum gives it, never unknown: each Fields offset read once by the monitor (TVI-WO-1203 (5))" \
+    "python3 -I - '$work/lognames.reads' '$work/lognames/renode-log.txt' <<'EOF'
+import re, sys
+want = [l.split() for l in open(sys.argv[1])]
+got = {}
+for l in open(sys.argv[2], errors='replace'):
+    m = re.search(r'\] (rcc|dma1): (?:\[cpu: [^\]]*\] )?Read\w* from (0x[0-9A-F]+) \(([^)]*)\)', l)
+    if m: got.setdefault((m.group(1), int(m.group(2), 16)), m.group(3))
+bad = [(i, o, n, got.get((i, int(o, 16)))) for i, o, n, a in want if n == '-' or got.get((i, int(o, 16))) != n]
+unknown = [k for k, v in got.items() if v == 'unknown']
+print('lognames:', len(want), 'offsets,', len(got), 'logged,', 'mismatched', bad[:5], 'unknown', unknown[:5])
+sys.exit(0 if len(want) > 100 and not bad and not unknown else 1)
 EOF"
 }
 

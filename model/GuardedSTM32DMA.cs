@@ -1009,6 +1009,65 @@ namespace Antmicro.Renode.Peripherals.Tviburi
         private static readonly uint[] Sizes = { 0, 1, 2 };
         private static readonly uint[] Directions = { 0, 1, 2 };
 
+        // The access log's register names (TVI-WO-1203 (5)): Renode's RegisterMapper names an access by any nested enum of the
+        // registered peripheral's type whose name contains "register", and this wrapper is the registered type, so without it
+        // every access logged `unknown`. This is the stock STM32DMA's own `Registers` enum (stream 0), copied by reflection from the pinned build, and streams 1-7 named in its pattern.
+        private enum Registers
+        {
+            LowInterruptStatus = 0x0,
+            HighInterruptStatus = 0x4,
+            LowInterruptClear = 0x8,
+            HighInterruptClear = 0xC,
+            StreamConfiguration = 0x10,
+            StreamNumberOfData = 0x14,
+            StreamPeripheralAddress = 0x18,
+            StreamMemory0Address = 0x1C,
+            StreamMemory1Address = 0x20,
+            StreamFIFOControl = 0x24,
+            Stream1Configuration = 0x28,
+            Stream1NumberOfData = 0x2C,
+            Stream1PeripheralAddress = 0x30,
+            Stream1Memory0Address = 0x34,
+            Stream1Memory1Address = 0x38,
+            Stream1FIFOControl = 0x3C,
+            Stream2Configuration = 0x40,
+            Stream2NumberOfData = 0x44,
+            Stream2PeripheralAddress = 0x48,
+            Stream2Memory0Address = 0x4C,
+            Stream2Memory1Address = 0x50,
+            Stream2FIFOControl = 0x54,
+            Stream3Configuration = 0x58,
+            Stream3NumberOfData = 0x5C,
+            Stream3PeripheralAddress = 0x60,
+            Stream3Memory0Address = 0x64,
+            Stream3Memory1Address = 0x68,
+            Stream3FIFOControl = 0x6C,
+            Stream4Configuration = 0x70,
+            Stream4NumberOfData = 0x74,
+            Stream4PeripheralAddress = 0x78,
+            Stream4Memory0Address = 0x7C,
+            Stream4Memory1Address = 0x80,
+            Stream4FIFOControl = 0x84,
+            Stream5Configuration = 0x88,
+            Stream5NumberOfData = 0x8C,
+            Stream5PeripheralAddress = 0x90,
+            Stream5Memory0Address = 0x94,
+            Stream5Memory1Address = 0x98,
+            Stream5FIFOControl = 0x9C,
+            Stream6Configuration = 0xA0,
+            Stream6NumberOfData = 0xA4,
+            Stream6PeripheralAddress = 0xA8,
+            Stream6Memory0Address = 0xAC,
+            Stream6Memory1Address = 0xB0,
+            Stream6FIFOControl = 0xB4,
+            Stream7Configuration = 0xB8,
+            Stream7NumberOfData = 0xBC,
+            Stream7PeripheralAddress = 0xC0,
+            Stream7Memory0Address = 0xC4,
+            Stream7Memory1Address = 0xC8,
+            Stream7FIFOControl = 0xCC,
+        }
+
         private static Row R(string reg, long off, string sec, string name, int msb, int lsb, uint[] allowed, string cls, string behaves, int page)
         {
             return new Row(reg, off, sec, name, msb, lsb, allowed, behaves, page);
