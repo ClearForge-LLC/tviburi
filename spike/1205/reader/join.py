@@ -64,7 +64,9 @@ TEST = {'GuardedSTM32H7_SPI': ('spi1', 'tests/spike.sh fields'), 'GuardedSTM32_T
         'GuardedSTM32H7_DMAMUX': ('dmamux1', 'tests/1308/dmamux.sh fields'), 'GuardedSTM32H7_PWR': ('pwr', 'tests/1308/pwr.sh fields')}
 refuse = collections.defaultdict(dict)
 for g in ('GuardedSTM32H7_SPI', 'GuardedSTM32_Timer', 'GuardedSTM32DMA', 'GuardedSTM32F7_USART', 'GuardedSTM32H7_Flash', 'GuardedSTM32H7_DMAMUX', 'GuardedSTM32H7_PWR'):
-    for l in open(os.path.join(cases_dir, 'Tviburi.%s.txt' % g)):
+    cf = os.path.join(cases_dir, 'Tviburi.%s.txt' % g)
+    if not os.path.exists(cf): continue   # a tree before 1308 has no such guard; a bound guard with none reads 'NO clause-6 case'
+    for l in open(cf):
         if l.startswith('# CASE refuse '):
             _, _, _, name, off, val = l.split()
             refuse[g].setdefault(name, 'CASE refuse %s %s %s' % (name, off, val))

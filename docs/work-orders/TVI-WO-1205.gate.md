@@ -34,7 +34,7 @@ How each clause is judged:
 | GPIO (tiers 2, 4b) | 108 | 85 | 23 | 0 |
 | DMA1/2 streams | 85 + 30 | 52 | 63 | 0 |
 | **DMAMUX1** | 0 + 10 | 0 | 0 | **10** (`1308`) |
-| TIM1 | 67 + 9 | 57 | 18 | 0, and one form finding (below) |
+| TIM1 | 67 + 9 | 57 | 18, then 19 with `TIMx_SR` read (below) | 0 (`1100a`'s form finding closed, below) |
 | FLASH.ACR | 2 | 2 | 0 | 0 |
 | ADC1 | 2 + 19 | 21 | 0 | 0 |
 | I2C1/2 | 66 + 1 | 56 | 11 | 0 |
@@ -49,11 +49,16 @@ How each clause is judged:
 
 **Since `1100a`:** only the RCC's split by tier moved. `1203` gave the RCC's registers their real names in the access log, so five armed registers now fall in tier 4a, not tier 1. The totals are unchanged.
 
-**TIM1's one form finding** (`1100a` F3) is `TIMx_SR`.
-- The run writes 0 to clear `UIF`/`CC1IF`–`CC4IF` and the break flags.
-- Each field has its own ledger row: `BIF`/`B2IF` `tag`, the CC flags `stock-wrong`, the overcapture flags `inherited-unaudited`, all `allowed: any`.
-- **Judged acknowledged:** a ledger row names each field the run writes. That is the WO's definition, and none names a different field.
-- **The form is still a row:** those rows quote no ruling. For an `rc_w0` flag that never sets, silicon ignores 0 and 1 alike, so no silent pass was found on the measured values.
+**TIM1's `TIMx_SR`: read in full, and acknowledged by name** (architect 17:02Z and 17:35Z; it was `1100a` F3's form finding).
+- **What the armed run does at TIM1** (run B, every access logged):
+  - SR: written `0x0` three times (0.104 s, 7.77 s), and never read. There are no TIM1 reads at all among 4,470,613 read lines.
+  - DIER: `0x0`, so no TIM1 interrupt or DMA request.
+  - CCMR1/2 `0x6868` (all four channels PWM outputs); SMCR never written; BDTR `0x8000`; CR2 `0`; EGR `0x1`.
+- **Each field against the stock model and RM0433 Rev 9 pp1596–1597:**
+  - **UIF, CC1IF–CC4IF, TIF, CC5IF, CC6IF, BIF, B2IF, SBIF, COMIF:** `stock, wrong`. The stock model sets UIF/CCxIF/TIF only with their interrupt enabled, and the twin never sets the channel 5–6, break and COM flags; silicon sets each on its own event. Each row now says why ArduPilot's path is not affected, quoting the ruling.
+  - **CC1OF–CC4OF:** acknowledged by name, **A10** (`TVI-WO-0100b.rm0433.md` §4, granted 17:35Z). The stock model's overcapture matches silicon's, and ArduPilot's outputs never capture.
+- **The text is generated:** it is set in `tests/1302/fields.py`, and the table is regenerated from it; no rule or behaviour changed. Re-joined on this ledger (`spike/1205/data/main-63fe557+a10/`): TIM1 is 57 guarded and 19 acknowledged, with 0 findings.
+- **CC5IF/CC6IF on silicon** (setting at a compare with CCR5/CCR6 at reset 0) is inferred from p1597, not run.
 
 **Guarded on a sibling's case** (the adversarial pass's "sibling instance" question): 97 of the guarded rows above the cut are on an instance whose clause-6 sweep wrote another instance of the same guard. They are `usart2` 27 and `usart3` 27 (swept on `usart1`), `i2c2` 17 (`i2c1`), `spi2` 16 (`spi1`), `gpioPortB` 9 and `gpioPortD` 1 (`gpioPortA`).
 - **Each is guarded, not merely inferred.** The run binds the guard's type at that instance (the platform listing). The rule that refuses is the same code, reading the same `Fields` table by offset, with no per-instance branch for these fields.
