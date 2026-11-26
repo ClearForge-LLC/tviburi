@@ -12,7 +12,7 @@ set -euo pipefail
 
 here=$(cd "$(dirname "$0")/../.." && pwd)
 IMAGE=$(sed -n 's/^IMAGE=//p' "$here/tests/spike.sh")
-CASES="second same ap gen order clockfirst invalid vosearly voslow cr2dbp bdcr bdcrok flashvos3 apbvos3 vos0 revy200 hse400 hse400v3 hse25 flashlow clockearly vos0byp bdcrbyte noclock nopwr notjudged reset recorded locked nibble norev revy byte misaligned read addr norcc registrations fields ledger regen"
+CASES="second same ap gen order clockfirst invalid vosearly voslow cr2dbp bdcr bdcrok flashvos3 apbvos3 vos0 revy200 hse400 hse400v3 hse25 bothrec flashlow clockearly vos0byp bdcrbyte noclock nopwr notjudged reset recorded locked nibble norev revy byte misaligned read addr norcc registrations fields ledger regen"
 MONITOR="reset recorded locked nibble norev revy byte misaligned read addr norcc registrations fields ledger regen"
 PATHS=$(for c in $CASES; do case " $MONITOR " in *" $c "*) ;; *) printf '"%s",' "$c" ;; esac; done | sed 's/,$//')
 scratch=${TVIBURI_SCRATCH:-$HOME/.cache/tviburi}
@@ -124,6 +124,8 @@ for t in ${TVIBURI_TESTS:-$CASES}; do
       PLATFORM_SED=$hse16 run_case "$t" "$t" 'emulation RunFor "0.01"' "${marks[@]}"
     elif [ "$t" = hse25 ]; then
       PLATFORM_SED='s/^    hseFrequency: 8000000$/    hseFrequency: 25000000/' run_case hse25 hse25 'emulation RunFor "0.01"' "${marks[@]}"
+    elif [ "$t" = bothrec ]; then
+      PLATFORM_SED='/^tviburiRcc:$/,/^    mode:/{s/enforcing/recorded/}' run_case bothrec bothrec 'emulation RunFor "0.01"' "${marks[@]}"
     elif [ "$t" = notjudged ]; then
       NOPWR=1 run_case notjudged notjudged 'emulation RunFor "0.01"' "${marks[@]}"
     else
@@ -181,6 +183,8 @@ for t in ${TVIBURI_TESTS:-$CASES}; do
       "passes hse400v3 && [ \"\$(readout hse400v3 READ)\" = 0x0000001B ]" ;;
   hse25) check "hse25 (B1): HSE 25 MHz / 11 x 352 / 2 = 400 MHz exactly at Scale 1, AHB 200, APB 100 passes" \
       "passes hse25 && [ \"\$(readout hse25 READ)\" = 0x0000001B ]" ;;
+  bothrec) check "bothrec (TVI-WO-1204's contract): rcc recorded, one RCC_APB1LENR write clearing USART3EN under UE = 1 records two would-refuses from that one access, TVI-RCC-VOS (APB4 at 64 MHz above VOS3's 50, the new first excess) then TVI-RCC-CLOCK (USART3's kernel clock stopped): every rule evaluated; never a pass" \
+      "[ \$rc = 1 ] && logged bothrec '[r[\"rule\"] for r in recs if r[\"access\"][\"offset\"] == \"0xE8\" and r[\"access\"][\"value\"] == \"0x0\"] == [\"TVI-RCC-VOS\", \"TVI-RCC-CLOCK\"] and all(r[\"tviburi\"] == \"would-refuse\" for r in recs)' rcc" ;;
   notjudged) check "notjudged (ruled Q20 (A)): on the board with no PWR guard, sys_ck 400 MHz, AHB 200 and every APB 200 MHz (above every scale's limit, p210) are not judged: no TVI-RCC-VOS, no record; CFGR reads SWS = PLL1 (0x1B), D1CFGR 0x08 (read by the firmware, not a record)" \
       "passes notjudged && logged notjudged 'len(recs) == 0' rcc && [ \"\$(readout notjudged READ)\" = 0x0000001B ] && [ \"\$(readout notjudged READ2)\" = 0x00000008 ]" ;;
   reset)

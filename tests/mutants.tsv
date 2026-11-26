@@ -636,3 +636,4 @@ RM03-rccField	model/GuardedSTM32H7_RCC.cs	fired |= records.Evaluates(fired) && R
 RM04-hsePlaceholder	model/GuardedSTM32H7_RCC.cs	(mode == Records.RecordedMode ? RecordedHsePlaceholder : 0UL)	(mode == Records.RecordedMode ? 0UL : 0UL)	rcc-hsesw
 I264-recNackStopf	model/GuardedSTM32F7_I2C.cs	                            nackStopf = true;\n	(empty)	i2c-recnack
 RM05-spiKernelEvery	model/GuardedSTM32H7_SPI.cs	fired |= records.Evaluates(fired) && starts && RefusedKernel(value);	fired |= !fired && starts && RefusedKernel(value);	recorded
+PW38-recordedEveryRule	model/GuardedSTM32H7_RCC.cs	            fired |= records.Evaluates(fired) && RefusedClockLoss(offset, b, value);	            fired |= !fired && RefusedClockLoss(offset, b, value);	pwr-bothrec

@@ -47,6 +47,9 @@
 //!                      Scale 1's limits exactly (the twin's double is 400000000.00000006 before rounding): passes. MARK_READ = CFGR.
 //!   path="hse400v3"  - the same sys_ck with D1CPRE /2 at Scale 3: CPU 200, AHB 100, every APB 50 (RTCAPBEN enabled): passes.
 //!   path="hse25"     - (hseFrequency 25 MHz) CR3, VOS1, 25 / 11 x 352 / 2 = 400 MHz exactly, AHB 200, APB 100: passes.
+//!   path="bothrec"   - (rcc recorded) CR3 at Scale 3, USART3 started (USART3EN, BRR, TE | UE), then USART3EN cleared in one RCC_APB1LENR
+//!                      write: it stops USART3's kernel clock (TVI-RCC-CLOCK, p376) and leaves APB4 (RTCAPBEN) the first APB above
+//!                      VOS3's 50 MHz at 64 MHz, a new verdict (TVI-RCC-VOS): both evaluated in recorded mode (model/Refusal.cs).
 //!   path="notjudged" - (a platform with no PWR guard, ruled Q20 (A)) sys_ck to 400 MHz, AHB 200, every APB 200 MHz, above every
 //!                      scale's limit, LATENCY 2: no TVI-RCC-VOS, passes. MARK_READ = CFGR (SWS = PLL1), MARK_READ2 = D1CFGR.
 #![no_std]
@@ -355,6 +358,15 @@ pub unsafe extern "C" fn reset() -> ! {
         hsepll(11, 352, 0x48, 0x440, 0x40);
         switch(3);
         write_volatile(MARK_READ, r(RCC + 0x10));
+    }
+    #[cfg(path = "bothrec")]
+    {
+        supply(0x02);
+        w(APB1LENR, r(APB1LENR) | 1 << 18);   // USART3EN (p463)
+        let _ = r(APB1LENR);
+        w(0x4000_4800 + 0x0C, 0x22C);          // USART3 BRR
+        w(0x4000_4800, 0b1001);                // USART3 CR1: TE | UE
+        w(APB1LENR, r(APB1LENR) & !(1 << 18));
     }
     #[cfg(path = "notjudged")]
     {
