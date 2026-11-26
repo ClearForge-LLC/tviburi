@@ -273,7 +273,12 @@ namespace Antmicro.Renode.Peripherals.Tviburi
         // sys_ck by SWS (p393): the HSI, the CSI, the HSE or PLL1's P output.
         private double? SysHz(ref string why)
         {
-            var sws = inner.ReadDoubleWord(CfgrOffset) >> 3 & 7;
+            return SysHz(inner.ReadDoubleWord(CfgrOffset) >> 3 & 7, ref why);
+        }
+
+        // sys_ck with a given SWS: the stock model's, or during TVI-RCC-VOS's trial the SW a CFGR write switches to.
+        private double? SysHz(uint sws, ref string why)
+        {
             var sys = sws == 0 ? Hsi() : sws == 1 ? CsiFrequency : sws == 2 ? (double?)HseFrequency : sws == 3 ? PllHz(1, 'p', ref why) : null;
             if(sys == null)
             {
@@ -372,6 +377,65 @@ namespace Antmicro.Renode.Peripherals.Tviburi
                 return null;
             }
             return vco / (div + 1);
+        }
+
+        // TVI-WO-1308 (ruled 2026-11-26T09:31Z Q9): the bus clocks now, in Hz, for the PWR guard's VOS rule: CPU (rcc_c_ck = sys_ck /
+        // D1CPRE, p394), AHB (rcc_hclk = rcc_c_ck / HPRE, p395), APB1-APB4 (rcc_pclk1/2 by D2PPRE1/2, p396; rcc_pclk3 by D1PPRE,
+        // p395; rcc_pclk4 by D3PPRE, p397); `apbEnabled`, per APB bus, whether one of its peripherals is enabled (RCC_APB1LENR or
+        // APB1HENR, APB2ENR, APB3ENR, APB4ENR, p462-471). Null, with the reason, where sys_ck has no frequency rule. It changes nothing.
+        public double[] BusClocks(out bool[] apbEnabled, out string why)
+        {
+            return Clocks(-1, 0, out apbEnabled, out why);
+        }
+
+        // The bus clocks as BusClocks gives them, after a write of `value` at `b` (none for b = -1): the write's copy, RCC_PLLxDIVR
+        // and RCC_CR (as the stock model keeps it) taken for the trial and restored, as TVI-RCC-CLOCK's trial does; CFGR's SW as the
+        // new SWS (TVI-RCC-SW has passed: its target runs); D1CFGR, D2CFGR and D3CFGR as written.
+        private double[] Clocks(long b, uint value, out bool[] apbEnabled, out string why)
+        {
+            var savedCopy = b >= 0 && copies.TryGetValue(b, out var c) ? c : (uint?)null;
+            var savedDivr = b >= 0 && divr.TryGetValue(b, out var d) ? d : (uint?)null;
+            try
+            {
+                if(savedCopy != null)
+                {
+                    copies[b] = value;
+                }
+                if(savedDivr != null)
+                {
+                    divr[b] = value;
+                }
+                if(b == CrOffset)
+                {
+                    crAfter = KeptCr(value);
+                }
+                apbEnabled = new[] { Copy(0x0E8) != 0 || Copy(0x0EC) != 0, Copy(0x0F0) != 0, Copy(0x0E4) != 0, Copy(0x0F4) != 0 };
+                why = "sys_ck";
+                var sys = SysHz(b == CfgrOffset ? value & 7 : inner.ReadDoubleWord(CfgrOffset) >> 3 & 7, ref why);
+                if(sys == null)
+                {
+                    return null;
+                }
+                var d1 = b == 0x018 ? value : inner.ReadDoubleWord(0x018);
+                var d2 = b == 0x01C ? value : inner.ReadDoubleWord(0x01C);
+                var d3 = b == 0x020 ? value : inner.ReadDoubleWord(0x020);
+                var cpu = sys.Value / Prescaler(d1 >> 8 & 0xF);
+                var ahb = cpu / Prescaler(d1 & 0xF);
+                Func<uint, double> apb = ppre => ahb / ((ppre & 4) == 0 ? 1 : 2 << (int)(ppre & 3));   // 0xx /1; 100-111 /2-/16
+                return new[] { cpu, ahb, apb(d2 >> 4 & 7), apb(d2 >> 8 & 7), apb(d1 >> 4 & 7), apb(d3 >> 4 & 7) };
+            }
+            finally
+            {
+                if(savedCopy != null)
+                {
+                    copies[b] = savedCopy.Value;
+                }
+                if(savedDivr != null)
+                {
+                    divr[b] = savedDivr.Value;
+                }
+                crAfter = null;
+            }
         }
 
         // D1CPRE and HPRE (pp. 394-395): 0xxx /1; 1000-1011 /2-/16; 1100-1111 /64-/512.

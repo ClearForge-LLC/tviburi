@@ -138,6 +138,20 @@ for i in "${!args[@]}"; do
     { echo; cat /repo/model/stm32h7-dmamux-restate.repl; echo
       printf 'tviburiDmamux1:\n    mode: "%s"\n\n' "${ACCEPT_MODE:-recorded}"; } >> "$plat"
   fi
+  # TVI-WO-1308: a tree with the PWR restatement gets it last, with its mode and the revision "V" (ruled 2026-11-26T09:31Z Q7:
+  # required, declared by this replay, as the ADC block does). The stock `pwr` is cancelled (Q13), so the consumer's own untyped
+  # `pwr:` update (the PWR script Aethelgard's generated platforms carry, AET-WO-4240v D-3 (a)), which would bind to the cancelled
+  # entry, is dropped first: its indented lines and its script, whose lines start at column 0 between ''' marks. A tree without it
+  # replays as before.
+  if [ -f /repo/model/stm32h7-pwr-restate.repl ]; then
+    awk -v t="'''" '/^pwr:$/ { f = 1; q = 0; next }
+      f && q { if (index($0, t)) q = 0; next }
+      f && index($0, t) { if (gsub(t, "&") % 2) q = 1; next }
+      f && /^[ \t]/ { next }
+      { f = 0; print }' "$plat" > "$plat.new" && cat "$plat.new" > "$plat" && rm "$plat.new"
+    { echo; cat /repo/model/stm32h7-pwr-restate.repl; echo
+      printf 'tviburiPwr:\n    mode: "%s"\n    revision: "V"\n\n' "${ACCEPT_MODE:-recorded}"; } >> "$plat"
+  fi
   args[$((i + 1))]=${c/'mach create; '/'include @/tmp/release/Tviburi.cs; mach create; '}
 done
 printf '%s\n' "${args[@]}" > /out/$n-$mode.argv.txt
