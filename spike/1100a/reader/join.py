@@ -84,7 +84,9 @@ def ledger_offset(g, inst, off):
 REQ = {}
 for (inst, off), f in arm.items():
     if inst == 'dmamux1' and off < 0x40: REQ[off // 4] = int(f[8], 16) & 0xFF
-REQPATH = {41: 'command', 42: 'command', 37: 'sensor', 38: 'sensor', 39: 'sensor', 40: 'sensor', 9: 'sensor', 43: 'other', 45: 'other', 46: 'other'}
+# USART1 is the console (SERIAL0, the MAVLink the run injects), USART2 CRSF RC input (SERIAL1), USART3 MAVLink2 (SERIAL2):
+# Sentinel-03's hwdef, Aethelgard spike/4400h/out/s03/sentinel-03.hwdef.dat L27-36. All three are command links.
+REQPATH = {41: 'command', 42: 'command', 43: 'command', 45: 'command', 46: 'command', 37: 'sensor', 38: 'sensor', 39: 'sensor', 40: 'sensor', 9: 'sensor'}
 def dma_path(inst, off, lsb):
     if inst not in ('dma1', 'dma2', 'dmamux1'): return None
     if inst == 'dmamux1': ch = off // 4 if off < 0x40 else None
@@ -103,7 +105,7 @@ def path(inst, off, lsb, cls):
     d = dma_path(inst, off, lsb)
     if d: return d
     if cls == 'sensor buses' or inst in ('spi1', 'spi2', 'i2c1', 'i2c3', 'adcM1S2'): return 'sensor'
-    if inst == 'usart1': return 'command'
+    if inst in ('usart1', 'usart2', 'usart3'): return 'command'
     return 'other'
 def tier(inst, reg):
     if inst == 'rcc' and re.search(r'(LP)?ENR$|CCIP[12]?R$', reg): return '1'
@@ -161,8 +163,6 @@ def state_of(inst, off, lsb, width, mask=None):
             # Reading R2 (measure §1.3, after the data): a stock-wrong row whose ledger text names its ruling is acknowledged by name.
             m = re.search(r'(acknowledged by name[^;.]*|ruled 2026[^;.)]*|coordinated with Aethelgard[^;.]*)', r.get('detail', '') + ' ' + r['behaves_as'])
             s, ev, sc = 'acknowledged', '%s: stock-wrong, %s' % (loc, m.group(1)), 'acknowledged'
-        elif r['state'] in ('acknowledged', 'inherited-unaudited'):
-            s, ev, sc = 'acknowledged', '%s: %s%s' % (loc, r['behaves_as'][:120], (' [' + r['reason'] + ']') if r.get('reason') else ''), 'acknowledged'
         else:
             s, ev, sc = 'FINDING', '%s: state %s with allowed any' % (loc, r['state']), 'none'
         if rank[s] < rank[worst]: worst = s

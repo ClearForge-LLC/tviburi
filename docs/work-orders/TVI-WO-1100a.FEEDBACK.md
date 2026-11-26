@@ -11,7 +11,7 @@
   - **reach,** against the armed run on `main`'s guarded twin (Aethelgard `4400h` `s03-arm-s` as `1305` captured it: arms at 9.003 s, armed from 9.332 s, no record from any guard);
   - **state,** against the ledger of `main`'s release `8e4a1f4b…`, judged on the types the run bound.
 - **States:** guarded 610, acknowledged by name 253, inherited 72, not reached 0. Each row has its evidence (`spike/1100a/data/states.tsv`).
-- **The cut, ranked:** two families are open on the four paths the armed run flies, **DMAMUX1** (7 channels) and **PWR** (5 registers). Recommended: those two slices. Cautious alternative: plus TIM5.
+- **The cut, ranked:** two families are open on the four paths the armed run flies, **DMAMUX1** (10 channels) and **PWR** (5 registers). Recommended: those two slices. Cautious alternative: plus TIM5.
 - **The audit:** clauses 2, 5 and 7 are met. Clauses 3, 4 and 6 are met in part, with named unproven cells, each a test fix. Clause 1 has two families open up to the cut.
 - **Nothing built.** No model, guard, test, CI or steering document changed. The fence holds: `docs/work-orders/TVI-WO-1100a.*` and `spike/1100a/` only.
 
@@ -56,14 +56,14 @@
 - For all 154 case-guarded rows, the case's offset and value set the row's own bits.
 - No queue row lands on a `MASKED` field or TIM1's `DMAR`.
 - The DMA, ADC and flash offset translations are correct.
-- Every cited case is in CI's case list.
-- **Not checked by the subagent:** that every case ran in run 45774342008. That run's jobs are all green; its aggregate's count was not read.
+- Every cited case is in CI's case list. Run 45774342008's aggregate confirms they ran: `970 expected (433 cases, 537 mutants), 970 ran across 10 shards, 0 failures` (read after the subagent's report).
 
 ## 4. Findings and rows (each for its owner; none fixed here)
 
-1. **The ledger over-claims guarding** (measure §5 F1; invariant 2's falsifier).
-   - `pins.tsv` gives no instance list for `SPI.STM32H7_SPI` or `Timers.STM32_Timer`, so the ledger's `model` rows say `guarded_by` for `spi4`, `timer2`–`timer7` and `timer12`–`timer17`. The run binds every one of them to the stock type.
-   - **A fix:** the instance column, plus a test that every `guarded_by` instance is restated. It goes with the gate-proofs slice, or sooner.
+1. **The release's class map guards instances Tviburi has never run guarded** (measure §5 F1).
+   - `pins.tsv` gives no instance list for SPI or the timers, so the `MANIFEST` restates `spi4` and all 14 timers onto the guards, and the ledger lists them `guarded_by`. Every Tviburi replay guards only `timer1`/`timer8` (and `spi1`/`spi2`).
+   - **Not invariant 2:** the ledger keeps them `inherited-unaudited`. But a consumer following the manifest would put ArduPilot's TIM5 under the TIM1/TIM8 allow-list, and its `ARR` = 0xFFFFFFFF would likely refuse (inferred, not run).
+   - **A fix,** with a test that the manifest restates only instances a replay has run. Not one line: SPI's instances are consumer-declared.
 2. **The gate-proofs slice** (measure §4), all fixes to tests:
    - **clause 3:** console-framed fixtures for a removed guard and a crash, and a runner case that kills the simulator;
    - **clause 4:** `stock-modf` asserts the after-marker; the page match moves into CI or is ruled a hand check;
@@ -85,12 +85,20 @@
 
 - **One container ran outside `~/bin/capped-run`:** a one-line read-only `grep` of the stock `stm32h7.repl` in the pinned image, with `--network none`, about 2 s. Not repeated.
 - **§0.6 was incomplete:** the window and the battery level, which `1305` and `1307` ran with, were added after A0 (R5). A0 is kept as evidence (F4).
-- **Readings after the data,** R1–R5 (measure §1.3), are stated with their reasons. They decide where 279 ledger rows fall.
+- **Readings after the data,** R1–R6 (measure §1.3), are stated with their reasons. R1–R3 decide where 279 ledger rows fall. R6 (the USART roles, from Sentinel-03's hwdef) moves 149 rows and registers to the command link and no family across the line.
 - **The 1.3 GB uncompressed console** sat in the session scratchpad on RAM-backed `/tmp` during the adversarial pass. Removed after it; the compressed copy is in `~/.cache/tvi-1100a/arm/`.
 
 ## 6. Reduction pass
 
-Reduction pass (diff): −2 lines net · 0 duplicates removed · 3 dead paths removed (an unused case lookup and an unused variable in `join.py`, an unused `sys.path` line in `clause6.py`; outputs byte-identical) · 0 protected kept · 1 finding (§4 item 7).
+Reduction pass (diff), run twice, before and after the adversarial corrections:
+- −6 lines net in the readers;
+- 1 duplicate removed: `locked` initialised once in `arm-writes.py`, not set and defaulted;
+- 4 dead paths removed: an unused case lookup, an unused variable and an unreachable second `acknowledged` arm in `join.py`, and an unused `sys.path` line in `clause6.py`;
+- outputs byte-identical after each;
+- 0 protected kept;
+- 1 finding (§4 item 7).
+
+`pipeline.sh` was then run end to end on disk (a fresh release, the cases, runs A and B, every table). Every committed table regenerated byte-identical before R6's path change.
 
 ## 7. Gates
 

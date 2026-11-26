@@ -52,8 +52,7 @@ for l in open(con, errors='replace'):
     k = (inst, word)
     r = regs.get(k)
     if r is None:
-        r = regs[k] = dict(name=name, n=0, after=0, vals=set(), first=v, last=v, orv=0, andv=0xFFFFFFFF, widths=set(), pc=pc, t=t, ta=None, sub=False)
-    r.setdefault('locked', 0)
+        r = regs[k] = dict(name=name, n=0, after=0, vals=set(), first=v, last=v, orv=0, andv=0xFFFFFFFF, widths=set(), pc=pc, t=t, ta=None, sub=False, locked=0)
     r['n'] += 1; r['vals'].add(v); r['last'] = v; r['orv'] |= v; r['widths'].add(width)
     if width == 4: r['andv'] &= v
     else: r['sub'] = True
@@ -66,8 +65,8 @@ for inst, a, v in locked:
     k = (inst, (a - b) & ~3)
     r = regs.get(k)
     if r is None:
-        r = regs[k] = dict(name='-', n=0, after=0, vals=set(), first=0, last=0, orv=0, andv=0xFFFFFFFF, widths=set(), pc='-', t=0.0, ta=None, sub=False)
-    r['locked'] = r.get('locked', 0) + 1
+        r = regs[k] = dict(name='-', n=0, after=0, vals=set(), first=0, last=0, orv=0, andv=0xFFFFFFFF, widths=set(), pc='-', t=0.0, ta=None, sub=False, locked=0)
+    r['locked'] += 1
 with open(pout, 'w') as f:
     f.write('# instance\ttype\tranges\n')
     for k, (ty, rs) in per.items():
@@ -82,7 +81,7 @@ with open(wout, 'w') as f:
                            ','.join(str(w) for w in sorted(r['widths'])), r['pc'], '%.9f' % r['t'],
                            '-' if r['ta'] is None else '%.9f' % r['ta'],
                            (','.join('0x%X' % v for v in sorted(r['vals'])) if len(r['vals']) <= 64 else 'many:%d' % len(r['vals'])) or '-',
-                           str(r.get('locked', 0))]) + '\n')
+                           str(r['locked'])]) + '\n')
 if len(sys.argv) > 5:
     with open(sys.argv[5], 'w') as f:
         f.write('# virtual time\tpc\ttag\twidth\taddress\tvalue\n')

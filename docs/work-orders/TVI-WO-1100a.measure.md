@@ -120,6 +120,12 @@ So these predictions are not blind on the following points:
   - The faithful extension is the armed queue made by the same readers: 91 ids (`4400h` at `fa12abf4`, committed as `data/aet-4400h-queue-ap-armed-sentinel-03.tsv`).
   - The 253 registers (240 found by the first reader, 13 more after the adversarial pass, §1.1) are reported separately, at register level, with their state (§2.4). The cut reads both.
 - **R5, the window and the battery level** (A0 → A): the knobs `1305` and `1307` ran with, which §0.6 did not name.
+- **R6, the command link is USART1, USART2 and USART3.** §0.5 named USART1 (MAVLink) only. Sentinel-03's hwdef (Aethelgard `spike/4400h/out/s03/sentinel-03.hwdef.dat` L27–36) gives each port a role:
+  - USART1, the console (SERIAL0, where the run injects MAVLink);
+  - USART2, CRSF RC input (SERIAL1);
+  - USART3, MAVLink2 (SERIAL2).
+
+  All three command the vehicle, so their registers and their DMAMUX1 routes (C1, C2, C7) are on the command-link path. This was read after the adversarial pass. It moves no family across the line: USART2/3 are guarded, and the DMAMUX1 slice takes every channel.
 
 ### 1.4 Predictions against the measurement
 
@@ -194,8 +200,8 @@ Of the 610 guarded rows (corrected by the adversarial pass, D2-1: the first join
 | motor | 4 (`CCR1`–`CCR4`, modeled) | 4 (`CR2`, `DIER`, `PSC`, `ARR`) | 0 | 1 (`TIMx_SR`: `BIF`/`B2IF` are `tag` with `allowed: any`; §5 F3) |
 | clock tree | 6 | 13 | **2: PWR `CPUCR` (0x10) and `D3CR` (0x18, `VOS` = 11)** | 0 |
 | sensor bus | 34 | 3 | **5: DMAMUX1 C3 (request 9, ADC1), C4 (38, SPI1 TX), C6 (40, SPI2 TX), C10 (39, SPI2 RX), C11 (37, SPI1 RX)** | 0 |
-| command link | 6 | 2 | **2: DMAMUX1 C0 (41, USART1 RX), C5 (42, USART1 TX)** | 0 |
-| other | 70 | 16 (six DMA2 stream registers written 0 while locked) | 85 (`nvic` 43, `rtc` 19, `timer5` 8, BDMA 7 written 0 while locked, `watchdog` 3, DMAMUX1 C1/C2/C7 for USART2/3, `dwt`, `rng`) | 0 |
+| command link | 15 | 5 | **5: DMAMUX1 C0 (41, USART1 RX), C5 (42, USART1 TX), C1 (43, USART2 RX), C2 (45, USART3 RX), C7 (46, USART3 TX)** | 0 |
+| other | 61 | 13 (six DMA2 stream registers written 0 while locked, among them) | 82 (`nvic` 43, `rtc` 19, `timer5` 8, BDMA 7 written 0 while locked, `watchdog` 3, `dwt`, `rng`) | 0 |
 
 - The request ids come from the armed run's own `CxCR` writes, read against RM0433 Rev 9 Table 121 (pp698–699; p604).
 - **Outside every model:** DMAMUX2 `C7CR` (ADC3's route to BDMA), DBGMCU and the AXI GPV are written with no peripheral to answer (§1.1). DMAMUX2 is not even an inherited model: the platform has none.
@@ -213,17 +219,19 @@ Of the 610 guarded rows (corrected by the adversarial pass, D2-1: the first join
 | 1 | 1 | clock tree (TIM1's `LPEN` on motor) | RCC enables and kernel-clock selectors | 36 + 5 | 23 | 18 | **0** | none |
 | 2 | 2 | motor, sensor bus | GPIO alternate-function routing and mode | 44 + 0 | 44 | 0 | **0** | none |
 | 3 | 3 | motor | TIM1 | 67 + 9 | 57 | 18 | **0** (one ledger-form finding, §5 F3) | none |
-| 4 | 3 | sensor bus, command link | DMA1/DMA2 streams (SPI1/2, ADC1, USART1) | 59 + 21 | 37 | 43 | **0** | none |
-| 5 | 3 | sensor bus, command link | **DMAMUX1 routes** | 0 + 7 | 0 | 0 | **7 channels: C3, C4, C6, C10, C11 (sensor); C0, C5 (command)** | **a new DMAMUX1 guard,** one slice for all 16 channels. It answers `1303` §1.1's row: writes with the clocks off, sub-word writes dropped, sync/event/generator fields as tags, a `CxCR` rewrite under a live stream unseen |
+| 4 | 3 | sensor bus, command link | DMA1/DMA2 streams | 85 + 30 | 52 | 63 | **0** | none |
+| 5 | 3 | sensor bus, command link | **DMAMUX1 routes** | 0 + 10 | 0 | 0 | **10 channels: C3, C4, C6, C10, C11 (ADC1, SPI1/2); C0, C1, C2, C5, C7 (USART1–3)** | **a new DMAMUX1 guard,** one slice for all 16 channels. It answers `1303` §1.1's row: writes with the clocks off, sub-word writes dropped, sync/event/generator fields as tags, a `CxCR` rewrite under a live stream unseen |
 | 6 | 4a | clock tree | RCC other (PLLs, prescalers, `BDCR`), `FLASH.ACR` | 54 + 14 | 44 | 24 | **0** | none |
 | 7 | 4b | clock tree | **PWR** | 3 + 2 | 0 | 0 | **5: `CR1` (`DBP`, p305), `CR2`, `CR3` (`LDOEN`, `USB33DEN`, p308), `CPUCR`, `D3CR` (`VOS` = 11, Scale 1, p310)** | **a new PWR guard** over the stock canned stub (`stm32h7.repl` L728, "a stock Python script's fixed answers"): `VOS`, `LDOEN`/`SCUEN`, `ACTVOSRDY`/`VOSRDY`. One slice |
 | 8 | 4b | motor, sensor bus | GPIO other (`OTYPER`, `OSPEEDR`, `PUPDR`) | 64 + 0 | 41 | 23 | **0** | none |
 | 9 | 4b | sensor bus | SPI1/2, I2C1/2, ADC1 | 138 + 22 | 121 | 39 | **0** | none |
-| 10 | 4b | command link | USART1 | 54 + 2 | 29 | 27 | **0** | none |
+| 10 | 4b | command link | USART1–USART3 | 162 + 5 | 87 | 80 | **0** | none |
+
+- The table is printed by `reader/cut.py` from the two state tables (`data/cut.txt`).
 
 - **The line, recommended:** every row and register the armed run reaches on the four paths is above it.
 - **Below it, waiting for Phase 4's bench:**
-  - what the armed run reaches on no named path: TIM5 (ChibiOS's tick, 5 rows and 8 registers), `nvic` (45), `rtc` (19), the watchdog (3), BDMA and DMAMUX2 (ADC3's internal channels; DMAMUX2 has no model at all), `dwt`, DBGMCU, the AXI GPV, `rng`, and USART2/3's DMAMUX routes (C1, C2, C7, which the DMAMUX1 slice takes anyway);
+  - what the armed run reaches on no named path: TIM5 (ChibiOS's tick, 5 rows and 8 registers), `nvic` (45), `rtc` (19), the watchdog (3), BDMA and DMAMUX2 (ADC3's internal channels; DMAMUX2 has no model at all), `dwt`, DBGMCU, the AXI GPV, `rng`;
   - what only the generated bring-up boards reach: TIM2's 54 rows;
   - DMA2 stream 1 (5 s window only);
   - `i2c4`, `lpuart1`, `spi4`, and every unwritten timer;
@@ -235,7 +243,7 @@ Of the 610 guarded rows (corrected by the adversarial pass, D2-1: the first join
 - **Why there:** it is the first measured window in which ArduPilot flies: armed, commanding its motors, reading its sensors over DMA, and answering MAVLink.
 - Above the line, everything but two families is guarded or acknowledged on `main` today. So the gate's clause 1 closes with **two slices**:
   - **PWR:** it is on the clock tree. Its stub answers every voltage-scale change "ready" at once, and the flash guard already "decides at VOS1 where VOS is unknown" (`1304`'s ruling).
-  - **DMAMUX1:** every DMA stream the armed run uses for its IMU, barometer, battery and MAVLink is routed through it. The DMA guard checks the route only at each stream's enable.
+  - **DMAMUX1:** every DMA stream the armed run uses for its IMU, barometer, battery, MAVLink and RC input is routed through it. The DMA guard checks the route only at each stream's enable.
 - **Rows below it** are on paths the armed run does not take, or takes outside the four.
 
 **The cautious reader's alternative: the same cut plus TIM5.**
@@ -246,11 +254,11 @@ Of the 610 guarded rows (corrected by the adversarial pass, D2-1: the first join
 
 ## 4. Phase 1's exit gate, clause by clause, at `main` `39e51af`
 
-**CI at `main`'s head:** run 45774342008 (push of `39e51af`, so `--all`): route, ten shards, budget, budget-tests and `ci`, all success (07:18–07:41Z). Every case and mutant below ran in it.
+**CI at `main`'s head:** run 45774342008 (push of `39e51af`, so `--all`): route, ten shards, budget, budget-tests and `ci`, all success (07:18–07:41Z). Its `ci` job's aggregate: `970 expected (433 cases, 537 mutants), 970 ran across 10 shards, 0 failures`, so every case cited below ran in it.
 
 | Clause | Met? | The job, case or test that proves it | What it does not prove |
 |---|---|---|---|
-| **1.** every path up to the cut refuses by name, complete record; a planted firmware hits each | **Not met: two families open** (PWR, 5; DMAMUX1, 7) up to the recommended cut | Guarded rows: each guard's clause-6 sweep (§2.3) and its named cases. Acknowledged rows: the ledger by name (`RUL-17`) | (a) **"Refuses by name"** is met by a refusal for a disallowed value, by modeling for a modeled field, and by a name in the ledger for an acknowledged one. A strict reading (each of the 253 acknowledged rows must refuse) is not met, and is the cut's cautious form. (b) **"A planted firmware"**: the sweeps are monitor writes (`pc: none`), not firmware; the guard's rule does not read the PC. (c) 165 guarded rows rest on a sibling instance's case (§2.3) |
+| **1.** every path up to the cut refuses by name, complete record; a planted firmware hits each | **Not met: two families open** (PWR, 5; DMAMUX1, 10) up to the recommended cut | Guarded rows: each guard's clause-6 sweep (§2.3) and its named cases. Acknowledged rows: the ledger by name (`RUL-17`) | (a) **"Refuses by name"** is met by a refusal for a disallowed value, by modeling for a modeled field, and by a name in the ledger for an acknowledged one. A strict reading (each of the 253 acknowledged rows must refuse) is not met, and is the cut's cautious form. (b) **"A planted firmware"**: the sweeps are monitor writes (`pc: none`), not firmware; the guard's rule does not read the PC. (c) 165 guarded rows rest on a sibling instance's case (§2.3) |
 | **2.** same build, byte-identical ledgers; any overlay file changes the model hash | **Met** | `reproducible` (two builds, two checkouts, umasks 022/077, mtimes 2000/2030: tarball, manifest, overlay, ledger identical); `identity` (one byte in a model file, the platform's comment, the bench data: each a new release hash); `adv-release` | — |
 | **3.** removing a guard, crashing, or a refusal: a non-pass at the runner **and** from a records-only check, in both framings, the console fixture included | **Partly. Unproven cells:** removed and crash in **console** framing; crash at the **runner** | Refusal: `modf` (runner 3), `unit` `the_console_fixture_is_read_in_both_framings` (committed `aet-7dec1d7b` console and `logFile` fixtures: Refused). Removed: `adv-removed` (asserts the runner's exit 1 only); the records check on a run with no guard is `stock-forge`'s `PROBLEM spi1: no load witness` (`logFile`). Crash: `crash` (check on `logFile`: no end record). Missing witness/end: `unit` `missing_witness_or_end_fails`, `logFile` host-stamp framing only | No console-framed case for a removed guard or a crash: the committed fixtures hold a refusal, a `TVI-LOAD`, a mode-less witness and forgeries. No runner case kills the simulator (`adv-noend-error` stops a script, and may still dispose). **A fix:** two console-framed fixtures and a runner kill case |
 | **4.** the MODF scar firmware refuses where stock Renode passes; condition text matches RM0433 Rev 9 by page | **Partly: the refusal is met; the stock half passes for another reason; the page match is not checked in CI** | `modf`: REFUSED (3), `TVI-SPI-MODF`, `predicted-fault`, citing §50.5.2 p2184. `stock-modf`: exit 1 | Measured here (`TVIBURI_TESTS="modf stock-modf"`): stock Renode runs the firmware past the faulting write (`after-marker=0xAF7E0002`, Renode exit 0), but `stock-modf` asserts only exit 1, which comes from "no load witness". A stock Renode that faulted would pass it too. The page match is hand-checked (p2184: "SSI bit … pulled low", read again here), not checked in CI. **A fix:** assert the after-marker |
@@ -264,11 +272,12 @@ Of the 610 guarded rows (corrected by the adversarial pass, D2-1: the first join
 
 ## 5. Findings
 
-- **F1, the ledger over-claims guarding for two classes** (invariant 2: "an inherited model the ledger presents as audited").
-  - The class map (`tools/tviburi-release/pins.tsv`) names no instances for `SPI.STM32H7_SPI` or `Timers.STM32_Timer`. So the ledger's `model` rows say `guarded_by` the guard for `spi4` and for `timer2`–`timer7` and `timer12`–`timer17`.
-  - The replay binds every one of them to the stock type: no restate file declares them.
-  - A consumer reading the ledger, or applying the class map to every instance of the type, would take TIM2–TIM5 as guarded.
-  - **A fix:** the instance column, as the other seven classes have.
+- **F1, the release's class map guards instances Tviburi has never run guarded.**
+  - The class map (`tools/tviburi-release/pins.tsv`) names no instances for `SPI.STM32H7_SPI` or `Timers.STM32_Timer`. So the release's `MANIFEST` tells a consumer to cancel and restate `spi4` and all 14 timers (`restate Timers.STM32_Timer timer2` … `timer17`) onto the guards, and the ledger's `model` rows list them as `guarded_by`.
+  - The ledger does keep them `inherited-unaudited`, so invariant 2 is not falsified. But a consumer predicting refusals from the ledger, or following the manifest, would be wrong.
+  - **Tviburi's own restate file and every replay guard only `timer1` and `timer8`** (and `spi1`/`spi2` by re-typing). No measurement has run TIM2–TIM17 or `spi4` under a guard.
+  - **Inferred, not run:** following the manifest puts ArduPilot's TIM5 under the TIM1/TIM8 allow-list. Its armed writes `ARR` = 0xFFFFFFFF and 32-bit `CCR1` values meet `TIMx_ARR.Res31_16` and `TIMx_CCR1.Res31_16`, both allowed `[0]`. So the consumer's armed run would likely refuse at ArduPilot's tick.
+  - **A fix:** state the guarded instances in the class map, and test that the manifest restates only instances a replay has run. SPI's consumer-declared instances need more than an instance column (`restated()` accepts only instances the stock chain declares).
 - **F2, the armed run's DMA `LIFCR`/`HIFCR`, USART `CR1`/`CR2`/`CR3` and TIM `CCMR` rows** are acknowledged through `stock-wrong` rows that quote their ruling (R2), not through `RUL-17`'s "inherited, unaudited (acknowledged by name)" class. **Two forms carry one meaning;** the ledger's reader must know both.
 - **F3, ledger rows whose form names no ruling:**
   - `TIMx_SR` `BIF`/`B2IF` (`tag`, `allowed: any`; reached by the armed run, written 0 only);
@@ -296,13 +305,14 @@ All in `spike/1100a/`:
 - `reader/rows.py`: the 935 rows placed;
 - `reader/join.py`: reach and state;
 - `reader/clause6.py`: clause 6 per guard.
+- `reader/cut.py`: the §3.1 table, from the two state tables.
 
 `data/`:
 - `rows.tsv`;
 - `states.tsv`: one line per row, with its evidence;
 - `arm-reach-outside.tsv` (§2.4);
 - `arm-writes.tsv` (with the writes refused at the clock lock, its last column), `arm-unmapped.tsv`, `arm-periph.tsv`;
-- `clause6.tsv`;
+- `clause6.tsv`, `cut.txt`;
 - `cmsis-regs.tsv`: `1100`'s `cmsis-regs.awk` on Aethelgard `f42a0c88`'s pinned header;
 - `aet-4400h-queue-ap-armed-sentinel-03.tsv`: Aethelgard `fa12abf4`, unchanged.
 
