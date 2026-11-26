@@ -216,7 +216,7 @@ fn stock_rows(chain: &stock::Chain, pins: &Pins) -> Vec<Row> {
         let guard = pins.classes.iter().find(|c| c.0 == ty).map(|c| c.1.as_str());
         let named = guard.and_then(|g| pins.instances.get(g));
         let (guarded, rest): (Vec<&str>, Vec<&str>) =
-            insts.iter().copied().partition(|i| guard.is_some() && named.map_or(true, |n| n.iter().any(|x| x == i)));
+            insts.iter().copied().partition(|i| named.is_some_and(|n| n.iter().any(|x| x == i)));
         let groups = if guarded.is_empty() || rest.is_empty() {
             vec![("", insts.clone(), if rest.is_empty() { guard } else { None })]
         } else {

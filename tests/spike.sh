@@ -553,8 +553,9 @@ t_verify() {
 
 t_manifest() { # TVI-WO-1203 (1): the MANIFEST restates onto a guard only an instance a committed replay has run under that guard
   pod manifest "$src" -- sh -c '/repo/scripts/build-release >/dev/null'
-  # Re-derived here, not taken from the release program: each `restate T i` line's class guard G must be declared `as "i"` (or
-  # by variable) on a top-level, uncommented `<var>: G @` entry of a model/stm32h7-*-restate.repl.
+  # belt-and-suspenders: re-derived here, not taken from the release program, so that a bug in either parser shows in the
+  # other. Each `restate T i` line's class guard G must be declared `as "i"` (or by variable) on a top-level, uncommented
+  # `<var>: G @` entry of a model/stm32h7-*-restate.repl.
   check "the release builds; each instance it restates is declared under its class's guard by a committed model/stm32h7-*-restate.repl; the timers restate only timer1 and timer8, SPI restates none and retypes the consumer's spi1 and spi2" \
     "[ \$rc = 0 ] && python3 -I - '$work/manifest/release/MANIFEST' '$src' <<'EOF'
 import glob, re, sys
