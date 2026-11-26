@@ -29,7 +29,7 @@ else
   mkdir "$src"
   git -C "$here" archive HEAD | tar -x -C "$src"
 fi
-GUARDS=$("$src/scripts/guards" "$src")   # the one guard list, from the board (scripts/guards; TVI-WO-1204 (6))
+GUARDS=$("$src/scripts/guards")   # the one guard list (scripts/guards; TVI-WO-1204 (6))
 
 fails=0
 check() { if eval "$2"; then echo "ok   $1"; else echo "FAIL $1"; fails=$((fails + 1)); fi; }

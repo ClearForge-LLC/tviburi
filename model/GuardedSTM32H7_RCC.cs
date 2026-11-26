@@ -101,12 +101,9 @@ namespace Antmicro.Renode.Peripherals.Tviburi
         // The stock entry's constructor arguments (stm32h7.repl: `systick: nvic`); the defaults are the stock model's.
         // Every property the stock entry takes is the stock model's, passed through: a consumer sets hseFrequency (or
         // csiFrequency) on this entry, never on the cancelled `rcc` (RUL-09 (b); TVI-WO-1300.rm0433.md §6.4).
-        // hseFrequency has no default (TVI-WO-1300b (4)): the guard never models an undeclared crystal, and HseFrequency stays
-        // null. The owned stock RCC is given 0 in enforcing mode, which it never runs on: TVI-RCC-HSE stops the run first. But
-        // in recorded mode with no crystal declared, the stock RCC runs on a placeholder 8 MHz so a run can continue past TVI-RCC-HSE; no guard
-        // reads it (TVI-WO-1204 (3) P2, ruled
-        // 2026-11-26T12:51Z): given 0, sys_ck on the HSE throws in the stock model (measured: "Frequency must be greater than 0"
-        // at the forwarded SW = HSE write). Every guard rule and query reads HseFrequency, never the stock model's.
+        // hseFrequency has no default (TVI-WO-1300b (4)): HseFrequency stays null, and every guard rule and query reads it. The
+        // stock RCC gets 0 in enforcing mode, where TVI-RCC-HSE stops the run first, and the header's placeholder in recorded mode:
+        // given 0 there, the forwarded SW = HSE write threw "Frequency must be greater than 0" (measured, TVI-WO-1204 (3) P2).
         public GuardedSTM32H7_RCC(IMachine machine, IHasDivisibleFrequency systick = null, ulong? hseFrequency = null,
             ulong csiFrequency = 4000000, string mode = Records.Enforcing)
         {
@@ -125,8 +122,7 @@ namespace Antmicro.Renode.Peripherals.Tviburi
         // platform declares none: a reader of it (the flash and USART guards) has no HSE frequency then.
         public ulong? HseFrequency { get; }
 
-        // The stock model's own default (STM32H7_RCC.DefaultHseFrequency, private there), given to it in recorded mode only when
-        // no crystal is declared (the constructor's comment). No guard reads it.
+        // The header's placeholder: the stock model's own default (STM32H7_RCC.DefaultHseFrequency, private there).
         private const ulong RecordedHsePlaceholder = 8000000;
         public ulong CsiFrequency { get; }
 

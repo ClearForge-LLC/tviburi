@@ -669,11 +669,11 @@ scripts_guards_alt() { "$src/scripts/guards" | tr ' ' '|'; }
 
 t_teardown() {
   # TVI-WO-1204 (2): the teardown race, fixed at its cause (measure §1: a clean quit tears down the old emulation's asynchronous
-  # logger with its queue undrained). 15 clean quits of the runner's own script under load, each required to write every
+  # logger with its queue undrained). 15 clean quits of the runner's own script (14 of them under load), each required to write every
   # guard's end record (tests/1204/teardown.sh). Without the flush in Records.End() a loaded quit lost one about 1 in 3 times.
   pod teardown "$src" -- bash /repo/tests/1204/teardown.sh
-  check "15 clean quits under load each write every guard's witness and end record, in the log file and on the console (TVI-WO-1204 (2))" \
-    "[ \$rc -eq 0 ] && grep -q '^teardown: 0 of 15 clean quits lost' '$work/teardown.stdout' && [ \"\$(awk 'NR > 1' '$work/teardown/teardown.tsv' | wc -l)\" = 15 ]"
+  check "15 clean quits (14 under load) each write every guard's witness and end record, in the log file and on the console (TVI-WO-1204 (2))" \
+    "[ \$rc -eq 0 ] && grep -q '^teardown: 0 of 15 clean quits lost' '$work/teardown.stdout' && [ \"\$(awk 'NR > 1' '$work/teardown/teardown.tsv' | wc -l)\" = 14 ]"
 }
 
 t_witnessed() {

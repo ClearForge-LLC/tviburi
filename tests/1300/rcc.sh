@@ -411,10 +411,8 @@ r = [json.loads(l.split(\" rcc: \", 1)[1]) for l in open(sys.argv[1]) if \" rcc:
 sys.exit(0 if [(x[\"rule\"], x[\"access\"][\"value\"]) for x in r] == [(\"TVI-RCC-HSE\", \"0x10003\"), (\"TVI-RCC-FIELD\", \"0x10003\")] else 1)
 ' '$work/recordedtwo/renode-log.txt'" ;;
   hsesw)
-    # TVI-WO-1204 (3) P2, ruled 2026-11-26T12:51Z: no crystal declared, HSEON then SW = HSE, from the monitor, in both modes. Recorded:
-    # TVI-RCC-HSE is recorded and the run goes on, the stock RCC on its placeholder 8 MHz (model/Refusal.cs's one exception), to the
-    # marker and an end; never a pass. Before the placeholder the forwarded SW = HSE threw ("Frequency must be greater than 0").
-    # Enforcing: TVI-RCC-HSE refuses at the HSEON write, as hse-none's firmware shows, and nothing throws.
+    # TVI-WO-1204 (3) P2: no crystal, HSEON then SW = HSE, in both modes (model/Refusal.cs's one exception). Before the placeholder
+    # the recorded run threw at the forwarded SW = HSE write ("Frequency must be greater than 0").
     hse=('cpu IsHalted true' 'sysbus WriteDoubleWord 0x58024400 0x00010001' 'sysbus WriteDoubleWord 0x58024410 0x2' 'emulation RunFor "0.00001"'
       'echo "TVIBURI-MARK-AFTER"' 'sysbus ReadDoubleWord 0x58024410')
     PLATFORM_SED='/^    hseFrequency: 8000000$/d; /^tviburiRcc:/,/mode:/ s/mode: "enforcing"/mode: "recorded"/' run_case hsesw - "${hse[@]}"
