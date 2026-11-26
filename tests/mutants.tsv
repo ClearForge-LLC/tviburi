@@ -371,7 +371,7 @@ US47-heldClear	model/GuardedSTM32F7_USART.cs	brrHeld &= (word & 0xFFFF) < 16;	(e
 US48-overrunFifo	model/GuardedSTM32F7_USART.cs	if((cr1 & FifoenBit) != 0 || (inner.ReadDoubleWord(IsrOffset) & RxfneBit) == 0)	if((inner.ReadDoubleWord(IsrOffset) & RxfneBit) == 0)	usart-overrun
 US49-overrunRxne	model/GuardedSTM32F7_USART.cs	if((cr1 & FifoenBit) != 0 || (inner.ReadDoubleWord(IsrOffset) & RxfneBit) == 0)	if((cr1 & FifoenBit) != 0)	usart-overrun
 US50-idleStart	model/GuardedSTM32F7_USART.cs	refused |= KernelHz(out var why) == null && RefuseIdle(	refused |= KernelHz(out var why) == null && false && RefuseIdle(	usart-idlenorule
-US51-idleFrame	model/GuardedSTM32F7_USART.cs	RefuseIdle(what, hz == null ?	if(false) RefuseIdle(what, hz == null ?	usart-idlenone
+US51-idleFrame	model/GuardedSTM32F7_USART.cs	RefuseIdle(what, hz == null ?	if(false) RefuseIdle(what, hz == null ?	usart-hzbyte
 US61-benchU2	model/bench-checks.tsv	Tviburi.GuardedSTM32F7_USART\tU2\tTVI-USART-BRR	Tviburi.GuardedSTM32F7_USART\tU3\tTVI-USART-BRR	usart-ledger
 US62-pllPortReset	model/GuardedSTM32F7_USART.cs	                idle = brrHeld = false;	                idle = brrHeld = false; pllUntrusted = new bool[3];	usart-idlenone
 RB01-usartWatched	model/GuardedSTM32H7_RCC.cs	.Concat(watched.Where(w => w.Value.IsRunning).Select(w => w.Key))	.Concat(new string[0])	rcc-usart-lost

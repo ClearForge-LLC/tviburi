@@ -11,9 +11,9 @@ set -euo pipefail
 
 here=$(cd "$(dirname "$0")/../.." && pwd)
 IMAGE=$(sed -n 's/^IMAGE=//p' "$here/tests/spike.sh")
-CASES="config m1ue over8ue psue psoff stopue reinit reinitstop disable same ap width tdrbyte read field nine kernel clock rxoff idle idleframe idlere dmarx fields ledger registrations recorded reset config2 regen brr0 brr8 brrheld overrun idlekernel idlenorule idlenone idlehse hzcsi hzsyscsi hzsyshse hzvcol hzwide hzdivr hzpllon hzvcoh hzrge hzpll3q hzport hzcsiref hzcfgon"
+CASES="config m1ue over8ue psue psoff stopue reinit reinitstop disable same ap width tdrbyte read field nine kernel clock rxoff idle idleframe idlere dmarx fields ledger registrations recorded reset config2 regen brr0 brr8 brrheld overrun idlekernel idlenorule idlenone idlehse hzcsi hzsyscsi hzsyshse hzvcol hzwide hzdivr hzpllon hzvcoh hzrge hzpll3q hzport hzcsiref hzcfgon hzbyte"
 GUARDS="spi1 rcc gpioPortA gpioPortB gpioPortC gpioPortD gpioPortE gpioPortF gpioPortG gpioPortH gpioPortI gpioPortJ gpioPortK timer1 timer8 dma1 dma2 flashController usart1 usart2 usart3 uart4 uart5 usart6 uart7 uart8 i2c1 i2c2 i2c3 adcM1S2 adc3"
-MONITOR="clock rxoff idle idleframe idlere dmarx fields ledger registrations recorded reset config2 regen brrheld overrun idlekernel idlenone idlehse hzcsi hzsyscsi hzsyshse hzvcol hzwide hzport hzpllon hzcsiref"
+MONITOR="clock rxoff idle idleframe idlere dmarx fields ledger registrations recorded reset config2 regen brrheld overrun idlekernel idlenone idlehse hzcsi hzsyscsi hzsyshse hzvcol hzwide hzport hzpllon hzcsiref hzbyte"
 PATHS=$(for c in $CASES; do case " $MONITOR " in *" $c "*) ;; *) printf '"%s",' "$c" ;; esac; done | sed 's/,$//')
 PATHS="$PATHS,\"hzcsi\",\"hzsyscsi\",\"hzsyshse\",\"hzvcol\",\"hzwide\",\"hzpllon\",\"hzcsiref\""   # TVI-WO-1300c: firmware run with monitor lines after it
 scratch=${TVIBURI_SCRATCH:-$HOME/.cache/tviburi}
@@ -378,6 +378,15 @@ sys.exit(0 if ok else 1)
     esac
     check "$t: the RCC guard's KernelHz has no rule ($w), so USART1's start refuses TVI-USART-IDLE, unmodeled (TVI-WO-1300c Q1, Q2, Q3, Q10)$([ $t = hzpllon ] && echo '; the RCC, recorded, records TVI-RCC-PLL for the change')" \
       "$([ $t = hzpllon ] && echo "grep -q '\"tviburi\":\"would-refuse\".*TVI-RCC-PLL' '$work/hzpllon/renode-log.txt' && [ \$rc = 1 -o \$rc = 3 ] && logged hzpllon" || echo "refuses $t") $([ $t = hzpllon ] && echo "'len(recs) >= 1 and recs[0][\"rule\"] == \"TVI-USART-IDLE\" and \"$w\" in recs[0][\"bit\"]'" || echo "TVI-USART-IDLE unmodeled '\"$w\" in r[\"bit\"]'")" ;;
+  hzbyte)
+    # TVI-WO-1300c: a byte with no rule for its frame (FrameTime's TVI-USART-IDLE, at the byte; once idlenone's csi_ker_ck, which the
+    # union now times): usart1 started on rcc_pclk2, then PLL3 on and USART16SEL = 010 under the running port (a clock on both inputs,
+    # so the mux switches, p371, and TVI-RCC-CLOCK has nothing lost), then a byte: pll3_q_ck has no rule on a USART (Q10). Recorded.
+    PLATFORM_SED='/^tviburiUsart1:$/{n;s/enforcing/recorded/}' run_case hzbyte - 'cpu IsHalted true' "$clk" \
+      'sysbus WriteDoubleWord 0x4001100C 0xC8' 'sysbus WriteDoubleWord 0x40011000 0x2000000D' 'sysbus WriteDoubleWord 0x58024400 0x10000001' \
+      'sysbus WriteDoubleWord 0x58024454 0x10' 'sysbus.usart1 WriteChar 0x41' 'emulation RunFor "0.0001"'
+    check "hzbyte: a byte after the source moved to pll3_q_ck under the running port: TVI-USART-IDLE, unmodeled, at the byte (RDR, its value), no rule on a USART (TVI-WO-1300c Q10), and nothing else" \
+      "[ \$rc = 1 ] && logged hzbyte 'len(recs) == 1 and recs[0][\"rule\"] == \"TVI-USART-IDLE\" and \"(pll3_q_ck): no rule for its frequency on a USART\" in recs[0][\"bit\"] and recs[0][\"access\"][\"offset\"] == \"0x24\" and recs[0][\"access\"][\"value\"] == \"0x41\"'" ;;
   hzport)
     # Q6: a port outside the RCC guard's query (usart6) answers "no rule": recorded, USART6EN (the RCC's would-refuse) and a start with RE.
     PLATFORM_SED='/^tviburiRcc:$/,/mode:/s/enforcing/recorded/; /^tviburiUsart6:$/{n;s/enforcing/recorded/}' run_case hzport - 'cpu IsHalted true' \
