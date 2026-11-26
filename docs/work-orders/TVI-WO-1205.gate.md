@@ -148,6 +148,10 @@ As amended and ratified 2026-11-26: a planted monitor write proves a path whose 
 | **Records-only check, console framing (Aethelgard's committed `renode.config`)** | `removed-console` (only spi1's witness and end missing) | `crash-console` (witness seen before the kill, exit 137) | `unit` `the_console_fixture_is_read_in_both_framings` (the committed `aet-7dec1d7b` console holds a refusal) |
 
 - **Mutants** (`unit`, the check tool's own tests, run in CI): `R06-endRequired`, `R07-witnessRequired`, `R16-consoleCr`, `R17-virtualStamp`, `R19-unframedRecord`. The runner: `S01-refusedExit`, `S04-scriptEnd`, `S05-afterMarker`.
+- **Per cell** (granted 18:56Z), each naming exactly one cell it kills:
+  - `R20`, `R21`, `R22`: R06 on `crash`, `crash-console`, `crash-runner`;
+  - `R24`, `R25`: R07 on `removed-console`, `stock-forge`.
+  - **`adv-removed` has none:** it rests on two independent lines in two files, the check's witness and end requirement and the runner's after-marker. Each line has its own mutant (R06/R07; `S05` by `nomark`). [the architect's ruling]
 - **The skeptic:**
   - **A timeout passed off as a crash.** `crash-console` requires the witness to be seen before the kill, and the exit to be 137, not a timeout.
   - **A check that reads only the log file.** `removed-console` and `crash-console` read the console in Aethelgard's framing.
@@ -179,6 +183,7 @@ As amended and ratified 2026-11-26: a planted monitor write proves a path whose 
   - `adv-hook`: a monitor write hook doesn't displace the guard.
   - `unit` `forged_records_on_the_console_are_not_records` (the console fixture).
 - **Mutants:** `R02-sourceFilter`, `R13-unnamedSource` and `R19-unframedRecord` (`unit`).
+- **Per cell** (18:56Z): `R26` (R02 on `forge`), `R28` (R02 on `adv-spray`), `R25` (R07 on `stock-forge`), and `R33` on `adv-hook`, the check's REFUSED verdict line, on which its rc 3 rests. R27 and R29–R31 were tried and survived: those cells rest on the lines above, not on R19's.
 - **The skeptic:** a forgery through a peripheral's own log line. That is `adv-spray`: the bytes land under `spi1`'s name, and the check still refuses them because they aren't a record's framing.
 
 ## 6. Clause 6: every field outside its allow-list refuses `unmodeled`, by name
@@ -209,4 +214,5 @@ As amended and ratified 2026-11-26: a planted monitor write proves a path whose 
   - `T02-recordedKind` and `T03-witnessMode`;
   - `RM01`, `RM02`, `RM05` (`1204`'s every-rule contract);
   - `T01-modeChecked` (`load`).
+  - `R32` (R12 on `adv-recorded`, 18:56Z).
 - **The skeptic:** a recorded run with nothing to record. `adv-recorded`: the witness's mode alone fails the run.
