@@ -24,7 +24,7 @@ How each clause is judged:
 **Summary:**
 - **Rows:** 935, the same set as `1100a`: guarded 610, acknowledged 253, inherited 72, unplaced 0.
 - **The armed run:** arms; 0 records.
-- **The table:** `spike/1205/data/cut-main.txt`.
+- **The table:** `spike/1205/data/main-63fe557/cut.txt`.
 
 **Above the cut:**
 

@@ -1,5 +1,6 @@
-"""TVI-WO-1205: TVI-WO-1100a's join (spike/1100a/reader/join.py), re-run on a later tree. Its one change: Aethelgard
-4400h's armed queue is read from spike/1100a/data, where 1100a committed it. Step 2 of 1100a: each placed row's reach and its state on the tree whose release ran.
+"""TVI-WO-1205: TVI-WO-1100a's join (spike/1100a/reader/join.py), re-run on a later tree. Its changes: Aethelgard
+4400h's armed queue is read from spike/1100a/data, where 1100a committed it; and TVI-WO-1308's DMAMUX1 and PWR guards
+(their sweeps, and DMAMUX's channel and generator rows judged at C0's and RG0's offsets). Step 2 of 1100a: each placed row's reach and its state on the tree whose release ran.
 Usage: python3 -I join.py DATA REPO LEDGER CASES OUT_ROWS OUT_REACH
   DATA      spike/1100a/data: rows.tsv, arm-writes.tsv, arm-periph.tsv, aet-4400h-queue-ap-armed-sentinel-03.tsv
   REPO      the tree (spike/1100/data/joined.tsv, spike/1150/data/writes-ap.tsv, model/*.cs, tests/1300/fields.resc,
@@ -58,9 +59,11 @@ TEST = {'GuardedSTM32H7_SPI': ('spi1', 'tests/spike.sh fields'), 'GuardedSTM32_T
         'GuardedSTM32DMA': ('dma1', 'tests/1303/dma.sh fields'), 'GuardedSTM32F7_USART': ('usart1', 'tests/1305/usart.sh fields'),
         'GuardedSTM32H7_Flash': ('flashController', 'tests/1304/flash.sh fields'), 'GuardedSTM32H7_RCC': ('rcc', 'tests/1300/rcc.sh fields'),
         'GuardedSTM32_GPIOPort': ('gpioPortA', 'tests/1301/gpio.sh fields'), 'GuardedSTM32F7_I2C': ('i2c1', 'tests/1306/i2c.sh fields'),
-        'GuardedSTM32H7_ADC': ('adcM1S2', 'tests/1307/adc.sh fields')}
+        'GuardedSTM32H7_ADC': ('adcM1S2', 'tests/1307/adc.sh fields'),
+        # TVI-WO-1308's two guards (1205's second change): their sweeps are ledger-driven, as the five above.
+        'GuardedSTM32H7_DMAMUX': ('dmamux1', 'tests/1308/dmamux.sh fields'), 'GuardedSTM32H7_PWR': ('pwr', 'tests/1308/pwr.sh fields')}
 refuse = collections.defaultdict(dict)
-for g in ('GuardedSTM32H7_SPI', 'GuardedSTM32_Timer', 'GuardedSTM32DMA', 'GuardedSTM32F7_USART', 'GuardedSTM32H7_Flash'):
+for g in ('GuardedSTM32H7_SPI', 'GuardedSTM32_Timer', 'GuardedSTM32DMA', 'GuardedSTM32F7_USART', 'GuardedSTM32H7_Flash', 'GuardedSTM32H7_DMAMUX', 'GuardedSTM32H7_PWR'):
     for l in open(os.path.join(cases_dir, 'Tviburi.%s.txt' % g)):
         if l.startswith('# CASE refuse '):
             _, _, _, name, off, val = l.split()
@@ -79,6 +82,9 @@ def ledger_offset(g, inst, off):
     if g == 'GuardedSTM32DMA' and 0x10 <= off < 0xD0: return 0x10 + (off - 0x10) % 0x18, 'stream %d' % ((off - 0x10) // 0x18)
     if g == 'GuardedSTM32H7_ADC' and off < 0x300: return off & 0xFF, ('ADC2' if inst == 'adcM1S2' and off >= 0x100 else None)
     if g == 'GuardedSTM32H7_Flash' and off in (0x100, 0x11C): return off - 0x100, 'alias'
+    # TVI-WO-1308: every CxCR is judged by C0's rows (0x000), every RGxCR by RG0's (0x100) (GuardedSTM32H7_DMAMUX.cs L375).
+    if g == 'GuardedSTM32H7_DMAMUX' and off < 0x40: return 0x000, 'channel %d' % (off // 4)
+    if g == 'GuardedSTM32H7_DMAMUX' and 0x100 <= off < 0x120: return 0x100, 'generator %d' % ((off - 0x100) // 4)
     return off, None
 
 # The path a register serves (§0.5), from the armed run's own DMAMUX1 routes (RM0433 Rev 9 Table 121, pp698-699).
@@ -152,7 +158,9 @@ def state_of(inst, off, lsb, width, mask=None):
                 ev, sc = '%s; offset 0x4C answers TVI-TIM-DMAR first' % loc, 'masked'
             elif c:
                 tinst, tname = TEST[ty]
-                sc = 'own' if inst == tinst and not note else ('stream 0' if note and note.startswith('stream') and note != 'stream 0' else ('sibling ' + tinst if inst != tinst else 'own'))
+                sc = 'own' if inst == tinst and not note else ('stream 0' if note and note.startswith('stream') and note != 'stream 0' else
+                    ('channel 0' if note and note.startswith('channel') and note != 'channel 0' else
+                    ('generator 0' if note and note.startswith('generator') and note != 'generator 0' else ('sibling ' + tinst if inst != tinst else 'own'))))
                 if note == 'ADC2': sc = 'ADC1 half of ' + tinst
                 ev = '%s%s; %s: %s' % ('modeled, other values refuse: ' if r['state'] == 'guard' else '', loc, tname, c)
             else:
