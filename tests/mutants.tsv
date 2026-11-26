@@ -637,3 +637,6 @@ RM04-hsePlaceholder	model/GuardedSTM32H7_RCC.cs	(mode == Records.RecordedMode ? 
 I264-recNackStopf	model/GuardedSTM32F7_I2C.cs	                            nackStopf = true;\n	(empty)	i2c-recnack
 RM05-spiKernelEvery	model/GuardedSTM32H7_SPI.cs	fired |= records.Evaluates(fired) && starts && RefusedKernel(value);	fired |= !fired && starts && RefusedKernel(value);	recorded
 PW38-recordedEveryRule	model/GuardedSTM32H7_RCC.cs	            fired |= records.Evaluates(fired) && RefusedClockLoss(offset, b, value);	            fired |= !fired && RefusedClockLoss(offset, b, value);	pwr-bothrec
+# TVI-WO-2100 (Q25; ruled 2026-11-26T18:38Z): the release's assemblies' sha256s, one mutant per check.
+RA01-asmSha	tools/tviburi-release/src/main.rs	        if got != *pin {	        if false {	adv-release
+RA02-buildLineSha	tools/tviburi-release/src/main.rs	m += &format!("build {asm} {b} {sha}\\n");	m += &format!("build {asm} {b}\\n");	manifest

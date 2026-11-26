@@ -5,8 +5,9 @@
 //!         Tviburi.cs                 the overlay as one C# file (overlay.rs): the body, then the template filled
 //!                                    with the release hash;
 //!         TviburiRelease.cs.template the release constant's template;
-//!         MANIFEST                   the build strings, the stock pins, the class map, the sha256 of every source
-//!                                    and released file, and the two excluded files with how each is checked.
+//!         MANIFEST                   the build strings with each assembly's sha256 (checked against <renode-root>),
+//!                                    the stock pins, the class map, the sha256 of every source and released file,
+//!                                    and the two excluded files with how each is checked.
 //!                                    The release hash is the sha256 of its bytes;
 //!         LEDGER.jsonl               the gap ledger, whose first line names the release hash;
 //!         tviburi-release.tar        those four files, with fixed order and metadata.
@@ -46,7 +47,9 @@ const LEDGER: &str = "LEDGER.jsonl";
 const TARBALL: &str = "tviburi-release.tar";
 const TOOL: &str = "tools/tviburi-release";
 const BENCH: &str = "model/bench-checks.tsv";
-const MANIFEST_FORMAT: &str = "tviburi-release-manifest 1";
+/// 2 since TVI-WO-2100 (Q25): a `build` line carries its assembly's sha256 after the string, so a format-1 reader taking
+/// the rest of the line as the string would misread it.
+const MANIFEST_FORMAT: &str = "tviburi-release-manifest 2";
 /// The committed replay (TVI-WO-1203 (1)): it loads every restatement and re-types the consumer's instances; a release
 /// source, since the release reads it.
 const REPLAY: &str = "tests/1301/replay-1301.sh";
@@ -55,7 +58,8 @@ const REPLAY: &str = "tests/1301/replay-1301.sh";
 const FIXTURE: &str = "tests/1301/fixtures/aet-1c32c8ea-ardupilot/varlib";
 
 struct Pins {
-    builds: Vec<(String, String)>,
+    /// (assembly, build string, sha256)
+    builds: Vec<(String, String, String)>,
     stock: Vec<stock::Pin>,
     /// (stock type, guard type)
     classes: Vec<(String, String)>,
@@ -64,6 +68,11 @@ struct Pins {
     instances: BTreeMap<String, Vec<String>>,
     /// A class row's fifth column: the consumer's own instances it retypes (TVI-WO-1203 (1); `-` for none).
     consumer: BTreeMap<String, Vec<String>>,
+}
+
+/// 64 lowercase hex digits.
+fn hex64(h: &str) -> bool {
+    h.len() == 64 && h.bytes().all(|b| b.is_ascii_hexdigit() && !b.is_ascii_uppercase())
 }
 
 /// Tab-separated rows of `min` to `max` non-empty fields; `#` lines are comments.
@@ -88,12 +97,17 @@ fn pins(repo: &Path) -> Result<Pins, String> {
     let src = Source { path: path.clone(), bytes: fs::read(repo.join(&path)).map_err(|e| format!("{path}: {e}"))? };
     let mut p = Pins { builds: vec![], stock: vec![], classes: vec![], instances: BTreeMap::new(), consumer: BTreeMap::new() };
     for f in tsv(&path, overlay::text(&src)?, 3, 5)? {
-        if f.len() > 3 && f[0] != "class" {
-            return Err(format!("{path}: only a class row takes a fourth and fifth column (its instances): {}", f.join(" ")));
+        let width = match f[0] {
+            "build" => 4,
+            "class" => 5,
+            _ => 3,
+        };
+        if f.len() != width && f[0] != "class" {
+            return Err(format!("{path}: a {} row of {} fields, not {width}: {}", f[0], f.len(), f.join(" ")));
         }
         match f[0] {
-            "build" => p.builds.push((f[1].into(), f[2].into())),
-            "stock" if f[1].len() == 64 && f[1].bytes().all(|b| b.is_ascii_hexdigit() && !b.is_ascii_uppercase()) => {
+            "build" if hex64(f[3]) => p.builds.push((f[1].into(), f[2].into(), f[3].into())),
+            "stock" if hex64(f[1]) => {
                 p.stock.push(stock::Pin { sha256: f[1].into(), path: f[2].into() })
             }
             "class" => {
@@ -465,8 +479,21 @@ fn bench_rows(src: &Source, pins: &Pins) -> Result<Vec<Row>, String> {
     Ok(rows)
 }
 
+/// The assembly a `build` row names, under the Renode root.
+fn assembly(asm: &str) -> &'static str {
+    if asm == "renode" { "Renode.dll" } else { "Infrastructure.dll" }
+}
+
 fn build(repo: &Path, renode: &Path, out: &Path) -> Result<(String, String), String> {
     let pins = pins(repo)?;
+    // TVI-WO-2100 Q25: a release is built only against the assemblies its `build` rows name, by sha256.
+    for (asm, _, pin) in &pins.builds {
+        let file = assembly(asm);
+        let got = sha256::hex(&fs::read(renode.join(file)).map_err(|e| format!("{file}: {e}"))?);
+        if got != *pin {
+            return Err(format!("{file} is sha256 {got}, not the pinned {pin} (pins.tsv `build {asm}`): a release is built only against the assemblies it names"));
+        }
+    }
     let model_files = overlay::regular_files(repo, "model")?;
     let models = overlay::models(&model_files)?;
     let template_path = format!("{TOOL}/{TEMPLATE}");
@@ -524,8 +551,8 @@ fn build(repo: &Path, renode: &Path, out: &Path) -> Result<(String, String), Str
 
     let mut m = format!("{MANIFEST_FORMAT}\n");
     m += "sources every file the release reads is a source line, its generator included, so that one release hash names one overlay and one ledger (northstar invariant 3)\n";
-    for (asm, b) in &pins.builds {
-        m += &format!("build {asm} {b}\n");
+    for (asm, b, sha) in &pins.builds {
+        m += &format!("build {asm} {b} {sha}\n");
     }
     for p in &pins.stock {
         m += &format!("stock {} {}\n", p.sha256, p.path);

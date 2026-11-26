@@ -570,6 +570,11 @@ t_manifest() { # TVI-WO-1203 (1): the MANIFEST restates or retypes onto a guard 
   pod manifest "$src" -- sh -c '/repo/scripts/build-release >/dev/null'
   check "the release builds, restating and retyping onto guards (each instance checked by the release program itself)" \
     "[ \$rc = 0 ] && grep -q '^restate ' '$work/manifest/release/MANIFEST' && grep -q '^retype ' '$work/manifest/release/MANIFEST'"
+  # TVI-WO-2100 Q25: each build line with its assembly's sha256.
+  check "the MANIFEST (format 2) carries each build line with its string and sha256" \
+    "grep -qx 'tviburi-release-manifest 2' '$work/manifest/release/MANIFEST' \
+     && [ \"\$(grep '^build ' '$work/manifest/release/MANIFEST')\" = \"\$(grep '^build' '$src/tools/tviburi-release/pins.tsv' | tr '\t' ' ')\" ] \
+     && [ \$(grep -cE '^build [a-z]+ [^ ]+ [0-9a-f]{64}\$' '$work/manifest/release/MANIFEST') = 2 ]"
   local row=$'Tviburi.GuardedSTM32_Timer\ttimer1 timer8\t-' spi=$'Tviburi.GuardedSTM32H7_SPI\t-\tspi1 spi2'
   planted() { # planted <name> <file> <old> <new> <expected message>: a tree with one edit, whose release must refuse by that message
     fixture "manifest-$1" "$2" "$3" "$4"
@@ -867,11 +872,14 @@ t_adv-release() {
   fixture rel-class model/GuardedSTM32H7_SPI.cs '"SSOM", 30, 30, Zero, Tag,' '"SSOM", 30, 30, Zero, "modelled",'
   fixture rel-form model/GuardedSTM32H7_SPI.cs '"MSSI", 3, 0, Zero, Tag, "0000 (no delay)", 2222),' '"MSSI", 3, 0, Zero, Tag, "0000 (no delay)", 2222), // a comment'
   fixture rel-pin tools/tviburi-release/pins.tsv 'b85cb4af7a7e' 'b85cb4af7a7f'
+  fixture rel-renode tools/tviburi-release/pins.tsv '5734eb0cd95a' '5734eb0cd95b'
+  fixture rel-infra tools/tviburi-release/pins.tsv 'ddb19d7bf722' 'ddb19d7bf723'
   fixture rel-template tools/tviburi-release/TviburiRelease.cs.template 'public static readonly string' 'public const string'
   fixture rel-bench model/bench-checks.tsv 'Tviburi.GuardedSTM32H7_SPI	B4' 'Tviburi.GuardedSTM32H7_TIM	B4'
   local f why
   for f in rel-symlink:'not a regular file' rel-subdir:'not a regular file' rel-case:'another case' rel-alias:'alias' \
       rel-late:'after a declaration' rel-row:'in no row' rel-class:'a stop' rel-form:'not one' rel-pin:'not the pinned' \
+      rel-renode:'Renode.dll is sha256 5734eb0cd95a[0-9a-f]*, not the pinned 5734eb0cd95b' rel-infra:'Infrastructure.dll is sha256 ddb19d7bf722[0-9a-f]*, not the pinned ddb19d7bf723' \
       rel-template:'exactly once' rel-bench:'not a guard'; do
     why=${f#*:}; f=${f%%:*}
     pod "$f" "$work/$f.tree" -- /repo/scripts/build-release

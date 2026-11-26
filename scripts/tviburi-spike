@@ -34,7 +34,7 @@ rustc --edition 2021 --target thumbv7em-none-eabihf -C opt-level=s -C panic=abor
 cargo build --quiet --offline --locked --manifest-path "$root/tools/tviburi-check/Cargo.toml" --target-dir "$out/target" \
   || { echo "VERDICT FAIL (check build)"; exit 1; }
 version=$("$root/scripts/build-release") || { echo "VERDICT FAIL (release build)"; exit 1; }
-build=$(sed -n 's/^build renode //p' "$out/release/MANIFEST")
+build=$(sed -n 's/^build renode \([^ ]*\) [0-9a-f]\{64\}$/\1/p' "$out/release/MANIFEST")   # the string; its sha256 follows
 renode --version 2>/dev/null | grep -qxF "  build: $build" || { echo "VERDICT FAIL (Renode is not the build the release names: $build)"; exit 1; }
 
 cat > "$out/run.resc" <<EOF2
