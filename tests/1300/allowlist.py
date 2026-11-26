@@ -84,6 +84,8 @@ for n in '123':
             % ('the stock model (%s)' % ('computed-read' if n == '1' and o in 'NP' else 'stored+callback' if n == '1' else 'stored, DIVN and DIVQ narrowed to 8 and 6 bits where silicon has 9 and 7, a row'))
             + ONE_RULE + ' (' + page + '): none after a write the stock model did not keep, or one made while PLL' + n + ' ran (Q2)'
             + ('; DIVP1 = 0 or an odd divisor gives none (p404; Figure 47 p346; Q7)' if (n, o) == ('1', 'P') else ''))
+FREQ[('RCC_CR', 'HSEON')] = (None, 'the stock model (stored+callback): stored; write 0 reverted if SW==HSE or PLL1 selected with PLLSRC==HSE; '
+    'in recorded mode with no crystal declared, the stock RCC runs on a placeholder 8 MHz so a run can continue past TVI-RCC-HSE; no guard reads it (TVI-WO-1204 (3) P2, ruled 2026-11-26T12:51Z)')
 FREQ[('RCC_PLLCKSELR', 'PLLSRC[1:0]')] = (None, "the guard's copy (the kernel clock query); the PLLs' reference, the HSI, CSI or HSE, 11 none (p399), in " + ONE_RULE)
 
 

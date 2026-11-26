@@ -53,7 +53,7 @@ EOF2
 timeout 120 renode --disable-gui --console --plain "$out/run.resc" </dev/null >"$out/renode.out" 2>&1
 rc=$?
 
-"$out/target/debug/tviburi-check" "$version" "$out/renode-log.txt" spi1 rcc gpioPortA gpioPortB gpioPortC gpioPortD gpioPortE gpioPortF gpioPortG gpioPortH gpioPortI gpioPortJ gpioPortK timer1 timer8 dma1 dma2 flashController usart1 usart2 usart3 uart4 uart5 usart6 uart7 uart8 i2c1 i2c2 i2c3 adcM1S2 adc3 dmamux1 >"$out/check.txt"
+"$out/target/debug/tviburi-check" "$version" "$out/renode-log.txt" $("$root/scripts/guards") >"$out/check.txt"
 crc=$?
 cat "$out/check.txt"
 if [ $crc -eq 3 ]; then

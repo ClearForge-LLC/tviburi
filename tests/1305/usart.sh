@@ -12,7 +12,6 @@ set -euo pipefail
 here=$(cd "$(dirname "$0")/../.." && pwd)
 IMAGE=$(sed -n 's/^IMAGE=//p' "$here/tests/spike.sh")
 CASES="config m1ue over8ue psue psoff stopue reinit reinitstop disable same ap width tdrbyte read field nine kernel clock rxoff idle idleframe idlere dmarx fields ledger registrations recorded reset config2 regen brr0 brr8 brrheld overrun idlekernel idlenorule idlenone idlehse hzcsi hzsyscsi hzsyshse hzvcol hzwide hzdivr hzpllon hzvcoh hzrge hzpll3q hzport hzcsiref hzcfgon hzbyte"
-GUARDS="spi1 rcc gpioPortA gpioPortB gpioPortC gpioPortD gpioPortE gpioPortF gpioPortG gpioPortH gpioPortI gpioPortJ gpioPortK timer1 timer8 dma1 dma2 flashController usart1 usart2 usart3 uart4 uart5 usart6 uart7 uart8 i2c1 i2c2 i2c3 adcM1S2 adc3 dmamux1"
 MONITOR="clock rxoff idle idleframe idlere dmarx fields ledger registrations recorded reset config2 regen brrheld overrun idlekernel idlenone idlehse hzcsi hzsyscsi hzsyshse hzvcol hzwide hzport hzpllon hzcsiref hzbyte"
 PATHS=$(for c in $CASES; do case " $MONITOR " in *" $c "*) ;; *) printf '"%s",' "$c" ;; esac; done | sed 's/,$//')
 PATHS="$PATHS,\"hzcsi\",\"hzsyscsi\",\"hzsyshse\",\"hzvcol\",\"hzwide\",\"hzpllon\",\"hzcsiref\""   # TVI-WO-1300c: firmware run with monitor lines after it
@@ -34,6 +33,7 @@ else
   mkdir "$src"
   git -C "$here" archive HEAD | tar -x -C "$src"
 fi
+GUARDS=$("$src/scripts/guards")   # the one guard list (scripts/guards; TVI-WO-1204 (6))
 
 fails=0
 check() { if eval "$2"; then echo "ok   $1"; else echo "FAIL $1"; fails=$((fails + 1)); fi; }
@@ -289,11 +289,8 @@ sys.exit(0 if ok else 1)
       "[ \$rc = 3 ] && first config2 'r[\"rule\"] == \"TVI-USART-CONFIG\" and r[\"kind\"] == \"unmodeled\" and \"lowPowerMode\" in r[\"condition\"]'" ;;
   regen)
     rc=0; python3 -I "$src/tests/1305/fields.py" "$src/tests/1305/data/rm0433-rev9-usart-fields.tsv" > "$work/fields.cs" || rc=$?
-    mkdir -p "$work/regen"
-    container -v "$src:/repo:ro,Z" -v "$work/regen:/out:Z" "$IMAGE" sh -c 'awk -v sha=$(sha256sum /opt/renode/platforms/cpus/stm32h7.repl | cut -c1-64) \
-      -f /repo/model/stm32h7-usart-restate.awk /opt/renode/platforms/cpus/stm32h7.repl > /out/restate.repl' </dev/null >"$work/regen.stdout" 2>&1 || rc=$?
-    check "regen: the guard's Fields table regenerates from tests/1305/data by tests/1305/fields.py, and the restatement from the pinned stm32h7.repl, byte for byte (RUL-16)" \
-      "[ \$rc = 0 ] && sed -n '/^        private static readonly Row\[\] Fields =$/,/^        };$/p' '$src/model/GuardedSTM32F7_USART.cs' | sed '1,2d;\$d' | cmp -s - '$work/fields.cs' && cmp -s '$work/regen/restate.repl' '$src/model/stm32h7-usart-restate.repl'" ;;
+    check "regen: the guard's Fields table regenerates from tests/1305/data by tests/1305/fields.py, byte for byte (RUL-16); its restatement is tests/spike.sh manifest's (TVI-WO-1204 (6))" \
+      "[ \$rc = 0 ] && sed -n '/^        private static readonly Row\[\] Fields =$/,/^        };$/p' '$src/model/GuardedSTM32F7_USART.cs' | sed '1,2d;\$d' | cmp -s - '$work/fields.cs'" ;;
   brr0) check "brr0: ArduPilot's measured start (usart_init with BRR = 0, sdStop, usart_init with BRR = 0, then BRR 0x271 with UE = 1; TVI-WO-1305a.measure.md §1) passes, enforcing, acknowledged by name; the byte written after the rewrite is sent (TC); BRR reads 0x271" \
     "passes brr0 && [ \"\$(readout brr0 READ)\" = 0x00000271 ] && bit \"\$(readout brr0 READ2)\" 6 1" ;;
   brr8) check "brr8: a start with BRR = 8 refuses TVI-USART-BRR, unmodeled, at the CR1 write that sets UE (\"USARTDIV must be greater than or equal to 16\", p2035)" \

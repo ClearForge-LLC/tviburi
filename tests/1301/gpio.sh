@@ -10,7 +10,6 @@ set -euo pipefail
 here=$(cd "$(dirname "$0")/../.." && pwd)
 IMAGE=$(sed -n 's/^IMAGE=//p' "$here/tests/spike.sh")
 CASES="valid blank blankfirst afterwards afrh package packageinput pk8af pk8out pc2 nopackage pupdr lckr brr read bsrr bsrrhalf otyper ardupilot gen-s03 recorded config query registrations reset misaligned fields ledger adv-monitor resetwrite recordedtwo twoaddr analogled analogout odrfirst moderfirst analoghold afodr afenter afenterhigh afout afentern inputidr button externalbad resetodr odrhalf exti afswitch afnosrc"
-GUARDS="spi1 rcc gpioPortA gpioPortB gpioPortC gpioPortD gpioPortE gpioPortF gpioPortG gpioPortH gpioPortI gpioPortJ gpioPortK timer1 timer8 dma1 dma2 flashController usart1 usart2 usart3 uart4 uart5 usart6 uart7 uart8 i2c1 i2c2 i2c3 adcM1S2 adc3 dmamux1"
 PATHS='"valid","blank","blankfirst","afterwards","twice","afrh","package","packageinput","pk8af","pk8out","pc2","pupdr","lckr","brr","read","bsrr","bsrrhalf","otyper","ardupilot","gen-s03","analogled","analogout","odrfirst","moderfirst","analoghold","afodr","afenter","afenterhigh","afout","afentern","inputidr","odrhalf","afswitch","afnosrc","idle"'
 scratch=${TVIBURI_SCRATCH:-$HOME/.cache/tviburi}
 mkdir -p "$scratch"
@@ -30,6 +29,7 @@ else
   mkdir "$src"
   git -C "$here" archive HEAD | tar -x -C "$src"
 fi
+GUARDS=$("$src/scripts/guards")   # the one guard list (scripts/guards; TVI-WO-1204 (6))
 
 fails=0
 check() { if eval "$2"; then echo "ok   $1"; else echo "FAIL $1"; fails=$((fails + 1)); fi; }

@@ -1,0 +1,7 @@
+#!/bin/sh
+# guards — the one guard-name list (TVI-WO-1204 (6)): every instance Tviburi's board runs under a guard, space-separated. The
+# runner and every test harness pass it to tools/tviburi-check as the peripherals whose witness and end a run needs; no
+# harness keeps a copy. Declared here, not derived from the platform a run loads: a run whose platform has lost a guard must
+# still be asked for that guard's witness (gate clause 3). tests/spike.sh guards holds this list to the committed board, so a
+# guard added to the board and not here, or here and not on the board, fails CI.
+echo "spi1 rcc gpioPortA gpioPortB gpioPortC gpioPortD gpioPortE gpioPortF gpioPortG gpioPortH gpioPortI gpioPortJ gpioPortK timer1 timer8 dma1 dma2 flashController usart1 usart2 usart3 uart4 uart5 usart6 uart7 uart8 i2c1 i2c2 i2c3 adcM1S2 adc3 dmamux1"

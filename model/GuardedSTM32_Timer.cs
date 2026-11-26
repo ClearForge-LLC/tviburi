@@ -39,8 +39,7 @@
 //                    silicon keeps the old value. predicted-fault. The same value passes (RUL-18, amended).
 //   TVI-TIM-FIELD    the allow-list (`Fields`): a field given a value the model does not implement, or a write to an
 //                    offset with no register. unmodeled.
-// Enforcing: the first rule that fires refuses the access. Recorded mode (RUL-19): every rule is evaluated and records
-// what it finds, and the access goes on as if none had fired (model/Refusal.cs).
+// Enforcing and recorded mode (RUL-19) are model/Refusal.cs's contract.
 
 using System;
 using System.Collections.Generic;

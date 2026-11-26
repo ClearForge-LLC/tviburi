@@ -13,7 +13,6 @@ set -euo pipefail
 here=$(cd "$(dirname "$0")/../.." && pwd)
 IMAGE=$(sed -n 's/^IMAGE=//p' "$here/tests/spike.sh")
 CASES="second same ap gen order clockfirst invalid vosearly voslow cr2dbp bdcr bdcrok flashvos3 apbvos3 vos0 revy200 hse400 hse400v3 hse25 flashlow clockearly vos0byp bdcrbyte noclock nopwr notjudged reset recorded locked nibble norev revy byte misaligned read addr norcc registrations fields ledger regen"
-BOARD_GUARDS="spi1 rcc gpioPortA gpioPortB gpioPortC gpioPortD gpioPortE gpioPortF gpioPortG gpioPortH gpioPortI gpioPortJ gpioPortK timer1 timer8 dma1 dma2 flashController usart1 usart2 usart3 uart4 uart5 usart6 uart7 uart8 i2c1 i2c2 i2c3 adcM1S2 adc3 dmamux1"
 MONITOR="reset recorded locked nibble norev revy byte misaligned read addr norcc registrations fields ledger regen"
 PATHS=$(for c in $CASES; do case " $MONITOR " in *" $c "*) ;; *) printf '"%s",' "$c" ;; esac; done | sed 's/,$//')
 scratch=${TVIBURI_SCRATCH:-$HOME/.cache/tviburi}
@@ -34,6 +33,7 @@ else
   mkdir "$src"
   git -C "$here" archive HEAD | tar -x -C "$src"
 fi
+BOARD_GUARDS=$("$src/scripts/guards")   # the one guard list (scripts/guards; TVI-WO-1204 (6))   # the board has no PWR guard (Q17 (a)): run_case adds pwr
 
 fails=0
 check() { if eval "$2"; then echo "ok   $1"; else echo "FAIL $1"; fails=$((fails + 1)); fi; }

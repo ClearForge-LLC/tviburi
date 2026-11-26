@@ -77,8 +77,10 @@
 //                   model keeps the bit, and nothing is lost. PLL1's source cleared with PLL1 on is TVI-RCC-PLL-REF's (above).
 //   TVI-RCC-KERNEL  (RequireKernelClock) a peripheral started with no kernel clock: predicted-fault, naming the selector,
 //                   its source and the pages; unmodeled for a peripheral the query does not cover.
-// Recorded mode (RUL-19): after a rule fires and is recorded, the access goes on to the stock model and the copies as
-// if no rule had fired, and no further rule is evaluated for it (model/Refusal.cs).
+// Recorded mode (RUL-19) is model/Refusal.cs's contract: every rule is evaluated and records, and the access goes on to the
+// stock model and the copies as if no rule had fired.
+// Its one exception here: in recorded mode with no crystal declared, the stock RCC runs on a placeholder 8 MHz so a
+// run can continue past TVI-RCC-HSE; no guard reads it (the constructor).
 // Enabling a bus clock before its kernel source runs is valid and never refused (architect, 2026-11-23). Whether
 // a peripheral's start finds its kernel clock is that peripheral's guard's rule, through the query (TVI-SPI-KERNEL);
 // RequireKernelClock asks the same question from the monitor, recorded under rcc, for a peripheral with no guard yet.
@@ -110,16 +112,15 @@ namespace Antmicro.Renode.Peripherals.Tviburi
         // The stock entry's constructor arguments (stm32h7.repl: `systick: nvic`); the defaults are the stock model's.
         // Every property the stock entry takes is the stock model's, passed through: a consumer sets hseFrequency (or
         // csiFrequency) on this entry, never on the cancelled `rcc` (RUL-09 (b); TVI-WO-1300.rm0433.md §6.4).
-        // hseFrequency has no default (TVI-WO-1300b (4)): the stock model's 8 MHz is not taken. The owned stock RCC is given 0
-        // for "none", which it can reach only after TVI-RCC-HSE has fired, in recorded mode. Then sys_ck on the HSE (SW = 010,
-        // or PLL1 from the HSE) gives the stock model's systick 0 Hz, which Renode refuses by throwing: the recorded run stops
-        // there, after the HSE record, so it fails closed (TVI-WO-1300b adversarial A2; read in the stock source, not run).
+        // hseFrequency has no default (TVI-WO-1300b (4)): HseFrequency stays null, and every guard rule and query reads it. The
+        // stock RCC gets 0 in enforcing mode, where TVI-RCC-HSE stops the run first, and the header's placeholder in recorded mode:
+        // given 0 there, the forwarded SW = HSE write threw "Frequency must be greater than 0" (measured, TVI-WO-1204 (3) P2).
         public GuardedSTM32H7_RCC(IMachine machine, IHasDivisibleFrequency systick = null, ulong? hseFrequency = null,
             ulong csiFrequency = 4000000, string mode = Records.Enforcing)
         {
             HseFrequency = hseFrequency == 0 ? null : hseFrequency;   // 0 Hz is no frequency: declared 0 is none (1300b adversarial)
             CsiFrequency = csiFrequency;
-            inner = new STM32H7_RCC(machine, systick, hseFrequency ?? 0, csiFrequency);
+            inner = new STM32H7_RCC(machine, systick, HseFrequency ?? (mode == Records.RecordedMode ? RecordedHsePlaceholder : 0UL), csiFrequency);
             host = machine;
             records = new Records(machine, this, nameof(GuardedSTM32H7_RCC), mode);
             muxes = new[] { PerMux, SpiMux, I2cMux, UsartMux, Usart2Mux, RngMux, AdcMux }.Select(m => new MuxState(m)).ToArray();
@@ -131,6 +132,9 @@ namespace Antmicro.Renode.Peripherals.Tviburi
         // The platform's constructor arguments, so a test can show which reached the guard. HseFrequency is null when the
         // platform declares none: a reader of it (the flash and USART guards) has no HSE frequency then.
         public ulong? HseFrequency { get; }
+
+        // The header's placeholder: the stock model's own default (STM32H7_RCC.DefaultHseFrequency, private there).
+        private const ulong RecordedHsePlaceholder = 8000000;
         public ulong CsiFrequency { get; }
 
         public void Reset()
@@ -598,9 +602,14 @@ namespace Antmicro.Renode.Peripherals.Tviburi
                     return;
                 }
             }
-            else if((RefusedField(b, b, word) || RefusedDbp(offset, b, word, width)) && !records.Recorded)
+            else
             {
-                return;
+                var fired = RefusedField(b, b, word);
+                fired |= records.Evaluates(fired) && RefusedDbp(offset, b, word, width);   // every rule in recorded mode (model/Refusal.cs)
+                if(fired && !records.Recorded)
+                {
+                    return;
+                }
             }
             Pass(b, word);
         }
@@ -633,7 +642,7 @@ namespace Antmicro.Renode.Peripherals.Tviburi
             return inner.ReadDoubleWord(b);
         }
 
-        // The first rule that fires for a 32-bit write, in the header's order; the rest are not evaluated.
+        // The rules for a 32-bit write, in the header's order: enforcing, the first that fires; recorded, every one (model/Refusal.cs).
         private bool Refused(long offset, uint value)
         {
             if(records.LoadFailed)
@@ -648,8 +657,15 @@ namespace Antmicro.Renode.Peripherals.Tviburi
                 return true;
             }
             var b = Base(offset);
-            return RefusedHse(b, value) || RefusedPll(b, value) || RefusedPllReference(b, value) || RefusedSwitch(b, value)
-                || RefusedField(offset, b, value) || RefusedDbp(offset, b, value, 32) || RefusedVos(offset, b, value) || RefusedClockLoss(offset, b, value);
+            var fired = RefusedHse(b, value);
+            fired |= records.Evaluates(fired) && RefusedPll(b, value);
+            fired |= records.Evaluates(fired) && RefusedPllReference(b, value);
+            fired |= records.Evaluates(fired) && RefusedSwitch(b, value);
+            fired |= records.Evaluates(fired) && RefusedField(offset, b, value);
+            fired |= records.Evaluates(fired) && RefusedDbp(offset, b, value, 32);
+            fired |= records.Evaluates(fired) && RefusedVos(offset, b, value);
+            fired |= records.Evaluates(fired) && RefusedClockLoss(offset, b, value);
+            return fired;
         }
 
         private void Pass(long b, uint value)
@@ -1523,7 +1539,7 @@ namespace Antmicro.Renode.Peripherals.Tviburi
             R("RCC_CR", 0x000, "§8.7.2", "HSECSSON", 19, 19, Any, "inherited, unaudited (acknowledged by name)", "the stock model (stored): FieldMode Read|Set: write 1 sets, write 0 cannot clear; no CSS behaviour", 384),
             R("RCC_CR", 0x000, "§8.7.2", "HSEBYP", 18, 18, Any, "acknowledged by name", "the twin has no oscillator: bypass and crystal behave alike (TVI-WO-1300 A3)", 384),
             R("RCC_CR", 0x000, "§8.7.2", "HSERDY", 17, 17, Any, "read-only", "ignored (read-only; stock computed-read)", 384),
-            R("RCC_CR", 0x000, "§8.7.2", "HSEON", 16, 16, Any, "inherited, unaudited (acknowledged by name)", "the stock model (stored+callback): stored; write 0 reverted if SW==HSE or PLL1 selected with PLLSRC==HSE", 384),
+            R("RCC_CR", 0x000, "§8.7.2", "HSEON", 16, 16, Any, "inherited, unaudited (acknowledged by name)", "the stock model (stored+callback): stored; write 0 reverted if SW==HSE or PLL1 selected with PLLSRC==HSE; in recorded mode with no crystal declared, the stock RCC runs on a placeholder 8 MHz so a run can continue past TVI-RCC-HSE; no guard reads it (TVI-WO-1204 (3) P2, ruled 2026-11-26T12:51Z)", 384),
             R("RCC_CR", 0x000, "§8.7.2", "D2CKRDY", 15, 15, Any, "read-only", "ignored (read-only; stock tag)", 384),
             R("RCC_CR", 0x000, "§8.7.2", "D1CKRDY", 14, 14, Any, "read-only", "ignored (read-only; stock tag)", 384),
             R("RCC_CR", 0x000, "§8.7.2", "HSI48RDY", 13, 13, Any, "read-only", "ignored (read-only; stock computed-read)", 384),

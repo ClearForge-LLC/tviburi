@@ -125,6 +125,11 @@ for r in $(seq 1 "$runs"); do
     [ -s "$out/2-accept.peak-proc.txt" ] && parts=$(awk '/^(RssAnon|RssFile|RssShmem|AnonHugePages|Threads):/ {v[$1] = $2} /^pid / {v["n"] = $4; v["s"] = $7}
       END {printf "%s\t%s\t%s\t%s\t%s\t%s\t%s", v["RssAnon:"], v["RssFile:"], v["RssShmem:"], v["AnonHugePages:"], v["Threads:"], v["n"], v["s"]}' \
       "$out/2-accept.peak-proc.txt")
+    # TVI-WO-1204 (6): on the branch's boots, every instance its release restates or retypes has a witness, by name.
+    if [ $s = branch ]; then
+      bash "$here/tests/1301/witnessed.sh" "$con" "$work/rel-$s/release/MANIFEST" >"$out/witnessed.txt" 2>&1 || unwitnessed="${unwitnessed:-} $r"
+      cat "$out/witnessed.txt"
+    fi
     printf '%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n' $s $r "$peak" "${wall:-none}" "${end:-0}" "${mine:-0}" "${other:-0}" "${would:-0}" \
       "$parts" >> "$work/runs.tsv"
     echo "$s boot $r: peak ${peak:-none} KiB, wall ${wall:-none} s, boot end ${end:-0}, witnesses of its release ${mine:-0}" \
@@ -136,6 +141,11 @@ done
 verdict=0
 echo "MEASURED main ${label[main]}; branch ${label[branch]}" >"$work/verdict.txt"
 container -v "$work:/w:ro" "$IMAGE" /w/judge/debug/tviburi-budget /w/runs.tsv >>"$work/verdict.txt" 2>&1 || verdict=$?
+if [ -n "${unwitnessed:-}" ]; then
+  echo "FAIL witnessed: the branch's boots$unwitnessed lack a witness for an instance its release puts under a guard (tests/1301/witnessed.sh)" \
+    | tee -a "$work/verdict.txt"
+  verdict=1
+fi
 cat "$work/verdict.txt"
 echo "outputs: $work"
 if [ -n "${GITHUB_STEP_SUMMARY:-}" ]; then

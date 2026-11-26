@@ -10,10 +10,10 @@ M05-ssiop	model/GuardedSTM32H7_SPI.cs	if((cfg2 & Cfg2Ssiop) != 0)	if(false)	cond
 M06-ssi	model/GuardedSTM32H7_SPI.cs	if((cr1 & Cr1Ssi) == 0)	if(false)	modf
 M07-historyCheck	model/GuardedSTM32H7_SPI.cs	if(failure == null && history != null)	if(false)	cfg2first
 M08-historyNote	model/GuardedSTM32H7_SPI.cs	if(history == null && (cfg2 & Cfg2Master) != 0 && FirstFailingBranch(cfg2, cr1) != null)	if(false)	cfg2first
-M09-speGate	model/GuardedSTM32H7_SPI.cs	if(!EnablePasses(value))	if(false)	modf
+M09-speGate	model/GuardedSTM32H7_SPI.cs	fired |= !EnablePasses(value);	fired |= false;	modf
 M10-iolockCheck	model/GuardedSTM32H7_SPI.cs	if(ioLock)\n                {\n                    // Certain only if	if(false)\n                {\n                    // Certain only if	iolock
 M11-iolockLatch	model/GuardedSTM32H7_SPI.cs	                    ioLock = true;\n	(empty)	iolock
-M12-cfg2WhileEnabled	model/GuardedSTM32H7_SPI.cs	if((cr1 & Cr1Spe) != 0 && value != cfg2)	if(false)	conditions
+M12-cfg2WhileEnabled	model/GuardedSTM32H7_SPI.cs	if(records.Evaluates(fired) && (cr1 & Cr1Spe) != 0 && value != cfg2)	if(false)	conditions
 M13-i2smod	model/GuardedSTM32H7_SPI.cs	if((value & I2sMod) != 0)	if(false)	conditions
 M15-resetIolock	model/GuardedSTM32H7_SPI.cs	ioLock = false;	(empty)	conditions
 M16-resetHistory	model/GuardedSTM32H7_SPI.cs	            history = null;\n            masterUnknown = false;	            masterUnknown = false;	conditions
@@ -26,7 +26,7 @@ M22-refusalAtError	model/Refusal.cs	Emit(LogLevel.Error, Recorded ? "would-refus
 M23-seq	model/Refusal.cs	seq++;	(empty)	modeled
 M24-readCr1Ssi	model/GuardedSTM32H7_SPI.cs	return (value & Cr1Stock) | (cr1 & ~Cr1Stock & ~Cr1IoLock);	return value;	modeled
 M25-readCfg2Copy	model/GuardedSTM32H7_SPI.cs	return cfg2;	return value;	rmw
-M26-readIolock	model/GuardedSTM32H7_SPI.cs	if(ioLock && !fired)\n                {\n                    records.Refuse("TVI-SPI-IOLOCK", Unmodeled, "SPI_CR1"	if(false)\n                {\n                    records.Refuse("TVI-SPI-IOLOCK", Unmodeled, "SPI_CR1"	conditions
+M26-readIolock	model/GuardedSTM32H7_SPI.cs	if(ioLock && records.Evaluates(fired))\n                {\n                    records.Refuse("TVI-SPI-IOLOCK", Unmodeled, "SPI_CR1"	if(false)\n                {\n                    records.Refuse("TVI-SPI-IOLOCK", Unmodeled, "SPI_CR1"	conditions
 M27-subwordAtRegister	model/GuardedSTM32H7_SPI.cs	if(width != 32 || offset % 4 != 0)	if(offset % 4 != 0)	conditions
 M28-unaligned	model/GuardedSTM32H7_SPI.cs	if(width != 32 || offset % 4 != 0)	if(width != 32)	conditions
 R01-refusalFirst	tools/tviburi-check/src/main.rs	let verdict = if !refusals.is_empty() {	let verdict = if !refusals.is_empty() && problems.is_empty() {	unit
@@ -46,7 +46,7 @@ S03-oneArgument	scripts/tviburi-spike	[ $# -eq 1 ] ||	true ||	adv-extra-arg
 S04-scriptEnd	scripts/tviburi-spike	grep -qx 'TVIBURI-END' <<<"$console" && 	(empty)	adv-noend
 S05-afterMarker	scripts/tviburi-spike	 && [ "$after" = "0xAF7E0002" ]	(empty)	nomark
 S06-variantMustMatch	scripts/tviburi-spike	[ -n "$variant" ] ||	true ||	adv-bad-variant
-M31-cfg2ReadAfterHistory	model/GuardedSTM32H7_SPI.cs	if(doubt != null && !fired)	if(false)	conditions
+M31-cfg2ReadAfterHistory	model/GuardedSTM32H7_SPI.cs	if(doubt != null && records.Evaluates(fired))	if(false)	conditions
 M32-loadRefusalAtNaming	model/Refusal.cs	                Refuse("TVI-LOAD", "unmodeled", "none", "none"	                if(false) Refuse("TVI-LOAD", "unmodeled", "none", "none"	load
 N01-noteMasterStateAfterCr1	model/GuardedSTM32H7_SPI.cs	                cr1 = value;\n                NoteMasterState();	                cr1 = value;	conditions
 N02-fieldAllowList	model/GuardedSTM32H7_SPI.cs	if(f.Allowed != null && !f.Allowed.Contains(v))	if(false)	fields
@@ -96,8 +96,8 @@ M35-resetEotBySuspend	model/GuardedSTM32H7_SPI.cs	            eotBySuspend = fal
 T01-modeChecked	model/Refusal.cs	if(mode != Enforcing && mode != RecordedMode)	if(false)	load
 T02-recordedKind	model/Refusal.cs	Recorded ? "would-refuse" : "refusal"	"refusal"	recorded
 T03-witnessMode	model/Refusal.cs	+ ",\\"mode\\":" + Json(mode) + witness);	+ ",\\"mode\\":" + Json(Enforcing) + witness);	recorded
-T05-recordedPassesWrite	model/GuardedSTM32H7_SPI.cs	|| RefusedWrite(offset, value)) && !records.Recorded)	|| RefusedWrite(offset, value)))	recorded
-T06-recordedPassesRead	model/GuardedSTM32H7_SPI.cs	if(fired && !records.Recorded)	if(fired)	recorded
+T05-recordedPassesWrite	model/GuardedSTM32H7_SPI.cs	if(fired && !records.Recorded)\n            {\n                return;\n	if(fired)\n            {\n                return;\n	recorded
+T06-recordedPassesRead	model/GuardedSTM32H7_SPI.cs	if(fired && !records.Recorded)\n            {\n                return 0;	if(fired)\n            {\n                return 0;	recorded
 T07-versionIsTheConstant	model/Refusal.cs	private readonly string version = TviburiRelease.ManifestSha256;	private readonly string version = "sha256:0000000000000000000000000000000000000000000000000000000000000000";	modeled
 U01-bitOverlap	tools/tviburi-release/src/main.rs	if entry.1 & mask != 0 {	if false {	unit
 U02-bitGap	tools/tviburi-release/src/main.rs	.find(|(_, (_, m))| *m != 0xFFFF_FFFF)	.find(|_| false)	unit
@@ -172,7 +172,7 @@ G13-portFromAddress	model/GuardedSTM32_GPIOPort.cs	port = (char)('A' + (int)((st
 G14-tableData	model/GuardedSTM32_GPIOPort.cs	PA5:89:	PA5:90:	afcheck
 G15-restatedRoute	model/stm32h7-gpio-restate.repl	tviburiTimer1:\n    0 -> tviburiGpioA#07@01 | tviburiGpioA#08@01 |	tviburiTimer1:\n    0 -> tviburiGpioA#07@01 |	gpio-registrations
 G16-boardPackage	model/tviburi-nucleo-h753zi.repl	tviburiGpioH:\n    mode: "enforcing"\n    package: "LQFP144"	tviburiGpioH:\n    mode: "enforcing"	gpio-package
-G17-namesLine	scripts/tviburi-spike	gpioPortJ gpioPortK timer1 timer8 dma1 dma2 flashController usart1 usart2 usart3 uart4 uart5 usart6 uart7 uart8 i2c1 i2c2 i2c3 adcM1S2 adc3 dmamux1 >	gpioPortJ timer1 timer8 dma1 dma2 flashController usart1 usart2 usart3 uart4 uart5 usart6 uart7 uart8 i2c1 i2c2 i2c3 adcM1S2 adc3 dmamux1 >	modeled
+G17-namesLine	scripts/guards	gpioPortJ gpioPortK timer1	gpioPortJ timer1	modeled
 G18-unlistedPinAf	model/GuardedSTM32_GPIOPort.cs	if(cell == null || cell.Text == "-")	if(cell != null && cell.Text == "-")	gpio-pk8af
 G19-unlistedPinPackage	model/GuardedSTM32_GPIOPort.cs	(!bonding.TryGetValue("P" + port + pin, out var b) || b.Pin == null)	(bonding.TryGetValue("P" + port + pin, out var b) && b.Pin == null)	gpio-pk8out
 G20-staleRefresh	model/GuardedSTM32_GPIOPort.cs	base.ReadDoubleWord(b);\n            }\n            var before = Selection();	}\n            var before = Selection();	gpio-resetwrite
@@ -270,7 +270,7 @@ DM30-recordedKeep	model/GuardedSTM32DMA.cs	            word = (word & ~mask) | (
 DM31-reset	model/GuardedSTM32DMA.cs	            inner.Reset();\n            ResetCopies();	            inner.Reset();	dma-reset
 DM32-clockReg	model/stm32h7-dma-restate.repl	        tviburiRcc RegistrationPeripheralAlias.DMA1\n	(empty)	dma-clock
 DM33-regen	tests/1303/fields.py	"00 only: a stock tag; burst transfers are not modeled", 662),\n        (reg, off, sec, "PBURST	"00 only: a stock tag; bursts are not modeled", 662),\n        (reg, off, sec, "PBURST	dma-regen
-DM34-restateGen	model/stm32h7-dma-restate.awk	    print "    dmamux: dmamux1"	    print "    dmamux:  dmamux1"	dma-restate
+DM34-restateGen	model/stm32h7-dma-restate.awk	    print "    dmamux: dmamux1"	    print "    dmamux:  dmamux1"	manifest
 DM35-instances	tools/tviburi-release/src/main.rs	.filter(|d| d.0 == stock_ty && names.contains(&d.1))	.filter(|d| d.0 == stock_ty)	unit
 DM36-reload	model/GuardedSTM32DMA.cs	var reload = Items(s) == 0 && programmed[s] != 0;	var reload = false;	dma-reload
 DM37-restart	model/GuardedSTM32DMA.cs	var restart = state == Completed && r == CrOffset && (word & EnBit) != 0 && programmed[s] != 0;	var restart = false;	dma-reassert
@@ -305,7 +305,7 @@ FL28-wrhOneSided	model/GuardedSTM32H7_Flash.cs	if(wrh < need)	if(wrh != need)	fl
 FL29-config	model/GuardedSTM32H7_Flash.cs	if(optionBytes < -1 || optionBytes > 0xFFFFFFFFL)	if(false)	flash-config
 FL30-ledgerLatency	model/GuardedSTM32H7_Flash.cs	"LATENCY", 3, 0, Latencies,	"LATENCY", 3, 0, Any,	flash-ledger flash-regen
 FL31-bank	model/GuardedSTM32H7_Flash.cs	return b >= 0x100 ? 1 : 0;	return 0;	flash-keytwice
-FL32-restate	model/stm32h7-flash-restate.repl	    -> nvic@4\n	(empty)	flash-regen
+FL32-restate	model/stm32h7-flash-restate.repl	    -> nvic@4\n	(empty)	manifest
 FL34-locking	model/GuardedSTM32H7_Flash.cs	var locking = !locked && (word & LockBit) != 0;	var locking = false;	flash-locking
 FL35-latchWhy	model/GuardedSTM32H7_Flash.cs	if(why != null && why != waitWhy)	if(why != null && waitWhy == null)	flash-worse
 FL36-keyLost	model/GuardedSTM32H7_Flash.cs	                else if(keyLost[k])\n	                else if(false)\n	flash-recorded
@@ -340,7 +340,7 @@ US24-requestRdr	model/GuardedSTM32F7_USART.cs	                var v = inner.Read
 US25-requestDmar	model/GuardedSTM32F7_USART.cs	                cr3 = word;\n                inner.WriteDoubleWord(offset, word);\n                Request();	                cr3 = word;\n                inner.WriteDoubleWord(offset, word);	usart-dmarx
 US26-config	model/GuardedSTM32F7_USART.cs	            if(lowPowerMode)	            if(false)	usart-config2
 US27-names	model/GuardedSTM32F7_USART.cs	            ControlRegister1 = 0x0,	            ControlRegisterOne = 0x0,	usart-registrations
-US28-restate	model/stm32h7-usart-restate.repl	    IRQ -> exti@26\n	(empty)	usart-regen
+US28-restate	model/stm32h7-usart-restate.repl	    IRQ -> exti@26\n	(empty)	manifest
 US29-fieldsM1	tests/1305/fields.py	'M1': ('Zero', T,	'M1': ('Any', T,	usart-regen usart-ledger
 US30-classRow	tools/tviburi-release/pins.tsv	Tviburi.GuardedSTM32F7_USART\tusart1 usart2	Tviburi.GuardedSTM32F7_USART\tusart2	usart-ledger
 US31-bench	model/bench-checks.tsv	Tviburi.GuardedSTM32F7_USART\tU1\t	Tviburi.GuardedSTM32F7_USART\tU2\t	usart-ledger
@@ -379,7 +379,7 @@ RB02-ueRunning	model/GuardedSTM32H7_RCC.cs	watched.Where(w => w.Value.IsRunning)
 RB03-usartHeld	model/GuardedSTM32F7_USART.cs	&& rcc.Holds(name, this)))	))	rcc-usart-unheld
 RB04-hseRule	model/GuardedSTM32H7_RCC.cs	|| HseFrequency != null ||	|| true ||	rcc-hse-none
 RB05-hseDefault	model/GuardedSTM32H7_RCC.cs	ulong? hseFrequency = null,	ulong? hseFrequency = 8000000,	rcc-hse-none
-RB06-hseToStock	model/GuardedSTM32H7_RCC.cs	new STM32H7_RCC(machine, systick, hseFrequency ?? 0, csiFrequency)	new STM32H7_RCC(machine, systick, 0, csiFrequency)	rcc-hse-declared
+RB06-hseToStock	model/GuardedSTM32H7_RCC.cs	HseFrequency ?? (mode == Records.RecordedMode ? RecordedHsePlaceholder : 0UL)	(mode == Records.RecordedMode ? RecordedHsePlaceholder : 0UL)	rcc-hse-declared
 RB07-rtcenServed	model/GuardedSTM32H7_RCC.cs	return (inner.ReadDoubleWord(b) & ~BdcrRtcen) | rtcen;	return inner.ReadDoubleWord(b);	rcc-rtcen
 RB08-rtcStockHeld	model/GuardedSTM32H7_RCC.cs	                value |= BdcrRtcen;\n	(empty)	rcc-rtcen
 RB09-rtcenKeptOnReset	model/GuardedSTM32H7_RCC.cs	            ResetCopies();\n            SyncEnables();	            ResetCopies();\n            rtcen = 0;\n            SyncEnables();	rcc-rtcen-reset
@@ -422,7 +422,7 @@ I230-runningName	model/GuardedSTM32F7_I2C.cs	public string RunningName => "PE";	
 I231-lockedWhileOff	model/GuardedSTM32H7_RCC.cs	            foreach(var g in guarded.Values)\n	            foreach(var g in guarded.Values.Cast<IPeripheral>().Concat(watched.Values))\n	i2c-clock
 I232-accessNames	model/GuardedSTM32F7_I2C.cs	            Timing = 0x10,	            TimingX = 0x10,	i2c-registrations
 I233-classRow	tools/tviburi-release/pins.tsv	Tviburi.GuardedSTM32F7_I2C\ti2c1 i2c2 i2c3	Tviburi.GuardedSTM32F7_I2C\ti2c1 i2c2	i2c-ledger
-I234-restateSet	model/stm32h7-i2c-restate.awk	/^i2c[123]: I2C	/^i2c[12]: I2C	i2c-regen
+I234-restateSet	model/stm32h7-i2c-restate.awk	/^i2c[123]: I2C	/^i2c[12]: I2C	manifest
 I235-sensorsShared	model/GuardedSTM32F7_I2C.cs	.SetValue(inner, ChildCollection);	.SetValue(inner, new Dictionary<int, II2CPeripheral>());	i2c-config
 I236-completionTracked	model/GuardedSTM32F7_I2C.cs	                Open();   // as in Read\n	(empty)	i2c-blindclear
 I237-reservedNotServed	model/GuardedSTM32F7_I2C.cs	cr1 = word & Cr1Defined;	cr1 = word;	i2c-recorded
@@ -498,7 +498,7 @@ AD39-recorded	model/GuardedSTM32H7_ADC.cs	                Pass(b, word);\n      
 AD40-adc12Bit	model/GuardedSTM32H7_RCC.cs	["adc12"] = new ClockedPeripheral(AdcMux, 0x0D8, 5,	["adc12"] = new ClockedPeripheral(AdcMux, 0x0D8, 4,	adc-query
 AD41-adcMux	model/GuardedSTM32H7_RCC.cs	"pll2_p_ck", "pll3_r_ck", "per_ck", "disabled");	"pll2_p_ck", "pll3_r_ck", "hsi_ker_ck", "disabled");	adc-query
 AD42-classRow	tools/tviburi-release/pins.tsv	Tviburi.GuardedSTM32H7_ADC\tadc3 adcM1S2	Tviburi.GuardedSTM32H7_ADC\tadc3	adc-ledger
-AD43-restateName	model/stm32h7-adc-restate.awk	v = name == "adc3" ? "tviburiAdc3" : "tviburiAdc12"	v = name == "adc3" ? "tviburiAdc12" : "tviburiAdc3"	adc-regen
+AD43-restateName	model/stm32h7-adc-restate.awk	v = name == "adc3" ? "tviburiAdc3" : "tviburiAdc12"	v = name == "adc3" ? "tviburiAdc12" : "tviburiAdc3"	manifest
 AD44-fieldsClass	tests/1307/fields.py	'EXTEN': ('Zero', G,	'EXTEN': ('Any', G,	adc-regen
 AD45-rateStale	model/GuardedSTM32H7_ADC.cs	rateStale |= (cr & AdstartBit) != 0;	rateStale |= false;	adc-rccchange adc-rccboost
 AD46-internal	model/GuardedSTM32H7_ADC.cs	if(Name == "adc3" && ch >= 17 && (regs[CcrOffset] & (1u << (41 - ch))) == 0)	if(false)	adc-internal
@@ -620,7 +620,7 @@ PW28-revYTable	model/GuardedSTM32H7_PWR.cs	var table = revision == "V" ? LimitsV
 PW29-flashPwrEvent	model/GuardedSTM32H7_Flash.cs	                    pwrGuard.Written += OnPwrWritten;\n	(empty)	pwr-flashlow
 PW30-sysBeforeSupply	model/GuardedSTM32H7_RCC.cs	if(!p.ActvosReady && sys1 != sys0)	if(false)	pwr-clockearly
 PW31-vos0Ldo	model/GuardedSTM32H7_PWR.cs	var vos0 = within0 && ldo;	var vos0 = within0;	pwr-vos0byp
-PW32-bdcrSubword	model/GuardedSTM32H7_RCC.cs	(RefusedField(b, b, word) || RefusedDbp(offset, b, word, width))	(RefusedField(b, b, word))	pwr-bdcrbyte
+PW32-bdcrSubword	model/GuardedSTM32H7_RCC.cs	fired |= records.Evaluates(fired) && RefusedDbp(offset, b, word, width);	fired |= false;	pwr-bdcrbyte
 PW33-vosNoRcc	model/GuardedSTM32H7_PWR.cs	if(rcc == null)	if(false)	pwr-norcc
 PW34-vosNoClocks	model/GuardedSTM32H7_PWR.cs	why = clocks == null ? "the running clocks cannot be computed (" + none + ")" :	why = clocks == null ? null :	pwr-noclock
 PW35-pwrAddr	model/GuardedSTM32H7_PWR.cs	if(start != PwrBase)	if(false)	pwr-addr
@@ -629,3 +629,10 @@ DX31-dmamuxAddr	model/GuardedSTM32H7_DMAMUX.cs	if(start != Dmamux1Base)	if(false
 DX32-pairAccess	model/GuardedSTM32H7_DMAMUX.cs	State(), crOffset, crValue, 32);	State(), 4 * channel, id, 32);	dmamux-pair
 PW37-wholeHertz	model/GuardedSTM32H7_PWR.cs	            clocks = clocks.Select(c => Math.Round(c, MidpointRounding.AwayFromZero)).ToArray();\n	(empty)	pwr-hse400 pwr-hse400v3 pwr-hse25
 DX33-pairSpan	model/GuardedSTM32H7_DMAMUX.cs	&& step != 0 && items > 1 ? par + step : (uint?)null;	&& false ? par + step : (uint?)null;	dmamux-pinc
+TD01-endFlush	model/Refusal.cs	                Logger.Flush();\n	(empty)	teardown
+RM01-evaluatesAll	model/Refusal.cs	public bool Evaluates(bool fired) => !fired || Recorded;	public bool Evaluates(bool fired) => !fired;	recorded rcc-recordedtwo
+RM02-spiOrderWord	model/GuardedSTM32H7_SPI.cs	fired |= records.Evaluates(fired) && RefusedOrder(offset, value, 32);	fired |= !fired && RefusedOrder(offset, value, 32);	recorded
+RM03-rccField	model/GuardedSTM32H7_RCC.cs	fired |= records.Evaluates(fired) && RefusedField(offset, b, value);	fired |= !fired && RefusedField(offset, b, value);	rcc-recordedtwo
+RM04-hsePlaceholder	model/GuardedSTM32H7_RCC.cs	(mode == Records.RecordedMode ? RecordedHsePlaceholder : 0UL)	(mode == Records.RecordedMode ? 0UL : 0UL)	rcc-hsesw
+I264-recNackStopf	model/GuardedSTM32F7_I2C.cs	                            nackStopf = true;\n	(empty)	i2c-recnack
+RM05-spiKernelEvery	model/GuardedSTM32H7_SPI.cs	fired |= records.Evaluates(fired) && starts && RefusedKernel(value);	fired |= !fired && starts && RefusedKernel(value);	recorded
