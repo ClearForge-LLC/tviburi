@@ -557,7 +557,7 @@ DX07-liveRunningOnly	model/GuardedSTM32H7_DMAMUX.cs	var state = StreamState(ch);
 DX08-fieldOff	model/GuardedSTM32H7_DMAMUX.cs	if(f.Offset != r || f.Allowed == null || f.Allowed.Contains(f.Of(word)))	if(true)	dmamux-se
 DX09-seRow	model/GuardedSTM32H7_DMAMUX.cs	"SE", 16, 16, Zero,	"SE", 16, 16, Any,	dmamux-se
 DX10-geRow	model/GuardedSTM32H7_DMAMUX.cs	"GE", 16, 16, Zero,	"GE", 16, 16, Any,	dmamux-ge
-DX11-reservedId	model/GuardedSTM32H7_DMAMUX.cs	51, 52, 53, 55, 56,	51, 52, 53, 54, 55, 56,	dmamux-reserved
+DX11-reservedId	model/GuardedSTM32H7_DMAMUX.cs	"DMAREQ_ID", 6, 0, Any,	"DMAREQ_ID", 6, 0, new uint[] { 0, 9, 37, 38, 39, 40, 41, 42, 43, 45, 46, 77, 83, 115 },	dmamux-reserved
 DX12-rgMap	model/GuardedSTM32H7_DMAMUX.cs	return RgcrOffset;	return b;	dmamux-ge
 DX13-reservedBits	model/GuardedSTM32H7_DMAMUX.cs	"Res15_10", 15, 10, Zero,	"Res15_10", 15, 10, Any,	dmamux-ledger
 DX14-misaligned	model/GuardedSTM32H7_DMAMUX.cs	if((offset & (width / 8 - 1)) == 0)	if(true)	dmamux-misaligned
@@ -586,3 +586,4 @@ MF07-consumerStock	tools/tviburi-release/src/main.rs	        if let Some(d) = de
 MF08-twice	tools/tviburi-release/src/main.rs	                if let Some(d) = all.iter().find(|n| all.iter().filter(|m| m == n).count() > 1) {	                if let Some(d) = all.iter().find(|_| false) {	manifest
 MF09-consumerRun	tools/tviburi-release/src/main.rs	if !consumer_run_guarded(	if false && !consumer_run_guarded(	manifest
 MF10-loaded	tools/tviburi-release/src/main.rs	if !loaded_by_replay(	if false && !loaded_by_replay(	manifest
+DX30-parMemory	model/GuardedSTM32H7_DMAMUX.cs	if(par < PeripheralsStart || par > PeripheralsEnd)	if(false)	dmamux-parmem

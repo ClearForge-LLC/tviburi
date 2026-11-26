@@ -19,7 +19,10 @@
 //!                     TVI-DMAMUX-LIVE, unmodeled.
 //!   path="livesame" - S0 P2M on 41 running, C0CR rewritten 41 three times (ArduPilot's pattern); S0 disabled; C0CR = 43 with
 //!                     the stream off: passes. MARK_READ = C0CR (43).
-//!   path="reserved" - C0CR = 54 (Reserved, Table 124 p697): TVI-DMAMUX-FIELD, unmodeled, at the write.
+//!   path="reserved" - C0CR = 54 (Reserved, Table 124 p697), taken at the write (ruled Q18 (a)); then DMA1 S0 P2M started on
+//!                     it with PAR = USART1_RDR: the DMA guard's TVI-DMA-ROUTE, predicted-fault, at the EN write.
+//!   path="parmem"   - DMA1 S0 P2M on 41 (usart1_rx_dma) with PAR = 0x24000000 (AXI SRAM): a PAR in memory, paced by the
+//!                     request, passes (ruled Q18 (b)). MARK_READ = S0CR (EN = 1).
 //!   path="se"       - C0CR = 41 with SE (bit 16): TVI-DMAMUX-FIELD, unmodeled.
 //!   path="ge"       - RG3CR = GE (bit 16), judged by RG0CR's rows: TVI-DMAMUX-FIELD, unmodeled.
 //!   path="byte"     - a byte write of 41 to C2CR, a byte write of 0 to its third byte (merged into the word: 41 stays), and a
@@ -162,6 +165,15 @@ pub unsafe extern "C" fn reset() -> ! {
     #[cfg(path = "reserved")]
     {
         w(DMAMUX1, 54);
+        write_volatile(MARK_READ, r(DMAMUX1));
+        cfg(DMA1, 0, 0, 54, USART1_RDR, SRAM4, 4, P2M);
+        en(DMA1, 0);
+    }
+    #[cfg(path = "parmem")]
+    {
+        cfg(DMA1, 0, 0, 41, 0x2400_0000, SRAM4, 4, P2M);
+        en(DMA1, 0);
+        write_volatile(MARK_READ, r(s(DMA1, 0, CR)));
     }
     #[cfg(path = "se")]
     {

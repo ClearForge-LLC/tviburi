@@ -31,18 +31,23 @@
 //                     model drops a sub-word write, measure.md §2.1 S); a read is served from the word.
 //   TVI-DMAMUX-READ   a read of an offset with no register (Table 133 p716-717). unmodeled.
 //   TVI-DMAMUX-FIELD  the allow-list (`Fields`): a field given a value the model does not implement (the synchronisation,
-//                     event and generator fields, 0 only; a reserved DMAREQ_ID, Table 124 p697-698), or a write to an offset
-//                     with no register. unmodeled.
+//                     event and generator fields, 0 only), or a write to an offset with no register. unmodeled. DMAREQ_ID takes
+//                     any id, a reserved one included (ruled 2026-11-26T10:43Z Q18 (a)): a route nothing starts moves nothing,
+//                     and a stream started on a reserved id is the DMA guard's TVI-DMA-ROUTE, predicted-fault (p697-698).
 //   TVI-DMAMUX-LIVE   (ruled Q3) a CxCR write that gives DMAREQ_ID another value while the DMA stream its channel serves is
 //                     enabled (running, or completed by the twin with EN still set; the DMA guard's StreamState): RM0433 sets
 //                     the route before the stream's EN (§17.4.2 p703) and states nothing of a change while it is active.
 //                     unmodeled. The same id passes (ArduPilot rewrites it 77,402 times, measure.md §2.1).
-//   TVI-DMAMUX-PAIR   (ruled Q3; the DMA guard's one call, RefusedPair, at its route check on EN) the stream's PAR is not the
-//                     data register of the request its channel routes (`Pairs`, below: each request the DMA guard raises or
+//   TVI-DMAMUX-PAIR   (ruled Q3, narrowed by Q18 (b); the DMA guard's one call, RefusedPair, at its route check on EN) the
+//                     stream's PAR is in the peripherals' region (0x40000000-0x5FFFFFFF, Table 7 p130, which Table 8 p132-135
+//                     divides into the peripherals' register spaces) and is not the data register of the request its channel
+//                     routes (`Pairs`, below: each request the DMA guard raises or
 //                     acknowledges, with its peripheral's base, Table 8 p132-135, and the register's offset by its page).
 //                     Silicon paces the stream by that request and moves to or from PAR as written, which no page calls a
 //                     fault; the twin pairs each request with its own peripheral and was never checked on another pairing.
-//                     unmodeled. A route the platform cannot raise stays the DMA guard's TVI-DMA-REQUEST/ROUTE.
+//                     unmodeled. A PAR in memory, paced by the request, passes: silicon moves it, and the stock model moves it
+//                     exactly. A PAR in a gap Table 8 reserves inside that region is judged too: it is no data register.
+//                     A route the platform cannot raise stays the DMA guard's TVI-DMA-REQUEST/ROUTE.
 // Enforcing: the first rule that fires refuses the access. Recorded mode (RUL-19): every rule is evaluated and records what it
 // finds, and the access goes on to the stock model as if none had fired (the clock still drops it: that is the model).
 //
@@ -191,6 +196,10 @@ namespace Antmicro.Renode.Peripherals.Tviburi
                 {
                     return false;
                 }
+                if(par < PeripheralsStart || par > PeripheralsEnd)
+                {
+                    return false;   // memory, paced by the request: legal on silicon, moved exactly by the stock model (Q18 (b))
+                }
                 var id = ids[channel];
                 var p = Pairs.FirstOrDefault(x => x.Id == id && x.ToMemory == toMemory);
                 if(p != null && p.Address == par)
@@ -209,7 +218,7 @@ namespace Antmicro.Renode.Peripherals.Tviburi
                 records.Refuse("TVI-DMAMUX-PAIR", Unmodeled, "DMAMUX1_C" + channel + "CR",
                     "DMAREQ_ID = " + id + (p == null ? "" : " (" + p.Request + ")") + " with DMA" + (channel / 8 + 1) + "_S" + channel % 8 + "PAR = 0x" + par.ToString("X8"),
                     condition,
-                    "RM0433 Rev 9 §17.3.2 Table 124 p697-698" + (p == null ? "" : "; " + p.Citation) + "; ruled 2026-11-26T09:31Z Q3",
+                    "RM0433 Rev 9 §17.3.2 Table 124 p697-698" + (p == null ? "" : "; " + p.Citation) + "; Table 7 p130 (the peripherals' region); ruled 2026-11-26T09:31Z Q3, 10:43Z Q18 (b)",
                     State(), 4 * channel, id, 32);
                 return !records.Recorded;
             }
@@ -309,7 +318,7 @@ namespace Antmicro.Renode.Peripherals.Tviburi
                 }
                 records.Refuse("TVI-DMAMUX-FIELD", Unmodeled, RegisterAt(b), f.Name + " (" + f.Bits + ") = " + f.Format(f.Of(word)),
                     RegisterAt(b) + "." + f.Name + " written " + f.Format(f.Of(word)) + ": the model implements only "
-                        + (f.Allowed.Length > 8 ? "the ids Table 124 does not reserve" : string.Join(", ", f.Allowed.Select(f.Format)))
+                        + string.Join(", ", f.Allowed.Select(f.Format))
                         + " (" + f.BehavesAs + ")",
                     "RM0433 Rev 9 " + f.Section + " p" + f.Page + "; the allow-list (RUL-17), ruled 2026-11-26T09:31Z Q1-Q4", State(), b, word, width);
                 return true;
@@ -455,6 +464,8 @@ namespace Antmicro.Renode.Peripherals.Tviburi
         private const int Channels = 16;
         private const int Generators = 8;
         private const ulong Dmamux1Base = 0x40020800;
+        private const uint PeripheralsStart = 0x40000000;   // Table 7 p130: "Peripherals (refer to Table 8)"
+        private const uint PeripheralsEnd = 0x5FFFFFFF;
         private const long CxcrEnd = 0x040;
         private const long CsrOffset = 0x080;
         private const long CfrOffset = 0x084;
@@ -578,8 +589,6 @@ namespace Antmicro.Renode.Peripherals.Tviburi
 
         private static readonly uint[] Any = null;
         private static readonly uint[] Zero = { 0 };
-        // DMAREQ_ID: every input Table 124 assigns (0 none, 1-8 the generators, 9-115 the peripherals), not 54 or 116-127 (Reserved).
-        private static readonly uint[] Routable = { 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47, 48, 49, 50, 51, 52, 53, 55, 56, 57, 58, 59, 60, 61, 62, 63, 64, 65, 66, 67, 68, 69, 70, 71, 72, 73, 74, 75, 76, 77, 78, 79, 80, 81, 82, 83, 84, 85, 86, 87, 88, 89, 90, 91, 92, 93, 94, 95, 96, 97, 98, 99, 100, 101, 102, 103, 104, 105, 106, 107, 108, 109, 110, 111, 112, 113, 114, 115 };
 
         private static Row R(string reg, long off, string sec, string name, int msb, int lsb, uint[] allowed, string cls, string behaves, int page)
         {
@@ -597,7 +606,7 @@ namespace Antmicro.Renode.Peripherals.Tviburi
             R("DMAMUX1_CxCR", 0x000, "§17.6.1", "EGE", 9, 9, Zero, "tag", "0 only: event generation is not modeled (ruled 2026-11-26T09:31Z)", 708),
             R("DMAMUX1_CxCR", 0x000, "§17.6.1", "SOIE", 8, 8, Zero, "tag", "0 only: no synchronisation overrun can occur while SE is 0 (ruled 2026-11-26T09:31Z)", 708),
             R("DMAMUX1_CxCR", 0x000, "§17.6.1", "Res7", 7, 7, Zero, "reserved", "reserved: must be kept at reset value", 708),
-            R("DMAMUX1_CxCR", 0x000, "§17.6.1", "DMAREQ_ID", 6, 0, Routable, "modeled by the guard", "the request routed to channel x: kept in the guard's copy, served on read and passed to the stock model, which raises the channel's line for that input; judged at the stream's EN against its PAR (TVI-DMAMUX-PAIR) and while it runs (TVI-DMAMUX-LIVE); a reserved id (54, 116-127, Table 124 p697-698) refuses: nothing is stated for it (ruled 2026-11-26T09:31Z Q3)", 709),
+            R("DMAMUX1_CxCR", 0x000, "§17.6.1", "DMAREQ_ID", 6, 0, Any, "modeled by the guard", "the request routed to channel x: kept in the guard's copy, served on read and passed to the stock model, which raises the channel's line for that input; judged at the stream's EN against its PAR (TVI-DMAMUX-PAIR) and while it runs (TVI-DMAMUX-LIVE); a reserved id (54, 116-127, Table 124 p697-698) is taken, and a stream started on it is the DMA guard's TVI-DMA-ROUTE (ruled 2026-11-26T09:31Z Q3, 10:43Z Q18 (a))", 709),
             R("DMAMUX1_CSR", 0x080, "§17.6.3", "Res31_16", 31, 16, Any, "read-only", "reserved in a read-only register: a write is ignored and changes nothing (no record, RUL-18 as amended)", 710),
             R("DMAMUX1_CSR", 0x080, "§17.6.3", "SOF", 15, 0, Any, "read-only", "read-only: a write is ignored; reads 0: no synchronisation overrun can occur while SE and EGE are 0 only", 710),
             R("DMAMUX1_CFR", 0x084, "§17.6.5", "Res31_16", 31, 16, Zero, "reserved", "reserved: must be kept at reset value", 711),

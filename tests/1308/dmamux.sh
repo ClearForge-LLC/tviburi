@@ -11,7 +11,7 @@ set -euo pipefail
 
 here=$(cd "$(dirname "$0")/../.." && pwd)
 IMAGE=$(sed -n 's/^IMAGE=//p' "$here/tests/spike.sh")
-CASES="pair pairrec pairtx routes fixture live livedone livesame reserved se ge byte misaligned read clock clockone rst rstroute reset recorded norcc registrations fields pairs ledger regen"
+CASES="pair pairrec pairtx parmem routes fixture live livedone livesame reserved se ge byte misaligned read clock clockone rst rstroute reset recorded norcc registrations fields pairs ledger regen"
 GUARDS="spi1 rcc gpioPortA gpioPortB gpioPortC gpioPortD gpioPortE gpioPortF gpioPortG gpioPortH gpioPortI gpioPortJ gpioPortK timer1 timer8 dma1 dma2 flashController usart1 usart2 usart3 uart4 uart5 usart6 uart7 uart8 i2c1 i2c2 i2c3 adcM1S2 adc3 dmamux1"
 MONITOR="misaligned read clock clockone rst rstroute reset recorded norcc registrations fields pairs ledger regen"
 PATHS=$(for c in $CASES; do case " $MONITOR " in *" $c "*) ;; *) printf '"%s",' "$c" ;; esac; done | sed 's/,$//')
@@ -113,6 +113,9 @@ for t in ${TVIBURI_TESTS:-$CASES}; do
   if [ $mon = 0 ]; then
     if [ "$t" = pairrec ]; then
       PLATFORM_SED=$rec run_case pairrec pair 'emulation RunFor "0.03"' "${marks[@]}"
+    elif [ "$t" = parmem ]; then
+      run_case "$t" "$t" 'sysbus WriteDoubleWord 0x24000000 0xA5' 'emulation RunFor "0.03"' "${marks[@]}" "${pulse[@]}" 'echo "R-NDTR"' 'sysbus ReadDoubleWord 0x40020014' \
+        'echo "R-DST"' 'sysbus ReadDoubleWord 0x38001900'
     elif [ "$t" = byte ]; then
       run_case "$t" "$t" 'emulation RunFor "0.03"' "${marks[@]}" "${pulse[@]}" 'echo "R-NDTR"' 'sysbus ReadDoubleWord 0x40020044' "$peek"
     else
@@ -124,6 +127,8 @@ for t in ${TVIBURI_TESTS:-$CASES}; do
       "refuses pair TVI-DMAMUX-PAIR unmodeled 'r[\"register\"] == \"DMAMUX1_C0CR\" and r[\"bit\"] == \"DMAREQ_ID = 41 (usart1_rx_dma) with DMA1_S0PAR = 0x40013030\" and \"USART1_RDR at 0x40011024\" in r[\"condition\"] and \"p2098\" in r[\"citation\"]' && records pair 'len(recs) == 1'" ;;
   pairrec) check "pairrec: dmamux1 recorded, dma1 enforcing: the same stream records one would-refuse (TVI-DMAMUX-PAIR) and starts, as if no rule had fired (RUL-19): S0CR reads EN = 1; never a pass at the check" \
       "[ \$rc = 1 ] && logged pairrec 'len(recs) == 1 and recs[0][\"tviburi\"] == \"would-refuse\" and recs[0][\"rule\"] == \"TVI-DMAMUX-PAIR\"' && after pairrec && [ \"\$(readout pairrec READ)\" = 0x00000401 ]" ;;
+  parmem) check "parmem (ruled Q18 (b)): a stream on 41 (usart1_rx_dma) with PAR in AXI SRAM (0x24000000), paced by the request, passes: EN reads 1, and a request on input 41 moves the byte at 0x24000000 into SRAM4 (NDTR 4 -> 3)" \
+      "passes parmem && [ \"\$(readout parmem READ)\" = 0x00000401 ] && [ \"\$(readout parmem NDTR)\" = 0x00000003 ] && [ \$(( \$(readout parmem DST) & 0xFF )) = 165 ]" ;;
   pairtx) check "pairtx: a memory-to-peripheral stream on 42 (usart1_tx_dma) with PAR = USART3_TDR refuses TVI-DMAMUX-PAIR, unmodeled, naming USART1_TDR" \
       "refuses pairtx TVI-DMAMUX-PAIR unmodeled '\"USART1_TDR at 0x40011028\" in r[\"condition\"] and \"memory-to-peripheral\" in r[\"condition\"]'" ;;
   routes) check "routes: the armed run's ten streams (DMA1 S0-S7 on 41, 43, 45, 9, 38, 42, 40, 46; DMA2 S2, S3 on 39, 37), each PAR its request's data register, pass; C11CR reads 37 and C3CR 9 from the copy" \
@@ -136,9 +141,9 @@ for t in ${TVIBURI_TESTS:-$CASES}; do
       "refuses livedone TVI-DMAMUX-LIVE unmodeled 'r[\"bit\"] == \"DMAREQ_ID 42 -> 46 (DMA1 stream 0 completed, EN still set)\"'" ;;
   livesame) check "livesame (ruled Q3): C0CR rewritten with the same id while its stream runs passes (ArduPilot's 77,402 rewrites), and another id once the stream is off passes; C0CR reads 43" \
       "passes livesame && [ \"\$(readout livesame READ)\" = 0x0000002B ]" ;;
-  reserved) check "reserved: C0CR = 54 (Reserved, Table 124 p697) refuses at the write, TVI-DMAMUX-FIELD, unmodeled, located" \
-      "refuses reserved TVI-DMAMUX-FIELD unmodeled 'r[\"bit\"] == \"DMAREQ_ID (6:0) = 0x36\" and r[\"access\"][\"offset\"] == \"0x0\"'" ;;
-  se) check "se: C0CR with SE = 1 (synchronisation, a tag allowed 0 only) refuses TVI-DMAMUX-FIELD, unmodeled, located (p708)" \
+  reserved) check "reserved (ruled Q18 (a)): C0CR = 54 (Reserved, Table 124 p697) is taken at the write (reads 54); a stream started on it meets the DMA guard's TVI-DMA-ROUTE, predicted-fault, located, and dmamux1 records nothing" \
+      "[ \$rc = 3 ] && records reserved 'len(recs) == 1 and recs[0][\"rule\"] == \"TVI-DMA-ROUTE\" and recs[0][\"kind\"] == \"predicted-fault\" and recs[0][\"peripheral\"] == \"sysbus.dma1\" and recs[0][\"access\"][\"pc\"] != \"none\" and recs[0][\"bit\"] == \"DMAMUX1_C0CR.DMAREQ_ID = 54 (reserved)\"' && [ \"\$(readout reserved READ)\" = 0x00000036 ]" ;;
+ se) check "se: C0CR with SE = 1 (synchronisation, a tag allowed 0 only) refuses TVI-DMAMUX-FIELD, unmodeled, located (p708)" \
       "refuses se TVI-DMAMUX-FIELD unmodeled 'r[\"bit\"] == \"SE (bit 16) = 1\" and \"p708\" in r[\"citation\"]'" ;;
   ge) check "ge: RG3CR with GE = 1 (a request generator, a tag allowed 0 only, judged by RGxCR's rows) refuses TVI-DMAMUX-FIELD, unmodeled, located (p712)" \
       "refuses ge TVI-DMAMUX-FIELD unmodeled 'r[\"register\"] == \"DMAMUX1_RG3CR\" and r[\"bit\"] == \"GE (bit 16) = 1\" and \"p712\" in r[\"citation\"]'" ;;
@@ -187,9 +192,9 @@ for t in ${TVIBURI_TESTS:-$CASES}; do
   recorded)
     PLATFORM_SED=$rec run_case recorded - "$clk" 'sysbus WriteDoubleWord 0x40020800 0x10029' 'echo "R-C0"' 'sysbus ReadDoubleWord 0x40020800' \
       'sysbus WriteDoubleWord 0x40020804 0x36' 'echo "R-C1"' 'sysbus ReadDoubleWord 0x40020804' "$peek"
-    check "recorded: dmamux1 recorded: SE = 1 and a reserved id (54) each record a would-refuse (TVI-DMAMUX-FIELD) and go on to the stock model (RUL-19): C0CR reads 41 (SE is not kept), C1CR 54, the stock model holds both; never a pass at the check" \
-      "[ \$rc = 1 ] && logged recorded 'len(recs) == 2 and all(r[\"tviburi\"] == \"would-refuse\" and r[\"rule\"] == \"TVI-DMAMUX-FIELD\" for r in recs)' && [ \"\$(readout recorded C0)\" = 0x00000029 ] && [ \"\$(readout recorded C1)\" = 0x00000036 ] && stock recorded 41,54,0,0,0,0,0,0,0,0,0,0,0,0,0,0" ;;
-  norcc)
+    check "recorded: dmamux1 recorded: SE = 1 records one would-refuse (TVI-DMAMUX-FIELD) and goes on to the stock model (RUL-19): C0CR reads 41 (SE is not kept); a reserved id (54) is taken with no record (Q18 (a)), C1CR 54; the stock model holds both; never a pass at the check" \
+      "[ \$rc = 1 ] && logged recorded 'len(recs) == 1 and recs[0][\"tviburi\"] == \"would-refuse\" and recs[0][\"rule\"] == \"TVI-DMAMUX-FIELD\" and recs[0][\"bit\"] == \"SE (bit 16) = 1\"' && [ \"\$(readout recorded C0)\" = 0x00000029 ] && [ \"\$(readout recorded C1)\" = 0x00000036 ] && stock recorded 41,54,0,0,0,0,0,0,0,0,0,0,0,0,0,0" ;;
+ norcc)
     PLATFORM=/repo/tests/1308/norcc.repl run_case norcc - "$clk" 'sysbus WriteDoubleWord 0x40020800 0x29'
     check "norcc: a DMAMUX1 guard on a machine with no RCC guard refuses its access, TVI-DMAMUX-CONFIG, unmodeled: its clock and reset cannot be watched" \
       "[ \$rc = 3 ] && records norcc 'len(recs) == 1 and recs[0][\"rule\"] == \"TVI-DMAMUX-CONFIG\" and \"no RCC guard\" in recs[0][\"condition\"]'" ;;
@@ -214,7 +219,7 @@ for t in ${TVIBURI_TESTS:-$CASES}; do
       /out/release.target/debug/tviburi-release cases /out/release/LEDGER.jsonl Tviburi.GuardedSTM32H7_DMAMUX 0x40020800 0x400 0x580244D8 0x3 >/out/cases.txt' </dev/null >"$work/fields-cases.stdout" 2>&1
     mapfile -t lines < "$work/fields-cases/cases.txt"
     run_case fields - "${lines[@]}"
-    check "fields: every ledger row's disallowed value refuses by name, unmodeled (a reserved DMAREQ_ID, the synchronisation, event and generator fields, the reserved bits); every allowed value passes (each assigned DMAREQ_ID); channels 1-15 and generators 1-7 judged by C0's and RG0's rows; no-register offsets refuse (gate clause 6)" \
+    check "fields: every ledger row's disallowed value refuses by name, unmodeled (the synchronisation, event and generator fields, the reserved bits); every allowed value passes (DMAREQ_ID 127 among them); channels 1-15 and generators 1-7 judged by C0's and RG0's rows; no-register offsets refuse (gate clause 6)" \
       "python3 -I - '$work/fields-cases/cases.txt' '$work/fields.stdout' <<'EOF'
 import json, sys
 cases = {}
@@ -242,7 +247,7 @@ for r in recs:
 missing = [v for k, v in cases.items() if v[0] == 'refuse' and k not in seen]
 passes = sum(1 for v in cases.values() if v[0] == 'pass')
 print(len(cases), 'cases;', passes, 'pass;', len(recs), 'refusals;', 'bad', bad[:5], 'missing', missing[:5])
-sys.exit(0 if not bad and not missing and len(cases) > 250 and passes > 120 else 1)
+sys.exit(0 if not bad and not missing and len(cases) > 250 and passes > 10 else 1)
 EOF" ;;
   pairs)
     # Ruled Q3: the guard holds a data register for exactly the requests the DMA guard raises or acknowledges, each in its
@@ -262,7 +267,7 @@ EOF" ;;
   ledger)
     mkdir -p "$work/ledger"
     rc=0; container -v "$src:/repo:ro,Z" -v "$work/ledger:/out:Z" "$IMAGE" sh -c '/repo/scripts/build-release /repo /out/release >/dev/null' </dev/null >"$work/ledger.stdout" 2>&1 || rc=$?
-    check "ledger: the release carries the DMAMUX1 guard's field rows over its 6 registers (DMAREQ_ID modeled, every assigned id allowed and 54, 116-127 not; SE, EGE, SOIE, SPOL, NBREQ, SYNC_ID, every RGxCR field and every reserved field of a writable register 0 only); the manifest restates dmamux1; the stock type's model row, guarded, lists it" \
+    check "ledger: the release carries the DMAMUX1 guard's field rows over its 6 registers (DMAREQ_ID modeled, any id allowed, a reserved one included (Q18 (a)); SE, EGE, SOIE, SPOL, NBREQ, SYNC_ID, every RGxCR field and every reserved field of a writable register 0 only); the manifest restates dmamux1; the stock type's model row, guarded, lists it" \
       "[ \$rc = 0 ] && grep -qx 'class Miscellaneous.STM32_DMAMUX Tviburi.GuardedSTM32H7_DMAMUX' '$work/ledger/release/MANIFEST' && [ \"\$(grep -c '^restate Miscellaneous.STM32_DMAMUX dmamux1 ' '$work/ledger/release/MANIFEST')\" = 1 ] && python3 -I -c '
 import json, sys
 rows = [json.loads(l) for l in open(sys.argv[1]).read().splitlines()[1:]]
@@ -271,7 +276,7 @@ f = [r for r in rows if r.get(\"peripheral\") == g and r[\"row\"] == \"field\"]
 by = {(r[\"register\"], r[\"field\"]): r for r in f}
 ok = len(f) == 26 and len({r[\"register\"] for r in f}) == 6
 d = by[(\"DMAMUX1_CxCR\", \"DMAREQ_ID\")]
-ok = ok and d[\"state\"] == \"guard\" and d[\"allowed\"] == [i for i in range(116) if i != 54]
+ok = ok and d[\"state\"] == \"guard\" and d[\"allowed\"] == \"any\"
 ok = ok and all(by[(\"DMAMUX1_CxCR\", x)][\"allowed\"] == [0] and by[(\"DMAMUX1_CxCR\", x)][\"state\"] == \"tag\" for x in (\"SE\", \"EGE\", \"SOIE\", \"SPOL\", \"NBREQ\", \"SYNC_ID\"))
 ok = ok and all(by[(\"DMAMUX1_RGxCR\", x)][\"allowed\"] == [0] for x in (\"SIG_ID\", \"OIE\", \"GE\", \"GPOL\", \"GNBREQ\"))
 ok = ok and sorted(r[\"field\"] for r in f if r[\"state\"] == \"reserved\" and r[\"allowed\"] == [0]) == [\"Res15_10\", \"Res15_9\", \"Res31_16\", \"Res31_16\", \"Res31_24\", \"Res31_27\", \"Res7\", \"Res7_3\"]
