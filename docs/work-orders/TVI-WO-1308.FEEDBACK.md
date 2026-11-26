@@ -126,11 +126,46 @@ The builders' own passes, before it:
 **Named changes outside the two guards' files:**
 - the DMA guard's one call (Q3);
 - the RCC guard's `TVI-RCC-VOS` and `DBP` read, and its generated ledger text (Q9, Q10);
-- the flash guard's scale read and its records' wording (Q21);
+- the flash guard's scale read (Q21), its re-judging at a `VOS` change and its records' wording (below);
 - the release program's `declared_for` (Q19);
 - `tests/1305/usart.sh:96`: its platform line `ReceiveDmaRequest -> dmamux1@41` repointed to `tviburiDmamux1@41`, otherwise it binds to the cancelled entry;
 - `tests/1304/flash.sh`'s `vosunknownlow` wording and `tests/1300/rcc.sh`'s ledger count (bench row R12);
 - every suite's guard list gains `dmamux1`.
+
+**Changes beyond the literal grants, ratified in review (2026-11-26T16:11Z), each with its page and the planted case and mutant that cover it:**
+- **The flash guard re-judges `TVI-FLASH-WAIT` at a `PWR_D3CR` write**, through the PWR guard's new `Written` event: asking the scale means asking again when it changes (RM0433 Rev 9 p160 Table 17; p310 "the system frequency shall first be decreased before changing the voltage scaling"). It is located at the `D3CR` write. Covered by `pwr-flashlow` / PW29.
+- **`TVI-RCC-VOS` is `unmodeled` for a `sys_ck` change while `ACTVOSRDY` = 0** (p308: the lower byte "shall be written before changing VOS level or ck_sys clock frequency"; p262: Run* mode). Only with a PWR guard. Covered by `pwr-clockearly` / PW30.
+- **VOS0 with the LDO off is `predicted-fault`** (DS12117 Rev 10 p210 Table 111 note 4, "VOS0 is available only when the LDO regulator is ON"; Table 112). Covered by `pwr-vos0byp` / PW31.
+- **New public API:**
+  - the PWR guard's `Revision`, `Scale`, `ScaleCitation`, `ActvosReady`, `LdoOn`, `Dbp` and event `Written`;
+  - the RCC guard's `BusClocks(out apbEnabled, out why)`.
+
+  The flash guard (`Scale`, `Written`) and the RCC guard (`Scale`, `ActvosReady`, `LdoOn`, `Dbp`, and `Exceeds` over `BusClocks`) read them. Covered by the cases above, and by `pwr-bdcrbyte` / PW32 and `pwr-noclock` / PW34. All are read-only, except the event.
+
+**Named, no code:**
+- **`TVI-DMAMUX-PAIR` covers the whole peripherals region** `0x40000000`–`0x5FFFFFFF` (Table 7 p130), Table 8's reserved gaps included. That is wider than Q18 (b)'s "a peripheral's register space". In enforcing mode the DMA guard refuses a `PAR` in a gap first, through its own `TVI-DMA-ADDRESS` span check (unmapped, p130–131).
+- **`RefusedVos` runs before `RefusedClockLoss`** (`model/GuardedSTM32H7_RCC.cs` ~L652). So on a PWR-guarded platform, a write that would have recorded `TVI-RCC-CLOCK` can now record `TVI-RCC-VOS` first. In recorded mode both should be evaluated under `1204`'s every-rule contract: checked after the merge of `1204` (below): both are in the RCC guard's `records.Evaluates` chain, and `pwr-bothrec` proves it.
+- **The DMA guard's header comments are stale:** `model/GuardedSTM32DMA.cs` L6–L12 and L136 say "DMAMUX1 is not guarded" and "the stock DMAMUX1". They go in one row with the dead `dmamux1:` block of its restate file, both `1303`'s and outside this fence.
+
+**The architect's review of #64 (16:11Z), the two bugs:**
+- **B1, a false `predicted-fault` at the exact limit.** `Exceeds` compared doubles from the RCC's PLL arithmetic: 16 MHz /7 ×350 /2 came out as 400000000.00000006 Hz. It now rounds each bus clock to the nearest hertz (`MidpointRounding.AwayFromZero`) before the limit test, the VOS0 test and the record text. That is one place, shared by `TVI-RCC-VOS` and `TVI-PWR-VOS` (ruled 16:31Z). **Named caveat:** a true overage under 0.5 Hz passes, which only FRACN can produce, in steps of input/DIVM/8192.
+  - Planted at the exact limits, each refusing before the fix and passing after: `pwr-hse400` (VOS1), `pwr-hse400v3` (D1CPRE /2 at VOS3: 200/100/50) and `pwr-hse25` (25 MHz /11 ×352 /2).
+  - Mutant PW37 restores the raw compare.
+- **B2, `PAIR` judged `PAR` alone.** A stream with `PINC` = 1 walked off the data register (USART1 RX, word, NDTR 4: `0x24`, `0x28`, `0x2C`, `0x30`). Each address `PAR + k·PSIZE` (k < NDTR) must now equal the routed request's data register (p663, p665). So `PINC` = 1 with NDTR > 1 refuses and names the first address the span leaves at; NDTR = 1 passes; `PINC` = 0 judges `PAR` alone.
+  - **Q22 (a): the DMA guard's grant is widened by one argument.** NDTR is passed on the same line, read as `PAR` is. Nothing else in that file changed.
+  - Cases `dmamux-pinc` (refuses `TVI-DMAMUX-PAIR` at the `EN` write, naming `0x40011028`) and `dmamux-pinc1` (passes); mutant DX33.
+
+**The merge of `main` `7a4e16f` (`TVI-WO-1204`):**
+- `dmamux1` is in `scripts/guards`, and both 1308 suites read it. **`pwr` is not in it:** the board has no PWR guard (Q17 (a)), and `1204`'s check holds the list to the board. The PWR suite adds `pwr` to the list for its own platform.
+- `RefusedDbp` and `RefusedVos` join the RCC guard's every-rule chain, before `RefusedClockLoss`. Its sub-word write path also evaluates `RefusedField` and then `RefusedDbp` (PW32 re-anchored).
+- **The two new guards already met the contract:** every rule runs under `!refused || records.Recorded`, the same test as `Records.Evaluates`. A misaligned access goes on in recorded mode, which the contract allows (as the SPI and the ADC do).
+- **Proven:** `pwr-bothrec` (the RCC guard recorded, a PWR guard at Scale 3, USART3 running). One `RCC_APB1LENR` write that clears `USART3EN` records two `would-refuse`s from one access, in order: `TVI-RCC-VOS` (APB4, with `RTCAPBEN` on from reset, becomes the first APB above VOS3's 50 MHz) and `TVI-RCC-CLOCK` (USART3's kernel clock stops under `UE`). Mutant PW38 restores the short-circuit and is killed by it.
+- **After the merge, on `864fa73`, all on the first run:**
+  - dmamux 30/30, pwr 42/42, rcc 76/76, flash 39/39, dma 56/56 (`1204` removed `restate`), adc 47/47;
+  - `spike.sh`'s acceptance base with `guards`, `manifest`, `teardown` and `witnessed`: 65 ok;
+  - mutants G17, DX01, DX02, DX33, PW32, PW37, PW38, RM01 and RM03, all killed;
+  - the route inventory passes, and no case lost an `end` record;
+  - the armed run, the fixture and `sentinel-03`, replayed on it: zero records; armed at 9.332 s.
 
 **The 1305 teardown race (ruled 11:26Z):**
 - `TVI-WO-1204`'s measure (`wo/tvi-1204-records-harness` `78276ca`) places it: the old emulation's logger is disposed with its end records queued. It loses 16 of 50 loaded quits on `main`, and none with a flush.
@@ -163,4 +198,4 @@ The builders' own passes, before it:
   - the slowest shard took 18.8 min.
 - **`1201`'s budget, judged in CI:** `MEDIANS main 1036844 KiB, branch 1061644 KiB, difference 24800 KiB (+24.2 MiB)`, **PASS**: every branch boot is under the ceiling. This is inside the measurement's projection (+5 to +25 MiB built; the pass-through probe's floor was −23.7 MiB).
 - **`times.tsv`:** this work order's rows are added from run 45847354723 by `1202a`'s method (Q16): 138 rows (66 cases, 72 mutants: DX 32, PW 36, and MF09–MF12, `1203`'s two included), 982.5 s at the 6975P-C reference; no existing row re-weighed. The shards' speeds against the table: 6975P-C 0.98–1.04, EPYC 7763 1.49–1.50, 9V74 1.09–1.13, 9V45 0.99. **Plan at eleven shards: 11.7 min each, 17.9 min at 1.53, 18.8 with setup**, under WO §7's 20 minutes.
-- **Not yet on `main` at READY:** `TVI-WO-1204`'s logger flush and its one guard list. This branch merges `main` after they land, and adds `dmamux1` and `pwr` to that list (ruled 10:46Z, 11:26Z).
+- **`main` `7a4e16f` (`TVI-WO-1204`) is merged** with its logger flush and its one guard list. `dmamux1` is in `scripts/guards` (§6).
