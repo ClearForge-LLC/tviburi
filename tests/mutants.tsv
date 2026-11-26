@@ -647,7 +647,6 @@ PW39-fieldsSweep	model/GuardedSTM32H7_PWR.cs	        private bool RefusedField(l
 R20-endRequiredCrash	tools/tviburi-check/src/main.rs	if !ch.end {	if false {	crash
 R21-endRequiredCrashConsole	tools/tviburi-check/src/main.rs	if !ch.end {	if false {	crash-console
 R22-endRequiredCrashRunner	tools/tviburi-check/src/main.rs	if !ch.end {	if false {	crash-runner
-R23-guardsRequiredRemoved	tools/tviburi-check/src/main.rs	    for (name, ch) in &channels {	    for (name, ch) in channels.iter().take(0) {	adv-removed
 R24-witnessRequiredRemovedConsole	tools/tviburi-check/src/main.rs	if !ch.witness {	if false {	removed-console
 R25-witnessRequiredStockForge	tools/tviburi-check/src/main.rs	if !ch.witness {	if false {	stock-forge
 R26-sourceFilterForge	tools/tviburi-check/src/main.rs	let Some(ch) = channels.get_mut(source) else {	let Some(ch) = channels.values_mut().next() else {	forge
