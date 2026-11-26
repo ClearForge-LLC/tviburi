@@ -231,11 +231,20 @@ fn field_rows(guard: &str, path: &str, rows: &[fields::Row]) -> Result<Vec<Row>,
         .collect()
 }
 
+/// Is this canned stock instance one a class row restates onto its guard (a Python stub the chain declares only as canned,
+/// such as `pwr`; TVI-WO-1308 Q19)? Its ledger row is then a guarded `model` row, never the stub's `canned` row (TVI-WO-2100
+/// Q26, granted 2026-11-26T19:45Z): a ledger that says `pwr` is still the stub would misstate what the release runs.
+fn restated_stub(chain: &stock::Chain, pins: &Pins, c: &(String, String, String, String)) -> bool {
+    pins.classes.iter().any(|(ty, g)| *ty == c.2 && pins.instances.get(g).is_some_and(|n| n.contains(&c.0)))
+        && !chain.declared.iter().any(|d| d.1 == c.0)
+}
+
 fn stock_rows(chain: &stock::Chain, pins: &Pins) -> Vec<Row> {
     // A stock file is named with its pinned sha256 (RUL-16: the rows are keyed by the pinned files' hashes).
     let pinned = |f: &str| format!("{f} sha256:{}", pins.stock.iter().find(|p| p.path == f).map_or("", |p| p.sha256.as_str()));
     let mut models: BTreeMap<&str, (Vec<&str>, Vec<&str>)> = BTreeMap::new();
-    for (ty, inst, file) in &chain.declared {
+    let stubs = chain.canned.iter().filter(|c| restated_stub(chain, pins, c)).map(|c| (&c.2, &c.0, &c.1));
+    for (ty, inst, file) in chain.declared.iter().map(|d| (&d.0, &d.1, &d.2)).chain(stubs) {
         let e = models.entry(ty).or_default();
         e.0.push(inst);
         e.1.push(file.as_str());
@@ -286,7 +295,7 @@ fn stock_rows(chain: &stock::Chain, pins: &Pins) -> Vec<Row> {
         m.insert("behaves_as".into(), s("reads 0; a write is discarded (a stock Renode tag; TVI-WO-0100, architecture §2.0a)"));
         rows.push(m);
     }
-    for (inst, file, ty, what) in &chain.canned {
+    for (inst, file, ty, what) in chain.canned.iter().filter(|c| !restated_stub(chain, pins, c)) {
         let mut m = Row::new();
         m.insert("row".into(), s("canned"));
         m.insert("peripheral".into(), s(ty));
@@ -967,6 +976,32 @@ mod tests {
         assert!(restated(&chain.declared, py, &names(&["pwr"]), &[]).unwrap_err().contains("does not declare as Python.PythonPeripheral"));
         let other = declared_for(&chain, "DMA.STM32DMA", &names(&["dma1", "pwr"]));
         assert!(restated(&other, "DMA.STM32DMA", &names(&["dma1", "pwr"]), &[]).unwrap_err().contains("names pwr, which the pinned stock chain does not declare as DMA.STM32DMA"));
+    }
+
+    #[test]
+    fn a_restated_stub_is_its_guards_model_row_and_an_unguarded_stub_stays_canned() {
+        // TVI-WO-2100 Q26: pwr, a Python stub the PWR guard's class row restates, is a guarded model row; fmc stays canned.
+        let f = "platforms/cpus/stm32h7.repl".to_string();
+        let stub = |i: &str| (i.to_string(), f.clone(), "Python.PythonPeripheral".to_string(), "a stock Python script's fixed answers".to_string());
+        let chain = stock::Chain { declared: vec![], canned: vec![stub("pwr"), stub("fmc")], tags: vec![] };
+        let g = "Tviburi.GuardedSTM32H7_PWR".to_string();
+        let pins = Pins {
+            builds: vec![],
+            stock: vec![stock::Pin { sha256: "a".repeat(64), path: f.clone() }],
+            classes: vec![("Python.PythonPeripheral".into(), g.clone())],
+            instances: BTreeMap::from([(g.clone(), vec!["pwr".to_string()])]),
+            consumer: BTreeMap::from([(g.clone(), vec![])]),
+            props: vec![],
+        };
+        let text = ledger::rows(stock_rows(&chain, &pins)).unwrap();
+        let lines: Vec<&str> = text.lines().collect();
+        assert_eq!(lines.len(), 2, "{text}");
+        let model = lines.iter().find(|l| l.contains("\"row\":\"model\"")).expect("a model row for pwr");
+        for want in ["\"guarded_by\":\"Tviburi.GuardedSTM32H7_PWR\"", "\"instances\":[\"pwr\"]", "\"peripheral\":\"Python.PythonPeripheral\"", &format!("\"files\":[\"{f} sha256:{}\"]", "a".repeat(64))] {
+            assert!(model.contains(want), "{model}: {want}");
+        }
+        let canned = lines.iter().find(|l| l.contains("\"row\":\"canned\"")).expect("fmc's canned row");
+        assert!(canned.contains("\"register\":\"fmc\"") && !text.contains("\"register\":\"pwr\""), "{text}");
     }
 
     #[test]

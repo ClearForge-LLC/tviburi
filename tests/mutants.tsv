@@ -646,3 +646,5 @@ RP05-busInterface	tools/tviburi-release/src/props.rs	    bases.iter().any(|b| BU
 RP06-propLines	tools/tviburi-release/src/main.rs	    for p in &pins.props {\n        m += &format!(	    for p in pins.props.iter().take(0) {\n        m += &format!(	manifest
 RA01-asmSha	tools/tviburi-release/src/main.rs	        if got != *pin {	        if false {	adv-release
 RA02-buildLineSha	tools/tviburi-release/src/main.rs	m += &format!("build {asm} {b} {sha}\\n");	m += &format!("build {asm} {b}\\n");	manifest
+# TVI-WO-2100 (Q26; granted 2026-11-26T19:45Z): a canned stub restated onto its guard (pwr) is a guarded model row in the ledger.
+Q26-stubCanned	tools/tviburi-release/src/main.rs	    pins.classes.iter().any(|(ty, g)| *ty == c.2 &&	    false && pins.classes.iter().any(|(ty, g)| *ty == c.2 &&	unit pwr-ledger

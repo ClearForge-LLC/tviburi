@@ -277,7 +277,7 @@ EOF" ;;
   ledger)
     mkdir -p "$work/ledger"
     rc=0; container -v "$src:/repo:ro,Z" -v "$work/ledger:/out:Z" "$IMAGE" sh -c '/repo/scripts/build-release /repo /out/release >/dev/null' </dev/null >"$work/ledger.stdout" 2>&1 || rc=$?
-    check "ledger (ruled Q19): the manifest restates pwr onto the PWR guard (its Python stub named by the class row), and fmc stays canned; the release carries the guard's 69 field rows over its 9 registers (DBP, VOS, the supply configuration and USB33DEN modeled; CR1 31:28 {0, 15}; the tags at their reset values) and bench rows P1-P5, and RCC's R12 for TVI-RCC-VOS, judged only with a PWR guard" \
+    check "ledger (ruled Q19): the manifest restates pwr onto the PWR guard (its Python stub named by the class row), and the ledger says so: pwr is a model row guarded by it, not the stub's canned row (TVI-WO-2100 Q26), and fmc stays canned; the release carries the guard's 69 field rows over its 9 registers (DBP, VOS, the supply configuration and USB33DEN modeled; CR1 31:28 {0, 15}; the tags at their reset values) and bench rows P1-P5, and RCC's R12 for TVI-RCC-VOS, judged only with a PWR guard" \
       "[ \$rc = 0 ] && grep -qx 'class Python.PythonPeripheral Tviburi.GuardedSTM32H7_PWR' '$work/ledger/release/MANIFEST' && [ \"\$(grep -c '^restate Python.PythonPeripheral ' '$work/ledger/release/MANIFEST')\" = 1 ] && grep -q '^restate Python.PythonPeripheral pwr ' '$work/ledger/release/MANIFEST' && python3 -I -c '
 import json, sys
 rows = [json.loads(l) for l in open(sys.argv[1]).read().splitlines()[1:]]
@@ -293,7 +293,9 @@ b = {r[\"field\"]: r for r in rows if r[\"row\"] == \"bench\"}
 ok = ok and all(b.get(x, {}).get(\"peripheral\") == g for x in (\"P1\", \"P2\", \"P3\", \"P4\", \"P5\"))
 ok = ok and b[\"R12\"][\"rule\"] == \"TVI-RCC-VOS\" and \"judged only with a PWR guard on the platform, not judged otherwise\" in b[\"R12\"][\"procedure\"]
 c = {r[\"register\"]: r for r in rows if r[\"row\"] == \"canned\" and r[\"peripheral\"] == \"Python.PythonPeripheral\"}
-ok = ok and sorted(c) == [\"fmc\", \"pwr\"]
+ok = ok and sorted(c) == [\"fmc\"]
+m = [r for r in rows if r[\"row\"] == \"model\" and r[\"peripheral\"] == \"Python.PythonPeripheral\"]
+ok = ok and len(m) == 1 and m[0].get(\"guarded_by\") == g and m[0][\"instances\"] == [\"pwr\"] and m[0][\"files\"][0].startswith(\"platforms/cpus/stm32h7.repl sha256:\")
 sys.exit(0 if ok else 1)
 ' '$work/ledger/release/LEDGER.jsonl'" ;;
   regen)
