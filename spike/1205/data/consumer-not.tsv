@@ -1,0 +1,28 @@
+# line	why it is not a consumer obligation (TVI-WO-1205 (3))
+28	Phase 1 goal text: names the consumer as the reason, no action
+36	TVI-WO-1100 row: Aethelgard named as the data source of the coverage map
+37	TVI-WO-1150 row: the spike that measured the seam; its consumer findings are cited from FB 1150 (A2, A3, D2, E1)
+40	TVI-WO-1300a row: a harness made runnable for Aethelgard 4240e, done; no consumer action
+42	TVI-WO-1301 row: Aethelgard named as an independent pin-data source; its consumer item is R:150 (F4)
+49	TVI-WO-1305 row: measured on Aethelgard 4400h; its consumer items are cited from FB 1305 (B6, B7, D5)
+62	TVI-WO-1205 row: this work order
+63	TVI-WO-13NN row: Tviburi's guard order; "a consumer row" is a future Tviburi trigger
+73	A Tviburi guard row (ADC CKMODE); Aethelgard 4240e named as the measurement
+75	A Tviburi guard row (SYSCFG_PMCR); Aethelgard 4410 named as the measurement
+81	Tviburi's replay harness and Aethelgard's reaper argv: a Tviburi harness fix
+175	Phase 2 heading
+179	Phase 2 goal text
+181	Phase 2 Work header; each bullet R:182-189 is cited
+193	Phase 2 exit gate heading; its clauses are Aethelgard's gate, not a checklist item
+203	Phase 3 context
+214	Phase 4 goal text
+216	Phase 4 shape; after Phase 2
+222	Phase 5 trigger
+228	Phase 5 family order
+229	Phase 5 family order
+254	Sequencing: Aethelgard's Phase 2 queues behind its own package queue
+269	Amendments row
+278	Amendments row
+279	Amendments row
+295	Amendments row
+303	Reconciliation: Scotty's instruction, the reason for the whole roadmap
