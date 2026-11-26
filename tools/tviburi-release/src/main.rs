@@ -144,9 +144,9 @@ fn state(class: &str) -> Option<(&'static str, Option<String>)> {
 
 /// The acknowledgement a `behaves as` text cites, each resolved to its own document: `(A<n>)` or `(A<n>; …)` is
 /// TVI-WO-0100b.rm0433.md §4's; `(TVI-WO-1300 A<n>)` or `(TVI-WO-1300 A<n>; …)` is TVI-WO-1300.rm0433.md §8's
-/// (granted by the architect, 2026-11-23T15:15Z).
+/// (granted by the architect, 2026-11-23T15:15Z); `(TVI-WO-1206 A<n>)` is TVI-WO-1206.rm0433.md §3's (granted 2026-11-26T23:36Z).
 fn acknowledgement(behaves: &str) -> Option<String> {
-    for (tag, doc) in [("(TVI-WO-1300 A", "TVI-WO-1300.rm0433.md §8"), ("(A", "TVI-WO-0100b.rm0433.md §4")] {
+    for (tag, doc) in [("(TVI-WO-1300 A", "TVI-WO-1300.rm0433.md §8"), ("(TVI-WO-1206 A", "TVI-WO-1206.rm0433.md §3"), ("(A", "TVI-WO-0100b.rm0433.md §4")] {
         if let Some(i) = behaves.find(tag) {
             let digits: String = behaves[i + tag.len()..].chars().take_while(char::is_ascii_digit).collect();
             let after = behaves[i + tag.len() + digits.len()..].chars().next();
@@ -834,6 +834,9 @@ mod tests {
         assert_eq!(acknowledgement("no oscillator (TVI-WO-1300 A3)").as_deref(), Some("TVI-WO-1300.rm0433.md §8 A3"));
         assert_eq!(acknowledgement("x (TVI-WO-1300 A12; p427)").as_deref(), Some("TVI-WO-1300.rm0433.md §8 A12"));
         assert_eq!(acknowledgement("x (TVI-WO-1300 Ax)"), None);
+        // TVI-WO-1206's acknowledgements cite TVI-WO-1206's document, never 0100b's or 1300's.
+        assert_eq!(acknowledgement("read (TVI-WO-1206 A7; p2097)").as_deref(), Some("TVI-WO-1206.rm0433.md §3 A7"));
+        assert_eq!(acknowledgement("x (TVI-WO-1206 A)"), None);
         let bare = fields::Row { behaves_as: "no reason".into(), ..row("R", 0, "ALL", 31, 0, None, "acknowledged by name") };
         assert!(field_rows("G", "f", &[bare]).unwrap_err().contains("no (A<n>) reason"));
     }

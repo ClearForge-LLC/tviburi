@@ -43,6 +43,7 @@ tests/mutants.tsv	TVI-WO-0100b.rm0433.md
 tests/mutants.tsv	TVI-WO-1300.rm0433.md
 tools/tviburi-release/src/main.rs	TVI-WO-0100b.rm0433.md
 tools/tviburi-release/src/main.rs	TVI-WO-1300.rm0433.md
+tools/tviburi-release/src/main.rs	TVI-WO-1206.rm0433.md
 tools/tviburi-route/src/main.rs	CLAUDE.md
 tools/tviburi-route/src/main.rs	docs/
 tools/tviburi-route/src/main.rs	FEEDBACK.md
