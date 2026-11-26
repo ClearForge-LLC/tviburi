@@ -33,7 +33,7 @@
 | branch, two machines | 20 | **0** |
 
 - **The measure file's A-load row** was 16 of 50 on `main`, at a heavier host load.
-- **CI case `teardown`:** 15 loaded quits, each needing every guard's witness and end record, in the log file and on the console.
+- **CI case `teardown`:** 15 clean quits, each needing every guard's witness and end record, in the log file and on the console. The first is the runner's own run, unloaded; it builds the firmware, check and release. The other 14 run beside 12 busy loops (3 per core on a 4-core CI runner).
 - **Mutant `TD01-endFlush`** drops the flush; `teardown` kills it.
 
 **The adversarial checks the ruling named:**
@@ -146,6 +146,14 @@
 - **`tests/spike.sh`, all cases,** passes on the P1 tree (ALL PASS). It passes again on the reduction tree, capped at 6 cargo jobs (13:53Z), with `teardown` rerun on `bf839d8` after the fix in §4: 0 of 15 lost.
 - **`tests/1300/rcc.sh`, all cases,** passes on the reduction tree: 76 ok, 0 FAIL (`recordedtwo` and `hsesw` included).
 - **The cases (3) adds or moves, on HEAD:** `rcc` `hsesw`, `hse-none`, `hse-zero`, `recorded`, `recordedfield`, `recordedtwo`, `fields`; `i2c` `recnack`, `nacktransfer`, `recorded`; `spike` `recorded`, `manifest`. All ok.
+- **The 14 generated boots and ArduPilot's fixture,** replayed by the committed `tests/1301/replay-1301.sh` with every guard recorded, on `main` and the branch, capped. Harness: `~/.cache/tvi-1204/h/loop.sh`; outputs: `rep/`.
+  - **Records:** 0 on every one, both trees.
+  - **Witnesses:** the same counts on both trees: 30, 31 or 32 per board, and 32 on the fixture.
+  - **Console:** every boot block's hash is identical, `main` against the branch.
+  - **Moved:** no record on the consumer's console. P1 adds none here, and no board runs the RCC with no crystal.
+  - **The fixture's peak,** one boot under host load: 1,250,180 KiB on the branch against 1,047,340 KiB on `main`. One sample; the budget's 11-boot medians judge it (below).
+- **The armed run** (`1305`'s capture of `4400h` `s03-arm-s`, the 1100a harness with cargo capped). Both trees arm from 9.332 s, 32 witnesses and 32 ends, 0 records.
+- **The other harnesses' cases that run the RCC, SPI or their own guard recorded:** `usart` `rxoff`, `hzpllon`, `hzport`, `idlenone`, `idlehse`, `recorded`; `timer`, `dma`, `flash`, `adc` and `gpio` `recorded` and their siblings. These also prove each harness's `GUARDS=` line: 14 ok, 0 FAIL.
 - **Mutants:** every mutant this WO adds or re-anchors is killed (listed in §1 and §3).
   - Added: `TD01`, `RM01`–`RM05`, `I264`.
   - Re-anchored: `G17`, `DM34`, `FL32`, `US28`, `I234`, `AD43`, `M09`, `M12`, `M26`, `M31`, `T05`, `T06`, `RB06`.
