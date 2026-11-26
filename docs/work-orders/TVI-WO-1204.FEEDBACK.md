@@ -62,7 +62,7 @@
 - **After a would-refuse,** what follows is the stock model's behaviour, not a guard's promise. A recorded run is never a pass. `1306a` F10's two edges are named there as examples.
 
 **P1, every rule evaluated (recorded only).**
-- **Code:** the SPI and RCC guards, the two that stopped at the first rule, now evaluate every rule through `Records.Evaluates`. Enforcing still short-circuits, and its paths are unchanged rule for rule.
+- **Code:** the SPI and RCC guards, the two whose headers said first rule only, now evaluate every rule through `Records.Evaluates`. That holds past the malformed-access exception, which the contract names (§1 (3), below). Enforcing still short-circuits, and its paths are unchanged rule for rule.
   - **SPI:** the access chain (LOAD, ENABLE, WIDTH), the order rule, the write rules (IOLOCK, CFG2-SPE, CFG1-SPE, I2SMOD, FIELD, the frame size, the truth table, KERNEL), and the read rules (READ, IOLOCK, MODF).
   - **RCC:** the write chain (HSE, PLL, PLL-REF, SW, FIELD, CLOCK).
   - **The grain is the rule:** each rule ID is evaluated. Within one rule, its first failing condition records.
@@ -73,6 +73,13 @@
   - `RM01-evaluatesAll`: `Evaluates` short-circuits in recorded mode; killed by `recorded` and `rcc-recordedtwo`.
   - `RM02-spiOrderWord`: SPI's 32-bit order rule short-circuits; killed by `recorded`. Its first form, on the 8-bit chain, survived: the case's TXDR write is 32-bit, so that mutant changed nothing the case runs. Re-anchored.
   - `RM03-rccField`: RCC's field rule short-circuits; killed by `rcc-recordedtwo`.
+
+**The malformed-access exception, named in the contract** (architect review, 15:18Z):
+- **Refused alone, rule evaluation stops:** an unloaded, misaligned or wrong-width access, in most guards.
+  - GPIO (`Misaligned`, around L232), the timer (`Narrow`, around L183) and the RCC (its misaligned write, `TVI-RCC-WIDTH`, around L576) still forward that access in recorded mode.
+  - The DMA (L232), the I2C (L205) and the USART (L229) return on a `Narrow` access in both modes, and the I2C and USART also on an offset with no register (`!Defined`). So in recorded mode that access never reaches the stock model, against "the access goes on". Their rules are outside this WO, so the contract states it (row R9).
+- **The SPI and the ADC continue past their width rule.**
+- **The review named GPIO, the timer and the RCC;** I found the DMA, I2C and USART returns while writing the text.
 
 **P2, a refused write is forwarded, and the HSEON case does not throw.** Ruled B at 12:51Z.
 - **What I proposed at 12:21Z, and why it failed:** I proposed masking HSEON. Before building it I ran it, which I had not done when I proposed it.
@@ -87,6 +94,7 @@
   - **Recorded:** `TVI-RCC-HSE` is recorded, then CFGR reads `0x12` (SWS = HSE), the marker, rcc's end; never a pass; nothing throws.
   - **Enforcing:** `TVI-RCC-HSE` refuses first, and nothing throws.
 - **Mutant `RM04-hsePlaceholder`:** gives the stock model 0 in recorded mode; killed by `hsesw`.
+- **Enforcing's 0 has no killable mutant:** `TVI-RCC-HSE` refuses first, so the stock model never runs on the HSE there.
 - **Adversarial, as ruled: does any guard read the stock model's HSE frequency? No.**
   - The RCC guard reaches `inner` only through `ReadDoubleWord` (16 sites), `WriteDoubleWord` (2), `Register`, `Unregister` and `Reset`. Those are register bits; no frequency property.
   - No guard reads a `.Frequency`, the systick, or any stock clock property.
@@ -139,7 +147,7 @@
 - **Before:** the old weights read the run's seven 6975P-C shards at 1.022–1.097 of plan, 2–10 % slow.
 - **After, in-sample:** 0.960–1.014, every shard within 4.0 %.
 - **New items are estimated:** `teardown` 250 s and `TD01-endFlush` 260 s from Furnace runs; the rest are small or at their kind's median.
-- **Out of sample, this PR's own CI:** §2.
+- **Out of sample, this PR's own CI:** within 5 %, then re-weighed from both runs (§2).
 
 ## 2. Acceptance
 
@@ -157,7 +165,14 @@
 - **Mutants:** every mutant this WO adds or re-anchors is killed (listed in §1 and §3).
   - Added: `TD01`, `RM01`–`RM05`, `I264`.
   - Re-anchored: `G17`, `DM34`, `FL32`, `US28`, `I234`, `AD43`, `M09`, `M12`, `M26`, `M31`, `T05`, `T06`, `RB06`.
-- **CI on the PR:** the route, ten shards, the budget (with the witness check), and the aggregate: written here after the PR's first CI run, with the plan against CI per shard.
+- **CI on #63, first run** (45846324975, `1750168`): all green.
+  - **Aggregate:** 1,000 items expected (446 cases, 554 mutants), 1,000 ran across ten shards, 0 failures.
+  - **Budget:** medians `main` 941,656 KiB, branch 942,648 KiB, +1.0 MiB (the local one-boot peak in the replays was noise).
+  - **Witness check:** `witnessed.sh` found a witness for every one of the 32 instances under a guard, on each of the 5 branch boots.
+  - **`teardown`** on a 4-core EPYC 9V45 runner: 285.6 s for its 15 quits, about 18 s a quit against the 120 s timeout. 0 lost.
+  - **`TD01-endFlush`** was killed there too (shard 1, EPYC 9V45, 288.4 s). The kill is probabilistic: a loaded quit lost an end record about 1 in 5 on Furnace, so 14 loaded quits all passing without the flush is about 4 % (0.8^14).
+  - **The plan against CI, out of sample:** #63's four 6975P-C shards ran at 0.967–1.018 of the plan from `main`'s run, all within 5 %.
+  - **Re-weighed from both runs,** as the review asked: every item now measured (teardown 309 s, TD01 334 s, RM01 26 s, RM05 19 s; the five restate mutants that now name `manifest`, 5–6 s). Against those weights both runs' 6975P-C shards read 0.959–1.026, within 4.1 %.
 
 ## 3. Adversarial pass
 
@@ -214,6 +229,8 @@ Reduction pass (diff): −23 net · 9 duplicates removed · 1 dead paths removed
 - **R4, `1306a` F10's second edge** (an uncleared NACK STOPF keeping controller mode): named in the contract, not pinned.
 - **R5:** recorded-mode rules reached after an earlier rule fired, on states that rule refused, are tested only by the cases above (§3).
 - **R6–R8:** the reduction findings (§4).
+- **R9, the malformed-access exception** (§1 (3)): whether GPIO, the timer and the RCC should evaluate their later rules past a misaligned or wrong-width access, and whether the DMA, I2C and USART should forward one in recorded mode. Those are guards' rules, a later WO.
+- **R10, `t_guards`' copy check** finds only a space-separated run of ten or more guard names on one line. A copy split across lines, or written another way, passes it. `board_guards` follows `using` one level deep.
 - **For the architect's docs PR:**
   - `RUL-12`'s level text (ruled 12:21Z);
   - the race rows (§1 (2)), closed in the roadmap.

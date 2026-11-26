@@ -19,6 +19,11 @@
 //     (Records.Evaluates). Nothing pauses. TVI-LOAD is the exception: a guard that failed to load refuses in either mode.
 //   - Recorded: the access goes on to the stock model and to the guard's copies as if no rule had fired, so a read returns
 //     what the stock model serves and a write reaches the stock model whole.
+//   - The malformed-access exception (TVI-WO-1204, architect review 15:18Z): an unloaded, misaligned or wrong-width access is
+//     refused alone in most guards, with no later rule evaluated for it. GPIO's and the timer's Misaligned or Narrow write and
+//     the RCC's misaligned write (its TVI-RCC-WIDTH) still go on to the stock model in recorded mode. The DMA's, the I2C's and
+//     the USART's Narrow access, and the I2C's and the USART's access to an offset with no register, go on to nothing, in
+//     either mode. The SPI evaluates its later rules past TVI-SPI-WIDTH, and so does the ADC past its Narrow.
 //   - One exception (TVI-WO-1204 (3) P2, ruled 2026-11-26T12:51Z): in recorded mode with no crystal declared, the stock RCC runs on a placeholder 8 MHz so a run
 //     can continue past TVI-RCC-HSE; no guard reads it (model/GuardedSTM32H7_RCC.cs).
 //   - What follows a would-refuse is the stock model's behaviour, not a guard's promise; a recorded run is never a pass.
