@@ -628,4 +628,4 @@ PW36-noPwrNamed	model/GuardedSTM32H7_Flash.cs	return -1;   // nothing at PWR_D3C
 DX31-dmamuxAddr	model/GuardedSTM32H7_DMAMUX.cs	if(start != Dmamux1Base)	if(false)	dmamux-addr
 DX32-pairAccess	model/GuardedSTM32H7_DMAMUX.cs	State(), crOffset, crValue, 32);	State(), 4 * channel, id, 32);	dmamux-pair
 PW37-wholeHertz	model/GuardedSTM32H7_PWR.cs	            clocks = clocks.Select(c => Math.Round(c, MidpointRounding.AwayFromZero)).ToArray();\n	(empty)	pwr-hse400 pwr-hse400v3 pwr-hse25
-DX31-pairSpan	model/GuardedSTM32H7_DMAMUX.cs	&& step != 0 && items > 1 ? par + step : (uint?)null;	&& false ? par + step : (uint?)null;	dmamux-pinc
+DX33-pairSpan	model/GuardedSTM32H7_DMAMUX.cs	&& step != 0 && items > 1 ? par + step : (uint?)null;	&& false ? par + step : (uint?)null;	dmamux-pinc
