@@ -39,7 +39,17 @@
 
 ## 3. The replays
 
-(filled in below)
+`main` (`a896644`, measure M1) against the built model (`175905e`; the commits after it change only cases and planted firmware: `git diff 175905e HEAD -- model/` is empty), in one harness (`~/.cache/tvi-1306a/h/replay-l.sh`: the committed `replay-1301.sh` with access logging), every guard recorded, `i2c1`–`i2c3`, `gpioPortB` and `usart1` logged; compared by `h/final-compare.sh` (evidence `~/.cache/tvi-1306a/m1`, `m4`, `final-compare.txt`).
+
+| Runs | Records (but the armed run's 530,175 `TVI-ADC-LEVEL`, `main`'s) | "Unknown slave" under a port | Boot block, step lines | `NACKF`, `START` to the first `ISR` read showing it | Other differences |
+|---|---|---|---|---|---|
+| Ten generated boards with the TMP117 | none, either side | 1 / 1 each | identical | 23.3–23.8 µs (computed 23.06 µs, 64 MHz `rcc_pclk1`, `0x10C7123C`/`3B`) | the stock `NACKCF` warning gone (2–5 lines a board on `main`, §4) |
+| `sentinel-02-bench`, `-bench-hse8` | none | 0 / 0 | identical | — | the `NACKCF` warning gone (3 / 0) |
+| `d1-drv8876`, `driver-judges-nothing` | none | 0 / 0 | identical | — | none |
+| ArduPilot's fixture (5 s) | none | 58 / 58 | registers identical; `cpu ExecutedInstructions` +4.7 % and the final PC differ | 23.4–23.6 µs ×58 (computed 23.1 µs) | its timeline (measure §2.3) |
+| The armed run (13 s) | none | 110 / 110 | registers identical; `ExecutedInstructions` +3.6 %, the PC | 95.1–97.8 µs ×110 (computed 95.1 µs) | **arms:** armed heartbeat from 9.332 s (`main` 9.787 s), the arm command accepted at 9.00 s on both |
+
+The spread above the computed time is each firmware's polling (ChibiOS reads `ISR` in its interrupt, the generated driver in its loop).
 
 ## 4. Consumer observers (Aethelgard `589030ca`), by board
 
@@ -95,8 +105,23 @@ A full pass (WO §5) by an independent reader, given the diff, the WO, the rulin
 
 ## 7. Gates
 
-(filled in below)
+- **Cases, local, on the committed tree:**
+  - the 47 I2C cases (`1306`'s 38, this WO's 9: `nack`, `nacktime`, `nackpll`, `nackirq`, `nackstop`, `nackpe`, `nacktransfer`, `nacktxdr`, `nackclock`) at `175905e`, plus `nackirq` and `nacktxdr` again at `300b387`;
+  - **`1300b`'s, `1306`'s and `1307`'s cases unchanged** (ruled Q2): the 68 RCC, 38 USART and 46 ADC cases with the I2C ones, 198 at `393ca32`. 196 passed; `i2c-nackpll` and `adc-rate2` failed once and passed on every rerun (§6).
+- **Mutants, run as CI's shard runs them** (`TVIBURI_MUTANTS=… tests/mutants.sh`, from `git archive HEAD`, the case ids its rows name). 78 rows: every `I2xx` and `RBxx` row, the I2C guard's and the RCC guard's watch rows.
+  - **At `175905e`:** 76 killed and **2 alive**: `I245` (the NACK's own `STOPF` now ends the transfer; the line still guards a `TXDR` before it) and `I251` (`nackirq`'s `STOPIE` masked the `NACKIE` term).
+  - **Fixed at `300b387`:** case `nacktxdr`, and a second NACK in `nackirq` cleared the other way round. `I245`, `I251` and `I263` were rerun there: **all killed**.
+  - **This WO's rows:** `I246`–`I264` (19), and `I216`, `I245` retargeted. Withdrawn: `I220`, `I238`.
+- **Reduction pass (diff), by a fresh reader** (`~/.cache/tvi-1306a/reduction.md`, then applied by me and re-proved with the cases and mutants above): −4 net · 4 duplicates removed (two comments and two ledger texts saying the NACK again) · 2 dead paths removed (`PllHz`'s `input == null || divm == 0`, already caught by `refHz < 1e6`; `Pass`'s unused default) · 0 protected kept · 4 findings (§6: the three copies of the PLL arithmetic; the RCC-guard lookup three times and the no-device test twice in the I2C guard, each a helper that would cost more lines than it saves).
+  - **Rejected:** merging `NackcfBit`, `NackieBit` and `StopieBit` into `NackfBit` and `StopfBit`. They share bit positions by layout, but they are three registers' fields, not one fact.
+  - **Rejected:** a helper for the NACK's two scheduled steps: no lines saved, two mutant rows churned.
+- **The shards:** ten, planned from this tree's `times.tsv` (the new rows at the I2C means, unmeasured): every one of the 416 cases and 533 mutants planned once; the longest shard 568 s, **15.4 min a job at 1.53**, `ci`'s wall 17.1–17.4 min.
 
 ## 8. Budget and CI
 
-(filled in below)
+- **The budget is CI's to judge** (ruled Q10: the same job, relative). Measured on Furnace before the build (measure §2.6), for the record:
+  - the NACK code compiled in but inactive: −5.7 MiB (PASS);
+  - the active NACK, prototype C: +10.3 MiB at load 8.7 (PASS), but +34.0 and +42.2 MiB at load 15–19 (REFUSE);
+  - `main` against itself at load 15: −2.2 MiB.
+  - The cause is ArduPilot's own extra work in the window: about 38 % more, now that its probes end in microseconds.
+- **CI:** (pending at the push; added below when the first run ends).
