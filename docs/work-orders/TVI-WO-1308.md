@@ -7,7 +7,7 @@
 
 **Grounds:**
 - **`TVI-WO-1100a`'s cut** (PR #59, `docs/work-orders/TVI-WO-1100a.cut.md`): on the armed ArduPilot run, everything on the four paths that fly is guarded or acknowledged, except two families.
-  - **DMAMUX1:** stock and unaudited. It routes every DMA stream the flight uses (IMU, barometer, battery, MAVLink). 7 channels are configured, 2 of them rewritten 37,678 times.
+  - **DMAMUX1:** stock and unaudited. It routes every DMA stream the flight uses: IMU, barometer, battery, MAVLink and RC. 10 channels are configured in the armed run (the cut page, revised at `53b365e`).
   - **PWR:** a stock stub that answers "ready" to everything. `VOS` goes to Scale 1 (RM0433 Rev 9 p310), the LDO and the USB regulator are enabled (p308), and backup-domain access is opened (p305).
 - **Both are in the recommended cut and in the cautious alternative.** `OQ-03`'s ruling (Scotty's) decides only whether TIM5 joins them, so this work order does not wait for it.
 - `RUL-07`, `RUL-13`, `RUL-16`, `RUL-17`, `RUL-18`; northstar invariants 1, 5 and 6.
@@ -50,7 +50,7 @@
   - a second supply-configuration write is ignored as silicon ignores it, and named;
   - a clock raised before `VOSRDY` refuses.
 - **The armed run, the fixture and the 14 boots:** no new record, boot blocks byte-identical, and the armed run arms. Or each difference is named and ruled.
-- **The class map lists both guards' instances,** and the ledger's `guarded_by` is true for them (`1100a`'s finding 1, fixed in `1203`; check against it).
+- **The release manifest restates both guards' instances** only as `1203`'s rule allows (an instance a replay has run guarded), and its test passes for them.
 - **The budget is judged in CI. CI is green.** Re-weigh `times.tsv` for your rows from this run, since the plan under-reads by about 15 %.
 
 ## 3. Fences

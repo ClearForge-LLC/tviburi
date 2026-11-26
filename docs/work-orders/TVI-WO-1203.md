@@ -1,4 +1,4 @@
-# TVI-WO-1203 — Phase 1's gate proofs: the ledger's over-claim fixed, and clauses 3, 4 and 6 proven in CI
+# TVI-WO-1203 — Phase 1's gate proofs: the manifest restates only what a replay has run guarded, and clauses 3, 4 and 6 proven in CI
 
 **Repo:** `ClearForge-LLC/tviburi` · **Base:** `main`, named in the kickoff.
 **Branch:** `wo/tvi-1203-gate-proofs`.
@@ -6,7 +6,9 @@
 **Phase:** 1, a `12NN` slice (identity, the ledger, CI). Written 2026-11-26. **Cadence:** build, with one stop if a fix would move a committed record.
 
 **Grounds:** `TVI-WO-1100a`'s audit (PR #59, `TVI-WO-1100a.cut.md` and `.measure.md`) at `main` `39e51af`, CI run 45774342008.
-- **The ledger over-claims guarding,** which is invariant 2's falsifier. `pins.tsv` has no instance list for `SPI.STM32H7_SPI` or `Timers.STM32_Timer`, so the ledger says `spi4`, `timer2`–`7` and `12`–`17` are `guarded_by`, while the run binds them stock.
+- **The release manifest restates instances Tviburi has never run guarded** (`1100a` measure §5 F1, as restated at `53b365e`). `pins.tsv` gives no instance list for SPI or the timers, so the `MANIFEST` restates `spi4` and all 14 timers onto the guards, and the ledger lists them `guarded_by`. Every replay guards only `timer1`/`timer8` and `spi1`/`spi2`.
+  - Not invariant 2: the ledger keeps them `inherited-unaudited`.
+  - But a consumer following the manifest would put ArduPilot's TIM5 under the TIM1/TIM8 allow-list, where its `ARR` = 0xFFFFFFFF would likely refuse (inferred, not run).
 - **Clause 3,** "cells unproven": a removed guard and a crash in Aethelgard's console framing, and a crash at Tviburi's runner.
 - **Clause 4,** partly met: the stock half of the `MODF` scar passes because the run has no witness, not because stock reached the end. The page match is checked by hand.
 - **Clause 6,** 20 rows unproven: I2C `ISR.TXE`/`TXIS`, and ADC `SQx`, `AWD1CH`, `CCR.PRESC`.
@@ -15,10 +17,11 @@
 - Northstar invariants 2, 3, 5 and 8; `RUL-11`, `RUL-17`, `RUL-19`.
 
 > **What this is:**
-> - **(1) The class map tells the truth.**
->   - Every guarded class lists the instances it guards, and the ledger says `guarded_by` only for an instance the run binds to the guard.
->   - A check refuses the release if the ledger names a guard for an instance the platform binds stock: planted, with a mutant.
->   - The ledger rows that change are named, and the release's model hash moves once, named.
+> - **(1) The manifest restates only what a replay has run guarded.**
+>   - Every guarded class lists the instances it guards.
+>   - The `MANIFEST` restates onto a guard only an instance some committed replay has run under that guard. SPI's instances are consumer-declared, so decide how a consumer's declared instance qualifies, and say so.
+>   - A check refuses the release if the manifest restates an instance no replay has run guarded: planted, with a mutant.
+>   - Name the manifest and ledger rows that change. The release's model hash moves once, and that is named too.
 > - **(2) Clause 3's three cells, each a CI case:**
 >   - a removed guard in Aethelgard's console framing;
 >   - a crash in that framing;
@@ -45,7 +48,7 @@
 
 ## 2. Acceptance
 
-- **The over-claim check** refuses a planted false `guarded_by`, and `main`'s ledger passes after (1).
+- **The manifest check** refuses a planted restatement of an instance no replay ran guarded, and `main`'s manifest passes after (1).
 - **Every clause-3 cell, the clause-4 halves and the 20 clause-6 rows** are CI cases, run in a shard and named in the aggregate.
 - **The 14 boots, the fixture and the armed run:** no new record, and the armed run arms.
 - **CI is green, with the budget judged.** Re-weigh your rows from this run.
@@ -70,7 +73,7 @@
 ## 5. Adversarial pass, targeted
 
 - **A case that passes for another reason,** as clause 4's stock half did.
-- **A `guarded_by` still true for an instance bound stock,** by a class name the check doesn't parse.
+- **An instance restated onto a guard that no replay ran,** by a class name the check doesn't parse.
 - **A crash case that times out instead of crashing,** read as a pass of the case.
 
 ## 7. Flag-and-stop conditions
