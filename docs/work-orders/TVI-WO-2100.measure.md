@@ -29,30 +29,46 @@ Image: `ghcr.io/clearforge-llc/aethelgard-tools@sha256:1e0ab105ec42…` — the 
   - P3, one byte of a model changed after the first build: "the two builds differ: tviburi-release.tar, differ: byte 4959, line 64";
   - P4, verify against the wrong hash: "verify against sha256:0000…".
 
-## 2. The rehearsal: the consumer with only the tarball — **stopped (WO §7, the second condition)**
+## 2. The rehearsal: the consumer with only the tarball — **stopped (WO §7, the second condition): a fact the manifest does not state**
 
-**The tarball holds four files:** `MANIFEST`, `Tviburi.cs`, `TviburiRelease.cs.template` and `LEDGER.jsonl`. Their bytes check against the manifest with `sha256sum` alone (`file`, `overlay` with its length, `ledger-rows`). So `verify` needs nothing from the tree, beyond the verifier itself if the consumer uses Tviburi's.
+**What the tarball alone gives, measured.**
+- It holds four files: `MANIFEST`, `Tviburi.cs`, `TviburiRelease.cs.template` and `LEDGER.jsonl`.
+- **The binding check needs no Tviburi tool.** `spike/2100/consumer-verify.sh` checks the released bytes against the MANIFEST's own lines in a fresh directory that holds only the tarball, with POSIX `sh`, `tar`, `sed` and `sha256sum`:
+  - the MANIFEST against the pin;
+  - the template's sha256;
+  - the overlay's first 912,038 bytes;
+  - `Tviburi.cs`'s tail, which equals the template with its one placeholder (`@@MANIFEST_SHA256@@`, readable in the shipped template) filled with the MANIFEST's sha256;
+  - the ledger's first line, and its rows' sha256.
 
-**Building the platform from the manifest's class map and the pinned stock files cannot be done.** The manifest states:
-- 11 `class` rows (stock type → guard type);
-- 32 `restate <stock type> <instance> platforms/cpus/stm32h7.repl` and 2 `retype` lines;
-- the stock pins.
+  Result: `CONSUMER VERIFY PASS` on `main` `cd235c7`'s tarball. It fails by name on a wrong pin and on one edited overlay byte.
+- **`tviburi-release verify` and `tviburi-check` are built from `tools/`,** so a consumer with only the tarball has neither. The check above replaces `verify`. `tviburi-check` is Tviburi's reference reader of the records contract (`RUL-11`/`RUL-12`), and the consumer reads records with its own (Aethelgard's console parser). Not a lack, but named: the release ships no reader.
 
-It does not state:
+**What `RUL-09` (b) leaves to the consumer, and what it cannot derive.** The ruling makes cancel-and-restate the consumer's job, from the pinned stock file and the class map. Its amendment replaced a shipped `.repl` fragment with the class map on purpose, so the restate texts not being shipped is not by itself a lack. Measured over the eleven committed restate files against the stock entries they restate:
+- **Derivable by (b) from the stock chain and the class map** (the bulk):
+  - `X: @none`;
+  - the guard at the stock address `as "X"`;
+  - the stock entry's properties and interrupt lines;
+  - the registration with its alias (stated by `RUL-07` for the RCC: every `rcc RegistrationPeripheralAlias` registration in the chain onto the RCC guard, the 58 restated blocks);
+  - **every reference to a cancelled variable repointed** (`dmaPeripheral: dmamux1`, DMAMUX1's routes, `spi4`/`crypto`, `@ gpioPortX`, `timerN@`, `@ i2cN`), found by grepping the pinned chain for the cancelled names.
 
-| # | What the consumer lacks | Where it lives in this tree |
-|---|---|---|
-| L1 | **The restatement texts.** The manifest names the eleven `model/stm32h7-*-restate.repl` files, the board `model/tviburi-nucleo-h753zi.repl` and `tests/1301/replay-1301.sh` as `source` lines by sha256, but **none is in the tarball**. A consumer can check their hashes but cannot get them | `model/stm32h7-*-restate.repl` |
-| L2 | **Each guard's declaration**: its variable name, and that its registration names the RCC guard's variable (`tviburiRcc RegistrationPeripheralAlias.X`), not the cancelled `rcc`. For the RCC itself, that is the 58 stock registrations restated onto it (`RUL-07`) | the restate files |
-| L3 | **Properties that are not the stock entry's**, each one the guard refuses (or runs unguarded) without: `revision` on `GuardedSTM32H7_ADC` and `GuardedSTM32H7_PWR`, required and never defaulted (`TVI-ADC-CONFIG`, `TVI-PWR-CONFIG`); `dmamux:` on `GuardedSTM32DMA`, the DMAMUX1 guard's variable (`null` → "no `dmamux`", refusing); `hseFrequency` on the RCC guard; `package` and `external` on the GPIO guards; `optionBytes` on the flash guard; `levels` on the ADC; `mode` on every guard | the guards' constructors; the restate files; `replay-1301.sh` |
-| L4 | **The cross-references a cancel leaves dangling**, which bind to the cancelled entry silently (`RUL-09` (b)): `dmaPeripheral: dmamux1` (the ADCs); DMAMUX1's routes onto the DMA guards; `spi4`'s `DMARecieve -> …@83` and `crypto`'s `OutDMA -> …@77`; `@ gpioPortX`, `-> gpioPortX`, `timerN@`, `@ i2cN` | the restate files; `replay-1301.sh`'s per-guard blocks |
-| L5 | **The order of the restatements**: the DMA guards before DMAMUX1's; ADC's before DMAMUX1's untyped updates | the board's `using` order |
-| L6 | **What a consumer must do with its own untyped blocks** for a cancelled instance (move the timers' and USARTs' `frequency` onto the guard; turn the flash controller's `init` into `optionBytes`; drop the PWR script) | `replay-1301.sh`; `TVI-WO-1205.consumer.md` (when merged) |
+  A consumer can reproduce all of this, though only if (b) is read as "repoint every reference", which is the trap it already warns of.
+- **Not derivable: properties that are no stock entry's, which the guards need.** None is in the manifest, the class map or the ledger's `model` rows:
 
-**So the artifact as released is a snapshot of this repository, not a release.** A consumer needs `model/` for L1–L5, and Tviburi's own replay harness for L6.
+| Guard | Property | Without it | Committed case |
+|---|---|---|---|
+| `GuardedSTM32H7_PWR` | `revision` ("V"/"Y"), required, never defaulted (`1308` Q7) | `TVI-PWR-CONFIG` at every access | `pwr-norev` |
+| `GuardedSTM32H7_ADC` | `revision`, required (`1307` Q2) | `TVI-ADC-CONFIG` | `adc-norevision` |
+| `GuardedSTM32DMA` | `dmamux: <the DMAMUX1 guard's variable>` | "no `dmamux`": `TVI-DMA-CONFIG` | `dma-config` |
+| `GuardedSTM32_GPIOPort` | `package` (e.g. "LQFP144"), and `external` levels | refused by name | `gpio-package`, `gpio-packageinput` |
+| `GuardedSTM32H7_RCC` | `hseFrequency` (no default, `1300b` (4)) | `TVI-RCC-HSE` at an HSE switch | `rcc` suite |
+| `GuardedSTM32H7_Flash` | `optionBytes` (the consumer's `init` word, moved) | its stock init cannot apply (E29, `1304`) | `flash` suite |
+| `GuardedSTM32H7_ADC` | `levels` (or `SetVoltage`) | `TVI-ADC-LEVEL` at a `DR` read | `adc-undeclared` |
+| every guard | `mode` ("enforcing" default) | — (defaulted) | — |
 
-**The fix the WO names is a release-program change, which needs a ruling.** Two options:
-- **(A)** Ship the restatement in the tarball, generated as today: the eleven restate files, or one `platform.repl` fragment in the board's order. Add a manifest line per guard naming each property it requires or accepts (L3).
-- **(B)** Have the manifest carry every fact as rows: declarations, properties, cross-references and order. The consumer's emitter then generates the restatement. That is more work for both sides, and a second transcription of what the `.awk` files already generate.
+**So the stop is L3:** the consumer cannot build a platform that loads every guard correctly without facts the release does not state. It must read them from this tree's restate files and `tests/1301/replay-1301.sh`, or from the work orders. Some are consumer facts (the revision, the crystal, levels and option bytes), and `1205`'s checklist covers them. But the release does not say **which properties each guard takes or requires**, so a consumer cannot know to supply them.
 
-I recommend (A).
+**The fix is a release-program change (WO §7), which needs a ruling.** Options:
+- **(A)** Ship the eleven generated restate files in the tarball, as `source` lines already hash them, plus one manifest line per guard naming its required and optional properties. **This partly reverses `RUL-09`'s amendment** (a shipped fragment instead of the class map alone).
+- **(B)** Keep the class map alone, and add only the per-guard property lines to the manifest (`property <guard> <name> required|optional <meaning>`). The consumer's emitter does (b) itself and supplies what each line names.
+
+I recommend **(B)**: it is the smallest change that closes the measured lack, and it keeps `RUL-09` as ruled. (A) is the cautious choice if Scotty wants the consumer's restatement checked byte for byte against Tviburi's.
