@@ -12,7 +12,6 @@ set -euo pipefail
 here=$(cd "$(dirname "$0")/../.." && pwd)
 IMAGE=$(sed -n 's/^IMAGE=//p' "$here/tests/spike.sh")
 CASES="config m1ue over8ue psue psoff stopue reinit reinitstop disable same ap width tdrbyte read field nine kernel clock rxoff idle idleframe idlere dmarx fields ledger registrations recorded reset config2 regen brr0 brr8 brrheld overrun idlekernel idlenorule idlenone idlehse hzcsi hzsyscsi hzsyshse hzvcol hzwide hzdivr hzpllon hzvcoh hzrge hzpll3q hzport hzcsiref hzcfgon hzbyte"
-GUARDS="spi1 rcc gpioPortA gpioPortB gpioPortC gpioPortD gpioPortE gpioPortF gpioPortG gpioPortH gpioPortI gpioPortJ gpioPortK timer1 timer8 dma1 dma2 flashController usart1 usart2 usart3 uart4 uart5 usart6 uart7 uart8 i2c1 i2c2 i2c3 adcM1S2 adc3"
 MONITOR="clock rxoff idle idleframe idlere dmarx fields ledger registrations recorded reset config2 regen brrheld overrun idlekernel idlenone idlehse hzcsi hzsyscsi hzsyshse hzvcol hzwide hzport hzpllon hzcsiref hzbyte"
 PATHS=$(for c in $CASES; do case " $MONITOR " in *" $c "*) ;; *) printf '"%s",' "$c" ;; esac; done | sed 's/,$//')
 PATHS="$PATHS,\"hzcsi\",\"hzsyscsi\",\"hzsyshse\",\"hzvcol\",\"hzwide\",\"hzpllon\",\"hzcsiref\""   # TVI-WO-1300c: firmware run with monitor lines after it
@@ -34,6 +33,7 @@ else
   mkdir "$src"
   git -C "$here" archive HEAD | tar -x -C "$src"
 fi
+GUARDS=$("$src/scripts/guards" "$src")   # the one guard list, from the board (scripts/guards; TVI-WO-1204 (6))
 
 fails=0
 check() { if eval "$2"; then echo "ok   $1"; else echo "FAIL $1"; fails=$((fails + 1)); fi; }

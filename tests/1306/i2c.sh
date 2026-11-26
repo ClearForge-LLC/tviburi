@@ -13,7 +13,6 @@ set -euo pipefail
 here=$(cd "$(dirname "$0")/../.." && pwd)
 IMAGE=$(sed -n 's/^IMAGE=//p' "$here/tests/spike.sh")
 CASES="config timingrpe timingrsame timingroff dnfpe anfoff clearfield ap absentnext absent icrres field width read kernel reset resetok startoff txdroff empty midstart midcr2 txdrread stopidle startstop stalestop blindclear softreset clock registrations recorded rccreset unheld clocklost absentname fields ledger regen nack nacktime nackpll nackirq nackstop nackpe nacktransfer nacktxdr nackclock isrmonwrite"
-GUARDS="spi1 rcc gpioPortA gpioPortB gpioPortC gpioPortD gpioPortE gpioPortF gpioPortG gpioPortH gpioPortI gpioPortJ gpioPortK timer1 timer8 dma1 dma2 flashController usart1 usart2 usart3 uart4 uart5 usart6 uart7 uart8 i2c1 i2c2 i2c3 adcM1S2 adc3"
 MONITOR="clock registrations recorded rccreset unheld clocklost absentname fields ledger regen nacktime nackpll isrmonwrite"
 CUSTOM="nackirq"   # a firmware case whose monitor lines are its own (TVI-WO-1306a)
 PATHS=$(for c in $CASES; do case " $MONITOR " in *" $c "*) ;; *) printf '"%s",' "$c" ;; esac; done | sed 's/,$//')
@@ -35,6 +34,7 @@ else
   mkdir "$src"
   git -C "$here" archive HEAD | tar -x -C "$src"
 fi
+GUARDS=$("$src/scripts/guards" "$src")   # the one guard list, from the board (scripts/guards; TVI-WO-1204 (6))
 
 fails=0
 check() { if eval "$2"; then echo "ok   $1"; else echo "FAIL $1"; fails=$((fails + 1)); fi; }

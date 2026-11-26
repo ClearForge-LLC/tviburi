@@ -67,7 +67,7 @@ run_case() { # run_case <name> <firmware path or -> <monitor lines...>
     fi
     timeout 120 renode --disable-gui --console --plain /out/run.resc </dev/null >/out/renode.out 2>&1
     echo "renode-exit=$?"
-    /out/target/debug/tviburi-check "$v" /out/renode-log.txt spi1 rcc gpioPortA gpioPortB gpioPortC gpioPortD gpioPortE gpioPortF gpioPortG gpioPortH gpioPortI gpioPortJ gpioPortK timer1 timer8 dma1 dma2 flashController usart1 usart2 usart3 uart4 uart5 usart6 uart7 uart8 i2c1 i2c2 i2c3 adcM1S2 adc3
+    /out/target/debug/tviburi-check "$v" /out/renode-log.txt $(/repo/scripts/guards)
   ' _ "$fw" </dev/null >"$work/$name.stdout" 2>&1 || rc=$?
   echo "--- $name ($fw): exit $rc"; grep -E '^(CHECK|PROBLEM)' "$work/$name.stdout" || true
 }

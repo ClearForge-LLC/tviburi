@@ -15,7 +15,7 @@
 set -euo pipefail
 
 IMAGE=ghcr.io/clearforge-llc/aethelgard-tools@sha256:1e0ab105ec42bdba66b773464f0b6679d622e4afdafef30ec4931e4326f49c63
-ACCEPTANCE="unit modf modeled ardupilot generated field stable cfg2first iolock rmw forge stock-forge stock-modf modf-page removed-console crash-console crash-runner nomark conditions fields load crash identity verify reproducible manifest lognames recorded allowlist"
+ACCEPTANCE="unit modf modeled ardupilot generated field stable cfg2first iolock rmw forge stock-forge stock-modf modf-page removed-console crash-console crash-runner nomark conditions fields load crash identity verify reproducible manifest lognames guards recorded allowlist"
 ADVERSARIAL="adv-removed adv-extra-arg adv-bad-variant adv-hook adv-loglevel adv-spray adv-noend adv-version adv-recorded adv-noname adv-release adv-cache"
 # TVI-WO-1300: the RCC guard's cases live in tests/1300/rcc.sh; each is a test here, rcc-<case>, run as part of the
 # acceptance group, so CI and tests/mutants.sh reach them.
@@ -89,7 +89,7 @@ renode_in() { # renode_in <name> <tree> <resc> [podman args...]: the release, Re
   local name=$1 tree=$2 resc=$3; shift 3
   pod "$name" "$tree" -v "$work/check-build:/check:ro,Z" "$@" -- sh -c "v=\$(/repo/scripts/build-release) || exit 9; \
     timeout 120 renode --disable-gui --console --plain $resc </dev/null >/out/renode.out 2>&1; \
-    echo renode-exit=\$?; /check/debug/tviburi-check \$v /out/renode-log.txt spi1 rcc gpioPortA gpioPortB gpioPortC gpioPortD gpioPortE gpioPortF gpioPortG gpioPortH gpioPortI gpioPortJ gpioPortK timer1 timer8 dma1 dma2 flashController usart1 usart2 usart3 uart4 uart5 usart6 uart7 uart8 i2c1 i2c2 i2c3 adcM1S2 adc3"
+    echo renode-exit=\$?; /check/debug/tviburi-check \$v /out/renode-log.txt \$(/repo/scripts/guards)"
 }
 
 version_of() { # version_of <name>: the release hash of the release a run built, sha256:<hex>
@@ -295,7 +295,7 @@ aet_console() { # aet_console <name> <tree> <variant> [kill]: kill: SIGKILL Reno
       timeout 120 renode --config /tmp/aet/renode.config --disable-gui --console --plain /out/run.resc </dev/null >/out/renode.out 2>&1
       echo "renode-exit=$?"
     fi
-    /out/target/debug/tviburi-check "$v" /out/renode.out spi1 rcc gpioPortA gpioPortB gpioPortC gpioPortD gpioPortE gpioPortF gpioPortG gpioPortH gpioPortI gpioPortJ gpioPortK timer1 timer8 dma1 dma2 flashController usart1 usart2 usart3 uart4 uart5 usart6 uart7 uart8 i2c1 i2c2 i2c3 adcM1S2 adc3'
+    /out/target/debug/tviburi-check "$v" /out/renode.out $(/repo/scripts/guards)'
 }
 aet_framed() { # aet_framed <name> <source>: a witness of <source> on the console in Aethelgard's framing (the check read that framing)
   grep -aq "^.\?\[[0-9][0-9]:[0-9][0-9]:[0-9][0-9]\.[0-9]\{9\}\] \[INFO\] $2: {\"tviburi\":\"witness\"" "$work/$1/renode.out"
@@ -491,7 +491,7 @@ t_crash() {
     # malformed (TVI-WO-1304: after the DMA and flash witnesses, spi1'"'"'s line straddled a block on every run)
     for i in $(seq 600); do grep -q "spi1: {\"tviburi\":\"witness\".*}\$" /out/renode-log.txt 2>/dev/null && break; sleep 0.1; done
     kill -9 $pid; wait $pid; echo renode-exit=$?
-    /check/debug/tviburi-check $v /out/renode-log.txt spi1 rcc gpioPortA gpioPortB gpioPortC gpioPortD gpioPortE gpioPortF gpioPortG gpioPortH gpioPortI gpioPortJ gpioPortK timer1 timer8 dma1 dma2 flashController usart1 usart2 usart3 uart4 uart5 usart6 uart7 uart8 i2c1 i2c2 i2c3 adcM1S2 adc3'
+    /check/debug/tviburi-check $v /out/renode-log.txt $(/repo/scripts/guards)'
   check "a simulator killed after its witness does not PASS (1, no end record, the witness seen)" \
     "grep -qx 'renode-exit=137' '$work/crash.stdout' && grep -qx 'CHECK FAIL' '$work/crash.stdout' \
      && grep -q '^PROBLEM spi1: no end record' '$work/crash.stdout' && ! grep -q '^PROBLEM spi1: no load witness' '$work/crash.stdout'"
@@ -509,7 +509,7 @@ t_identity() {
   pod id-empty "$src" -v "$work/check-build:/check:ro,Z" -- sh -c 'v=$(/repo/scripts/build-release) || exit 9
     printf "include @/repo/scripts/prelude.resc\nquit\n" >/out/empty.resc; cd /out
     env -i /opt/renode/renode --disable-gui --console --plain /out/empty.resc </dev/null >/out/renode.out 2>&1
-    /check/debug/tviburi-check $v /out/renode-log.txt spi1 rcc gpioPortA gpioPortB gpioPortC gpioPortD gpioPortE gpioPortF gpioPortG gpioPortH gpioPortI gpioPortJ gpioPortK timer1 timer8 dma1 dma2 flashController usart1 usart2 usart3 uart4 uart5 usart6 uart7 uart8 i2c1 i2c2 i2c3 adcM1S2 adc3'
+    /check/debug/tviburi-check $v /out/renode-log.txt $(/repo/scripts/guards)'
   check "the witness's version is the same with TVIBURI_MODEL_DIR at another directory (and the run PASSes), and with an empty environment" \
     "grep -qx 'VERDICT PASS' '$work/id-otherdir.stdout' && [ \$(version_of id-otherdir) = $v ] && spi1_records id-otherdir 'recs[0][\"model_version\"] == \"$v\"' \
      && [ \$(version_of id-empty) = $v ] && spi1_records id-empty 'recs[0][\"tviburi\"] == \"witness\" and recs[0][\"model_version\"] == \"$v\"'"
@@ -647,6 +647,26 @@ sys.exit(0 if len(want) > 120 and not bad and not unknown else 1)
 EOF"
 }
 
+t_guards() { # TVI-WO-1204 (6): scripts/guards is the one list, held to the committed board; no file keeps a copy
+  board_guards() { # the instances a tree's board runs under a guard, sorted: the board and each `using "./…"` file it includes
+    for f in $(awk '/^using "\.\// { s = $0; sub(/^using "\.\//, "", s); sub(/".*$/, "", s); print s }' "$1/model/tviburi-nucleo-h753zi.repl") \
+      tviburi-nucleo-h753zi.repl; do awk -f "$src/tests/1204/board-guards.awk" "$1/model/$f"; done | sort | paste -sd' ' -
+  }
+  listed() { "$1/scripts/guards" | tr ' ' '\n' | sort | paste -sd' ' -; }
+  check "scripts/guards, the one list, names exactly the instances the committed board runs under a guard ($(listed "$src" | wc -w))" \
+    '[ "$(listed "$src")" = "$(board_guards "$src")" ] && [ "$(listed "$src" | wc -w)" -ge 31 ]'
+  # Planted: a guard declared on the board and not in the list (as a work order adding a guard would leave it): the hold fails.
+  fixture guards-extra model/tviburi-nucleo-h753zi.repl 'using "./stm32h7-adc-restate.repl"' 'using "./stm32h7-adc-restate.repl"'
+  printf '\nspi2: Tviburi.GuardedSTM32H7_SPI @ sysbus 0x40003800\n' >>"$work/guards-extra.tree/model/tviburi-nucleo-h753zi.repl"
+  check "planted: a guard on the board (spi2) that the list does not name is caught" \
+    '[ "$(listed "$work/guards-extra.tree")" != "$(board_guards "$work/guards-extra.tree")" ]'
+  # No other file keeps the list, in any order: no runner, harness or CI line names ten or more guards (the replay's own USART
+  # restatement loop names eight, for another purpose: their properties).
+  check "no file but scripts/guards keeps a copy of the list (no line elsewhere names ten or more guards)" \
+    '! grep -rIlE "($(scripts_guards_alt))( [A-Za-z0-9]+)*( ($(scripts_guards_alt))){9}" "$src/scripts" "$src/tests" "$src/.github" 2>/dev/null | grep -v "^$src/scripts/guards\$" | grep -q .'
+}
+scripts_guards_alt() { "$src/scripts/guards" | tr ' ' '|'; }
+
 t_reproducible() {
   # Two release builds from one commit, in two checkouts with different mtimes and umasks: byte-identical.
   local t
@@ -745,9 +765,9 @@ t_adv-version() {
   need_check
   pod adv-version "$src" -v "$work/check-build:/check:ro,Z" -v "$work/modeled:/run:ro,Z" -- sh -c '
     v=sha256:$(sha256sum </run/release/MANIFEST | cut -c1-64); w=sha256:$(printf %064d 0)
-    /check/debug/tviburi-check "$v" /run/renode-log.txt spi1 rcc gpioPortA gpioPortB gpioPortC gpioPortD gpioPortE gpioPortF gpioPortG gpioPortH gpioPortI gpioPortJ gpioPortK timer1 timer8 dma1 dma2 flashController usart1 usart2 usart3 uart4 uart5 usart6 uart7 uart8 i2c1 i2c2 i2c3 adcM1S2 adc3 >/dev/null; echo right=$?
-    /check/debug/tviburi-check "$w" /run/renode-log.txt spi1 rcc gpioPortA gpioPortB gpioPortC gpioPortD gpioPortE gpioPortF gpioPortG gpioPortH gpioPortI gpioPortJ gpioPortK timer1 timer8 dma1 dma2 flashController usart1 usart2 usart3 uart4 uart5 usart6 uart7 uart8 i2c1 i2c2 i2c3 adcM1S2 adc3 >/dev/null; echo wrong=$?
-    /check/debug/tviburi-check /run/renode-log.txt spi1 rcc gpioPortA gpioPortB gpioPortC gpioPortD gpioPortE gpioPortF gpioPortG gpioPortH gpioPortI gpioPortJ gpioPortK timer1 timer8 dma1 dma2 flashController usart1 usart2 usart3 uart4 uart5 usart6 uart7 uart8 i2c1 i2c2 i2c3 adcM1S2 adc3 >/dev/null; echo none=$?
+    /check/debug/tviburi-check "$v" /run/renode-log.txt $(/repo/scripts/guards) >/dev/null; echo right=$?
+    /check/debug/tviburi-check "$w" /run/renode-log.txt $(/repo/scripts/guards) >/dev/null; echo wrong=$?
+    /check/debug/tviburi-check /run/renode-log.txt $(/repo/scripts/guards) >/dev/null; echo none=$?
     /check/debug/tviburi-check "$v" /run/renode-log.txt spi2 >/run-unnamed.txt; echo unnamed=$?; grep -c "not named" /run-unnamed.txt'
   check "the check passes the modeled run only with its expected version: wrong (1) and none (1) fail (gate clause 7)" \
     "grep -qx right=0 '$work/adv-version.stdout' && grep -qx wrong=1 '$work/adv-version.stdout' && grep -qx none=1 '$work/adv-version.stdout'"
