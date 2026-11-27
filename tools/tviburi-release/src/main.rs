@@ -144,9 +144,9 @@ fn state(class: &str) -> Option<(&'static str, Option<String>)> {
 
 /// The acknowledgement a `behaves as` text cites, each resolved to its own document: `(A<n>)` or `(A<n>; …)` is
 /// TVI-WO-0100b.rm0433.md §4's; `(TVI-WO-1300 A<n>)` or `(TVI-WO-1300 A<n>; …)` is TVI-WO-1300.rm0433.md §8's
-/// (granted by the architect, 2026-11-23T15:15Z).
+/// (granted by the architect, 2026-11-23T15:15Z); `(TVI-WO-1206 A<n>)` is TVI-WO-1206.rm0433.md §3's (granted 2026-11-26T23:36Z).
 fn acknowledgement(behaves: &str) -> Option<String> {
-    for (tag, doc) in [("(TVI-WO-1300 A", "TVI-WO-1300.rm0433.md §8"), ("(A", "TVI-WO-0100b.rm0433.md §4")] {
+    for (tag, doc) in [("(TVI-WO-1300 A", "TVI-WO-1300.rm0433.md §8"), ("(TVI-WO-1206 A", "TVI-WO-1206.rm0433.md §3"), ("(A", "TVI-WO-0100b.rm0433.md §4")] {
         if let Some(i) = behaves.find(tag) {
             let digits: String = behaves[i + tag.len()..].chars().take_while(char::is_ascii_digit).collect();
             let after = behaves[i + tag.len() + digits.len()..].chars().next();
@@ -206,6 +206,57 @@ fn field_rows(guard: &str, path: &str, rows: &[fields::Row]) -> Result<Vec<Row>,
             Ok(m)
         })
         .collect()
+}
+
+/// The acknowledgements' homes and the section each one's A-rows are in (TVI-WO-1206 (A), ruled 2026-11-27T00:10Z). The release
+/// reads them, so each is a source, and each routes as code (tools/tviburi-route `READ_DOCS`).
+const HOMES: [(&str, &str); 3] = [
+    ("docs/work-orders/TVI-WO-0100b.rm0433.md", "4"),
+    ("docs/work-orders/TVI-WO-1300.rm0433.md", "8"),
+    ("docs/work-orders/TVI-WO-1206.rm0433.md", "3"),
+];
+
+/// The A-numbers a home defines: in its section `## <sec>.`, up to the next `## `, a table row that starts `| A<n> |` or a
+/// bold `**A<n>**` (TVI-WO-1300.rm0433.md §8 names its rows so).
+fn defined(text: &str, sec: &str) -> BTreeSet<String> {
+    let head = format!("## {sec}.");
+    let mut out = BTreeSet::new();
+    let Some(i) = text.lines().position(|l| l.starts_with(&head)) else { return out };
+    let num = |t: &str| t.chars().take_while(char::is_ascii_digit).collect::<String>();
+    for l in text.lines().skip(i + 1).take_while(|l| !l.starts_with("## ")) {
+        if let Some(rest) = l.strip_prefix("| A") {
+            let d = num(rest);
+            if !d.is_empty() && rest[d.len()..].starts_with(" |") {
+                out.insert(format!("A{d}"));
+            }
+        }
+        for (j, _) in l.match_indices("**A") {
+            let d = num(&l[j + 3..]);
+            if !d.is_empty() && l[j + 3 + d.len()..].starts_with("**") {
+                out.insert(format!("A{d}"));
+            }
+        }
+    }
+    out
+}
+
+/// Every row's acknowledgement (`reason`, as `acknowledgement()` resolved it) names a row its home defines: a citation
+/// with no row would build, and be false (TVI-WO-1206 (A)).
+fn check_acknowledged(rows: &[Row], homes: &BTreeMap<String, BTreeSet<String>>) -> Result<(), String> {
+    for r in rows {
+        let str_of = |k: &str| match r.get(k) {
+            Some(Value::Str(v)) => Some(v.as_str()),
+            _ => None,
+        };
+        let Some(reason) = str_of("reason") else { continue };
+        let (home, a) = reason.rsplit_once(' ').unwrap_or((reason, ""));
+        let known = homes.get(home).is_some_and(|d| d.contains(a));
+        if !known {
+            return Err(format!("{} {}.{}: its acknowledgement {reason} names no row of {home}", str_of("peripheral").unwrap_or_default(),
+                str_of("register").unwrap_or_default(), str_of("field").unwrap_or_default()));
+        }
+    }
+    Ok(())
 }
 
 fn stock_rows(chain: &stock::Chain, pins: &Pins) -> Vec<Row> {
@@ -521,6 +572,13 @@ fn build(repo: &Path, renode: &Path, out: &Path) -> Result<(String, String), Str
     }
     let json_rs = "tools/tviburi-check/src/json.rs";
     sources.push(Source { path: json_rs.into(), bytes: fs::read(repo.join(json_rs)).map_err(|e| format!("{json_rs}: {e}"))? });
+    let mut homes = BTreeMap::new();
+    for (path, sec) in HOMES {
+        let bytes = fs::read(repo.join(path)).map_err(|e| format!("{path}: {e}"))?;
+        homes.insert(format!("{} §{sec}", path.rsplit('/').next().unwrap_or(path)), defined(&String::from_utf8_lossy(&bytes), sec));
+        sources.push(Source { path: path.into(), bytes });
+    }
+    check_acknowledged(&rows, &homes)?;
 
     let mut m = format!("{MANIFEST_FORMAT}\n");
     m += "sources every file the release reads is a source line, its generator included, so that one release hash names one overlay and one ledger (northstar invariant 3)\n";
@@ -834,6 +892,27 @@ mod tests {
         assert_eq!(acknowledgement("no oscillator (TVI-WO-1300 A3)").as_deref(), Some("TVI-WO-1300.rm0433.md §8 A3"));
         assert_eq!(acknowledgement("x (TVI-WO-1300 A12; p427)").as_deref(), Some("TVI-WO-1300.rm0433.md §8 A12"));
         assert_eq!(acknowledgement("x (TVI-WO-1300 Ax)"), None);
+        // TVI-WO-1206's acknowledgements cite TVI-WO-1206's document, never 0100b's or 1300's.
+        assert_eq!(acknowledgement("read (TVI-WO-1206 A7; p2097)").as_deref(), Some("TVI-WO-1206.rm0433.md §3 A7"));
+        assert_eq!(acknowledgement("x (TVI-WO-1206 A)"), None);
+        // TVI-WO-1206 (A): an acknowledgement must name a row its home defines; one plant per home.
+        let doc = "x\n## 3. y\n| A1 | f |\n| A12 | g |\n## 4. z\n| A2 | h |\n";
+        assert_eq!(defined(doc, "3"), ["A1", "A12"].iter().map(|x| x.to_string()).collect());
+        assert_eq!(defined("## 8. r\n| x | **A1** = F1, **A6** = F6 |\n", "8"), ["A1", "A6"].iter().map(|x| x.to_string()).collect());
+        let homes: BTreeMap<String, BTreeSet<String>> = [
+            ("TVI-WO-0100b.rm0433.md §4", vec!["A1", "A10"]),
+            ("TVI-WO-1300.rm0433.md §8", vec!["A4"]),
+            ("TVI-WO-1206.rm0433.md §3", vec!["A12"]),
+        ].into_iter().map(|(h, v)| (h.to_string(), v.into_iter().map(String::from).collect())).collect();
+        for (text, ok) in [("x (A10)", true), ("x (A11)", false), ("x (TVI-WO-1300 A4)", true), ("x (TVI-WO-1300 A7)", false),
+                           ("x (TVI-WO-1206 A12; p1)", true), ("x (TVI-WO-1206 A13; p1)", false)] {
+            let ack = fields::Row { behaves_as: text.into(), ..row("R", 0, "ALL", 31, 0, None, "acknowledged by name") };
+            let got = check_acknowledged(&field_rows("G", "f", &[ack]).unwrap(), &homes);
+            assert_eq!(got.is_ok(), ok, "{text}: {got:?}");
+            if !ok {
+                assert!(got.unwrap_err().contains("names no row of"), "{text}");
+            }
+        }
         let bare = fields::Row { behaves_as: "no reason".into(), ..row("R", 0, "ALL", 31, 0, None, "acknowledged by name") };
         assert!(field_rows("G", "f", &[bare]).unwrap_err().contains("no (A<n>) reason"));
     }

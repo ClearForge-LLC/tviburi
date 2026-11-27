@@ -1,0 +1,501 @@
+# TVI-WO-1206: CPU reads per register in the 14 generated boots and ArduPilot's fixture (ap-fx) on main 8e15435, every access logged (spike/1206/harness/gen-log.sh); the instances behind the 129 only
+# board	instance	offset	register	reads	distinct_returned	commonest (value:count, up to 4)
+ap-fx	gpioPortA	0x000	Mode	34	2	0x28A805:18 0x28A405:16
+ap-fx	gpioPortA	0x004	OutputType	34	1	0x0:34
+ap-fx	gpioPortA	0x008	OutputSpeed	34	2	0xAA8246A0:18 0xAA8242A0:16
+ap-fx	gpioPortA	0x00C	PullUpPullDown	36	3	0x140000:34 0x0:1 0x100000:1
+ap-fx	gpioPortA	0x020	AlternateFunctionLow	34	2	0x55500000:18 0x55000000:16
+ap-fx	gpioPortB	0x000	Mode	6512	2	0xA800A000:3257 0xA400A000:3255
+ap-fx	gpioPortB	0x004	OutputType	6512	1	0xC0:6512
+ap-fx	gpioPortB	0x008	OutputSpeed	6512	1	0x2AA0AAA:6512
+ap-fx	gpioPortB	0x00C	PullUpPullDown	6512	1	0x0:6512
+ap-fx	gpioPortB	0x024	AlternateFunctionHigh	6512	2	0x55500000:3257 0x55000000:3255
+ap-fx	i2c1	0x000	Control1	7215	6	0xD7:3921 0xD3:1591 0x91:626 0x90:568
+ap-fx	i2c1	0x004	Control2	2718	17	0x1008C:1014 0x6048C:960 0x8C:510 0x1048C:54
+ap-fx	i2c1	0x018	InterruptAndStatus	5063	5	0x5:2907 0x41:1017 0x1:568 0x3:513
+ap-fx	i2c1	0x024	ReceiveData	2907	10	0x0:960 0x19:480 0x40:480 0xF3:480
+ap-fx	rcc	0x000	ClockControl	6	3	0x25:3 0x3025:2 0x3F003025:1
+ap-fx	rcc	0x010	ClockConfiguration	3	3	0x0:1 0x8000:1 0x801B:1
+ap-fx	rcc	0x070	BackupDomainControl	5	2	0x0:4 0x8000:1
+ap-fx	rcc	0x07C	AHB3Reset	3	2	0x0:2 0x14031:1
+ap-fx	rcc	0x080	AHB1Reset	3	2	0x0:2 0xA008023:1
+ap-fx	rcc	0x084	AHB2Reset	3	2	0x0:2 0x271:1
+ap-fx	rcc	0x088	AHB4Reset	6	3	0x0:4 0x7FF:1 0x3280000:1
+ap-fx	rcc	0x08C	APB3Reset	3	2	0x0:2 0x8:1
+ap-fx	rcc	0x090	APB1ResetLow	11475	4	0x0:7650 0x4000:3256 0x200000:568 0xE8FFC3FF:1
+ap-fx	rcc	0x094	APB1ResetHigh	3	2	0x0:2 0x136:1
+ap-fx	rcc	0x098	APB2Reset	54	3	0x0:36 0x1000:17 0x31D73033:1
+ap-fx	rcc	0x09C	APB4Reset	3	2	0x0:2 0x20DEA8:1
+ap-fx	rcc	0x0D0	ResetStatus	1	1	0xFE0000:1
+ap-fx	rcc	0x0D8	AHB1Clock	6580	3	0x3:6545 0x1:34 0x0:1
+ap-fx	rcc	0x0DC	AHB2Clock	4	4	0x0:1 0x20000000:1 0x60000000:1 0xE0000000:1
+ap-fx	rcc	0x0E0	AHB4Clock	1	1	0x0:1
+ap-fx	rcc	0x0E8	APB1ClockLow	7080	4	0x200008:3730 0x204008:3348 0x0:1 0x8:1
+ap-fx	rcc	0x0F0	APB2Clock	34	3	0x10:17 0x1010:16 0x0:1
+ap-fx	rcc	0x0F4	APB4Clock	1	1	0x10000:1
+ap-fx	rcc	0x100	AHB1SleepClock	13160	1	0x1E03C023:13160
+ap-fx	rcc	0x104	AHB2SleepClock	8	1	0xE0000271:8
+ap-fx	rcc	0x108	AHB4SleepClock	2	1	0x312807FF:2
+ap-fx	rcc	0x110	APB1LowSleepClock	14160	1	0xE8FFCBFF:14160
+ap-fx	rcc	0x118	APB2SleepClock	68	1	0x31D73033:68
+ap-fx	rcc	0x11C	APB4SleepClock	2	1	0x421DEAA:2
+ap-fx	spi1	0x000	Control1	107	4	0x101:54 0x301:19 0x0:17 0x100:17
+ap-fx	spi1	0x030	ReceiveData	552	11	0x0:286 0xFF:256 0x2:2 0xEF:1
+ap-fx	spi2	0x000	Control1	19535	4	0x101:9767 0x0:3256 0x100:3256 0x301:3256
+ap-fx	spi2	0x030	ReceiveData	34269	256	0x0:23956 0x8:3482 0x68:1749 0x1:1498
+ap-fx	usart1	0x000	ControlRegister1	5	2	0x2000013D:4 0x2000011D:1
+ap-fx	usart1	0x004	ControlRegister2	2	1	0x40:2
+ap-fx	usart1	0x008	ControlRegister3	9	1	0xC1:9
+d1-drv8876	gpioPortA	0x000	Mode	14	7	0xABFFFFFF:3 0xABFFFFFE:2 0xABEFFFFE:2 0xAB2FFFFE:2
+d1-drv8876	gpioPortA	0x008	OutputSpeed	5	1	0xC000000:5
+d1-drv8876	gpioPortA	0x018	BitSet	1	1	0x0:1
+d1-drv8876	gpioPortA	0x020	AlternateFunctionLow	1	1	0x0:1
+d1-drv8876	gpioPortA	0x024	AlternateFunctionHigh	4	4	0x0:1 0x700:1 0x701:1 0x711:1
+d1-drv8876	gpioPortB	0x000	Mode	2	1	0xFFFFFEBF:2
+d1-drv8876	gpioPortB	0x008	OutputSpeed	1	1	0xC0:1
+d1-drv8876	gpioPortB	0x024	AlternateFunctionHigh	1	1	0x0:1
+d1-drv8876	rcc	0x000	ClockControl	1	1	0x25:1
+d1-drv8876	rcc	0x010	ClockConfiguration	1	1	0x0:1
+d1-drv8876	rcc	0x018	Domain1ClockConfiguration	1	1	0x0:1
+d1-drv8876	rcc	0x01C	Domain2ClockConfiguration	1	1	0x0:1
+d1-drv8876	rcc	0x04C	Domain1KernelClockConfiguration	1	1	0x0:1
+d1-drv8876	rcc	0x050	Domain2KernelClockConfigurationLow	1	1	0x0:1
+d1-drv8876	rcc	0x054	Domain2KernelClockConfigurationHigh	1	1	0x0:1
+d1-drv8876	rcc	0x0E0	AHB4Clock	8	5	0x1:2 0x3:2 0x23:2 0x0:1
+d1-drv8876	rcc	0x0E8	APB1ClockLow	2	2	0x0:1 0x1:1
+d1-drv8876	rcc	0x0F0	APB2Clock	4	3	0x1:2 0x0:1 0x11:1
+d1-drv8876	timer1	0x000	Control1	1	1	0x0:1
+d1-drv8876	usart1	0x01C	InterruptAndStatus	4438	4	0x206000D0:3387 0x206000C0:1043 0x206000F0:7 0x206000E0:1
+d1-drv8876	usart1	0x024	ReceiveData	8	8	0x2E:1 0x8A:1 0xBE:1 0x3:1
+driver-judges-nothing	gpioPortA	0x000	Mode	7	6	0xABFFFFFF:2 0xABFFFFFE:1 0xABFFFFFA:1 0xABEFFFFA:1
+driver-judges-nothing	gpioPortA	0x008	OutputSpeed	5	1	0xC000000:5
+driver-judges-nothing	gpioPortA	0x020	AlternateFunctionLow	2	2	0x0:1 0x1:1
+driver-judges-nothing	gpioPortA	0x024	AlternateFunctionHigh	4	4	0x0:1 0x700:1 0x701:1 0x711:1
+driver-judges-nothing	gpioPortB	0x000	Mode	2	1	0xFFFFFEBF:2
+driver-judges-nothing	gpioPortB	0x008	OutputSpeed	1	1	0xC0:1
+driver-judges-nothing	gpioPortB	0x024	AlternateFunctionHigh	1	1	0x0:1
+driver-judges-nothing	rcc	0x000	ClockControl	1	1	0x25:1
+driver-judges-nothing	rcc	0x010	ClockConfiguration	1	1	0x0:1
+driver-judges-nothing	rcc	0x018	Domain1ClockConfiguration	1	1	0x0:1
+driver-judges-nothing	rcc	0x01C	Domain2ClockConfiguration	1	1	0x0:1
+driver-judges-nothing	rcc	0x04C	Domain1KernelClockConfiguration	1	1	0x0:1
+driver-judges-nothing	rcc	0x050	Domain2KernelClockConfigurationLow	1	1	0x0:1
+driver-judges-nothing	rcc	0x054	Domain2KernelClockConfigurationHigh	1	1	0x0:1
+driver-judges-nothing	rcc	0x0E0	AHB4Clock	4	3	0x1:2 0x0:1 0x3:1
+driver-judges-nothing	rcc	0x0E8	APB1ClockLow	2	2	0x0:1 0x1:1
+driver-judges-nothing	rcc	0x0F0	APB2Clock	4	3	0x1:2 0x0:1 0x11:1
+driver-judges-nothing	timer1	0x000	Control1	1	1	0x0:1
+driver-judges-nothing	usart1	0x01C	InterruptAndStatus	4438	4	0x206000D0:3387 0x206000C0:1043 0x206000F0:7 0x206000E0:1
+driver-judges-nothing	usart1	0x024	ReceiveData	8	8	0x4:1 0x59:1 0xB4:1 0x72:1
+hse-crystal-16	gpioPortA	0x000	Mode	14	13	0xABFFFFFF:2 0xABFFFFFE:1 0xABFFFFFA:1 0xABDFFFFA:1
+hse-crystal-16	gpioPortA	0x008	OutputSpeed	12	3	0xC000000:8 0xC000400:2 0xC004400:2
+hse-crystal-16	gpioPortA	0x020	AlternateFunctionLow	8	8	0x0:1 0x1:1 0x11:1 0x711:1
+hse-crystal-16	gpioPortA	0x024	AlternateFunctionHigh	3	3	0x0:1 0x50000:1 0x50001:1
+hse-crystal-16	gpioPortB	0x000	Mode	8	7	0xFFFFFEBF:2 0xFFEFFEBF:1 0xFFAFFEBF:1 0xEFAFFEBF:1
+hse-crystal-16	gpioPortB	0x008	OutputSpeed	6	1	0xC0:6
+hse-crystal-16	gpioPortB	0x020	AlternateFunctionLow	2	2	0x0:1 0x4000000:1
+hse-crystal-16	gpioPortB	0x024	AlternateFunctionHigh	5	5	0x0:1 0x700:1 0x7700:1 0x5007700:1
+hse-crystal-16	i2c1	0x000	Control1	1	1	0x0:1
+hse-crystal-16	i2c1	0x018	InterruptAndStatus	20021	7	0x31:19860 0x1:126 0x11:14 0x5:8
+hse-crystal-16	i2c1	0x024	ReceiveData	8	7	0x0:2 0x60:1 0x50:1 0x19:1
+hse-crystal-16	rcc	0x000	ClockControl	3	3	0x25:1 0x30025:1 0x30B0025:1
+hse-crystal-16	rcc	0x010	ClockConfiguration	2	2	0x0:1 0x1B:1
+hse-crystal-16	rcc	0x018	Domain1ClockConfiguration	1	1	0x0:1
+hse-crystal-16	rcc	0x01C	Domain2ClockConfiguration	1	1	0x0:1
+hse-crystal-16	rcc	0x04C	Domain1KernelClockConfiguration	1	1	0x0:1
+hse-crystal-16	rcc	0x050	Domain2KernelClockConfigurationLow	1	1	0x0:1
+hse-crystal-16	rcc	0x054	Domain2KernelClockConfigurationHigh	1	1	0x0:1
+hse-crystal-16	rcc	0x0E0	AHB4Clock	4	3	0x1:2 0x0:1 0x3:1
+hse-crystal-16	rcc	0x0E8	APB1ClockLow	10	6	0x200000:2 0x204000:2 0x204001:2 0x224001:2
+hse-crystal-16	rcc	0x0F0	APB2Clock	4	3	0x1000:2 0x0:1 0x1001:1
+hse-crystal-16	spi1	0x000	Control1	1	1	0x0:1
+hse-crystal-16	spi1	0x014	Status	21	5	0x100A:17 0x30007:1 0x20007:1 0x10007:1
+hse-crystal-16	spi1	0x030	ReceiveData	4	4	0x0:1 0xEF:1 0x40:1 0x17:1
+hse-crystal-16	spi2	0x000	Control1	1	1	0x0:1
+hse-crystal-16	spi2	0x014	Status	260	8	0x100A:245 0x10007:5 0x100F:5 0x60007:1
+hse-crystal-16	spi2	0x030	ReceiveData	15	5	0x0:11 0x47:1 0x12:1 0x2:1
+hse-crystal-16	timer1	0x000	Control1	4	3	0x81:2 0x0:1 0x80:1
+hse-crystal-16	timer1	0x004	Control2	1	1	0x0:1
+hse-crystal-16	timer1	0x008	SlaveModeControl	1	1	0x0:1
+hse-crystal-16	timer1	0x00C	DmaOrInterruptEnable	1	1	0x0:1
+hse-crystal-16	timer1	0x018	CaptureOrCompareMode1	1	1	0x6868:1
+hse-crystal-16	timer1	0x01C	CaptureOrCompareMode2	1	1	0x0:1
+hse-crystal-16	timer1	0x020	CaptureOrCompareEnable	1	1	0x11:1
+hse-crystal-16	timer1	0x028	Prescaler	1	1	0x0:1
+hse-crystal-16	timer1	0x02C	AutoReload	1	1	0x6A:1
+hse-crystal-16	timer1	0x030	RepetitionCounter	1	1	0x0:1
+hse-crystal-16	timer1	0x034	CaptureOrCompare1	1	1	0x28:1
+hse-crystal-16	timer1	0x038	CaptureOrCompare2	1	1	0x28:1
+hse-crystal-16	usart2	0x01C	InterruptAndStatus	8331	4	0x206000D0:6795 0x206000C0:1528 0x206000F0:7 0x206000E0:1
+hse-crystal-16	usart2	0x024	ReceiveData	8	8	0xD:1 0x6C:1 0x43:1 0xC7:1
+hse-crystal-16	usart3	0x01C	InterruptAndStatus	4438	4	0x206000D0:3738 0x206000C0:692 0x206000F0:7 0x206000E0:1
+hse-crystal-16	usart3	0x024	ReceiveData	8	8	0x34:1 0x7F:1 0x14:1 0x2F:1
+hse-external-8	gpioPortA	0x000	Mode	14	13	0xABFFFFFF:2 0xABFFFFFE:1 0xABFFFFFA:1 0xABDFFFFA:1
+hse-external-8	gpioPortA	0x008	OutputSpeed	12	3	0xC000000:8 0xC000400:2 0xC004400:2
+hse-external-8	gpioPortA	0x020	AlternateFunctionLow	8	8	0x0:1 0x1:1 0x11:1 0x711:1
+hse-external-8	gpioPortA	0x024	AlternateFunctionHigh	3	3	0x0:1 0x50000:1 0x50001:1
+hse-external-8	gpioPortB	0x000	Mode	8	7	0xFFFFFEBF:2 0xFFEFFEBF:1 0xFFAFFEBF:1 0xEFAFFEBF:1
+hse-external-8	gpioPortB	0x008	OutputSpeed	6	1	0xC0:6
+hse-external-8	gpioPortB	0x020	AlternateFunctionLow	2	2	0x0:1 0x4000000:1
+hse-external-8	gpioPortB	0x024	AlternateFunctionHigh	5	5	0x0:1 0x700:1 0x7700:1 0x5007700:1
+hse-external-8	i2c1	0x000	Control1	1	1	0x0:1
+hse-external-8	i2c1	0x018	InterruptAndStatus	20021	7	0x31:19860 0x1:126 0x11:14 0x5:8
+hse-external-8	i2c1	0x024	ReceiveData	8	7	0x0:2 0x60:1 0x50:1 0x19:1
+hse-external-8	rcc	0x000	ClockControl	3	3	0x25:1 0x30025:1 0x30B0025:1
+hse-external-8	rcc	0x010	ClockConfiguration	2	2	0x0:1 0x1B:1
+hse-external-8	rcc	0x018	Domain1ClockConfiguration	1	1	0x0:1
+hse-external-8	rcc	0x01C	Domain2ClockConfiguration	1	1	0x0:1
+hse-external-8	rcc	0x04C	Domain1KernelClockConfiguration	1	1	0x0:1
+hse-external-8	rcc	0x050	Domain2KernelClockConfigurationLow	1	1	0x0:1
+hse-external-8	rcc	0x054	Domain2KernelClockConfigurationHigh	1	1	0x0:1
+hse-external-8	rcc	0x0E0	AHB4Clock	4	3	0x1:2 0x0:1 0x3:1
+hse-external-8	rcc	0x0E8	APB1ClockLow	10	6	0x200000:2 0x204000:2 0x204001:2 0x224001:2
+hse-external-8	rcc	0x0F0	APB2Clock	4	3	0x1000:2 0x0:1 0x1001:1
+hse-external-8	spi1	0x000	Control1	1	1	0x0:1
+hse-external-8	spi1	0x014	Status	21	5	0x100A:17 0x30007:1 0x20007:1 0x10007:1
+hse-external-8	spi1	0x030	ReceiveData	4	4	0x0:1 0xEF:1 0x40:1 0x17:1
+hse-external-8	spi2	0x000	Control1	1	1	0x0:1
+hse-external-8	spi2	0x014	Status	260	8	0x100A:245 0x10007:5 0x100F:5 0x60007:1
+hse-external-8	spi2	0x030	ReceiveData	15	5	0x0:11 0x47:1 0x12:1 0x2:1
+hse-external-8	timer1	0x000	Control1	4	3	0x81:2 0x0:1 0x80:1
+hse-external-8	timer1	0x004	Control2	1	1	0x0:1
+hse-external-8	timer1	0x008	SlaveModeControl	1	1	0x0:1
+hse-external-8	timer1	0x00C	DmaOrInterruptEnable	1	1	0x0:1
+hse-external-8	timer1	0x018	CaptureOrCompareMode1	1	1	0x6868:1
+hse-external-8	timer1	0x01C	CaptureOrCompareMode2	1	1	0x0:1
+hse-external-8	timer1	0x020	CaptureOrCompareEnable	1	1	0x11:1
+hse-external-8	timer1	0x028	Prescaler	1	1	0x0:1
+hse-external-8	timer1	0x02C	AutoReload	1	1	0x6A:1
+hse-external-8	timer1	0x030	RepetitionCounter	1	1	0x0:1
+hse-external-8	timer1	0x034	CaptureOrCompare1	1	1	0x28:1
+hse-external-8	timer1	0x038	CaptureOrCompare2	1	1	0x28:1
+hse-external-8	usart2	0x01C	InterruptAndStatus	8331	4	0x206000D0:6795 0x206000C0:1528 0x206000F0:7 0x206000E0:1
+hse-external-8	usart2	0x024	ReceiveData	8	8	0x93:1 0x90:1 0xBA:1 0xD4:1
+hse-external-8	usart3	0x01C	InterruptAndStatus	4438	4	0x206000D0:3738 0x206000C0:692 0x206000F0:7 0x206000E0:1
+hse-external-8	usart3	0x024	ReceiveData	8	7	0xF5:2 0xF3:1 0x1A:1 0x83:1
+motors-dshot600	gpioPortA	0x000	Mode	9	8	0xABFFFFFF:2 0xABFFFFFD:1 0xABEFFFFD:1 0xABAFFFFD:1
+motors-dshot600	gpioPortA	0x008	OutputSpeed	8	3	0xC000000:4 0xC000400:2 0xC004400:2
+motors-dshot600	gpioPortA	0x020	AlternateFunctionLow	3	3	0x0:1 0x500000:1 0x5500000:1
+motors-dshot600	gpioPortA	0x024	AlternateFunctionHigh	4	4	0x0:1 0x100:1 0x1100:1 0x1101:1
+motors-dshot600	gpioPortB	0x000	Mode	3	2	0xFFFFFEBF:2 0xFFFFEEBF:1
+motors-dshot600	gpioPortB	0x008	OutputSpeed	2	1	0xC0:2
+motors-dshot600	gpioPortB	0x020	AlternateFunctionLow	2	2	0x0:1 0x4000000:1
+motors-dshot600	i2c1	0x000	Control1	1	1	0x0:1
+motors-dshot600	i2c1	0x018	InterruptAndStatus	20004	7	0x31:19858 0x1:128 0x11:14 0x3:1
+motors-dshot600	i2c1	0x024	ReceiveData	1	1	0x60:1
+motors-dshot600	rcc	0x000	ClockControl	2	2	0x25:1 0x3000025:1
+motors-dshot600	rcc	0x010	ClockConfiguration	1	1	0x0:1
+motors-dshot600	rcc	0x018	Domain1ClockConfiguration	1	1	0x0:1
+motors-dshot600	rcc	0x01C	Domain2ClockConfiguration	1	1	0x0:1
+motors-dshot600	rcc	0x04C	Domain1KernelClockConfiguration	1	1	0x0:1
+motors-dshot600	rcc	0x050	Domain2KernelClockConfigurationLow	9	2	0x4000:8 0x0:1
+motors-dshot600	rcc	0x054	Domain2KernelClockConfigurationHigh	1	1	0x0:1
+motors-dshot600	rcc	0x0E0	AHB4Clock	4	3	0x1:2 0x0:1 0x3:1
+motors-dshot600	rcc	0x0E8	APB1ClockLow	2	2	0x0:1 0x200000:1
+motors-dshot600	rcc	0x0F0	APB2Clock	4	3	0x1000:2 0x0:1 0x1001:1
+motors-dshot600	spi1	0x000	Control1	1	1	0x0:1
+motors-dshot600	spi1	0x014	Status	21	5	0x100A:17 0x30007:1 0x20007:1 0x10007:1
+motors-dshot600	spi1	0x030	ReceiveData	4	4	0x0:1 0xEF:1 0x40:1 0x17:1
+motors-dshot600	timer1	0x000	Control1	4	3	0x81:2 0x0:1 0x80:1
+motors-dshot600	timer1	0x004	Control2	1	1	0x0:1
+motors-dshot600	timer1	0x008	SlaveModeControl	1	1	0x0:1
+motors-dshot600	timer1	0x00C	DmaOrInterruptEnable	1	1	0x0:1
+motors-dshot600	timer1	0x018	CaptureOrCompareMode1	1	1	0x6868:1
+motors-dshot600	timer1	0x01C	CaptureOrCompareMode2	1	1	0x6868:1
+motors-dshot600	timer1	0x020	CaptureOrCompareEnable	1	1	0x1111:1
+motors-dshot600	timer1	0x028	Prescaler	1	1	0x0:1
+motors-dshot600	timer1	0x02C	AutoReload	1	1	0x6A:1
+motors-dshot600	timer1	0x030	RepetitionCounter	1	1	0x0:1
+motors-dshot600	timer1	0x034	CaptureOrCompare1	1	1	0x28:1
+motors-dshot600	timer1	0x038	CaptureOrCompare2	1	1	0x28:1
+motors-dshot600	timer1	0x03C	CaptureOrCompare3	1	1	0x28:1
+motors-dshot600	timer1	0x040	CaptureOrCompare4	1	1	0x28:1
+motors-pwm	gpioPortA	0x000	Mode	9	8	0xABFFFFFF:2 0xABFFFFFD:1 0xABEFFFFD:1 0xABAFFFFD:1
+motors-pwm	gpioPortA	0x008	OutputSpeed	8	3	0xC000000:4 0xC000400:2 0xC004400:2
+motors-pwm	gpioPortA	0x020	AlternateFunctionLow	3	3	0x0:1 0x500000:1 0x5500000:1
+motors-pwm	gpioPortA	0x024	AlternateFunctionHigh	4	4	0x0:1 0x100:1 0x1100:1 0x1101:1
+motors-pwm	gpioPortB	0x000	Mode	3	2	0xFFFFFEBF:2 0xFFFFEEBF:1
+motors-pwm	gpioPortB	0x008	OutputSpeed	2	1	0xC0:2
+motors-pwm	gpioPortB	0x020	AlternateFunctionLow	2	2	0x0:1 0x4000000:1
+motors-pwm	i2c1	0x000	Control1	1	1	0x0:1
+motors-pwm	i2c1	0x018	InterruptAndStatus	20004	7	0x31:19858 0x1:128 0x11:14 0x3:1
+motors-pwm	i2c1	0x024	ReceiveData	1	1	0x60:1
+motors-pwm	rcc	0x000	ClockControl	2	2	0x25:1 0x3000025:1
+motors-pwm	rcc	0x010	ClockConfiguration	1	1	0x0:1
+motors-pwm	rcc	0x018	Domain1ClockConfiguration	1	1	0x0:1
+motors-pwm	rcc	0x01C	Domain2ClockConfiguration	1	1	0x0:1
+motors-pwm	rcc	0x04C	Domain1KernelClockConfiguration	1	1	0x0:1
+motors-pwm	rcc	0x050	Domain2KernelClockConfigurationLow	9	2	0x4000:8 0x0:1
+motors-pwm	rcc	0x054	Domain2KernelClockConfigurationHigh	1	1	0x0:1
+motors-pwm	rcc	0x0E0	AHB4Clock	4	3	0x1:2 0x0:1 0x3:1
+motors-pwm	rcc	0x0E8	APB1ClockLow	2	2	0x0:1 0x200000:1
+motors-pwm	rcc	0x0F0	APB2Clock	4	3	0x1000:2 0x0:1 0x1001:1
+motors-pwm	spi1	0x000	Control1	1	1	0x0:1
+motors-pwm	spi1	0x014	Status	21	5	0x100A:17 0x30007:1 0x20007:1 0x10007:1
+motors-pwm	spi1	0x030	ReceiveData	4	4	0x0:1 0xEF:1 0x40:1 0x17:1
+motors-pwm	timer1	0x000	Control1	1	1	0x0:1
+sentinel-01	gpioPortA	0x000	Mode	8	7	0xABFFFFFF:2 0xABFFFFFD:1 0xABEFFFFD:1 0xABEFFBFD:1
+sentinel-01	gpioPortA	0x008	OutputSpeed	6	3	0xC000000:3 0xC000400:2 0xC004400:1
+sentinel-01	gpioPortA	0x020	AlternateFunctionLow	3	3	0x0:1 0x500000:1 0x5500000:1
+sentinel-01	gpioPortA	0x024	AlternateFunctionHigh	3	3	0x0:1 0x700:1 0x770:1
+sentinel-01	gpioPortB	0x000	Mode	5	4	0xFFFFFEBF:2 0xFFEFFEBF:1 0xFFAFFEBF:1 0xFFAFEEBF:1
+sentinel-01	gpioPortB	0x008	OutputSpeed	4	1	0xC0:4
+sentinel-01	gpioPortB	0x020	AlternateFunctionLow	2	2	0x0:1 0x4000000:1
+sentinel-01	gpioPortB	0x024	AlternateFunctionHigh	2	2	0x0:1 0x400:1
+sentinel-01	i2c1	0x000	Control1	1	1	0x0:1
+sentinel-01	i2c1	0x018	InterruptAndStatus	20004	7	0x31:19858 0x1:127 0x11:15 0x3:1
+sentinel-01	i2c1	0x024	ReceiveData	1	1	0x60:1
+sentinel-01	i2c2	0x000	Control1	1	1	0x0:1
+sentinel-01	rcc	0x000	ClockControl	2	2	0x25:1 0x3000025:1
+sentinel-01	rcc	0x010	ClockConfiguration	1	1	0x0:1
+sentinel-01	rcc	0x018	Domain1ClockConfiguration	1	1	0x0:1
+sentinel-01	rcc	0x01C	Domain2ClockConfiguration	1	1	0x0:1
+sentinel-01	rcc	0x04C	Domain1KernelClockConfiguration	1	1	0x0:1
+sentinel-01	rcc	0x050	Domain2KernelClockConfigurationLow	9	2	0x4000:8 0x0:1
+sentinel-01	rcc	0x054	Domain2KernelClockConfigurationHigh	1	1	0x0:1
+sentinel-01	rcc	0x0E0	AHB4Clock	4	3	0x1:2 0x0:1 0x3:1
+sentinel-01	rcc	0x0E8	APB1ClockLow	4	3	0x200000:2 0x0:1 0x600000:1
+sentinel-01	rcc	0x0F0	APB2Clock	4	3	0x1000:2 0x0:1 0x1010:1
+sentinel-01	spi1	0x000	Control1	1	1	0x0:1
+sentinel-01	spi1	0x014	Status	21	5	0x100A:17 0x30007:1 0x20007:1 0x10007:1
+sentinel-01	spi1	0x030	ReceiveData	4	4	0x0:1 0xEF:1 0x40:1 0x17:1
+sentinel-01	usart1	0x01C	InterruptAndStatus	4442	4	0x206000D0:3387 0x206000C0:1047 0x206000F0:7 0x206000E0:1
+sentinel-01	usart1	0x024	ReceiveData	8	8	0x0:1 0xFE:1 0x4D:1 0x3F:1
+sentinel-01-ext-bmp581	gpioPortA	0x000	Mode	8	7	0xABFFFFFF:2 0xABFFFFFD:1 0xABEFFFFD:1 0xABEFFBFD:1
+sentinel-01-ext-bmp581	gpioPortA	0x008	OutputSpeed	6	3	0xC000000:3 0xC000400:2 0xC004400:1
+sentinel-01-ext-bmp581	gpioPortA	0x020	AlternateFunctionLow	3	3	0x0:1 0x500000:1 0x5500000:1
+sentinel-01-ext-bmp581	gpioPortA	0x024	AlternateFunctionHigh	3	3	0x0:1 0x700:1 0x770:1
+sentinel-01-ext-bmp581	gpioPortB	0x000	Mode	5	4	0xFFFFFEBF:2 0xFFEFFEBF:1 0xFFAFFEBF:1 0xFFAFEEBF:1
+sentinel-01-ext-bmp581	gpioPortB	0x008	OutputSpeed	4	1	0xC0:4
+sentinel-01-ext-bmp581	gpioPortB	0x020	AlternateFunctionLow	2	2	0x0:1 0x4000000:1
+sentinel-01-ext-bmp581	gpioPortB	0x024	AlternateFunctionHigh	2	2	0x0:1 0x400:1
+sentinel-01-ext-bmp581	i2c1	0x000	Control1	1	1	0x0:1
+sentinel-01-ext-bmp581	i2c1	0x018	InterruptAndStatus	20004	7	0x31:19858 0x1:127 0x11:15 0x3:1
+sentinel-01-ext-bmp581	i2c1	0x024	ReceiveData	1	1	0x60:1
+sentinel-01-ext-bmp581	i2c2	0x000	Control1	1	1	0x0:1
+sentinel-01-ext-bmp581	i2c2	0x018	InterruptAndStatus	17	4	0x5:7 0x3:5 0x21:3 0x41:2
+sentinel-01-ext-bmp581	i2c2	0x024	ReceiveData	7	6	0x0:2 0x50:1 0x19:1 0x40:1
+sentinel-01-ext-bmp581	rcc	0x000	ClockControl	2	2	0x25:1 0x3000025:1
+sentinel-01-ext-bmp581	rcc	0x010	ClockConfiguration	1	1	0x0:1
+sentinel-01-ext-bmp581	rcc	0x018	Domain1ClockConfiguration	1	1	0x0:1
+sentinel-01-ext-bmp581	rcc	0x01C	Domain2ClockConfiguration	1	1	0x0:1
+sentinel-01-ext-bmp581	rcc	0x04C	Domain1KernelClockConfiguration	1	1	0x0:1
+sentinel-01-ext-bmp581	rcc	0x050	Domain2KernelClockConfigurationLow	9	2	0x4000:8 0x0:1
+sentinel-01-ext-bmp581	rcc	0x054	Domain2KernelClockConfigurationHigh	1	1	0x0:1
+sentinel-01-ext-bmp581	rcc	0x0E0	AHB4Clock	4	3	0x1:2 0x0:1 0x3:1
+sentinel-01-ext-bmp581	rcc	0x0E8	APB1ClockLow	4	3	0x200000:2 0x0:1 0x600000:1
+sentinel-01-ext-bmp581	rcc	0x0F0	APB2Clock	4	3	0x1000:2 0x0:1 0x1010:1
+sentinel-01-ext-bmp581	spi1	0x000	Control1	1	1	0x0:1
+sentinel-01-ext-bmp581	spi1	0x014	Status	21	5	0x100A:17 0x30007:1 0x20007:1 0x10007:1
+sentinel-01-ext-bmp581	spi1	0x030	ReceiveData	4	4	0x0:1 0xEF:1 0x40:1 0x17:1
+sentinel-01-ext-bmp581	usart1	0x01C	InterruptAndStatus	4442	4	0x206000D0:3387 0x206000C0:1047 0x206000F0:7 0x206000E0:1
+sentinel-01-ext-bmp581	usart1	0x024	ReceiveData	8	8	0x21:1 0xB5:1 0xAE:1 0xC:1
+sentinel-01-minimal	gpioPortA	0x000	Mode	8	7	0xABFFFFFF:2 0xABFFFFFD:1 0xABEFFFFD:1 0xABEFFBFD:1
+sentinel-01-minimal	gpioPortA	0x008	OutputSpeed	6	3	0xC000000:3 0xC000400:2 0xC004400:1
+sentinel-01-minimal	gpioPortA	0x020	AlternateFunctionLow	3	3	0x0:1 0x500000:1 0x5500000:1
+sentinel-01-minimal	gpioPortA	0x024	AlternateFunctionHigh	3	3	0x0:1 0x700:1 0x770:1
+sentinel-01-minimal	gpioPortB	0x000	Mode	3	2	0xFFFFFEBF:2 0xFFFFEEBF:1
+sentinel-01-minimal	gpioPortB	0x008	OutputSpeed	2	1	0xC0:2
+sentinel-01-minimal	gpioPortB	0x020	AlternateFunctionLow	2	2	0x0:1 0x4000000:1
+sentinel-01-minimal	i2c1	0x000	Control1	1	1	0x0:1
+sentinel-01-minimal	i2c1	0x018	InterruptAndStatus	20004	7	0x31:19858 0x1:127 0x11:15 0x3:1
+sentinel-01-minimal	i2c1	0x024	ReceiveData	1	1	0x60:1
+sentinel-01-minimal	rcc	0x000	ClockControl	2	2	0x25:1 0x3000025:1
+sentinel-01-minimal	rcc	0x010	ClockConfiguration	1	1	0x0:1
+sentinel-01-minimal	rcc	0x018	Domain1ClockConfiguration	1	1	0x0:1
+sentinel-01-minimal	rcc	0x01C	Domain2ClockConfiguration	1	1	0x0:1
+sentinel-01-minimal	rcc	0x04C	Domain1KernelClockConfiguration	1	1	0x0:1
+sentinel-01-minimal	rcc	0x050	Domain2KernelClockConfigurationLow	9	2	0x4000:8 0x0:1
+sentinel-01-minimal	rcc	0x054	Domain2KernelClockConfigurationHigh	1	1	0x0:1
+sentinel-01-minimal	rcc	0x0E0	AHB4Clock	4	3	0x1:2 0x0:1 0x3:1
+sentinel-01-minimal	rcc	0x0E8	APB1ClockLow	2	2	0x0:1 0x200000:1
+sentinel-01-minimal	rcc	0x0F0	APB2Clock	4	3	0x1000:2 0x0:1 0x1010:1
+sentinel-01-minimal	spi1	0x000	Control1	1	1	0x0:1
+sentinel-01-minimal	spi1	0x014	Status	21	5	0x100A:17 0x30007:1 0x20007:1 0x10007:1
+sentinel-01-minimal	spi1	0x030	ReceiveData	4	4	0x0:1 0xEF:1 0x40:1 0x17:1
+sentinel-01-minimal	usart1	0x01C	InterruptAndStatus	4442	4	0x206000D0:3387 0x206000C0:1047 0x206000F0:7 0x206000E0:1
+sentinel-01-minimal	usart1	0x024	ReceiveData	8	8	0x14:1 0x3:1 0xC2:1 0x24:1
+sentinel-02-bench	gpioPortA	0x000	Mode	3	2	0xABFFFFFF:2 0xABFFFBFF:1
+sentinel-02-bench	gpioPortA	0x008	OutputSpeed	2	1	0xC000000:2
+sentinel-02-bench	gpioPortA	0x020	AlternateFunctionLow	2	2	0x0:1 0x500000:1
+sentinel-02-bench	gpioPortB	0x000	Mode	4	3	0xFFFFFEBF:2 0xFFFFFABF:1 0xFFFFEABF:1
+sentinel-02-bench	gpioPortB	0x008	OutputSpeed	3	1	0xC0:3
+sentinel-02-bench	gpioPortB	0x020	AlternateFunctionLow	3	3	0x0:1 0x500000:1 0x4500000:1
+sentinel-02-bench	gpioPortD	0x000	Mode	2	1	0xFFFFFFFF:2
+sentinel-02-bench	gpioPortD	0x008	OutputSpeed	1	1	0x0:1
+sentinel-02-bench	i2c1	0x000	Control1	1	1	0x0:1
+sentinel-02-bench	i2c1	0x018	InterruptAndStatus	17	4	0x5:7 0x3:5 0x21:3 0x41:2
+sentinel-02-bench	i2c1	0x024	ReceiveData	7	6	0x0:2 0x50:1 0x19:1 0x40:1
+sentinel-02-bench	rcc	0x000	ClockControl	2	2	0x25:1 0x3000025:1
+sentinel-02-bench	rcc	0x010	ClockConfiguration	1	1	0x0:1
+sentinel-02-bench	rcc	0x018	Domain1ClockConfiguration	1	1	0x0:1
+sentinel-02-bench	rcc	0x01C	Domain2ClockConfiguration	1	1	0x0:1
+sentinel-02-bench	rcc	0x04C	Domain1KernelClockConfiguration	1	1	0x0:1
+sentinel-02-bench	rcc	0x050	Domain2KernelClockConfigurationLow	9	2	0x4000:8 0x0:1
+sentinel-02-bench	rcc	0x054	Domain2KernelClockConfigurationHigh	1	1	0x0:1
+sentinel-02-bench	rcc	0x0E0	AHB4Clock	6	4	0x1:2 0x3:2 0x0:1 0xB:1
+sentinel-02-bench	rcc	0x0E8	APB1ClockLow	2	2	0x0:1 0x200000:1
+sentinel-02-bench	rcc	0x0F0	APB2Clock	2	2	0x0:1 0x1000:1
+sentinel-02-bench	spi1	0x000	Control1	1	1	0x0:1
+sentinel-02-bench	spi1	0x014	Status	260	8	0x100A:245 0x10007:5 0x100F:5 0x60007:1
+sentinel-02-bench	spi1	0x030	ReceiveData	15	5	0x0:11 0x47:1 0x12:1 0x2:1
+sentinel-02-bench-hse8	gpioPortA	0x000	Mode	3	2	0xABFFFFFF:2 0xABFFFBFF:1
+sentinel-02-bench-hse8	gpioPortA	0x008	OutputSpeed	2	1	0xC000000:2
+sentinel-02-bench-hse8	gpioPortA	0x020	AlternateFunctionLow	2	2	0x0:1 0x500000:1
+sentinel-02-bench-hse8	gpioPortB	0x000	Mode	4	3	0xFFFFFEBF:2 0xFFFFFABF:1 0xFFFFEABF:1
+sentinel-02-bench-hse8	gpioPortB	0x008	OutputSpeed	3	1	0xC0:3
+sentinel-02-bench-hse8	gpioPortB	0x020	AlternateFunctionLow	3	3	0x0:1 0x500000:1 0x4500000:1
+sentinel-02-bench-hse8	gpioPortD	0x000	Mode	2	1	0xFFFFFFFF:2
+sentinel-02-bench-hse8	gpioPortD	0x008	OutputSpeed	1	1	0x0:1
+sentinel-02-bench-hse8	i2c1	0x000	Control1	1	1	0x0:1
+sentinel-02-bench-hse8	i2c1	0x018	InterruptAndStatus	17	4	0x5:7 0x3:5 0x21:3 0x41:2
+sentinel-02-bench-hse8	i2c1	0x024	ReceiveData	7	6	0x0:2 0x50:1 0x19:1 0x40:1
+sentinel-02-bench-hse8	rcc	0x000	ClockControl	3	3	0x25:1 0x30025:1 0x30B0025:1
+sentinel-02-bench-hse8	rcc	0x010	ClockConfiguration	2	2	0x0:1 0x1B:1
+sentinel-02-bench-hse8	rcc	0x018	Domain1ClockConfiguration	1	1	0x0:1
+sentinel-02-bench-hse8	rcc	0x01C	Domain2ClockConfiguration	1	1	0x0:1
+sentinel-02-bench-hse8	rcc	0x04C	Domain1KernelClockConfiguration	1	1	0x0:1
+sentinel-02-bench-hse8	rcc	0x050	Domain2KernelClockConfigurationLow	1	1	0x0:1
+sentinel-02-bench-hse8	rcc	0x054	Domain2KernelClockConfigurationHigh	1	1	0x0:1
+sentinel-02-bench-hse8	rcc	0x0E0	AHB4Clock	6	4	0x1:2 0x3:2 0x0:1 0xB:1
+sentinel-02-bench-hse8	rcc	0x0E8	APB1ClockLow	2	2	0x0:1 0x200000:1
+sentinel-02-bench-hse8	rcc	0x0F0	APB2Clock	2	2	0x0:1 0x1000:1
+sentinel-02-bench-hse8	spi1	0x000	Control1	1	1	0x0:1
+sentinel-02-bench-hse8	spi1	0x014	Status	260	8	0x100A:245 0x10007:5 0x100F:5 0x60007:1
+sentinel-02-bench-hse8	spi1	0x030	ReceiveData	15	5	0x0:11 0x47:1 0x12:1 0x2:1
+sentinel-02-shaped	gpioPortA	0x000	Mode	14	13	0xABFFFFFF:2 0xABFFFFFD:1 0xABFFFFF5:1 0xABEFFFF5:1
+sentinel-02-shaped	gpioPortA	0x008	OutputSpeed	12	3	0xC000000:8 0xC000400:2 0xC004400:2
+sentinel-02-shaped	gpioPortA	0x020	AlternateFunctionLow	6	6	0x0:1 0x700:1 0x7700:1 0x507700:1
+sentinel-02-shaped	gpioPortA	0x024	AlternateFunctionHigh	5	5	0x0:1 0x100:1 0x1100:1 0x51100:1
+sentinel-02-shaped	gpioPortB	0x000	Mode	8	7	0xFFFFFEBF:2 0xFFEFFEBF:1 0xFFAFFEBF:1 0xEFAFFEBF:1
+sentinel-02-shaped	gpioPortB	0x008	OutputSpeed	6	1	0xC0:6
+sentinel-02-shaped	gpioPortB	0x020	AlternateFunctionLow	2	2	0x0:1 0x4000000:1
+sentinel-02-shaped	gpioPortB	0x024	AlternateFunctionHigh	5	5	0x0:1 0x700:1 0x7700:1 0x5007700:1
+sentinel-02-shaped	i2c1	0x000	Control1	1	1	0x0:1
+sentinel-02-shaped	i2c1	0x018	InterruptAndStatus	20021	7	0x31:19858 0x1:127 0x11:15 0x5:8
+sentinel-02-shaped	i2c1	0x024	ReceiveData	8	7	0x0:2 0x60:1 0x50:1 0x19:1
+sentinel-02-shaped	rcc	0x000	ClockControl	2	2	0x25:1 0x3000025:1
+sentinel-02-shaped	rcc	0x010	ClockConfiguration	1	1	0x0:1
+sentinel-02-shaped	rcc	0x018	Domain1ClockConfiguration	1	1	0x0:1
+sentinel-02-shaped	rcc	0x01C	Domain2ClockConfiguration	1	1	0x0:1
+sentinel-02-shaped	rcc	0x04C	Domain1KernelClockConfiguration	1	1	0x0:1
+sentinel-02-shaped	rcc	0x050	Domain2KernelClockConfigurationLow	9	2	0x4000:8 0x0:1
+sentinel-02-shaped	rcc	0x054	Domain2KernelClockConfigurationHigh	1	1	0x0:1
+sentinel-02-shaped	rcc	0x0E0	AHB4Clock	4	3	0x1:2 0x0:1 0x3:1
+sentinel-02-shaped	rcc	0x0E8	APB1ClockLow	8	5	0x200000:2 0x204000:2 0x224000:2 0x0:1
+sentinel-02-shaped	rcc	0x0F0	APB2Clock	4	3	0x1000:2 0x0:1 0x1001:1
+sentinel-02-shaped	spi1	0x000	Control1	1	1	0x0:1
+sentinel-02-shaped	spi1	0x014	Status	21	5	0x100A:17 0x30007:1 0x20007:1 0x10007:1
+sentinel-02-shaped	spi1	0x030	ReceiveData	4	4	0x0:1 0xEF:1 0x40:1 0x17:1
+sentinel-02-shaped	spi2	0x000	Control1	1	1	0x0:1
+sentinel-02-shaped	spi2	0x014	Status	260	8	0x100A:245 0x10007:5 0x100F:5 0x60007:1
+sentinel-02-shaped	spi2	0x030	ReceiveData	15	5	0x0:11 0x47:1 0x12:1 0x2:1
+sentinel-02-shaped	timer1	0x000	Control1	4	3	0x81:2 0x0:1 0x80:1
+sentinel-02-shaped	timer1	0x004	Control2	1	1	0x0:1
+sentinel-02-shaped	timer1	0x008	SlaveModeControl	1	1	0x0:1
+sentinel-02-shaped	timer1	0x00C	DmaOrInterruptEnable	1	1	0x0:1
+sentinel-02-shaped	timer1	0x018	CaptureOrCompareMode1	1	1	0x6868:1
+sentinel-02-shaped	timer1	0x01C	CaptureOrCompareMode2	1	1	0x6868:1
+sentinel-02-shaped	timer1	0x020	CaptureOrCompareEnable	1	1	0x1111:1
+sentinel-02-shaped	timer1	0x028	Prescaler	1	1	0x0:1
+sentinel-02-shaped	timer1	0x02C	AutoReload	1	1	0x6A:1
+sentinel-02-shaped	timer1	0x030	RepetitionCounter	1	1	0x0:1
+sentinel-02-shaped	timer1	0x034	CaptureOrCompare1	1	1	0x28:1
+sentinel-02-shaped	timer1	0x038	CaptureOrCompare2	1	1	0x28:1
+sentinel-02-shaped	timer1	0x03C	CaptureOrCompare3	1	1	0x28:1
+sentinel-02-shaped	timer1	0x040	CaptureOrCompare4	1	1	0x28:1
+sentinel-02-shaped	usart2	0x01C	InterruptAndStatus	8331	4	0x206000D0:6794 0x206000C0:1529 0x206000F0:7 0x206000E0:1
+sentinel-02-shaped	usart2	0x024	ReceiveData	8	8	0x87:1 0xAC:1 0xB8:1 0x82:1
+sentinel-02-shaped	usart3	0x01C	InterruptAndStatus	4438	4	0x206000D0:3738 0x206000C0:692 0x206000F0:7 0x206000E0:1
+sentinel-02-shaped	usart3	0x024	ReceiveData	8	8	0x19:1 0x72:1 0x6D:1 0x46:1
+sentinel-03	gpioPortA	0x000	Mode	12	10	0xABFFFFFF:2 0xABEAABAD:2 0xABFFFFFD:1 0xABEFFFFD:1
+sentinel-03	gpioPortA	0x008	OutputSpeed	9	3	0xC000000:5 0xC000400:2 0xC004400:2
+sentinel-03	gpioPortA	0x020	AlternateFunctionLow	6	6	0x0:1 0x700:1 0x7700:1 0x507700:1
+sentinel-03	gpioPortA	0x024	AlternateFunctionHigh	4	4	0x0:1 0x700:1 0x701:1 0x771:1
+sentinel-03	gpioPortB	0x000	Mode	9	8	0xFFFFFEBF:2 0xFFEFFEBF:1 0xFFAFFEBF:1 0xFDAFFEBF:1
+sentinel-03	gpioPortB	0x008	OutputSpeed	8	1	0xC0:8
+sentinel-03	gpioPortB	0x020	AlternateFunctionLow	2	2	0x0:1 0x4000000:1
+sentinel-03	gpioPortB	0x024	AlternateFunctionHigh	5	5	0x0:1 0x400:1 0x4400:1 0x504400:1
+sentinel-03	gpioPortE	0x000	Mode	4	3	0xFFFFFFFF:2 0xFFBFFFFF:1 0xFBBFFFFF:1
+sentinel-03	gpioPortE	0x008	OutputSpeed	3	1	0x0:3
+sentinel-03	gpioPortE	0x024	AlternateFunctionHigh	3	3	0x0:1 0x1000:1 0x101000:1
+sentinel-03	i2c1	0x000	Control1	1	1	0x0:1
+sentinel-03	i2c1	0x018	InterruptAndStatus	20017	7	0x31:19894 0x1:96 0x11:10 0x5:7
+sentinel-03	i2c1	0x024	ReceiveData	7	6	0x0:2 0x50:1 0x19:1 0x40:1
+sentinel-03	i2c2	0x000	Control1	1	1	0x0:1
+sentinel-03	rcc	0x000	ClockControl	2	2	0x25:1 0x3000025:1
+sentinel-03	rcc	0x010	ClockConfiguration	1	1	0x0:1
+sentinel-03	rcc	0x018	Domain1ClockConfiguration	1	1	0x0:1
+sentinel-03	rcc	0x01C	Domain2ClockConfiguration	1	1	0x0:1
+sentinel-03	rcc	0x04C	Domain1KernelClockConfiguration	1	1	0x0:1
+sentinel-03	rcc	0x050	Domain2KernelClockConfigurationLow	9	2	0x4000:8 0x0:1
+sentinel-03	rcc	0x054	Domain2KernelClockConfigurationHigh	1	1	0x0:1
+sentinel-03	rcc	0x0E0	AHB4Clock	8	5	0x1:2 0x3:2 0x7:2 0x0:1
+sentinel-03	rcc	0x0E8	APB1ClockLow	10	6	0x200000:2 0x600000:2 0x604000:2 0x624000:2
+sentinel-03	rcc	0x0F0	APB2Clock	6	4	0x1000:2 0x1001:2 0x0:1 0x1011:1
+sentinel-03	spi1	0x000	Control1	1	1	0x0:1
+sentinel-03	spi1	0x014	Status	21	5	0x100A:17 0x30007:1 0x20007:1 0x10007:1
+sentinel-03	spi1	0x030	ReceiveData	4	4	0x0:1 0xEF:1 0x40:1 0x17:1
+sentinel-03	spi2	0x000	Control1	1	1	0x0:1
+sentinel-03	spi2	0x014	Status	260	8	0x100A:245 0x10007:5 0x100F:5 0x60007:1
+sentinel-03	spi2	0x030	ReceiveData	15	5	0x0:11 0x47:1 0x12:1 0x2:1
+sentinel-03	timer1	0x000	Control1	4	3	0x81:2 0x0:1 0x80:1
+sentinel-03	timer1	0x004	Control2	1	1	0x0:1
+sentinel-03	timer1	0x008	SlaveModeControl	1	1	0x0:1
+sentinel-03	timer1	0x00C	DmaOrInterruptEnable	1	1	0x0:1
+sentinel-03	timer1	0x018	CaptureOrCompareMode1	1	1	0x6868:1
+sentinel-03	timer1	0x01C	CaptureOrCompareMode2	1	1	0x6868:1
+sentinel-03	timer1	0x020	CaptureOrCompareEnable	1	1	0x1111:1
+sentinel-03	timer1	0x028	Prescaler	1	1	0x0:1
+sentinel-03	timer1	0x02C	AutoReload	1	1	0x6A:1
+sentinel-03	timer1	0x030	RepetitionCounter	1	1	0x0:1
+sentinel-03	timer1	0x034	CaptureOrCompare1	1	1	0x28:1
+sentinel-03	timer1	0x038	CaptureOrCompare2	1	1	0x28:1
+sentinel-03	timer1	0x03C	CaptureOrCompare3	1	1	0x28:1
+sentinel-03	timer1	0x040	CaptureOrCompare4	1	1	0x28:1
+sentinel-03	usart1	0x01C	InterruptAndStatus	3331	4	0x206000D0:2536 0x206000C0:787 0x206000F0:7 0x206000E0:1
+sentinel-03	usart1	0x024	ReceiveData	8	8	0x47:1 0xD1:1 0xBA:1 0xB4:1
+sentinel-03	usart2	0x01C	InterruptAndStatus	3328	4	0x206000D0:2799 0x206000C0:521 0x206000F0:7 0x206000E0:1
+sentinel-03	usart2	0x024	ReceiveData	8	8	0x8E:1 0x70:1 0xFF:1 0x5B:1
+sentinel-03	usart3	0x01C	InterruptAndStatus	6247	4	0x206000D0:5091 0x206000C0:1148 0x206000F0:7 0x206000E0:1
+sentinel-03	usart3	0x024	ReceiveData	8	8	0x3C:1 0x2B:1 0xBE:1 0x5:1
+serial-dshot-9600	gpioPortA	0x000	Mode	9	8	0xABFFFFFF:2 0xABFFFFFD:1 0xABEFFFFD:1 0xABAFFFFD:1
+serial-dshot-9600	gpioPortA	0x008	OutputSpeed	8	3	0xC000000:4 0xC000400:2 0xC004400:2
+serial-dshot-9600	gpioPortA	0x020	AlternateFunctionLow	3	3	0x0:1 0x500000:1 0x5500000:1
+serial-dshot-9600	gpioPortA	0x024	AlternateFunctionHigh	4	4	0x0:1 0x100:1 0x1100:1 0x1101:1
+serial-dshot-9600	gpioPortB	0x000	Mode	6	5	0xFFFFFEBF:2 0xEFFFFEBF:1 0xAFFFFEBF:1 0xAFFFEEBF:1
+serial-dshot-9600	gpioPortB	0x008	OutputSpeed	4	1	0xC0:4
+serial-dshot-9600	gpioPortB	0x020	AlternateFunctionLow	2	2	0x0:1 0x4000000:1
+serial-dshot-9600	gpioPortB	0x024	AlternateFunctionHigh	3	3	0x0:1 0x4000000:1 0x44000000:1
+serial-dshot-9600	i2c1	0x000	Control1	1	1	0x0:1
+serial-dshot-9600	i2c1	0x018	InterruptAndStatus	20004	7	0x31:19858 0x1:127 0x11:15 0x3:1
+serial-dshot-9600	i2c1	0x024	ReceiveData	1	1	0x60:1
+serial-dshot-9600	rcc	0x000	ClockControl	2	2	0x25:1 0x3000025:1
+serial-dshot-9600	rcc	0x010	ClockConfiguration	1	1	0x0:1
+serial-dshot-9600	rcc	0x018	Domain1ClockConfiguration	1	1	0x0:1
+serial-dshot-9600	rcc	0x01C	Domain2ClockConfiguration	1	1	0x0:1
+serial-dshot-9600	rcc	0x04C	Domain1KernelClockConfiguration	1	1	0x0:1
+serial-dshot-9600	rcc	0x050	Domain2KernelClockConfigurationLow	9	2	0x4000:8 0x0:1
+serial-dshot-9600	rcc	0x054	Domain2KernelClockConfigurationHigh	1	1	0x0:1
+serial-dshot-9600	rcc	0x0E0	AHB4Clock	4	3	0x1:2 0x0:1 0x3:1
+serial-dshot-9600	rcc	0x0E8	APB1ClockLow	2	2	0x0:1 0x200000:1
+serial-dshot-9600	rcc	0x0F0	APB2Clock	6	4	0x1000:2 0x1001:2 0x0:1 0x1011:1
+serial-dshot-9600	spi1	0x000	Control1	1	1	0x0:1
+serial-dshot-9600	spi1	0x014	Status	21	5	0x100A:17 0x30007:1 0x20007:1 0x10007:1
+serial-dshot-9600	spi1	0x030	ReceiveData	4	4	0x0:1 0xEF:1 0x40:1 0x17:1
+serial-dshot-9600	timer1	0x000	Control1	4	3	0x81:2 0x0:1 0x80:1
+serial-dshot-9600	timer1	0x004	Control2	1	1	0x0:1
+serial-dshot-9600	timer1	0x008	SlaveModeControl	1	1	0x0:1
+serial-dshot-9600	timer1	0x00C	DmaOrInterruptEnable	1	1	0x0:1
+serial-dshot-9600	timer1	0x018	CaptureOrCompareMode1	1	1	0x6868:1
+serial-dshot-9600	timer1	0x01C	CaptureOrCompareMode2	1	1	0x6868:1
+serial-dshot-9600	timer1	0x020	CaptureOrCompareEnable	1	1	0x1111:1
+serial-dshot-9600	timer1	0x028	Prescaler	1	1	0x0:1
+serial-dshot-9600	timer1	0x02C	AutoReload	1	1	0x6A:1
+serial-dshot-9600	timer1	0x030	RepetitionCounter	1	1	0x0:1
+serial-dshot-9600	timer1	0x034	CaptureOrCompare1	1	1	0x28:1
+serial-dshot-9600	timer1	0x038	CaptureOrCompare2	1	1	0x28:1
+serial-dshot-9600	timer1	0x03C	CaptureOrCompare3	1	1	0x28:1
+serial-dshot-9600	timer1	0x040	CaptureOrCompare4	1	1	0x28:1
+serial-dshot-9600	usart1	0x01C	InterruptAndStatus	43331	4	0x206000D0:36971 0x206000C0:6352 0x206000F0:7 0x206000E0:1
+serial-dshot-9600	usart1	0x024	ReceiveData	8	8	0xC1:1 0xE4:1 0x55:1 0x32:1

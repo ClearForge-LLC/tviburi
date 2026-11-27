@@ -258,7 +258,7 @@ ok = len({r[\"register\"] for r in f}) == 11 and all(by[(\"I2C_TIMINGR\", x)][\"
 ok = ok and by[(\"I2C_CR1\", \"DNF\")][\"state\"] == \"guard\" and by[(\"I2C_CR1\", \"ANFOFF\")][\"state\"] == \"guard\" and by[(\"I2C_CR2\", \"START\")][\"state\"] == \"guard\"
 ok = ok and all(by[(r, f)][\"state\"] == \"guard\" for r, f in ((\"I2C_ISR\", \"NACKF\"), (\"I2C_ICR\", \"NACKCF\"), (\"I2C_CR1\", \"NACKIE\"), (\"I2C_CR2\", \"STOP\")))
 ok = ok and \"inferred: RM0433 gives no figure\" in by[(\"I2C_ISR\", \"NACKF\")][\"behaves_as\"] and \"p1975\" in by[(\"I2C_CR2\", \"START\")][\"behaves_as\"] and by[(\"I2C_ICR\", \"Res6\")][\"allowed\"] == \"any\" and by[(\"I2C_ICR\", \"Res7\")][\"allowed\"] == [0]
-ok = ok and by[(\"I2C_ICR\", \"Res2_1\")][\"state\"] == \"inherited-unaudited\" and by[(\"I2C_CR2\", \"RELOAD\")][\"allowed\"] == [0]
+ok = ok and by[(\"I2C_ICR\", \"Res2_1\")][\"state\"] == \"acknowledged\" and by[(\"I2C_CR2\", \"RELOAD\")][\"allowed\"] == [0]
 m = [r for r in rows if r[\"row\"] == \"model\" and r[\"peripheral\"] == \"I2C.STM32F7_I2C\"]
 mg = [x for x in m if x[\"field\"] == \"guarded\"]; mu = [x for x in m if x[\"field\"] == \"unguarded\"]
 ok = ok and len(mg) == 1 and mg[0].get(\"guarded_by\") == g and mg[0][\"instances\"] == [\"i2c1\", \"i2c2\", \"i2c3\"]
