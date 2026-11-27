@@ -2073,7 +2073,7 @@ spi1	GuardedSTM32H7_SPI	0x000	Control1	SPI_CR1.SPE	acknowledged	read	sensor
 spi1	GuardedSTM32H7_SPI	0x000	Control1	SPI_CR1.SSI	guard	guarded	sensor
 spi1	GuardedSTM32H7_SPI	0x000	Control1	SPI_CR1.TCRCINI	tag	read	sensor
 spi1	GuardedSTM32H7_SPI	0x004	Control2	SPI_CR2.TSER	tag	read	sensor
-spi1	GuardedSTM32H7_SPI	0x004	Control2	SPI_CR2.TSIZE	stock-wrong	read	sensor
+spi1	GuardedSTM32H7_SPI	0x004	Control2	SPI_CR2.TSIZE	acknowledged	read	sensor
 spi1	GuardedSTM32H7_SPI	0x008	Configuration1	SPI_CFG1.CRCEN	tag	read	sensor
 spi1	GuardedSTM32H7_SPI	0x008	Configuration1	SPI_CFG1.CRCSIZE	acknowledged	read	sensor
 spi1	GuardedSTM32H7_SPI	0x008	Configuration1	SPI_CFG1.DSIZE	acknowledged	read	sensor
@@ -2141,7 +2141,7 @@ spi2	GuardedSTM32H7_SPI	0x000	Control1	SPI_CR1.SPE	acknowledged	read	sensor
 spi2	GuardedSTM32H7_SPI	0x000	Control1	SPI_CR1.SSI	guard	guarded	sensor
 spi2	GuardedSTM32H7_SPI	0x000	Control1	SPI_CR1.TCRCINI	tag	read	sensor
 spi2	GuardedSTM32H7_SPI	0x004	Control2	SPI_CR2.TSER	tag	read	sensor
-spi2	GuardedSTM32H7_SPI	0x004	Control2	SPI_CR2.TSIZE	stock-wrong	read	sensor
+spi2	GuardedSTM32H7_SPI	0x004	Control2	SPI_CR2.TSIZE	acknowledged	read	sensor
 spi2	GuardedSTM32H7_SPI	0x008	Configuration1	SPI_CFG1.CRCEN	tag	read	sensor
 spi2	GuardedSTM32H7_SPI	0x008	Configuration1	SPI_CFG1.CRCSIZE	acknowledged	read	sensor
 spi2	GuardedSTM32H7_SPI	0x008	Configuration1	SPI_CFG1.DSIZE	acknowledged	read	sensor

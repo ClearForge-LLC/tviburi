@@ -35,7 +35,7 @@
 
 ## 2. Acceptance
 
-All on the branch's head `4c7ffae` (the commits after it change `TVI-WO-1205`'s verdict and FEEDBACK and this file only).
+All on `f398a8b`, the branch's last tree change (the one commit after it records these results and CI).
 - **0 above-cut fields on `inherited-unaudited`,** by the gate's per-field measure: 1,982 fields above the cut at 208 registers, 399 guarded, 1,583 read, 0 open; none unlisted, none stock-bound (`spike/1206/data/branch/coverage.tsv`). On `main` the same measure finds 434 open.
 - **Every changed row cites a manual page and a stock source line:** `spike/1206/check-rows.py 8e15435 …`, 295 rows changed, 0 failures. Every A-number cited is a §3 row, and the release refuses any other.
 - **Every reading's quotes are on their page and at their lines:**
@@ -43,9 +43,9 @@ All on the branch's head `4c7ffae` (the commits after it change `TVI-WO-1205`'s 
   - The second list: 174 rows. Its failures are `from_memory` notes no row rests on, and DMAT's quotes from the DMA guard, checked by hand (§4).
 - **Nothing behavioural moved:**
   - **The 16 replays** are identical to the baseline in records (0), witnesses, boot hash and boot lines (`data/branch/replays.txt`). The armed run arms at 9.332 s with 34 witnesses, 34 ends and 0 records.
-  - **`LEDGER.jsonl`, `main` against the branch:** 1,946 rows each side, 295 changed, exactly the two work lists (`data/branch/ledger-diff.txt`). Keys changed: `state` 295, `behaves_as` 295, `reason` 168, `detail` 127. Every other key of every row is identical.
+  - **`LEDGER.jsonl`, `main` against the branch:** 1,946 rows each side, 295 changed, exactly the two work lists (`data/branch/ledger-diff.txt`). Keys changed: `state` 295, `behaves_as` 295, `reason` 169, `detail` 126. Every other key of every row is identical.
   - **The model tables:** 295 rows changed in class and text only; allowed sets, bits and everything outside the tables are byte-identical.
-- **CI:** [CI on the head]
+- **CI:** 45927404214 on `f398a8b`, success: "1167 expected (518 cases, 649 mutants), 1167 ran across 11 shards, 0 failures"; the budget's medians main 950,828, branch 944,112 KiB (−6.6 MiB, within noise; the +68.8 MiB line is the budget tests' own planted case).
 - **Unmapped writes:** the measure lists the armed run's three, each judged off the cut or on no flight path (`TVI-WO-1206.rm0433.md` §5).
 - **The addendum fits the page:** `TVI-WO-1205.verdict.md` is 840 words with it (722 before).
 - **Off the cut, not counted:** `FLASH_CCR1/2.Res15_0` (path `other`) stay `inherited-unaudited` (R8).
