@@ -15,12 +15,12 @@
 
 ## 0. The verdict (WO §1.4)
 
-**Clause 1 is met,** by the gate's per-field measure on `f398a8b`: 1,982 fields above the cut at 208 registers, 399 guarded, 1,583 read, **0 open**. On `main` the same measure finds 434 open. Written as the addendum in `TVI-WO-1205.verdict.md` and `TVI-WO-1205.FEEDBACK.md`, as the fence asks.
+**Clause 1 is met,** by the gate's per-field measure on `26310c6`: 1,982 fields above the cut at 208 registers, 399 guarded, 1,583 read, **0 open**. On `main` the same measure finds 434 open. Written as the addendum in `TVI-WO-1205.verdict.md` and `TVI-WO-1205.FEEDBACK.md`, as the fence asks.
 - **What was read:** 295 fields, each against RM0433 Rev 9 by page and the pinned stock source by line, for every value the armed run, the 14 generated boots and the fixture write. 226 are `acknowledged` (A1–A31) and 69 `stock-wrong`, each with why the flight path is unaffected.
 - **What the verdict rests on beyond the manual:** 18 acknowledgements are field evidence by the architect's rulings, because RM0433 is silent for what the firmware does (A11, A12, A13, A25–A29; `TVI-WO-1206.rm0433.md` §4). Each quotes the manual's words, the run's counts and the twin's behaviour, and each has a bench row for Phase 4. If any is overruled, clause 1 is not met by that field: a one-line change in `spike/1206/readings.py`.
 - **What the measure lists outside its field count:** three unmapped writes, each judged off the cut or on no flight path (§5 of `TVI-WO-1206.rm0433.md`). DMAMUX2 is a Phase 4 row (R9).
 - **What the adversarial pass left on record:** the second re-read disagreed on 16 of 35 fields; each is resolved in §4 with its reason. No resolution changes the count, since both states count as read. One disagreement was a real gap, now in A26.
-- **Nothing behavioural moved:** `LEDGER.jsonl` differs from `main` on exactly the 295 fields, in state and text only. The 16 replays are identical, and the armed run arms at 9.332 s with 0 records. CI 45927404214: 1,167 items, 0 failures.
+- **Nothing behavioural moved:** `LEDGER.jsonl` differs from `main` on exactly the 295 fields, in state and text only. The 16 replays are identical, and the armed run arms at 9.332 s with 0 records. CI 45931691248 on `26310c6`: 1,167 items, 0 failures.
 
 ## 1. What was built
 
@@ -44,7 +44,7 @@
 
 ## 2. Acceptance
 
-All on `f398a8b`, the branch's last tree change (the one commit after it records these results and CI).
+All on `26310c6`, the branch's last tree change (the commit after it records these results and CI).
 - **0 above-cut fields on `inherited-unaudited`,** by the gate's per-field measure: 1,982 fields above the cut at 208 registers, 399 guarded, 1,583 read, 0 open; none unlisted, none stock-bound (`spike/1206/data/branch/coverage.tsv`). On `main` the same measure finds 434 open.
 - **Every changed row cites a manual page and a stock source line:** `spike/1206/check-rows.py 8e15435 …`, 295 rows changed, 0 failures. Every A-number cited is a §3 row, and the release refuses any other.
 - **Every reading's quotes are on their page and at their lines:**
@@ -52,9 +52,9 @@ All on `f398a8b`, the branch's last tree change (the one commit after it records
   - The second list: 174 rows. Its failures are `from_memory` notes no row rests on, and DMAT's quotes from the DMA guard, checked by hand (§4).
 - **Nothing behavioural moved:**
   - **The 16 replays** are identical to the baseline in records (0), witnesses, boot hash and boot lines (`data/branch/replays.txt`). The armed run arms at 9.332 s with 34 witnesses, 34 ends and 0 records.
-  - **`LEDGER.jsonl`, `main` against the branch:** 1,946 rows each side, 295 changed, exactly the two work lists (`data/branch/ledger-diff.txt`). Keys changed: `state` 295, `behaves_as` 295, `reason` 169, `detail` 126. Every other key of every row is identical.
+  - **`LEDGER.jsonl`, `main` against the branch:** 1,946 rows each side, 295 changed, exactly the two work lists (`data/branch/ledger-diff.txt`). Keys changed: `state` 295, `behaves_as` 295, `reason` 226, `detail` 69. Every other key of every row is identical.
   - **The model tables:** 295 rows changed in class and text only; allowed sets, bits and everything outside the tables are byte-identical.
-- **CI:** 45927404214 on `f398a8b`, success: "1167 expected (518 cases, 649 mutants), 1167 ran across 11 shards, 0 failures"; the budget's medians main 950,828, branch 944,112 KiB (−6.6 MiB, within noise; the +68.8 MiB line is the budget tests' own planted case).
+- **CI:** 45931691248 on `26310c6`, success: "1167 expected (518 cases, 649 mutants), 1167 ran across 11 shards, 0 failures". The budget's medians are main 855,824 KiB, branch 865,828 KiB (+9.8 MiB, within its 32 MiB bound). The overlay's behaviour is unchanged since −6.6 MiB on `f398a8b`, so this is run-to-run noise; the +89.6 MiB line is the budget tests' own planted case.
 - **Unmapped writes:** the measure lists the armed run's three, each judged off the cut or on no flight path (`TVI-WO-1206.rm0433.md` §5).
 - **The addendum fits the page:** `TVI-WO-1205.verdict.md` is 840 words with it (722 before).
 - **Off the cut, not counted:** `FLASH_CCR1/2.Res15_0` (path `other`) stay `inherited-unaudited` (R8).
@@ -150,6 +150,6 @@ Reduction pass (diff): −18 net · 2 duplicates removed · 1 dead path removed 
   - the 129's undercount (00:38Z, ruled 00:43Z);
   - the four field-evidence items (01:18Z, ruled 01:37Z).
 - **TSIZE and DMAMUX2** (my 01:41Z note, ruled 02:12Z).
-- **Clause 1, re-judged (WO §1.4):** met by the gate's per-field measure on `f398a8b`. 0 of 1,982 fields above the cut are open; 18 rest on field evidence by ruling, each with a bench row. The three unmapped writes are each judged off the cut or on no flight path. Written as the addendum in `TVI-WO-1205.verdict.md` and `TVI-WO-1205.FEEDBACK.md`.
+- **Clause 1, re-judged (WO §1.4):** met by the gate's per-field measure on `26310c6`. 0 of 1,982 fields above the cut are open; 18 rest on field evidence by ruling, each with a bench row. The three unmapped writes are each judged off the cut or on no flight path. Written as the addendum in `TVI-WO-1205.verdict.md` and `TVI-WO-1205.FEEDBACK.md`.
 - **The addendum is the WO's last stop.**
 - **Not merged by me.**

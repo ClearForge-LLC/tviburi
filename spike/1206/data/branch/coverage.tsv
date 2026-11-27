@@ -1292,7 +1292,7 @@ i2c1	GuardedSTM32F7_I2C	0x000	Control1	I2C_CR1.NOSTRETCH	acknowledged	read	senso
 i2c1	GuardedSTM32F7_I2C	0x000	Control1	I2C_CR1.PE	guard	guarded	sensor
 i2c1	GuardedSTM32F7_I2C	0x000	Control1	I2C_CR1.PECEN	tag	read	sensor
 i2c1	GuardedSTM32F7_I2C	0x000	Control1	I2C_CR1.RXDMAEN	acknowledged	read	sensor
-i2c1	GuardedSTM32F7_I2C	0x000	Control1	I2C_CR1.RXIE	acknowledged	read	sensor
+i2c1	GuardedSTM32F7_I2C	0x000	Control1	I2C_CR1.RXIE	stock-wrong	read	sensor
 i2c1	GuardedSTM32F7_I2C	0x000	Control1	I2C_CR1.Res13	reserved	read	sensor
 i2c1	GuardedSTM32F7_I2C	0x000	Control1	I2C_CR1.Res31_24	reserved	read	sensor
 i2c1	GuardedSTM32F7_I2C	0x000	Control1	I2C_CR1.SBC	tag	read	sensor
@@ -1348,7 +1348,7 @@ i2c2	GuardedSTM32F7_I2C	0x000	Control1	I2C_CR1.NOSTRETCH	acknowledged	read	other
 i2c2	GuardedSTM32F7_I2C	0x000	Control1	I2C_CR1.PE	guard	guarded	other,sensor
 i2c2	GuardedSTM32F7_I2C	0x000	Control1	I2C_CR1.PECEN	tag	read	other,sensor
 i2c2	GuardedSTM32F7_I2C	0x000	Control1	I2C_CR1.RXDMAEN	acknowledged	read	other,sensor
-i2c2	GuardedSTM32F7_I2C	0x000	Control1	I2C_CR1.RXIE	acknowledged	read	other,sensor
+i2c2	GuardedSTM32F7_I2C	0x000	Control1	I2C_CR1.RXIE	stock-wrong	read	other,sensor
 i2c2	GuardedSTM32F7_I2C	0x000	Control1	I2C_CR1.Res13	reserved	read	other,sensor
 i2c2	GuardedSTM32F7_I2C	0x000	Control1	I2C_CR1.Res31_24	reserved	read	other,sensor
 i2c2	GuardedSTM32F7_I2C	0x000	Control1	I2C_CR1.SBC	tag	read	other,sensor
@@ -1661,21 +1661,21 @@ rcc	GuardedSTM32H7_RCC	0x070	BackupDomainControl	RCC_BDCR.Res7	reserved	read	clo
 rcc	GuardedSTM32H7_RCC	0x074	ClockControlAndStatus	RCC_CSR.LSION	stock-wrong	read	clock tree
 rcc	GuardedSTM32H7_RCC	0x074	ClockControlAndStatus	RCC_CSR.LSIRDY	read-only	read	clock tree
 rcc	GuardedSTM32H7_RCC	0x074	ClockControlAndStatus	RCC_CSR.Res31_2	reserved	read	clock tree
-rcc	GuardedSTM32H7_RCC	0x07C	AHB3Reset	RCC_AHB3RSTR.DMA2DRST	stock-wrong	read	clock tree
+rcc	GuardedSTM32H7_RCC	0x07C	AHB3Reset	RCC_AHB3RSTR.DMA2DRST	acknowledged	read	clock tree
 rcc	GuardedSTM32H7_RCC	0x07C	AHB3Reset	RCC_AHB3RSTR.FMCRST	acknowledged	read	clock tree
 rcc	GuardedSTM32H7_RCC	0x07C	AHB3Reset	RCC_AHB3RSTR.JPGDECRST	stock-wrong	read	clock tree
 rcc	GuardedSTM32H7_RCC	0x07C	AHB3Reset	RCC_AHB3RSTR.MDMARST	stock-wrong	read	clock tree
-rcc	GuardedSTM32H7_RCC	0x07C	AHB3Reset	RCC_AHB3RSTR.QSPIRST	stock-wrong	read	clock tree
+rcc	GuardedSTM32H7_RCC	0x07C	AHB3Reset	RCC_AHB3RSTR.QSPIRST	acknowledged	read	clock tree
 rcc	GuardedSTM32H7_RCC	0x07C	AHB3Reset	RCC_AHB3RSTR.Res11_6	acknowledged	read	clock tree
 rcc	GuardedSTM32H7_RCC	0x07C	AHB3Reset	RCC_AHB3RSTR.Res13	acknowledged	read	clock tree
 rcc	GuardedSTM32H7_RCC	0x07C	AHB3Reset	RCC_AHB3RSTR.Res15	acknowledged	read	clock tree
 rcc	GuardedSTM32H7_RCC	0x07C	AHB3Reset	RCC_AHB3RSTR.Res31_17	acknowledged	read	clock tree
 rcc	GuardedSTM32H7_RCC	0x07C	AHB3Reset	RCC_AHB3RSTR.Res3_1	acknowledged	read	clock tree
 rcc	GuardedSTM32H7_RCC	0x07C	AHB3Reset	RCC_AHB3RSTR.SDMMC1RST	stock-wrong	read	clock tree
-rcc	GuardedSTM32H7_RCC	0x080	AHB1Reset	RCC_AHB1RSTR.ADC12RST	stock-wrong	read	clock tree
-rcc	GuardedSTM32H7_RCC	0x080	AHB1Reset	RCC_AHB1RSTR.DMA1RST	stock-wrong	read	clock tree
-rcc	GuardedSTM32H7_RCC	0x080	AHB1Reset	RCC_AHB1RSTR.DMA2RST	stock-wrong	read	clock tree
-rcc	GuardedSTM32H7_RCC	0x080	AHB1Reset	RCC_AHB1RSTR.ETH1MACRST	stock-wrong	read	clock tree
+rcc	GuardedSTM32H7_RCC	0x080	AHB1Reset	RCC_AHB1RSTR.ADC12RST	acknowledged	read	clock tree
+rcc	GuardedSTM32H7_RCC	0x080	AHB1Reset	RCC_AHB1RSTR.DMA1RST	acknowledged	read	clock tree
+rcc	GuardedSTM32H7_RCC	0x080	AHB1Reset	RCC_AHB1RSTR.DMA2RST	acknowledged	read	clock tree
+rcc	GuardedSTM32H7_RCC	0x080	AHB1Reset	RCC_AHB1RSTR.ETH1MACRST	acknowledged	read	clock tree
 rcc	GuardedSTM32H7_RCC	0x080	AHB1Reset	RCC_AHB1RSTR.Res14_6	acknowledged	read	clock tree
 rcc	GuardedSTM32H7_RCC	0x080	AHB1Reset	RCC_AHB1RSTR.Res24_16	acknowledged	read	clock tree
 rcc	GuardedSTM32H7_RCC	0x080	AHB1Reset	RCC_AHB1RSTR.Res26	acknowledged	read	clock tree
@@ -1686,60 +1686,60 @@ rcc	GuardedSTM32H7_RCC	0x080	AHB1Reset	RCC_AHB1RSTR.USB2OTGRST	stock-wrong	read	
 rcc	GuardedSTM32H7_RCC	0x084	AHB2Reset	RCC_AHB2RSTR.CRYPTRST	stock-wrong	read	clock tree
 rcc	GuardedSTM32H7_RCC	0x084	AHB2Reset	RCC_AHB2RSTR.DCMIRST	stock-wrong	read	clock tree
 rcc	GuardedSTM32H7_RCC	0x084	AHB2Reset	RCC_AHB2RSTR.HASHRST	stock-wrong	read	clock tree
-rcc	GuardedSTM32H7_RCC	0x084	AHB2Reset	RCC_AHB2RSTR.RNGRST	stock-wrong	read	clock tree
+rcc	GuardedSTM32H7_RCC	0x084	AHB2Reset	RCC_AHB2RSTR.RNGRST	acknowledged	read	clock tree
 rcc	GuardedSTM32H7_RCC	0x084	AHB2Reset	RCC_AHB2RSTR.Res31_10	acknowledged	read	clock tree
 rcc	GuardedSTM32H7_RCC	0x084	AHB2Reset	RCC_AHB2RSTR.Res3_1	acknowledged	read	clock tree
 rcc	GuardedSTM32H7_RCC	0x084	AHB2Reset	RCC_AHB2RSTR.Res8_7	acknowledged	read	clock tree
 rcc	GuardedSTM32H7_RCC	0x084	AHB2Reset	RCC_AHB2RSTR.SDMMC2RST	stock-wrong	read	clock tree
-rcc	GuardedSTM32H7_RCC	0x088	AHB4Reset	RCC_AHB4RSTR.ADC3RST	stock-wrong	read	clock tree
-rcc	GuardedSTM32H7_RCC	0x088	AHB4Reset	RCC_AHB4RSTR.BDMARST	stock-wrong	read	clock tree
-rcc	GuardedSTM32H7_RCC	0x088	AHB4Reset	RCC_AHB4RSTR.CRCRST	stock-wrong	read	clock tree
-rcc	GuardedSTM32H7_RCC	0x088	AHB4Reset	RCC_AHB4RSTR.GPIOARST	stock-wrong	read	clock tree
-rcc	GuardedSTM32H7_RCC	0x088	AHB4Reset	RCC_AHB4RSTR.GPIOBRST	stock-wrong	read	clock tree
-rcc	GuardedSTM32H7_RCC	0x088	AHB4Reset	RCC_AHB4RSTR.GPIOCRST	stock-wrong	read	clock tree
-rcc	GuardedSTM32H7_RCC	0x088	AHB4Reset	RCC_AHB4RSTR.GPIODRST	stock-wrong	read	clock tree
-rcc	GuardedSTM32H7_RCC	0x088	AHB4Reset	RCC_AHB4RSTR.GPIOERST	stock-wrong	read	clock tree
-rcc	GuardedSTM32H7_RCC	0x088	AHB4Reset	RCC_AHB4RSTR.GPIOFRST	stock-wrong	read	clock tree
-rcc	GuardedSTM32H7_RCC	0x088	AHB4Reset	RCC_AHB4RSTR.GPIOGRST	stock-wrong	read	clock tree
-rcc	GuardedSTM32H7_RCC	0x088	AHB4Reset	RCC_AHB4RSTR.GPIOHRST	stock-wrong	read	clock tree
-rcc	GuardedSTM32H7_RCC	0x088	AHB4Reset	RCC_AHB4RSTR.GPIOIRST	stock-wrong	read	clock tree
-rcc	GuardedSTM32H7_RCC	0x088	AHB4Reset	RCC_AHB4RSTR.GPIOJRST	stock-wrong	read	clock tree
-rcc	GuardedSTM32H7_RCC	0x088	AHB4Reset	RCC_AHB4RSTR.GPIOKRST	stock-wrong	read	clock tree
-rcc	GuardedSTM32H7_RCC	0x088	AHB4Reset	RCC_AHB4RSTR.HSEMRST	stock-wrong	read	clock tree
+rcc	GuardedSTM32H7_RCC	0x088	AHB4Reset	RCC_AHB4RSTR.ADC3RST	acknowledged	read	clock tree
+rcc	GuardedSTM32H7_RCC	0x088	AHB4Reset	RCC_AHB4RSTR.BDMARST	acknowledged	read	clock tree
+rcc	GuardedSTM32H7_RCC	0x088	AHB4Reset	RCC_AHB4RSTR.CRCRST	acknowledged	read	clock tree
+rcc	GuardedSTM32H7_RCC	0x088	AHB4Reset	RCC_AHB4RSTR.GPIOARST	acknowledged	read	clock tree
+rcc	GuardedSTM32H7_RCC	0x088	AHB4Reset	RCC_AHB4RSTR.GPIOBRST	acknowledged	read	clock tree
+rcc	GuardedSTM32H7_RCC	0x088	AHB4Reset	RCC_AHB4RSTR.GPIOCRST	acknowledged	read	clock tree
+rcc	GuardedSTM32H7_RCC	0x088	AHB4Reset	RCC_AHB4RSTR.GPIODRST	acknowledged	read	clock tree
+rcc	GuardedSTM32H7_RCC	0x088	AHB4Reset	RCC_AHB4RSTR.GPIOERST	acknowledged	read	clock tree
+rcc	GuardedSTM32H7_RCC	0x088	AHB4Reset	RCC_AHB4RSTR.GPIOFRST	acknowledged	read	clock tree
+rcc	GuardedSTM32H7_RCC	0x088	AHB4Reset	RCC_AHB4RSTR.GPIOGRST	acknowledged	read	clock tree
+rcc	GuardedSTM32H7_RCC	0x088	AHB4Reset	RCC_AHB4RSTR.GPIOHRST	acknowledged	read	clock tree
+rcc	GuardedSTM32H7_RCC	0x088	AHB4Reset	RCC_AHB4RSTR.GPIOIRST	acknowledged	read	clock tree
+rcc	GuardedSTM32H7_RCC	0x088	AHB4Reset	RCC_AHB4RSTR.GPIOJRST	acknowledged	read	clock tree
+rcc	GuardedSTM32H7_RCC	0x088	AHB4Reset	RCC_AHB4RSTR.GPIOKRST	acknowledged	read	clock tree
+rcc	GuardedSTM32H7_RCC	0x088	AHB4Reset	RCC_AHB4RSTR.HSEMRST	acknowledged	read	clock tree
 rcc	GuardedSTM32H7_RCC	0x088	AHB4Reset	RCC_AHB4RSTR.Res18_11	acknowledged	read	clock tree
 rcc	GuardedSTM32H7_RCC	0x088	AHB4Reset	RCC_AHB4RSTR.Res20	acknowledged	read	clock tree
 rcc	GuardedSTM32H7_RCC	0x088	AHB4Reset	RCC_AHB4RSTR.Res23_22	acknowledged	read	clock tree
 rcc	GuardedSTM32H7_RCC	0x088	AHB4Reset	RCC_AHB4RSTR.Res31_26	acknowledged	read	clock tree
-rcc	GuardedSTM32H7_RCC	0x08C	APB3Reset	RCC_APB3RSTR.LTDCRST	stock-wrong	read	clock tree
+rcc	GuardedSTM32H7_RCC	0x08C	APB3Reset	RCC_APB3RSTR.LTDCRST	acknowledged	read	clock tree
 rcc	GuardedSTM32H7_RCC	0x08C	APB3Reset	RCC_APB3RSTR.Res2_0	acknowledged	read	clock tree
 rcc	GuardedSTM32H7_RCC	0x08C	APB3Reset	RCC_APB3RSTR.Res31_4	acknowledged	read	clock tree
 rcc	GuardedSTM32H7_RCC	0x090	APB1ResetLow	RCC_APB1LRSTR.CECRST	stock-wrong	read	clock tree
 rcc	GuardedSTM32H7_RCC	0x090	APB1ResetLow	RCC_APB1LRSTR.DAC12RST	stock-wrong	read	clock tree
-rcc	GuardedSTM32H7_RCC	0x090	APB1ResetLow	RCC_APB1LRSTR.I2C1RST	stock-wrong	read	clock tree
-rcc	GuardedSTM32H7_RCC	0x090	APB1ResetLow	RCC_APB1LRSTR.I2C2RST	stock-wrong	read	clock tree
-rcc	GuardedSTM32H7_RCC	0x090	APB1ResetLow	RCC_APB1LRSTR.I2C3RST	stock-wrong	read	clock tree
-rcc	GuardedSTM32H7_RCC	0x090	APB1ResetLow	RCC_APB1LRSTR.LPTIM1RST	stock-wrong	read	clock tree
+rcc	GuardedSTM32H7_RCC	0x090	APB1ResetLow	RCC_APB1LRSTR.I2C1RST	acknowledged	read	clock tree
+rcc	GuardedSTM32H7_RCC	0x090	APB1ResetLow	RCC_APB1LRSTR.I2C2RST	acknowledged	read	clock tree
+rcc	GuardedSTM32H7_RCC	0x090	APB1ResetLow	RCC_APB1LRSTR.I2C3RST	acknowledged	read	clock tree
+rcc	GuardedSTM32H7_RCC	0x090	APB1ResetLow	RCC_APB1LRSTR.LPTIM1RST	acknowledged	read	clock tree
 rcc	GuardedSTM32H7_RCC	0x090	APB1ResetLow	RCC_APB1LRSTR.Res13_10	acknowledged	read	clock tree
 rcc	GuardedSTM32H7_RCC	0x090	APB1ResetLow	RCC_APB1LRSTR.Res26_24	acknowledged	read	clock tree
 rcc	GuardedSTM32H7_RCC	0x090	APB1ResetLow	RCC_APB1LRSTR.Res28	acknowledged	read	clock tree
 rcc	GuardedSTM32H7_RCC	0x090	APB1ResetLow	RCC_APB1LRSTR.SPDIFRXRST	stock-wrong	read	clock tree
-rcc	GuardedSTM32H7_RCC	0x090	APB1ResetLow	RCC_APB1LRSTR.SPI2RST	stock-wrong	read	clock tree
+rcc	GuardedSTM32H7_RCC	0x090	APB1ResetLow	RCC_APB1LRSTR.SPI2RST	acknowledged	read	clock tree
 rcc	GuardedSTM32H7_RCC	0x090	APB1ResetLow	RCC_APB1LRSTR.SPI3RST	stock-wrong	read	clock tree
-rcc	GuardedSTM32H7_RCC	0x090	APB1ResetLow	RCC_APB1LRSTR.TIM12RST	stock-wrong	read	clock tree
-rcc	GuardedSTM32H7_RCC	0x090	APB1ResetLow	RCC_APB1LRSTR.TIM13RST	stock-wrong	read	clock tree
-rcc	GuardedSTM32H7_RCC	0x090	APB1ResetLow	RCC_APB1LRSTR.TIM14RST	stock-wrong	read	clock tree
-rcc	GuardedSTM32H7_RCC	0x090	APB1ResetLow	RCC_APB1LRSTR.TIM2RST	stock-wrong	read	clock tree
-rcc	GuardedSTM32H7_RCC	0x090	APB1ResetLow	RCC_APB1LRSTR.TIM3RST	stock-wrong	read	clock tree
-rcc	GuardedSTM32H7_RCC	0x090	APB1ResetLow	RCC_APB1LRSTR.TIM4RST	stock-wrong	read	clock tree
-rcc	GuardedSTM32H7_RCC	0x090	APB1ResetLow	RCC_APB1LRSTR.TIM5RST	stock-wrong	read	clock tree
-rcc	GuardedSTM32H7_RCC	0x090	APB1ResetLow	RCC_APB1LRSTR.TIM6RST	stock-wrong	read	clock tree
-rcc	GuardedSTM32H7_RCC	0x090	APB1ResetLow	RCC_APB1LRSTR.TIM7RST	stock-wrong	read	clock tree
-rcc	GuardedSTM32H7_RCC	0x090	APB1ResetLow	RCC_APB1LRSTR.UART4RST	stock-wrong	read	clock tree
-rcc	GuardedSTM32H7_RCC	0x090	APB1ResetLow	RCC_APB1LRSTR.UART5RST	stock-wrong	read	clock tree
-rcc	GuardedSTM32H7_RCC	0x090	APB1ResetLow	RCC_APB1LRSTR.UART7RST	stock-wrong	read	clock tree
-rcc	GuardedSTM32H7_RCC	0x090	APB1ResetLow	RCC_APB1LRSTR.UART8RST	stock-wrong	read	clock tree
-rcc	GuardedSTM32H7_RCC	0x090	APB1ResetLow	RCC_APB1LRSTR.USART2RST	stock-wrong	read	clock tree
-rcc	GuardedSTM32H7_RCC	0x090	APB1ResetLow	RCC_APB1LRSTR.USART3RST	stock-wrong	read	clock tree
+rcc	GuardedSTM32H7_RCC	0x090	APB1ResetLow	RCC_APB1LRSTR.TIM12RST	acknowledged	read	clock tree
+rcc	GuardedSTM32H7_RCC	0x090	APB1ResetLow	RCC_APB1LRSTR.TIM13RST	acknowledged	read	clock tree
+rcc	GuardedSTM32H7_RCC	0x090	APB1ResetLow	RCC_APB1LRSTR.TIM14RST	acknowledged	read	clock tree
+rcc	GuardedSTM32H7_RCC	0x090	APB1ResetLow	RCC_APB1LRSTR.TIM2RST	acknowledged	read	clock tree
+rcc	GuardedSTM32H7_RCC	0x090	APB1ResetLow	RCC_APB1LRSTR.TIM3RST	acknowledged	read	clock tree
+rcc	GuardedSTM32H7_RCC	0x090	APB1ResetLow	RCC_APB1LRSTR.TIM4RST	acknowledged	read	clock tree
+rcc	GuardedSTM32H7_RCC	0x090	APB1ResetLow	RCC_APB1LRSTR.TIM5RST	acknowledged	read	clock tree
+rcc	GuardedSTM32H7_RCC	0x090	APB1ResetLow	RCC_APB1LRSTR.TIM6RST	acknowledged	read	clock tree
+rcc	GuardedSTM32H7_RCC	0x090	APB1ResetLow	RCC_APB1LRSTR.TIM7RST	acknowledged	read	clock tree
+rcc	GuardedSTM32H7_RCC	0x090	APB1ResetLow	RCC_APB1LRSTR.UART4RST	acknowledged	read	clock tree
+rcc	GuardedSTM32H7_RCC	0x090	APB1ResetLow	RCC_APB1LRSTR.UART5RST	acknowledged	read	clock tree
+rcc	GuardedSTM32H7_RCC	0x090	APB1ResetLow	RCC_APB1LRSTR.UART7RST	acknowledged	read	clock tree
+rcc	GuardedSTM32H7_RCC	0x090	APB1ResetLow	RCC_APB1LRSTR.UART8RST	acknowledged	read	clock tree
+rcc	GuardedSTM32H7_RCC	0x090	APB1ResetLow	RCC_APB1LRSTR.USART2RST	acknowledged	read	clock tree
+rcc	GuardedSTM32H7_RCC	0x090	APB1ResetLow	RCC_APB1LRSTR.USART3RST	acknowledged	read	clock tree
 rcc	GuardedSTM32H7_RCC	0x094	APB1ResetHigh	RCC_APB1HRSTR.CRSRST	stock-wrong	read	clock tree
 rcc	GuardedSTM32H7_RCC	0x094	APB1ResetHigh	RCC_APB1HRSTR.FDCANRST	stock-wrong	read	clock tree
 rcc	GuardedSTM32H7_RCC	0x094	APB1ResetHigh	RCC_APB1HRSTR.MDIOSRST	stock-wrong	read	clock tree
@@ -1761,23 +1761,23 @@ rcc	GuardedSTM32H7_RCC	0x098	APB2Reset	RCC_APB2RSTR.Res3_2	acknowledged	read	clo
 rcc	GuardedSTM32H7_RCC	0x098	APB2Reset	RCC_APB2RSTR.SAI1RST	stock-wrong	read	clock tree
 rcc	GuardedSTM32H7_RCC	0x098	APB2Reset	RCC_APB2RSTR.SAI2RST	stock-wrong	read	clock tree
 rcc	GuardedSTM32H7_RCC	0x098	APB2Reset	RCC_APB2RSTR.SAI3RST	stock-wrong	read	clock tree
-rcc	GuardedSTM32H7_RCC	0x098	APB2Reset	RCC_APB2RSTR.SPI1RST	stock-wrong	read	clock tree
-rcc	GuardedSTM32H7_RCC	0x098	APB2Reset	RCC_APB2RSTR.SPI4RST	stock-wrong	read	clock tree
+rcc	GuardedSTM32H7_RCC	0x098	APB2Reset	RCC_APB2RSTR.SPI1RST	acknowledged	read	clock tree
+rcc	GuardedSTM32H7_RCC	0x098	APB2Reset	RCC_APB2RSTR.SPI4RST	acknowledged	read	clock tree
 rcc	GuardedSTM32H7_RCC	0x098	APB2Reset	RCC_APB2RSTR.SPI5RST	stock-wrong	read	clock tree
-rcc	GuardedSTM32H7_RCC	0x098	APB2Reset	RCC_APB2RSTR.TIM15RST	stock-wrong	read	clock tree
-rcc	GuardedSTM32H7_RCC	0x098	APB2Reset	RCC_APB2RSTR.TIM16RST	stock-wrong	read	clock tree
-rcc	GuardedSTM32H7_RCC	0x098	APB2Reset	RCC_APB2RSTR.TIM17RST	stock-wrong	read	clock tree
-rcc	GuardedSTM32H7_RCC	0x098	APB2Reset	RCC_APB2RSTR.TIM1RST	stock-wrong	read	clock tree
-rcc	GuardedSTM32H7_RCC	0x098	APB2Reset	RCC_APB2RSTR.TIM8RST	stock-wrong	read	clock tree
-rcc	GuardedSTM32H7_RCC	0x098	APB2Reset	RCC_APB2RSTR.USART1RST	stock-wrong	read	clock tree
-rcc	GuardedSTM32H7_RCC	0x098	APB2Reset	RCC_APB2RSTR.USART6RST	stock-wrong	read	clock tree
+rcc	GuardedSTM32H7_RCC	0x098	APB2Reset	RCC_APB2RSTR.TIM15RST	acknowledged	read	clock tree
+rcc	GuardedSTM32H7_RCC	0x098	APB2Reset	RCC_APB2RSTR.TIM16RST	acknowledged	read	clock tree
+rcc	GuardedSTM32H7_RCC	0x098	APB2Reset	RCC_APB2RSTR.TIM17RST	acknowledged	read	clock tree
+rcc	GuardedSTM32H7_RCC	0x098	APB2Reset	RCC_APB2RSTR.TIM1RST	acknowledged	read	clock tree
+rcc	GuardedSTM32H7_RCC	0x098	APB2Reset	RCC_APB2RSTR.TIM8RST	acknowledged	read	clock tree
+rcc	GuardedSTM32H7_RCC	0x098	APB2Reset	RCC_APB2RSTR.USART1RST	acknowledged	read	clock tree
+rcc	GuardedSTM32H7_RCC	0x098	APB2Reset	RCC_APB2RSTR.USART6RST	acknowledged	read	clock tree
 rcc	GuardedSTM32H7_RCC	0x09C	APB4Reset	RCC_APB4RSTR.COMP12RST	stock-wrong	read	clock tree
-rcc	GuardedSTM32H7_RCC	0x09C	APB4Reset	RCC_APB4RSTR.I2C4RST	stock-wrong	read	clock tree
-rcc	GuardedSTM32H7_RCC	0x09C	APB4Reset	RCC_APB4RSTR.LPTIM2RST	stock-wrong	read	clock tree
-rcc	GuardedSTM32H7_RCC	0x09C	APB4Reset	RCC_APB4RSTR.LPTIM3RST	stock-wrong	read	clock tree
-rcc	GuardedSTM32H7_RCC	0x09C	APB4Reset	RCC_APB4RSTR.LPTIM4RST	stock-wrong	read	clock tree
-rcc	GuardedSTM32H7_RCC	0x09C	APB4Reset	RCC_APB4RSTR.LPTIM5RST	stock-wrong	read	clock tree
-rcc	GuardedSTM32H7_RCC	0x09C	APB4Reset	RCC_APB4RSTR.LPUART1RST	stock-wrong	read	clock tree
+rcc	GuardedSTM32H7_RCC	0x09C	APB4Reset	RCC_APB4RSTR.I2C4RST	acknowledged	read	clock tree
+rcc	GuardedSTM32H7_RCC	0x09C	APB4Reset	RCC_APB4RSTR.LPTIM2RST	acknowledged	read	clock tree
+rcc	GuardedSTM32H7_RCC	0x09C	APB4Reset	RCC_APB4RSTR.LPTIM3RST	acknowledged	read	clock tree
+rcc	GuardedSTM32H7_RCC	0x09C	APB4Reset	RCC_APB4RSTR.LPTIM4RST	acknowledged	read	clock tree
+rcc	GuardedSTM32H7_RCC	0x09C	APB4Reset	RCC_APB4RSTR.LPTIM5RST	acknowledged	read	clock tree
+rcc	GuardedSTM32H7_RCC	0x09C	APB4Reset	RCC_APB4RSTR.LPUART1RST	acknowledged	read	clock tree
 rcc	GuardedSTM32H7_RCC	0x09C	APB4Reset	RCC_APB4RSTR.Res0	acknowledged	read	clock tree
 rcc	GuardedSTM32H7_RCC	0x09C	APB4Reset	RCC_APB4RSTR.Res13	acknowledged	read	clock tree
 rcc	GuardedSTM32H7_RCC	0x09C	APB4Reset	RCC_APB4RSTR.Res2	acknowledged	read	clock tree

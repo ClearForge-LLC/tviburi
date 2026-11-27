@@ -1,18 +1,18 @@
-# TVI-WO-1206: the 16 replays on the branch's head (f398a8b's tree), every guard recorded; identical to 1205's post-1308 baseline in records, witnesses, boot hash and boot lines
-2026-11-27T02:20:00Z fin3 d1-drv8876 records 0 witnesses 32 boot c91f1410debdf753 141
-2026-11-27T02:20:06Z fin3 driver-judges-nothing records 0 witnesses 32 boot baefccb691a5f2ec 129
-2026-11-27T02:20:15Z fin3 hse-crystal-16 records 0 witnesses 34 boot 9d0b92b8f323b263 195
-2026-11-27T02:20:24Z fin3 hse-external-8 records 0 witnesses 34 boot db085d6cbc984358 195
-2026-11-27T02:20:30Z fin3 motors-dshot600 records 0 witnesses 33 boot f0466b98f8839cf9 119
-2026-11-27T02:20:36Z fin3 motors-pwm records 0 witnesses 33 boot a0bd0002fef8dfb8 119
-2026-11-27T02:20:42Z fin3 sentinel-01 records 0 witnesses 33 boot d94e2c45d4a0a451 101
-2026-11-27T02:20:49Z fin3 sentinel-01-ext-bmp581 records 0 witnesses 33 boot 302c5fb8adebbbf6 115
-2026-11-27T02:20:55Z fin3 sentinel-01-minimal records 0 witnesses 33 boot 901edd99a3f4a52a 99
-2026-11-27T02:21:02Z fin3 sentinel-02-bench records 0 witnesses 33 boot 3b91b5bfc3263e0e 115
-2026-11-27T02:21:10Z fin3 sentinel-02-bench-hse8 records 0 witnesses 33 boot 3ca8564d8d3fe318 119
-2026-11-27T02:21:19Z fin3 sentinel-02-shaped records 0 witnesses 34 boot 380120f09f517f9b 173
-2026-11-27T02:21:27Z fin3 sentinel-03 records 0 witnesses 34 boot d859eabe34ac72c6 185
-2026-11-27T02:21:34Z fin3 serial-dshot-9600 records 0 witnesses 33 boot 8ec9a63d9239a5d3 129
-2026-11-27T02:21:47Z fin3 ap-fx records 0 witnesses 34 boot 0cee377f606bedcc 75
+# TVI-WO-1206: the 16 replays on the branch's head (26310c6's tree), every guard recorded; identical to 1205's post-1308 baseline in records, witnesses, boot hash and boot lines
+2026-11-27T03:04:17Z fin4 d1-drv8876 records 0 witnesses 32 boot c91f1410debdf753 141
+2026-11-27T03:04:25Z fin4 driver-judges-nothing records 0 witnesses 32 boot baefccb691a5f2ec 129
+2026-11-27T03:04:35Z fin4 hse-crystal-16 records 0 witnesses 34 boot 9d0b92b8f323b263 195
+2026-11-27T03:04:45Z fin4 hse-external-8 records 0 witnesses 34 boot db085d6cbc984358 195
+2026-11-27T03:04:53Z fin4 motors-dshot600 records 0 witnesses 33 boot f0466b98f8839cf9 119
+2026-11-27T03:04:59Z fin4 motors-pwm records 0 witnesses 33 boot a0bd0002fef8dfb8 119
+2026-11-27T03:05:06Z fin4 sentinel-01 records 0 witnesses 33 boot d94e2c45d4a0a451 101
+2026-11-27T03:05:14Z fin4 sentinel-01-ext-bmp581 records 0 witnesses 33 boot 302c5fb8adebbbf6 115
+2026-11-27T03:05:21Z fin4 sentinel-01-minimal records 0 witnesses 33 boot 901edd99a3f4a52a 99
+2026-11-27T03:05:30Z fin4 sentinel-02-bench records 0 witnesses 33 boot 3b91b5bfc3263e0e 115
+2026-11-27T03:05:38Z fin4 sentinel-02-bench-hse8 records 0 witnesses 33 boot 3ca8564d8d3fe318 119
+2026-11-27T03:05:48Z fin4 sentinel-02-shaped records 0 witnesses 34 boot 380120f09f517f9b 173
+2026-11-27T03:05:57Z fin4 sentinel-03 records 0 witnesses 34 boot d859eabe34ac72c6 185
+2026-11-27T03:06:05Z fin4 serial-dshot-9600 records 0 witnesses 33 boot 8ec9a63d9239a5d3 129
+2026-11-27T03:06:19Z fin4 ap-fx records 0 witnesses 34 boot 0cee377f606bedcc 75
 heartbeats 18 ; armed (base_mode & 0x80) from 9.332 ; base_mode values [81, 89, 209, 217]
-2026-11-27T02:22:59Z armed fin3: witnesses 34 ends 34 records 0
+2026-11-27T03:07:35Z armed fin4: witnesses 34 ends 34 records 0
