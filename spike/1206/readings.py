@@ -148,7 +148,8 @@ ACK = {
          'SPI_CR1.CSTART'),
     26: ("by the architect's ruling, 2026-11-27T01:37Z, on field evidence: p2225 says SUSP \"has to be cleared prior SPI is disabled\"; every "
          "armed disable follows a suspend with SUSP still set (spi1 2,022 times, spi2 37,677). RM0433 gives no behaviour for that; the twin "
-         "disables normally and keeps SUSP until the next start's IFCR write. ArduPilot flies this sequence on silicon, which is field evidence, "
+         "disables normally and keeps SUSP until the next start's IFCR write; at SPE 1 to 0 the stock model also clears TSIZE and EOT, which no run "
+         "reads (no CR2, SR or RXDR read before the next enable, which rewrites CR2). ArduPilot flies this sequence on silicon, which is field evidence, "
          "not the manual. Bench row BR4 (TVI-WO-1206 FEEDBACK §5): disable with SUSP set, on the Nucleo",
          'SPI_CR1.SPE'),
     27: ("by the architect's ruling, 2026-11-27T01:37Z, on field evidence: p2180 orders the stream's enable before TXDMAEN \"to prevent DMA "
