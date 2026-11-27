@@ -163,6 +163,15 @@ ACK = {
          "0x20600090 x2). RM0433 gives no behaviour for those 1s; the twin ignores the bits. ChibiOS flies with these writes on silicon, which is "
          "field evidence, not the manual. Bench row BR2, extended (TVI-WO-1206 FEEDBACK §5): read USART_ISR after ICR = 0xFFFFFFFF on the Nucleo",
          'USART_ICR.Res10_10 USART_ICR.Res16_14 USART_ICR.Res19_18 USART_ICR.Res31_21'),
+    29: ("by the architect's ruling, 2026-11-27T02:12Z, with the ambiguity in the open: p2179 says \"In reception, the RXP flag is not set "
+         "when EOT is set. In the case when the number of data to be received (TSIZE) is not a multiple of packet size, the number of remaining "
+         "data is indicated by the RXWNE and RXPLVL fields\"; the second sentence sets the case, so the twin follows the incomplete-packet "
+         "reading: on a complete final packet it sets RXP and EOT together (SR 0x100F), which the manual does not settle. If silicon differs, "
+         "the generated boards' bounded RXP poll returns SpiError::Rxp (cap-gen <board>/gen/board/src/board.rs L269) and their control flow "
+         "changes; ArduPilot never reads SPI_SR, so this touches only the generated boards. SR.TXTF also reads 0 in the twin, a stock tag, "
+         "where silicon sets it once TSIZE frames are queued (p2226), and no board tests it (all 14 crates mask 0x1 and 0x8 only). Bench row "
+         "BR7 (TVI-WO-1206 FEEDBACK §5): poll RXP on the last frame of a TSIZE transfer, FTHLV 0, on the Nucleo",
+         'SPI_CR2.TSIZE'),
 }
 
 # stock-wrong: field -> (what differs, why the flight path is unaffected)
@@ -242,9 +251,6 @@ SW['TIMx_EGR.UG'] = ("at UG silicon sets UIF whatever UIE (p1597, p1599) and cle
                      "and keeps the clock's fractional sub-count",
                      "no firmware reads TIMx_SR or CNT (%s); every UG comes with CR1 = 0, the counter stopped, ARR and PSC already in force on both sides; "
                      "the sub-count can shift the phase by under one counter tick at ArduPilot's second setup (7.77 s), which no firmware reads" % EVID)
-SW['SPI_CR2.TSIZE'] = ("SR.TXTF reads 0 in the twin, a stock tag, where silicon sets it once TSIZE frames are in the TxFIFO (p2226)",
-                       "the armed run never reads SPI_SR; the generated boards poll SR but test only RXP and EOT (cap-gen <board>/gen/board/src/board.rs "
-                       "L269, the RXP poll, and its EOT poll; all 14 crates mask 0x1 and 0x8 only), so neither control flow nor data changes")
 SW['SPI_CR1.CSUSP'] = ("the stock model sets SR.EOT at a suspend, where silicon sets only SUSP (p2216)",
                        "only ArduPilot suspends, and it never reads SPI_SR (0 reads in the armed run and the fixture); the generated boards read SR but never "
                        "write CSUSP (gen-writes.tsv); EOTIE is always 0; chip selects are untouched (the multiplexer drops the stock FinishTransmission)")

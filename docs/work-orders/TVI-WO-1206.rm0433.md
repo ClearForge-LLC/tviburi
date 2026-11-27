@@ -16,19 +16,23 @@
 
 ## 2. How each field was read
 
-- **The unit:** the 129 items above the cut (105 rows, 24 registers) hold **121 distinct ledger fields**. One reading per field covers every instance bound to that guard type. The readers checked per instance; the stock code differs between instances only in constructor frequencies, which none of these readings uses.
+- **The unit:** the 129 items above the cut (105 rows, 24 registers) hold **121 distinct ledger fields** (the first list); the per-field measure found **174 more** open above the cut (the second list, `items2.tsv`; ruled 2026-11-27T00:43Z). One reading per field covers every instance bound to that guard type. The readers checked per instance; the stock code differs between instances only in constructor frequencies, which none of these readings uses.
 - **Predictions first:** `spike/1206/predictions.md`, committed before any reading (`fe69aa5`).
 - **The readers:** five workers, one per family slice, each returning verbatim quotes with page and `file Ln`, and what each side does per value (`~/.cache/tvi-1206/reads/`). They assigned no state.
 - **The checks:** `spike/1206/check-reads.py`: 121 rows, 0 quotes off their page or lines. The builder then checked each claim against the runs above and assigned every state (`spike/1206/readings.py`, which writes the rows and this document's §3).
 
-| Family | Fields | `acknowledged` | `stock-wrong` |
-|---|---|---|---|
-| RCC enables | 47 | 41 | 6 |
-| RCC clocks | 27 | 24 | 3 |
-| TIM1 | 17 | 9 | 8 |
-| I2C, GPIO, SPI | 9 | 4 | 5 |
-| USART | 21 | 15 | 6 |
-| **All** | **121** | **93** | **28** |
+| Family | First list | Second list | `acknowledged` | `stock-wrong` |
+|---|---|---|---|---|
+| RCC enables | 47 | 29 | 69 | 7 |
+| RCC reset bits | 0 | 88 | 2 | 86 |
+| RCC clocks, CR, CFGR | 27 | 11 | 29 | 9 |
+| TIM1 | 17 | 2 | 10 | 9 |
+| DMA | 0 | 13 | 12 | 1 |
+| I2C | 7 | 11 | 15 | 3 |
+| SPI | 1 | 12 | 10 | 3 |
+| USART | 21 | 8 | 22 | 7 |
+| GPIO | 1 | 0 | 0 | 1 |
+| **All** | **121** | **174** | **169** | **126** |
 
 ## 3. The acknowledgements
 
@@ -62,12 +66,28 @@
 | A26 | `SPI_CR1.SPE` | by the architect's ruling, 2026-11-27T01:37Z, on field evidence: p2225 says SUSP "has to be cleared prior SPI is disabled"; every armed disable follows a suspend with SUSP still set (spi1 2,022 times, spi2 37,677). RM0433 gives no behaviour for that; the twin disables normally and keeps SUSP until the next start's IFCR write; at SPE 1 to 0 the stock model also clears TSIZE and EOT, which no run reads (no CR2, SR or RXDR read before the next enable, which rewrites CR2). ArduPilot flies this sequence on silicon, which is field evidence, not the manual. Bench row BR4 (TVI-WO-1206 FEEDBACK §5): disable with SUSP set, on the Nucleo | its own page(s) and stock line(s) |
 | A27 | `SPI_CFG1.TXDMAEN` | by the architect's ruling, 2026-11-27T01:37Z, on field evidence: p2180 orders the stream's enable before TXDMAEN "to prevent DMA channel management raising error events", naming no error; ArduPilot sets TXDMAEN first for every SPI transmit stream. RM0433 gives no behaviour for the other order; the twin raises no error, and its transmit stream is unpaced, the DMA guard's acknowledgement (ruled 2026-11-24T14:10Z Q5 (c), requests 38 and 40). ArduPilot flies this order on silicon, which is field evidence, not the manual. Bench row BR5 (TVI-WO-1206 FEEDBACK §5): read SPI_SR and the DMA flags after this order, on the Nucleo | its own page(s) and stock line(s) |
 | A28 | `USART_ICR.Res10_10`, `USART_ICR.Res16_14`, `USART_ICR.Res19_18`, `USART_ICR.Res31_21` | by the architect's ruling, 2026-11-27T01:37Z, on field evidence: p2097 says only "Reserved, must be kept at reset value"; ChibiOS writes USART_ICR = 0xFFFFFFFF at each init (49 writes in the armed run), and usart1's IDLE handler echoes its ISR read (0x206000D0 x19, 0x20600090 x2). RM0433 gives no behaviour for those 1s; the twin ignores the bits. ChibiOS flies with these writes on silicon, which is field evidence, not the manual. Bench row BR2, extended (TVI-WO-1206 FEEDBACK §5): read USART_ISR after ICR = 0xFFFFFFFF on the Nucleo | its own page(s) and stock line(s) |
+| A29 | `SPI_CR2.TSIZE` | by the architect's ruling, 2026-11-27T02:12Z, with the ambiguity in the open: p2179 says "In reception, the RXP flag is not set when EOT is set. In the case when the number of data to be received (TSIZE) is not a multiple of packet size, the number of remaining data is indicated by the RXWNE and RXPLVL fields"; the second sentence sets the case, so the twin follows the incomplete-packet reading: on a complete final packet it sets RXP and EOT together (SR 0x100F), which the manual does not settle. If silicon differs, the generated boards' bounded RXP poll returns SpiError::Rxp (cap-gen <board>/gen/board/src/board.rs L269) and their control flow changes; ArduPilot never reads SPI_SR, so this touches only the generated boards. SR.TXTF also reads 0 in the twin, a stock tag, where silicon sets it once TSIZE frames are queued (p2226), and no board tests it (all 14 crates mask 0x1 and 0x8 only). Bench row BR7 (TVI-WO-1206 FEEDBACK §5): poll RXP on the last frame of a TSIZE transfer, FTHLV 0, on the Nucleo | its own page(s) and stock line(s) |
 
 ## 4. Acknowledged on field evidence, by ruling
 
-Three acknowledgements rest on a ruling because RM0433 is silent for the values written, not on a reading that silicon matches:
-- **A11, PLL3** (architect, 2026-11-27T00:10Z): p347 guarantees no PLL3 frequency with DIVP3EN = 0 and DIVP3 = 7, ArduPilot's configuration, and PLL3 also runs VCOL on a 16 MHz reference (p346). Bench row BR1.
-- **A13, PLL2** (TVI-WO-1300c Q1, 2026-11-26T04:03Z; found by this WO's adversarial pass): PLL2 runs VCOL on an 8 MHz reference, outside p346's 1 to 2 MHz, so RM0433 guarantees no frequency for pll2_q_ck, every USART's kernel clock. Bench row R11.
-- **A12, `I2C_ICR` bits 2:1** (architect, 2026-11-25T05:06Z Q10): p2012 says only "must be kept at reset value", and ChibiOS writes 1s there. Bench row BR2.
+These acknowledgements rest on a ruling because RM0433 is silent for what the firmware does, not on a reading that silicon matches. 18 fields, each with a bench row (TVI-WO-1206 FEEDBACK §5):
+- **The clocks:**
+  - **A13, PLL2** (TVI-WO-1300c Q1): VCOL on an 8 MHz reference, outside p346's 1–2 MHz; it feeds every USART (pll2_q, 72 MHz). R11.
+  - **A11, PLL3** (2026-11-27T00:10Z): DIVP3EN = 0 with DIVP3 = 7 (p347), and VCOL on 16 MHz; it feeds I2C and the ADC (pll3_r, 30 MHz). BR1.
+- **The SPI sequence:**
+  - **A25:** spi1's restart after a suspend with SPE kept 1 (p2216, p2175). BR3.
+  - **A26:** disable with SUSP set (p2225). BR4.
+  - **A29:** RXP with EOT on a complete final packet (p2179; generated boards only). BR7.
+- **A27, TXDMAEN's order** (p2180). BR5.
+- **The reserved bits ChibiOS writes:**
+  - **A12:** I2C ICR bits 2:1 and 6.
+  - **A28:** USART ICR's four reserved ranges. BR2.
 
-Either can be overruled to "not met" by one line in `spike/1206/readings.py`.
+Any of them can be overruled to "not met" by one line in `spike/1206/readings.py`.
+
+## 5. Unmapped writes the measure lists
+
+The armed run writes three addresses the twin maps to nothing (`spike/1206/reader/fields.py`, ruled 2026-11-27T02:12Z), each judged against the ruled cut's text:
+- **DMAMUX2 `C7CR` = 0x11** (p132, p709): ADC3's request to BDMA channel 7. Off the cut, whose L31 puts "ADC3's internal channels (BDMA, and DMAMUX2, which has no model at all)" off the four paths. ADC3 converts only those: SQR1 0x4D2442 gives SQ1–3 = 17, 18, 19, with PCSEL 0xE0000; p925 wires VINP[17] to VBAT/4, [18] to VSENSE and [19] to VREFINT. A Phase 4 row.
+- **DBGMCU `APB1LFZ1` = 0x8** (p3195, p3197): it freezes TIM5 in debug. Off the cut, as one of the debug units.
+- **The AXI interconnect's GPV, 0x51008108 = 0x1** (p133, p111): the bus matrix's own configuration, on no flight path; the twin has no bus matrix.

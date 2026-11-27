@@ -1,4 +1,7 @@
 # instance	type	offset	register	field	state	outcome	register_paths
+(unmapped)	-	0x51008108	the AXI interconnect's GPV (p133, 0x51000000-0x510FFFFF; p111)	-	value 0x1 at 00:00:00.000000000	unmapped	on no flight path: the AXI matrix's own configuration, not named by the cut; the twin has no bus matrix
+(unmapped)	-	0x5C00103C	DBGMCU APB1LFZ1 (p3195 base 0x5C001000; register p3197)	-	value 0x8 at 00:00:00.000971130	unmapped	off the cut: the debug units (0x8 freezes TIM5 in debug)
+(unmapped)	-	0x5802581C	DMAMUX2 C7CR (p132; register p709)	-	value 0x11 at 00:00:00.003377350	unmapped	off the cut: ADC3's request to BDMA channel 7; ADC3 converts its internal channels only (SQR1 0x4D2442: SQ1-3 = 17, 18, 19; PCSEL 0xE0000; p925: VINP[17] VBAT/4, [18] VSENSE, [19] VREFINT)
 adc3	GuardedSTM32H7_ADC	0x000	InterruptAndStatus	ADC_ISR.ADRDY	guard	guarded	other
 adc3	GuardedSTM32H7_ADC	0x000	InterruptAndStatus	ADC_ISR.AWD1	guard	guarded	other
 adc3	GuardedSTM32H7_ADC	0x000	InterruptAndStatus	ADC_ISR.AWD2	guard	guarded	other

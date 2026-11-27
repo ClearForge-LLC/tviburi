@@ -8,7 +8,9 @@ Usage: python3 -I spike/1206/reader/fields.py JOIN_DATA LEDGER OUT
   OUT        one line per (instance, offset, field): its state, its outcome, the register's path
 Outcomes: guarded (state `guard`); read (any other state but `inherited-unaudited`, RUL-17 as amended); open
 (`inherited-unaudited`); unlisted (a guarded type's register offset with no field rows: written, judged by no row: open);
-stock (the instance is bound to a stock type, not a guard). Above the cut: a register whose path is not `other`. Prints the
+stock (the instance is bound to a stock type, not a guard); unmapped (ruled 2026-11-27T02:12Z: an armed write to an
+address the twin maps to nothing, listed by address and by what RM0433 places there, so a missing peripheral is never
+invisible to the measure; each is judged against the ruled cut's text in UNMAPPED below). Above the cut: a register whose path is not `other`. Prints the
 counts above the cut; exit 0 always (the counts are the result)."""
 import collections, json, sys
 
@@ -37,7 +39,22 @@ for r in states:
     if 'arm' in r['reach']: path[(r['instance'], int(r['offset'], 16))].add(r['path'].split(' (')[0])
 for r in reach:
     path[(r['instance'], int(r['offset'], 16))].add(r['path'].split(' (')[0])
-lines, tally = [], collections.Counter()
+# What RM0433 Rev 9 places at each address the armed run writes and the twin does not map, and its place against the ruled
+# cut (the cut's L31: off the four paths are "the interrupt controller; the RTC; the watchdog; ADC3's internal channels
+# (BDMA, and DMAMUX2, which has no model at all); the debug units; the RNG").
+UNMAPPED = {
+    0x5802581C: ('DMAMUX2 C7CR (p132; register p709)', 'off the cut: ADC3\'s request to BDMA channel 7; ADC3 converts its internal '
+                 'channels only (SQR1 0x4D2442: SQ1-3 = 17, 18, 19; PCSEL 0xE0000; p925: VINP[17] VBAT/4, [18] VSENSE, [19] VREFINT)'),
+    0x5C00103C: ('DBGMCU APB1LFZ1 (p3195 base 0x5C001000; register p3197)', 'off the cut: the debug units (0x8 freezes TIM5 in debug)'),
+    0x51008108: ('the AXI interconnect\'s GPV (p133, 0x51000000-0x510FFFFF; p111)', 'on no flight path: the AXI matrix\'s own '
+                 'configuration, not named by the cut; the twin has no bus matrix'),
+}
+lines, tally, unm = [], collections.Counter(), collections.Counter()
+for u in rd(data + 'arm-unmapped.tsv'):
+    a = int(u['address'], 16)
+    where, judged = UNMAPPED.get(a, ('not in UNMAPPED: judge it', 'unjudged'))
+    lines.append('\t'.join(['(unmapped)', '-', '0x%08X' % a, where, '-', 'value %s at %s' % (u['value'], u['virtual time']), 'unmapped', judged]))
+    unm['judged' if a in UNMAPPED else 'UNJUDGED'] += 1
 for w in writes:
     inst, ty, off = w['instance'], w['type'], int(w['offset'], 16)
     p = ','.join(sorted(path.get((inst, off), {'(no path)'})))
@@ -55,5 +72,6 @@ for w in writes:
 with open(out, 'w') as o:
     o.write('# instance\ttype\toffset\tregister\tfield\tstate\toutcome\tregister_paths\n' + '\n'.join(lines) + '\n')
 print('per-field coverage above the cut: %d fields at %d registers: %s' % (
-    sum(tally.values()), len({(l.split('\t')[0], l.split('\t')[2]) for l in lines if any(x not in ('other', '(no path)') for x in l.split('\t')[7].split(','))}),
+    sum(tally.values()), len({(l.split('\t')[0], l.split('\t')[2]) for l in lines if l.split('\t')[6] != 'unmapped' and any(x not in ('other', '(no path)') for x in l.split('\t')[7].split(','))}),
     dict(tally)))
+print('unmapped writes (outside the field count, each judged against the cut in its line): %s' % (dict(unm) or 'none'))

@@ -9,6 +9,7 @@
 - **00:43Z:** (a), the work order widens to every field the per-field measure finds open, and that measure is the gate's.
 - **00:59Z:** `tests/1300/rcc.sh` `ledger` granted; a reading appends to a row and never erases a true fact.
 - **01:37Z:** (a) for the four field-evidence items (A25–A28).
+- **02:12Z:** `TSIZE` (a), A29 with the ambiguity in the open; DMAMUX2 (a) and (b): the measure lists unmapped writes, and DMAMUX2 is off the cut by its text.
 
 **The deliverables:** `TVI-WO-1206.rm0433.md` (the readings' sources, method and acknowledgements A1–A28); the ledger rows themselves (295 fields in seven guards); the addendum in `TVI-WO-1205.verdict.md` and `TVI-WO-1205.FEEDBACK.md`.
 
@@ -19,7 +20,7 @@
 - **The second:** 174 fields the per-field measure found open above the cut (`items2.tsv`), after the adversarial pass showed the 129 undercounted (§4).
 - **The method, both lists:** predictions committed first (`predictions.md`, `predictions2.md`); a 20 % re-read drawn with its seed before reading (`reread.txt` seed 1206, `reread2.txt` seed 12062); ten reading workers returning verbatim quotes with page and `file Ln`, no state; every quote checked mechanically (`check-reads.py`); every state assigned by the builder in one table (`readings.py`), which also writes §3's A-rows.
 - **What a row now says:** its text on main, kept, then its reading: `acknowledged (TVI-WO-1206 A<n>; p…; File.cs L…)`, or `stock, wrong (what differs; unaffected: why)` with its page and line. One false clause was replaced: `I2C_CR2.AUTOEND`'s "a STOP after NBYTES" held for AUTOEND = 1 only.
-- **The result:** 169 `acknowledged`, 126 `stock-wrong`, no stop left. 17 of the acknowledged rest on field evidence by ruling, where RM0433 is silent (A11, A12, A13, A25–A28).
+- **The result:** 169 `acknowledged`, 126 `stock-wrong`, no stop left. 18 of the acknowledged rest on field evidence by ruling, where RM0433 is silent (A11, A12, A13, A25–A29; `TVI-WO-1206.rm0433.md` §4).
 
 **The gate's measure** (`spike/1206/reader/fields.py`, ruled 00:43Z): every field of every register the armed run writes, judged guarded, read or open. DMA streams 1–7 are judged by stream 0's rows and DMAMUX channels by C0's, as the guards do. 1206's join (`reader/join.py`) counts RUL-17 as amended: every state but `inherited-unaudited` is read.
 
@@ -45,7 +46,8 @@ All on the branch's head `4c7ffae` (the commits after it change `TVI-WO-1205`'s 
   - **`LEDGER.jsonl`, `main` against the branch:** 1,946 rows each side, 295 changed, exactly the two work lists (`data/branch/ledger-diff.txt`). Keys changed: `state` 295, `behaves_as` 295, `reason` 168, `detail` 127. Every other key of every row is identical.
   - **The model tables:** 295 rows changed in class and text only; allowed sets, bits and everything outside the tables are byte-identical.
 - **CI:** [CI on the head]
-- **The addendum fits the page:** `TVI-WO-1205.verdict.md` is 825 words with it (722 before).
+- **Unmapped writes:** the measure lists the armed run's three, each judged off the cut or on no flight path (`TVI-WO-1206.rm0433.md` §5).
+- **The addendum fits the page:** `TVI-WO-1205.verdict.md` is 840 words with it (722 before).
 - **Off the cut, not counted:** `FLASH_CCR1/2.Res15_0` (path `other`) stay `inherited-unaudited` (R8).
 
 ## 3. Predictions, scored
@@ -93,8 +95,8 @@ A miss is not a defect: the predictions guard against reading toward a total, an
   - the ready flags and SW now cite ArduPilot's ChibiOS source (Aethelgard 4400h's tree, `hal_lld.c` L266, L299, L306, L398, L465), no longer from memory, and SW is stock-wrong alike;
   - wording: USB1OTGRST (stock resets USB2's alias), CSUSP, A1 (no locked read of an A1 peripheral), A12 (NACKCF), A22 (i2c1 only), the TSIZE and MINC cites.
 - **Raised:**
-  - **TSIZE,** whose "unaffected" rests on p2179's ambiguous "the RXP flag is not set when EOT is set" (§7);
-  - **DMAMUX2,** an unmapped route (`C7CR` = 0x11, ADC3 to BDMA channel 7) the per-field measure cannot see (§7).
+  - **TSIZE,** whose "unaffected" rested on p2179's ambiguous "the RXP flag is not set when EOT is set". Ruled at 02:12Z: A29, with the ambiguity in the open, and BR7.
+  - **DMAMUX2,** an unmapped route (`C7CR` = 0x11, ADC3 to BDMA channel 7) the per-field measure could not see. Ruled at 02:12Z: the measure lists every unmapped write, and DMAMUX2 is off the cut (`TVI-WO-1206.rm0433.md` §5).
 
 ## 5. Findings and rows
 
@@ -112,7 +114,9 @@ A miss is not a defect: the predictions guard against reading toward a total, an
   - **BR3:** spi1's restart after a suspend without an SPE toggle (A25).
   - **BR4:** disable with SUSP set (A26).
   - **BR5:** SPI_SR and the DMA flags after TXDMAEN is set before the stream (A27).
+  - **BR7:** RXP on the last frame of a TSIZE transfer, FTHLV 0 (A29).
   - R11 (1300's) stands for PLL2 (A13).
+- **R9. A Phase 4 row: DMAMUX2.** The twin has no DMAMUX2, and the stock BDMA leaves channel 7's registers unhandled, so ADC3's internal channels (VBAT/4, VSENSE, VREFINT) never reach memory by BDMA. That is off the ruled cut (its L31), and the measure lists it (`TVI-WO-1206.rm0433.md` §5).
 
 ## 6. Reduction pass
 
@@ -133,8 +137,6 @@ Reduction pass (diff): −18 net · 2 duplicates removed · 1 dead path removed 
   - PLL3's unguaranteed frequency (00:02Z, ruled 00:10Z);
   - the 129's undercount (00:38Z, ruled 00:43Z);
   - the four field-evidence items (01:18Z, ruled 01:37Z).
-- **Open with the architect at the addendum (my 01:41Z note):**
-  - **SPI `TSIZE`:** p2179's "In reception, the RXP flag is not set when EOT is set" is ambiguous. If it holds for a complete final packet, the generated boards' bounded RXP poll fails on silicon (cap-gen `board.rs` L269) and their control flow changes. The twin sets RXP and EOT together (SR 0x100F). Proposed (a): the incomplete-packet reading, with bench row BR7.
-  - **DMAMUX2:** the armed run's `C7CR` = 0x11 (ADC3 to BDMA channel 7) lands on no peripheral in the twin, and the stock BDMA leaves channel 7's registers unhandled. The per-field measure reads mapped CPU writes only, so this route is outside it.
+- **TSIZE and DMAMUX2** (my 01:41Z note, ruled 02:12Z).
 - **The addendum is the WO's last stop.**
 - **Not merged by me.**
