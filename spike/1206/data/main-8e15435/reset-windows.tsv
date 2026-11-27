@@ -1,7 +1,8 @@
-# TVI-WO-1206 (spike/1206/reset-windows.py): accesses to any other peripheral while an RCC reset register holds a 1, in the armed run and each generated boot and the fixture on main 8e15435
-armed	reset-register writes 4074
+# TVI-WO-1206 (spike/1206/reset-windows.py): accesses to any other peripheral while an RCC reset register (AHBxReset, APBxReset, APB1ResetLow/High) holds a 1, in the armed run and each generated boot and the fixture on main 8e15435
+armed	reset-register writes 82558
+armed	adcM1S2	Read	while APB1ResetLow	28
 armed	adcM1S2	Read	while APB2Reset	3
-ap-fx	reset-register writes 50
+ap-fx	reset-register writes 7702
 d1-drv8876	reset-register writes 0
 driver-judges-nothing	reset-register writes 0
 hse-crystal-16	reset-register writes 0

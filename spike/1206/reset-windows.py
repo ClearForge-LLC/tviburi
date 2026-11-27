@@ -11,7 +11,7 @@ for l in sys.stdin.buffer:
     m = w.search(l.decode('latin-1'))
     if not m: continue
     inst, rw, off, name, val = m.groups()
-    if inst == 'rcc' and name.endswith('Reset') and rw == 'Write':
+    if inst == 'rcc' and re.search(r'Reset(Low|High)?$', name) and rw == 'Write':  # AHBxReset, APBxReset, APB1ResetLow/High
         writes += 1
         if int(val, 16): held[name] = int(val, 16)
         else: held.pop(name, None)
