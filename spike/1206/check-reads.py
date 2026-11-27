@@ -5,12 +5,18 @@
 - every field is in the work list, and its `values` cover the work list's armed and generated values.
 What it cannot check (whether a quote covers the value written, whether a line is this register's) is the builder's own pass.
 
-Usage: python3 -I spike/1206/check-reads.py ITEMS RM_TXT STOCK_ROOT MODEL_DIR READS.jsonl...
+Usage: python3 -I spike/1206/check-reads.py ITEMS RM_TXT STOCK_ROOT MODEL_DIR [--builder BUILDER_VALUES] READS.jsonl...
+BUILDER_VALUES (spike/1206/data/builder-values.tsv): values a reader's row does not list that the builder's own check covers.
 STOCK_ROOT is the tree's src/; a cited stock file resolves to the one file under it whose path ends with the cited path.
 Prints one line per failed check, and a total; exit 1 if any failed."""
 import json, os, re, sys
 
 items, rm_txt, stock_root, model_dir, *reads = sys.argv[1:]
+builder = {}
+if reads[:1] == ['--builder']:
+    for l in open(reads[1]):
+        if not l.startswith('#'): f, v, _ = l.rstrip('\n').split('\t'); builder[f] = v
+    reads = reads[2:]
 work = {}
 for l in open(items):
     if l.startswith('#'): continue
@@ -60,7 +66,7 @@ for path in reads:
                 fail(f, 'rm quote not on p%s: %.80s' % (q['page'], q['quote']))
         for q in r.get('stock', []):
             try:
-                src = resolve(q['file'])
+                src = resolve(q['file'].split(' (')[0])  # a reader may annotate the path: 'File.cs (dir/)'
                 if squash(q['quote']) not in squash(lines_of(src, q['lines'])):
                     fail(f, 'stock quote not at %s %s: %.80s' % (q['file'], q['lines'], q['quote']))
             except OSError as e:
@@ -72,9 +78,10 @@ for path in reads:
         if not r.get('stock') and not r.get('guard'): fail(f, 'no stock or guard quote')
         said = squash(json.dumps(r.get('values', ''))).lower()
         for v in set(work[f]['arm'].split(',')) | set(work[f]['gen'].split(',')):
-            if v in ('-', '', 'null') or v.split(' ')[-1].startswith('many'): continue
+            if v in ('-', '', 'null') or 'many' in v: continue
             iv = int(v, 0)
             forms = {v.lower(), hex(iv), str(iv), bin(iv)[2:], format(iv, '02b')}
+            if builder.get(f) == 'all' or v.lower() in builder.get(f, '').split(','): continue
             if r.get('all_values') is not True and not any(x in said for x in forms):
                 fail(f, 'value %s written but not covered' % v)
         if r.get('from_memory'): fail(f, 'from memory, not read: %s' % r['from_memory'])

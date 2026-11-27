@@ -19,7 +19,7 @@ for p in glob.glob(os.path.join(reads_dir, '*.jsonl')):
 work = {l.split('\t')[0]: l.rstrip('\n').split('\t') for l in open(items) if not l.startswith('#')}
 
 LINES = {'RCC_APB4ENR.LPUART1EN': ['STM32H7_RCC.cs L1010-1012', 'STM32H7_RCC.cs L1355-1364']}  # the reader cited APB4Reset's bit
-VALUES = {'I2C_CR2.AUTOEND': '0x0,0x1'}  # the generated boards write 1 (CR2 0x201248C, 0x20124EC, 0x206248C: spike/1100/data/writes.tsv); 1100's queue has null
+VALUES = {}  # every value is now in items.tsv, from the logged boots (spike/1206/data/main-8e15435/gen-writes.tsv)
 
 
 import re
@@ -68,8 +68,9 @@ ACK = {
         "decode every value as the manual does",
         'RCC_D1CFGR.D1CPRE RCC_D1CFGR.D1PPRE RCC_D1CFGR.HPRE RCC_D2CFGR.D2PPRE1 RCC_D2CFGR.D2PPRE2'),
     6: ("for the value written the twin's PLL1 frequency equals the manual's formula (p347: VCO = ref x (DIVN + 1), out = VCO / (DIVy + 1)), "
-        "inside p346's input ranges: the armed run's VCOH on 16 MHz (HSI / 4), the generated boards' VCOH on 3.2 MHz (hse-crystal-16: HSE 16 / 5) "
-        "and VCOL on 1.6 MHz (hse-external-8: 8 / 5), each VCO in its range (p404)",
+        "inside p346's input ranges: ArduPilot's VCOH on 16 MHz (HSI / 4), ten generated boards' VCOH on 12.8 MHz (HSI / 5, DIVN1 0xF: 204.8 MHz), "
+        "hse-crystal-16's VCOH on 3.2 MHz (HSE 16 / 5) and hse-external-8's and sentinel-02-bench-hse8's VCOL on 1.6 MHz (8 / 5), each VCO in "
+        "its range (p404; spike/1206/data/main-8e15435/gen-writes.tsv)",
         'RCC_PLL1DIVR.DIVN1 RCC_PLL1DIVR.DIVP1 RCC_PLL1DIVR.DIVQ1 RCC_PLL1DIVR.DIVR1'),
     13: ("by TVI-WO-1300c's ruling Q1 (2026-11-26T04:03Z), on field evidence: PLL2 runs VCOL (PLLCFGR 0x1BF0FFD, PLL2VCOSEL = 1) on an 8 MHz "
          "reference (PLLCKSELR 0x408040: HSI 64 MHz / DIVM2 8), where p346 gives VCOL 1 to 2 MHz and p347 says VCOL must be chosen only at or "
@@ -123,7 +124,7 @@ SW = {
     'RCC_D3CFGR.D3PPRE': ("the stock model applies a new APB4 divider to its APB4 peripherals only at the next CR, CFGR, D1CFGR or D2CFGR write (no update on D3CFGR)",
                           "the armed run's CFGR write 3.98 us later applies it; no APB4 timer runs (lptimer2-5: no access in any run, %s); the guard's own APB4 frequency is computed at the write" % ACCESS),
     'TIMx_CR1.ARPE': ("with ARPE = 1 the stock model loads a new ARR only at overflow, not at UG (p1531, p1533)",
-                      "every ARR change is written with CR1 = 0 (ARPE = 0, counter stopped) and followed by UG: ArduPilot's two configurations (0.104 s, 7.77 s) and every generated board's (spike/1100/data/writes.tsv); later ARR writes repeat the value in force"),
+                      "every ARR change is written with CR1 = 0 (ARPE = 0, counter stopped) and followed by UG: ArduPilot's two configurations (0.104 s, 7.77 s) and every generated boot's and the fixture's (spike/1206/data/main-8e15435/gen-writes.tsv); later ARR writes repeat the value in force"),
     'TIMx_CR1.URS': ("with URS = 0 a UG sets UIF on silicon (p1597); the stock model sets it only with UIE = 1",
                      "no firmware reads TIMx_SR: 0 TIM1 reads in the armed run, no SR read in the generated boots or the fixture (%s); with DIER = 0 no interrupt or DMA request follows on either side" % EVID),
     'TIMx_DIER.UIE': ("with UIE = 0 silicon still sets UIF at an update event (p1597); the stock model does not at UG",
@@ -131,11 +132,11 @@ SW = {
     **{'TIMx_DIER.CC%dIE' % k: ("with CC%dIE = 0 silicon still sets CC%dIF at a compare match (p1597); the stock model sets it only with the enable" % (k, k),
                                  "no firmware reads TIMx_SR (%s); the interrupt is off on both sides" % EVID) for k in (1, 2, 3, 4)},
     'TIMx_PSC.PSC[15:0]': ("the stock model applies a new PSC at the write, where silicon loads it at the next update event (p1531, p1609)",
-                           "every PSC write is made with the counter stopped and followed by UG, which loads it on silicon: ArduPilot's two configurations and every generated board's (spike/1100/data/writes.tsv)"),
+                           "every PSC write is made with the counter stopped and followed by UG, which loads it on silicon: ArduPilot's two configurations and every generated boot's and the fixture's (spike/1206/data/main-8e15435/gen-writes.tsv)"),
     'I2C_CR1.ERRIE': ("the twin raises no bus error (BERR, ARLO), where silicon can on a misplaced START or STOP or a lost arbitration (p1997-1998)",
                       "the twin's bus has one controller and no line faults, and the other four error sources (OVR, TIMEOUT, PECERR, ALERT) need modes their own rows allow only at 0"),
     'I2C_CR2.AUTOEND': ("a STOP does not clear TC in the stock model, where silicon clears it when START or STOP is set (p2011); and TC (AUTOEND = 0) or STOPF (1) comes at the last RXDR read, not at the last byte received",
-                        "the generated boards' polling sees TC or STOPF at once, as I2C_TXDR.TXDATA's row says, and takes the same branches; ArduPilot, after each software STOP, clears TCIE in its next write and PE in the one after (CR2 0x6448C, CR1 0x97, 0x96: the armed run), and PE = 0 clears TC on both sides (p2011), with no event interrupt taken between; the generated boards run I2C with CR1 = 0x1 (no interrupts) and end with AUTOEND = 1 (spike/1100/data/writes.tsv)"),
+                        "the generated boards' polling sees TC or STOPF at once, as I2C_TXDR.TXDATA's row says, and takes the same branches; ArduPilot, after each software STOP, clears TCIE in its next write and PE in the one after (CR2 0x6448C, CR1 0x97, 0x96: the armed run), and PE = 0 clears TC on both sides (p2011), with no event interrupt taken between (the armed run, and the fixture 507 times); the generated boards write CR1 only 0x0 and 0x1 (no interrupts) and never a software STOP (spike/1206/data/main-8e15435/gen-writes.tsv)"),
     'I2C_TXDR.TXDATA': ("TXIS stays 1 from START to the last byte and TXE always reads 1, with no bus time (p2011, p2014)",
                         "the bytes, their order and their addressing are those silicon sends; a firmware polling I2C_ISR sees TXIS, TXE and TC at once where silicon sets them a byte time later (the generated boots poll so: genlog hse-crystal-16, i2c1 at 0.000042 s), so it polls fewer times and takes the same branches; no rule of the twin times the bus"),
     'SPI_TXDR.TXDR': ("TXP always reads 1 and RXP, EOT and TXC are set at the write, with no bus time (p2226-2227)",
@@ -172,7 +173,7 @@ assert set(owner) | set(SW) | HELD == set(work), sorted(set(work) ^ (set(owner) 
 print('# field\tstate\tA\tclass\tbehaves_as')
 for f in sorted(work):
     raw = [v for v in (work[f][6].split(',') + work[f][7].split(',')) if v not in ('-', 'null')]
-    vals = ','.join(sorted({hex(int(v, 0)) for v in raw if not v.split(' ')[-1].startswith('many')}, key=lambda x: int(x, 16)) + [v for v in raw if 'many' in v]) or '-'
+    vals = ','.join(sorted({hex(int(v, 0)) for v in raw if 'many' not in v}, key=lambda x: int(x, 16)) + [v for v in raw if 'many' in v]) or '-'
     vals = VALUES.get(f, vals)
     if len(vals.split(',')) > 8:
         n = len(vals.split(','))

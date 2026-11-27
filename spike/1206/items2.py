@@ -1,8 +1,8 @@
 """TVI-WO-1206, widened (architect, 2026-11-27T00:43Z): the second work list. Every field the per-field measure
 (spike/1206/reader/fields.py) finds open above the cut, with its model row and every value written, by the armed run (its
-register values cut to the field's bits) and by the generated boards' firmware (spike/1100/data/writes.tsv).
+register values cut to the field's bits) and by the generated boards and the fixture (spike/1206/data/main-8e15435/gen-writes.tsv).
 
-Usage: python3 -I spike/1206/items2.py COVERAGE ARM_WRITES MODEL_DIR WRITES OUT
+Usage: python3 -I spike/1206/items2.py COVERAGE ARM_WRITES MODEL_DIR GEN_WRITES OUT
   COVERAGE    fields.py's output for the tree (spike/1206/data/branch/coverage-first.tsv)
   ARM_WRITES  the join's arm-writes.tsv for the same tree
 Columns as items.tsv: field, model, bits, allowed, page, paths, arm_values, gen_values, items (instance@offset), text."""
@@ -23,11 +23,33 @@ def rd(f):
     ls = open(f).read().splitlines(); h = ls[0].lstrip('# ').split('\t')
     return [dict(zip(h, l.split('\t'))) for l in ls[1:] if not l.startswith('#')]
 arm = {(r['instance'], int(r['offset'], 16)): r['values'] for r in rd(armw)}
-fw = {}
-for l in open(writes):
-    c = l.rstrip('\n').split('\t')
-    if len(c) > 7 and c[0] == 'W' and c[3] == 'fw':
-        fw.setdefault((c[4], int(c[6], 16)), set()).add(int(c[7], 16))
+def gen_values(path):
+    """(instance, offset) -> [values] and [many-tokens] from spike/1206/data/main-8e15435/gen-writes.tsv (every board's writes)."""
+    out = {}
+    for l in open(path):
+        if l.startswith('#'): continue
+        b, inst, off, name, n, vals = l.rstrip('\n').split('\t')
+        e = out.setdefault((inst, int(off, 16)), ([], []))
+        if vals.startswith('many'):
+            m = re.match(r'many:(\d+) or=(0x[0-9A-F]+) and=(0x[0-9A-F]+)', vals); e[1].append((b, int(m.group(1)), int(m.group(2), 16)))
+        else:
+            e[0].extend(int(x, 16) for x in vals.split(','))
+    return out
+
+
+def field_gen(fw, at, lo, width):
+    """A field's values from gen_values: each value cut to its bits; a `many` register gives 0 if the field's bits are never 1,
+    else `<board> many:N (bits ever 1: 0x..)`."""
+    mask = (1 << width) - 1; vals, many = set(), set()
+    for k in at:
+        vs, ms = fw.get(k, ([], []))
+        vals.update(hex((v >> lo) & mask) for v in vs)
+        for b, n, orv in ms:
+            if (orv >> lo) & mask == 0: vals.add('0x0')
+            else: many.add('%s %s many:%d (bits ever 1: 0x%X)' % (b, k[0], n, (orv >> lo) & mask))
+    return sorted(vals, key=lambda x: int(x, 16)) + sorted(many)
+
+fw = gen_values(writes)
 need = {}
 for l in open(cov):
     if l.startswith('#'): continue
@@ -48,10 +70,10 @@ with open(out, 'w') as o:
             for v in arm.get(k, '').split(','):
                 if v.startswith('0x'): av.add(cut(int(v, 16)))
                 elif v.startswith('many'): many.add('%s %s' % (k[0], v))
-        gv = {cut(v) for k in e['at'] for v in fw.get(k, ())}
+        gv = field_gen(fw, e['at'], m['lo'], w)
         key = lambda x: int(x, 16)
         o.write('\t'.join([f, m['src'], '%d:%d' % (m['hi'], m['lo']), m['allowed'], m['page'], ','.join(sorted(e['paths'])),
-                           ','.join(sorted(av, key=key) + sorted(many)) or '-', ','.join(sorted(gv, key=key)) or '-',
+                           ','.join(sorted(av, key=key) + sorted(many)) or '-', ','.join(gv) or '-',
                            ' | '.join('%s@0x%03X' % k for k in sorted(e['at'])),
                            re.sub(r'\b(TVI-WO-\w+(?:\.[\w-]+)?)\.md\b', r'\1', m['text'])]) + '\n')
 print('%d fields at %d instance-registers written to %s; %d without a unique model row' % (
