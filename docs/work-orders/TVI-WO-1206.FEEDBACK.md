@@ -138,5 +138,6 @@ Reduction pass (diff): −18 net · 2 duplicates removed · 1 dead path removed 
   - the 129's undercount (00:38Z, ruled 00:43Z);
   - the four field-evidence items (01:18Z, ruled 01:37Z).
 - **TSIZE and DMAMUX2** (my 01:41Z note, ruled 02:12Z).
+- **Clause 1, re-judged (WO §1.4):** met by the gate's per-field measure on `f398a8b`. 0 of 1,982 fields above the cut are open; 18 rest on field evidence by ruling, each with a bench row. The three unmapped writes are each judged off the cut or on no flight path. Written as the addendum in `TVI-WO-1205.verdict.md` and `TVI-WO-1205.FEEDBACK.md`.
 - **The addendum is the WO's last stop.**
 - **Not merged by me.**
