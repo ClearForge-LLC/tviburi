@@ -21,14 +21,14 @@
 - **The readers:** five workers, one per family slice, each returning verbatim quotes with page and `file Ln`, and what each side does per value (`~/.cache/tvi-1206/reads/`). They assigned no state.
 - **The checks:** `spike/1206/check-reads.py`: 121 rows, 0 quotes off their page or lines. The builder then checked each claim against the runs above and assigned every state (`spike/1206/readings.py`, which writes the rows and this document's §3).
 
-| Family | Fields | `acknowledged` | `stock-wrong` | Held (§4) |
-|---|---|---|---|---|
-| RCC enables | 47 | 42 | 5 | 0 |
-| RCC clocks | 27 | 20 | 3 | 4 |
-| TIM1 | 17 | 9 | 8 | 0 |
-| I2C, GPIO, SPI | 9 | 3 | 5 | 1 |
-| USART | 21 | 15 | 6 | 0 |
-| **All** | **121** | **89** | **27** | **5** |
+| Family | Fields | `acknowledged` | `stock-wrong` |
+|---|---|---|---|
+| RCC enables | 47 | 42 | 5 |
+| RCC clocks | 27 | 24 | 3 |
+| TIM1 | 17 | 9 | 8 |
+| I2C, GPIO, SPI | 9 | 4 | 5 |
+| USART | 21 | 15 | 6 |
+| **All** | **121** | **94** | **27** |
 
 ## 3. The acknowledgements
 
@@ -44,8 +44,13 @@
 | A8 | `I2C_CR2.ADD10`, `I2C_CR2.RELOAD`, `I2C_ICR.ADDRCF` | written 0 only: 7-bit addressing, no reload, and a 0 written to ADDRCF clears nothing, alike on both sides | its own page(s) and stock line(s) |
 | A9 | `USART_CR1.OVER8`, `USART_CR1.RTOIE`, `USART_CR1.TCIE`, `USART_CR1.TXFNFIE` | written 0 only: oversampling by 16, no receiver-timeout, transfer-complete or TX-FIFO interrupt, alike on both sides | its own page(s) and stock line(s) |
 | A10 | `USART_ICR.CMCF`, `USART_ICR.CTSCF`, `USART_ICR.EOBCF`, `USART_ICR.FECF`, `USART_ICR.LBDCF`, `USART_ICR.NECF`, `USART_ICR.ORECF`, `USART_ICR.PECF`, `USART_ICR.TCBGTCF`, `USART_ICR.TXFECF`, `USART_ICR.WUCF` | a 1 clears its ISR flag and a 0 does nothing, on both sides; the twin never sets the flag, which is its own read-only row's matter | its own page(s) and stock line(s) |
+| A11 | `RCC_PLL3DIVR.DIVN3`, `RCC_PLL3DIVR.DIVP3`, `RCC_PLL3DIVR.DIVQ3`, `RCC_PLL3DIVR.DIVR3` | by the architect's ruling, 2026-11-27T00:10Z, on field evidence: p347 says "To insure an optimal behavior of the PLL when one of the post-divider (DIVP, DIVQ or DIVR) is not used, the application shall set the enable bit (DIVyEN) as well as the corresponding post-divider bits (DIVP, DIVQ or DIVR) to '0'. If the above rules are not respected, the PLL output frequency is not guaranteed." The armed run writes PLLCFGR 0x1FF0000, PLL3DIVR 0x7040E0E, PLLCFGR 0x1BF0FFD (DIVP3EN = 0, DIVP3 = 7), then CR 0x15003025 (PLL1-3 on). RM0433 guarantees no frequency for PLL3's outputs in this configuration. The twin serves the formula's 30 MHz on pll3_r_ck to I2C1/2 and the ADC. ArduPilot flies this configuration on silicon, which is field evidence, not the manual. Bench row BR1 (TVI-WO-1206.FEEDBACK.md): measure pll3_r_ck on the Nucleo with DIVP3EN = 0 and DIVP3 = 7, by I2C SCL timing | its own page(s) and stock line(s) |
+| A12 | `I2C_ICR.Res2_1` | by the architect's ruling of 2026-11-25T05:06Z Q10 (a clear register: the write clears nothing), on field evidence: p2012 says only "Reserved, must be kept at reset value", so RM0433 gives no behaviour for the 1s ChibiOS writes here (ICR = 0x2, 0x4); the twin ignores the bits, and a 0 behaves alike on both sides. ChibiOS flies with these writes on silicon, which is field evidence, not the manual. Bench row BR2 (TVI-WO-1206.FEEDBACK.md): read I2C_ISR after ICR = 0x2 and 0x4 on the Nucleo | its own page(s) and stock line(s) |
 
-## 4. Held for a ruling
+## 4. Acknowledged on field evidence, by ruling
 
-- **`RCC_PLL3DIVR` `DIVN3`, `DIVP3`, `DIVQ3`, `DIVR3`:** the armed run leaves DIVP3EN = 0 with DIVP3 = 7, and p347 then guarantees no PLL3 output frequency. Raised to the architect.
-- **`I2C_ICR.Res2_1`:** its state is pinned by `tests/1306/i2c.sh` L261. Raised to the architect.
+Two acknowledgements rest on a ruling because RM0433 is silent for the values written, not on a reading that silicon matches:
+- **A11, PLL3** (architect, 2026-11-27T00:10Z): p347 guarantees no PLL3 frequency with DIVP3EN = 0 and DIVP3 = 7, ArduPilot's configuration. Bench row BR1.
+- **A12, `I2C_ICR` bits 2:1** (architect, 2026-11-25T05:06Z Q10): p2012 says only "must be kept at reset value", and ChibiOS writes 1s there. Bench row BR2.
+
+Either can be overruled to "not met" by one line in `spike/1206/readings.py`.
