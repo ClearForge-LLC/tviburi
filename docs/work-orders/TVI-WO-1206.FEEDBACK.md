@@ -16,7 +16,7 @@
 ## 0. The verdict (WO §1.4)
 
 **Clause 1 is met,** by the gate's per-field measure on `f398a8b`: 1,982 fields above the cut at 208 registers, 399 guarded, 1,583 read, **0 open**. On `main` the same measure finds 434 open. Written as the addendum in `TVI-WO-1205.verdict.md` and `TVI-WO-1205.FEEDBACK.md`, as the fence asks.
-- **What was read:** 295 fields, each against RM0433 Rev 9 by page and the pinned stock source by line, for every value the armed run, the 14 generated boots and the fixture write. 169 are `acknowledged` (A1–A29) and 126 `stock-wrong`, each with why the flight path is unaffected.
+- **What was read:** 295 fields, each against RM0433 Rev 9 by page and the pinned stock source by line, for every value the armed run, the 14 generated boots and the fixture write. 226 are `acknowledged` (A1–A31) and 69 `stock-wrong`, each with why the flight path is unaffected.
 - **What the verdict rests on beyond the manual:** 18 acknowledgements are field evidence by the architect's rulings, because RM0433 is silent for what the firmware does (A11, A12, A13, A25–A29; `TVI-WO-1206.rm0433.md` §4). Each quotes the manual's words, the run's counts and the twin's behaviour, and each has a bench row for Phase 4. If any is overruled, clause 1 is not met by that field: a one-line change in `spike/1206/readings.py`.
 - **What the measure lists outside its field count:** three unmapped writes, each judged off the cut or on no flight path (§5 of `TVI-WO-1206.rm0433.md`). DMAMUX2 is a Phase 4 row (R9).
 - **What the adversarial pass left on record:** the second re-read disagreed on 16 of 35 fields; each is resolved in §4 with its reason. No resolution changes the count, since both states count as read. One disagreement was a real gap, now in A26.
@@ -29,7 +29,7 @@
 - **The second:** 174 fields the per-field measure found open above the cut (`items2.tsv`), after the adversarial pass showed the 129 undercounted (§4).
 - **The method, both lists:** predictions committed first (`predictions.md`, `predictions2.md`); a 20 % re-read drawn with its seed before reading (`reread.txt` seed 1206, `reread2.txt` seed 12062); ten reading workers returning verbatim quotes with page and `file Ln`, no state; every quote checked mechanically (`check-reads.py`); every state assigned by the builder in one table (`readings.py`), which also writes §3's A-rows.
 - **What a row now says:** its text on main, kept, then its reading: `acknowledged (TVI-WO-1206 A<n>; p…; File.cs L…)`, or `stock, wrong (what differs; unaffected: why)` with its page and line. One false clause was replaced: `I2C_CR2.AUTOEND`'s "a STOP after NBYTES" held for AUTOEND = 1 only.
-- **The result:** 169 `acknowledged`, 126 `stock-wrong`, no stop left. 18 of the acknowledged rest on field evidence by ruling, where RM0433 is silent (A11, A12, A13, A25–A29; `TVI-WO-1206.rm0433.md` §4).
+- **The result:** 226 `acknowledged`, 69 `stock-wrong`, no stop left. 18 of the acknowledged rest on field evidence by ruling, where RM0433 is silent (A11, A12, A13, A25–A29; `TVI-WO-1206.rm0433.md` §4).
 
 **The gate's measure** (`spike/1206/reader/fields.py`, ruled 00:43Z): every field of every register the armed run writes, judged guarded, read or open. DMA streams 1–7 are judged by stream 0's rows and DMAMUX channels by C0's, as the guards do. 1206's join (`reader/join.py`) counts RUL-17 as amended: every state but `inherited-unaudited` is read.
 
@@ -64,7 +64,7 @@ All on `f398a8b`, the branch's last tree change (the one commit after it records
 | List | Predicted (ack / stock-wrong / stop or held) | Read | Where it missed |
 |---|---|---|---|
 | First (121) | 104 / 16 / 1 | 93 / 28 / 0 | TIM1 (16 ack predicted, 9 read): flag-setting and timing differ in 8 fields, each unobservable. `AUTOEND`, the predicted stop, is stock-wrong: ArduPilot clears TCIE and PE straight after its STOP |
-| Second (174) | 146 / 24 / 4 | 76 / 98 / 0 | RCC reset bits (80 ack predicted, 2 read): the twin resets once at the write of 1 where RM0433 says "resets"; unobservable by `reset-windows.tsv`. The four held went to rulings, with three more SPI items |
+| Second (174) | 146 / 24 / 4 | 133 / 41 / 0 | RCC reset bits (80 ack predicted, 60 read): the 28 with no registered alias reset nothing in the twin. The four held went to rulings, with three more SPI items |
 
 A miss is not a defect: the predictions guard against reading toward a total, and neither list was.
 
@@ -93,12 +93,12 @@ A miss is not a defect: the predictions guard against reading toward a total, an
 
 **The second re-read** (35 fields, seed 12062, an independent Opus reader):
 - **Agreed on 19 of 35.**
-- **Disagreed on 16, each resolved by the builder (both sides count as read, so clause 1's count is the same either way):**
-  - **11 registered reset bits, stock-wrong kept:** it says the same, since the twin resets the block. The builder keeps stock-wrong because RM0433 says only "1: resets", so the twin's one-shot reset is not shown to equal silicon's; `reset-windows.tsv` shows no firmware can tell them apart.
-  - **I2C RXIE, acknowledged kept:** it says it differs, because RXNE rises at START. The builder credits that to RXNE's and START's model (R4), since RXIE's own gate (flag AND enable) matches.
-  - **BDMAEN, acknowledged kept:** it says it differs, through DMAMUX2 and BDMA channel 7. That is DMAMUX2's matter, ruled off the cut at 02:12Z; the enable's own gate matches (p373).
-  - **DSIZE 0 and USART `Res16_14`, acknowledged kept:** it says the manual is silent, and A20 and A28 already say so (A28 by ruling).
-  - **SPI SPE, the reader was right:** the stock model also clears TSIZE and EOT at the disable. A26 now states it.
+- **Disagreed on 16.** Both sides count as read, so clause 1's count is the same either way. Each was then put to an independent adjudicator (a fresh Opus reader given both positions and the sources), whose verdicts the builder checked and applied:
+  - **11 registered reset bits, the re-reader was right:** for a registered block the stock reset calls the peripheral's own Reset() at every write with the bit 1 (STM32H7_RCC.cs L1377-1383; PeripheralRegister.cs L335), which is all RM0433's "1: resets" states. The same holds for every reset bit with a registered alias: 58 move to `acknowledged` (A30). The 28 with no registered alias stay `stock-wrong`, since nothing is reset.
+  - **I2C RXIE, neither reader's reason:** the adjudicator found that the stock interrupt also requires a read transfer (L463), so "flag AND enable on both sides" was false. It is now `stock-wrong`, with the state never reached. RXNE's arrival at START stays the read transfer's matter (R4).
+  - **BDMAEN, acknowledged kept** (the adjudicator agrees): it says it differs, through DMAMUX2 and BDMA channel 7. That is DMAMUX2's matter, off the cut (02:12Z). Its own row (A31) now names DMAMUX2, as p458's 1 clocks both.
+  - **DSIZE 0 and USART `Res16_14`, acknowledged kept** (the adjudicator agrees): it says the manual is silent, and A28 says so by ruling. A20 now cites 0100b's A6 for DSIZE 0 ("not used", p2220).
+  - **SPI SPE, the reader was right** (the adjudicator agrees on A26): the stock model also clears TSIZE and EOT at the disable. A26 now states it.
 
 **The second review** (a fresh Opus reviewer of the 174's rows; no acknowledged row cites another register's line):
 - **Fixed:**
@@ -115,7 +115,7 @@ A miss is not a defect: the predictions guard against reading toward a total, an
 - **R1. The method's hole** (§4; ruled at 00:43Z): 1100a's join judged queue rows and unrowed registers, not fields. The per-field measure replaces it as the gate's; `gap.py` is the evidence.
 - **R2. The DMA guard, `DMA_SxCR.MINC` = 0:** on a memory-to-peripheral stream with NDT > 1 the stock model sends the item once and then zeros, where silicon repeats it (p663). ArduPilot's 32 such streams (SPI1 TX, NDT 256) are U4's Read dummy bytes, which `GenericSpiFlash` ignores. A device that reads MOSI there would see it. A finding row for the DMA guard.
 - **R3. I2C, TC is not cleared by a STOP in the stock model** (p2011 says it is), and the guard does not mask it. No run acts on it: ArduPilot clears TCIE and PE straight after. A row for the I2C guard's STOP path.
-- **R4. Flags the twin never sets:** CMF, TXFE and possibly TCBGT on USART, and RXNE's timing on I2C. Silicon sets them on this platform; their own read-only rows say "never set in the twin", true but incomplete. Also, the stock USART_ISR resets to 0x200000C0 where p2085 gives 0x0X8000C0.
+- **R4. Flags the twin never sets, or sets early:** CMF, TXFE and possibly TCBGT on USART; on I2C a read's NBYTES all arrive at START, so RXNE rises at once, where silicon has one byte per eighth SCL pulse (p1979). No row owns RXNE's timing yet; it belongs to the read transfer (CR2) or RXDR. Silicon sets them on this platform; their own read-only rows say "never set in the twin", true but incomplete. Also, the stock USART_ISR resets to 0x200000C0 where p2085 gives 0x0X8000C0.
 - **R5. Stock decodes:** HPRE and D1CPRE 0xC–0xF as /32–/256 where p394–395 gives /64–/512 (the guard decodes correctly; no run writes them). An EGR write of 0 resets the counter in the stock model (p1599: "No action"). RCC_RSR uses a dual-core bit layout.
 - **R6. Row pages:** several rows cite a register's first page where the bit text is on the next: UIE p1595, TI1S p1591, CC1S p1603, LIFCR p661, OPM p1589, UG p1599. Their readings cite the right pages; the rows' own page numbers are unchanged, as the allowed-set data they sit beside.
 - **R7. `I2C_CR2.SADD` 0x90:** ten generated boards address a TMP117 the platform has no model for (TVI-WO-1306 Q9). Silicon would ACK, the twin NACKs, and the firmware times out.

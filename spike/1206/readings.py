@@ -57,7 +57,7 @@ ACK = {
         'RCC_APB2ENR.TIM15EN RCC_APB2ENR.TIM16EN RCC_APB2ENR.TIM17EN RCC_APB2ENR.SPI4EN RCC_APB2ENR.USART6EN RCC_APB4ENR.I2C4EN '
         'RCC_APB4ENR.LPTIM2EN RCC_APB4ENR.LPTIM3EN RCC_APB4ENR.LPTIM4EN RCC_APB4ENR.LPTIM5EN RCC_APB4ENR.LPUART1EN RCC_APB4ENR.SYSCFGEN '
         'RCC_AHB4ENR.GPIOAEN RCC_AHB4ENR.GPIOBEN RCC_AHB4ENR.GPIOGEN RCC_AHB4ENR.GPIOHEN RCC_AHB4ENR.GPIOIEN RCC_AHB4ENR.GPIOJEN '
-        'RCC_AHB4ENR.GPIOKEN RCC_AHB4ENR.BDMAEN RCC_AHB4ENR.CRCEN RCC_AHB4ENR.HSEMEN RCC_APB1LENR.TIM3EN RCC_APB1LENR.TIM4EN RCC_APB1LENR.TIM5EN '
+        'RCC_AHB4ENR.GPIOKEN RCC_AHB4ENR.CRCEN RCC_AHB4ENR.HSEMEN RCC_APB1LENR.TIM3EN RCC_APB1LENR.TIM4EN RCC_APB1LENR.TIM5EN '
         'RCC_APB1LENR.TIM6EN RCC_APB1LENR.TIM7EN RCC_APB1LENR.TIM12EN RCC_APB1LENR.TIM13EN RCC_APB1LENR.TIM14EN RCC_APB1LENR.LPTIM1EN '
         'RCC_APB1LENR.I2C3EN RCC_APB1LENR.UART4EN RCC_APB1LENR.UART5EN RCC_APB1LENR.UART7EN RCC_APB1LENR.UART8EN'),
     2: ("written 0 only: the bit is stored and reads back from the guard's copy as silicon's does, and the stock RCC registers no "
@@ -126,14 +126,14 @@ ACK = {
          "enabled stream; direct mode with DMDIS 0), as silicon's peripheral-to-memory transfers do",
          'DMA_SxCR.MSIZE[1:0] DMA_SxCR.PSIZE[1:0] DMA_SxCR.PINC DMA_SxFCR.DMDIS'),
     19: ("written 0 only: the interrupt is off on both sides", 'SPI_IER.EOTIE SPI_IER.RXPIE SPI_IER.TXPIE'),
-    20: ("for the values written: 8-bit frames (DSIZE 7; 0 only with SPE = 0), a receive DMA request per frame received, and SUSPC clears SUSP, "
-         "alike on both sides",
+    20: ("for the values written: 8-bit frames (DSIZE 7, one byte per frame on both sides; 0, which p2220 calls 'not used', is written only with "
+         "SPE = 0, acknowledged at stop by 0100b's A6, ruled 2026-11-23T11:00Z), a receive DMA request per frame received, and SUSPC clears SUSP",
          'SPI_CFG1.DSIZE SPI_CFG1.RXDMAEN SPI_IFCR.SUSPC'),
     21: ("written 0 only: no target mode, no clock-stretch disable, no receive DMA, no STOP interrupt, alike on both sides",
          'I2C_CR1.ADDRIE I2C_CR1.NOSTRETCH I2C_CR1.RXDMAEN I2C_CR1.STOPIE'),
     22: ("the interrupt is the flag AND the enable on both sides; ArduPilot's i2c1 takes all three (CR1 0xD3, 0xD7; i2c2 writes 0xD3, 0x90, 0x91, so RXIE 0 there), each of the armed run's 12,750 "
          "handler entries with an enabled flag set; when the flags fire is I2C_TXDR.TXDATA's and I2C_CR2.AUTOEND's matter",
-         'I2C_CR1.RXIE I2C_CR1.TCIE I2C_CR1.TXIE'),
+         'I2C_CR1.TCIE I2C_CR1.TXIE'),
     23: ("each transfer goes to the address written, in the direction written, for NBYTES bytes (8,339 RXDR reads = 1,378 x 6 + 71 x 1 in the "
          "armed run; no START with NBYTES 0), as silicon's; at 0x90 ten generated boards address a TMP117 the platform has no model for, so the "
          "twin NACKs where silicon would ACK: the platform's missing device (TVI-WO-1306 Q9), not this field",
@@ -172,6 +172,16 @@ ACK = {
          "where silicon sets it once TSIZE frames are queued (p2226), and no board tests it (all 14 crates mask 0x1 and 0x8 only). Bench row "
          "BR7 (TVI-WO-1206 FEEDBACK §5): poll RXP on the last frame of a TSIZE transfer, FTHLV 0, on the Nucleo",
          'SPI_CR2.TSIZE'),
+    30: ("a 1 resets the block on both sides: the stock RCC calls the registered peripheral's own Reset() at every write with the bit 1 "
+         "(STM32H7_RCC.cs L1377-1383; a field's write callback runs at each write of its register, PeripheralRegister.cs L335), as RM0433's "
+         "'1: resets' the block; a 0 resets nothing. Whether silicon also holds the block in reset while the bit is 1 is not stated, and no run "
+         "accesses a block while its bit is 1 (spike/1206/data/main-8e15435/reset-windows.tsv). Found by the independent adjudication of the "
+         "second re-read (TVI-WO-1206 FEEDBACK §4)",
+         '''RCC_AHB1RSTR.ADC12RST RCC_AHB1RSTR.DMA1RST RCC_AHB1RSTR.DMA2RST RCC_AHB1RSTR.ETH1MACRST RCC_AHB2RSTR.RNGRST RCC_AHB3RSTR.DMA2DRST RCC_AHB3RSTR.QSPIRST RCC_AHB4RSTR.ADC3RST RCC_AHB4RSTR.BDMARST RCC_AHB4RSTR.CRCRST RCC_AHB4RSTR.GPIOARST RCC_AHB4RSTR.GPIOBRST RCC_AHB4RSTR.GPIOCRST RCC_AHB4RSTR.GPIODRST RCC_AHB4RSTR.GPIOERST RCC_AHB4RSTR.GPIOFRST RCC_AHB4RSTR.GPIOGRST RCC_AHB4RSTR.GPIOHRST RCC_AHB4RSTR.GPIOIRST RCC_AHB4RSTR.GPIOJRST RCC_AHB4RSTR.GPIOKRST RCC_AHB4RSTR.HSEMRST RCC_APB1LRSTR.I2C1RST RCC_APB1LRSTR.I2C2RST RCC_APB1LRSTR.I2C3RST RCC_APB1LRSTR.LPTIM1RST RCC_APB1LRSTR.SPI2RST RCC_APB1LRSTR.TIM12RST RCC_APB1LRSTR.TIM13RST RCC_APB1LRSTR.TIM14RST RCC_APB1LRSTR.TIM2RST RCC_APB1LRSTR.TIM3RST RCC_APB1LRSTR.TIM4RST RCC_APB1LRSTR.TIM5RST RCC_APB1LRSTR.TIM6RST RCC_APB1LRSTR.TIM7RST RCC_APB1LRSTR.UART4RST RCC_APB1LRSTR.UART5RST RCC_APB1LRSTR.UART7RST RCC_APB1LRSTR.UART8RST RCC_APB1LRSTR.USART2RST RCC_APB1LRSTR.USART3RST RCC_APB2RSTR.SPI1RST RCC_APB2RSTR.SPI4RST RCC_APB2RSTR.TIM15RST RCC_APB2RSTR.TIM16RST RCC_APB2RSTR.TIM17RST RCC_APB2RSTR.TIM1RST RCC_APB2RSTR.TIM8RST RCC_APB2RSTR.USART1RST RCC_APB2RSTR.USART6RST RCC_APB3RSTR.LTDCRST RCC_APB4RSTR.I2C4RST RCC_APB4RSTR.LPTIM2RST RCC_APB4RSTR.LPTIM3RST RCC_APB4RSTR.LPTIM4RST RCC_APB4RSTR.LPTIM5RST RCC_APB4RSTR.LPUART1RST'''),
+    31: ("as A1 for BDMA: a 0 drops its accesses, as silicon ignores them (p373; the armed run's nine BDMA writes while it is 0), and a 1 clocks "
+         "it; p458's 1 also clocks DMAMUX2, which the twin does not model (TVI-WO-1206.rm0433 §5): its one write drops at any BDMAEN, the "
+         "missing block's matter, not this field's",
+         'RCC_AHB4ENR.BDMAEN'),
 }
 
 # stock-wrong: field -> (what differs, why the flight path is unaffected)
@@ -225,12 +235,11 @@ SW = {
     'USART_CR1.RXFNEIE': ("the twin never sets ORE, so the interrupt never fires on an overrun as silicon's does (p2090)",
                           "an overrunning byte with the FIFO off refuses TVI-USART-OVERRUN; with the FIFO on, FIFOEN's own stock-wrong row holds it"),
 }
-SW.update({f: ("the twin resets a registered peripheral once, at the write of 1, and a block with no registered alias not at all, where RM0433 "
-                 "says '1: resets' the block (whether silicon holds it in reset while the bit is 1 is not quoted, so nothing here rests on it)",
+SW.update({f: ("no peripheral is registered at this bit's alias, so the twin resets nothing where RM0433 says '1: resets' the block",
                  "no run accesses a block while its reset bit is 1 (spike/1206/data/main-8e15435/reset-windows.tsv: of the armed run's 82,558 "
                  "reset-register writes, the only accesses inside a window are 31 adcM1S2 reads, during APB1ResetLow and APB2Reset, which hold no "
                  "ADC bit; the fixture's 7,702 have none; the generated boots write no reset register), and no run "
-                 "accesses a block whose reset alias has no registered peripheral (%s)" % ACCESS) for f in """RCC_AHB1RSTR.ADC12RST RCC_AHB1RSTR.DMA1RST RCC_AHB1RSTR.DMA2RST RCC_AHB1RSTR.ETH1MACRST RCC_AHB1RSTR.USB1OTGRST RCC_AHB1RSTR.USB2OTGRST RCC_AHB2RSTR.CRYPTRST RCC_AHB2RSTR.DCMIRST RCC_AHB2RSTR.HASHRST RCC_AHB2RSTR.RNGRST RCC_AHB2RSTR.SDMMC2RST RCC_AHB3RSTR.DMA2DRST RCC_AHB3RSTR.JPGDECRST RCC_AHB3RSTR.MDMARST RCC_AHB3RSTR.QSPIRST RCC_AHB3RSTR.SDMMC1RST RCC_AHB4RSTR.ADC3RST RCC_AHB4RSTR.BDMARST RCC_AHB4RSTR.CRCRST RCC_AHB4RSTR.GPIOARST RCC_AHB4RSTR.GPIOBRST RCC_AHB4RSTR.GPIOCRST RCC_AHB4RSTR.GPIODRST RCC_AHB4RSTR.GPIOERST RCC_AHB4RSTR.GPIOFRST RCC_AHB4RSTR.GPIOGRST RCC_AHB4RSTR.GPIOHRST RCC_AHB4RSTR.GPIOIRST RCC_AHB4RSTR.GPIOJRST RCC_AHB4RSTR.GPIOKRST RCC_AHB4RSTR.HSEMRST RCC_APB1HRSTR.CRSRST RCC_APB1HRSTR.FDCANRST RCC_APB1HRSTR.MDIOSRST RCC_APB1HRSTR.OPAMPRST RCC_APB1HRSTR.SWPRST RCC_APB1LRSTR.CECRST RCC_APB1LRSTR.DAC12RST RCC_APB1LRSTR.I2C1RST RCC_APB1LRSTR.I2C2RST RCC_APB1LRSTR.I2C3RST RCC_APB1LRSTR.LPTIM1RST RCC_APB1LRSTR.SPDIFRXRST RCC_APB1LRSTR.SPI2RST RCC_APB1LRSTR.SPI3RST RCC_APB1LRSTR.TIM12RST RCC_APB1LRSTR.TIM13RST RCC_APB1LRSTR.TIM14RST RCC_APB1LRSTR.TIM2RST RCC_APB1LRSTR.TIM3RST RCC_APB1LRSTR.TIM4RST RCC_APB1LRSTR.TIM5RST RCC_APB1LRSTR.TIM6RST RCC_APB1LRSTR.TIM7RST RCC_APB1LRSTR.UART4RST RCC_APB1LRSTR.UART5RST RCC_APB1LRSTR.UART7RST RCC_APB1LRSTR.UART8RST RCC_APB1LRSTR.USART2RST RCC_APB1LRSTR.USART3RST RCC_APB2RSTR.DFSDM1RST RCC_APB2RSTR.HRTIMRST RCC_APB2RSTR.SAI1RST RCC_APB2RSTR.SAI2RST RCC_APB2RSTR.SAI3RST RCC_APB2RSTR.SPI1RST RCC_APB2RSTR.SPI4RST RCC_APB2RSTR.SPI5RST RCC_APB2RSTR.TIM15RST RCC_APB2RSTR.TIM16RST RCC_APB2RSTR.TIM17RST RCC_APB2RSTR.TIM1RST RCC_APB2RSTR.TIM8RST RCC_APB2RSTR.USART1RST RCC_APB2RSTR.USART6RST RCC_APB3RSTR.LTDCRST RCC_APB4RSTR.COMP12RST RCC_APB4RSTR.I2C4RST RCC_APB4RSTR.LPTIM2RST RCC_APB4RSTR.LPTIM3RST RCC_APB4RSTR.LPTIM4RST RCC_APB4RSTR.LPTIM5RST RCC_APB4RSTR.LPUART1RST RCC_APB4RSTR.SAI4RST RCC_APB4RSTR.SPI6RST RCC_APB4RSTR.VREFRST""".split()})
+                 "accesses a block whose reset alias has no registered peripheral (%s)" % ACCESS) for f in set("""RCC_AHB1RSTR.ADC12RST RCC_AHB1RSTR.DMA1RST RCC_AHB1RSTR.DMA2RST RCC_AHB1RSTR.ETH1MACRST RCC_AHB1RSTR.USB1OTGRST RCC_AHB1RSTR.USB2OTGRST RCC_AHB2RSTR.CRYPTRST RCC_AHB2RSTR.DCMIRST RCC_AHB2RSTR.HASHRST RCC_AHB2RSTR.RNGRST RCC_AHB2RSTR.SDMMC2RST RCC_AHB3RSTR.DMA2DRST RCC_AHB3RSTR.JPGDECRST RCC_AHB3RSTR.MDMARST RCC_AHB3RSTR.QSPIRST RCC_AHB3RSTR.SDMMC1RST RCC_AHB4RSTR.ADC3RST RCC_AHB4RSTR.BDMARST RCC_AHB4RSTR.CRCRST RCC_AHB4RSTR.GPIOARST RCC_AHB4RSTR.GPIOBRST RCC_AHB4RSTR.GPIOCRST RCC_AHB4RSTR.GPIODRST RCC_AHB4RSTR.GPIOERST RCC_AHB4RSTR.GPIOFRST RCC_AHB4RSTR.GPIOGRST RCC_AHB4RSTR.GPIOHRST RCC_AHB4RSTR.GPIOIRST RCC_AHB4RSTR.GPIOJRST RCC_AHB4RSTR.GPIOKRST RCC_AHB4RSTR.HSEMRST RCC_APB1HRSTR.CRSRST RCC_APB1HRSTR.FDCANRST RCC_APB1HRSTR.MDIOSRST RCC_APB1HRSTR.OPAMPRST RCC_APB1HRSTR.SWPRST RCC_APB1LRSTR.CECRST RCC_APB1LRSTR.DAC12RST RCC_APB1LRSTR.I2C1RST RCC_APB1LRSTR.I2C2RST RCC_APB1LRSTR.I2C3RST RCC_APB1LRSTR.LPTIM1RST RCC_APB1LRSTR.SPDIFRXRST RCC_APB1LRSTR.SPI2RST RCC_APB1LRSTR.SPI3RST RCC_APB1LRSTR.TIM12RST RCC_APB1LRSTR.TIM13RST RCC_APB1LRSTR.TIM14RST RCC_APB1LRSTR.TIM2RST RCC_APB1LRSTR.TIM3RST RCC_APB1LRSTR.TIM4RST RCC_APB1LRSTR.TIM5RST RCC_APB1LRSTR.TIM6RST RCC_APB1LRSTR.TIM7RST RCC_APB1LRSTR.UART4RST RCC_APB1LRSTR.UART5RST RCC_APB1LRSTR.UART7RST RCC_APB1LRSTR.UART8RST RCC_APB1LRSTR.USART2RST RCC_APB1LRSTR.USART3RST RCC_APB2RSTR.DFSDM1RST RCC_APB2RSTR.HRTIMRST RCC_APB2RSTR.SAI1RST RCC_APB2RSTR.SAI2RST RCC_APB2RSTR.SAI3RST RCC_APB2RSTR.SPI1RST RCC_APB2RSTR.SPI4RST RCC_APB2RSTR.SPI5RST RCC_APB2RSTR.TIM15RST RCC_APB2RSTR.TIM16RST RCC_APB2RSTR.TIM17RST RCC_APB2RSTR.TIM1RST RCC_APB2RSTR.TIM8RST RCC_APB2RSTR.USART1RST RCC_APB2RSTR.USART6RST RCC_APB3RSTR.LTDCRST RCC_APB4RSTR.COMP12RST RCC_APB4RSTR.I2C4RST RCC_APB4RSTR.LPTIM2RST RCC_APB4RSTR.LPTIM3RST RCC_APB4RSTR.LPTIM4RST RCC_APB4RSTR.LPTIM5RST RCC_APB4RSTR.LPUART1RST RCC_APB4RSTR.SAI4RST RCC_APB4RSTR.SPI6RST RCC_APB4RSTR.VREFRST""".split()) - set(ACK[30][1].split())})
 for f in 'RCC_CR.HSI48ON RCC_CR.HSEON RCC_CR.PLL1ON RCC_CR.PLL2ON RCC_CR.PLL3ON'.split():
     SW[f] = ("the stock ready flag follows the ON bit at once, where silicon sets it once the oscillator is stable or the PLL locked (p340, p343, p347-348)",
              "each firmware reads the flag once after the enable and finds it set; ArduPilot's ChibiOS (Aethelgard 4400h's tree, ~/.cache/aet-4400h/src/ap/modules/ChibiOS/os/hal/ports/STM32/STM32H7xx/hal_lld.c, sha256 33372d9fb751) waits on it unbounded "
@@ -240,6 +249,10 @@ for f in 'RCC_CR.HSI48ON RCC_CR.HSEON RCC_CR.PLL1ON RCC_CR.PLL2ON RCC_CR.PLL3ON'
              "with VCOL above 2 MHz is A13's and A11's field evidence")
 SW['RCC_CFGR.SW'] = ("the stock SWS follows SW at once, where silicon switches once the new clock is selected (p392)",
                      "the switch is to a clock already ready (HSI, or PLL1 after PLL1RDY) and the guard's TVI-RCC-SW judges its readiness; " + "ArduPilot's ChibiOS (Aethelgard 4400h's tree, ~/.cache/aet-4400h/src/ap/modules/ChibiOS/os/hal/ports/STM32/STM32H7xx/hal_lld.c, sha256 33372d9fb751) waits on SWS unbounded (L266, L465) and the generated firmware with SWS_POLLS (main.rs L53), whose next step is the same: only the polls and the time differ")
+SW['I2C_CR1.RXIE'] = ("the stock receive interrupt also requires a read transfer (STM32F7_I2C.cs L463: receiveInterruptEnabled && isReadTransfer && "
+                     "rxData.Count > 0), where silicon's is RXNE AND RXIE (p2003, p2011)",
+                     "RXNE with RD_WRN = 0 never arises: the stock StartTransfer clears the receive queue (L344), and no run reads I2C_ISR in that state; "
+                     "that a read's NBYTES all arrive at START is the read transfer's matter (TVI-WO-1206 FEEDBACK R4), not this field's")
 SW['RCC_AHB4ENR.BKPRAMEN'] = ("the twin's backup SRAM is plain memory the enable never gates, where silicon clocks it by this bit (p458)",
                               "written 0 only, and no run is seen to access the backup SRAM; the access log covers peripherals, not memory, so that is not measured (a row)")
 SW['DMA_SxCR.MINC'] = ("on a memory-to-peripheral stream with MINC = 0 and NDT > 1 the stock model sends the memory item once and then zeros, where silicon "
