@@ -4,11 +4,14 @@ data/readings.tsv: field, state (acknowledged | stock-wrong | held), the A-numbe
 behaves-as text the field's ledger row takes. Each text cites RM0433 Rev 9 by page and the stock source (renode-infrastructure
 066a7f13) by file and line, from the checked reading.
 
-Usage: python3 -I spike/1206/readings.py READS_DIR spike/1206/data/items.tsv > spike/1206/data/readings.tsv
+Usage: python3 -I spike/1206/readings.py READS_DIR spike/1206/data/items.tsv [MAIN_MODEL_DIR] > spike/1206/data/readings.tsv
+Each row keeps its text on main (MAIN_MODEL_DIR, default ~/.cache/tvi-1206/main/model: what the row said about the guard's
+own rules stays true) and appends its reading; where that text is wrong for a value now read, OLD replaces it.
        python3 -I spike/1206/readings.py READS_DIR spike/1206/data/items.tsv --table   (TVI-WO-1206.rm0433.md §3's table)"""
 import glob, json, os, sys
 
 reads_dir, items = sys.argv[1:3]
+main_model = sys.argv[3] if len(sys.argv) > 3 and not sys.argv[3].startswith('--') else os.path.expanduser('~/.cache/tvi-1206/main/model')
 R = {}
 for p in glob.glob(os.path.join(reads_dir, '*.jsonl')):
     for l in open(p):
@@ -17,6 +20,18 @@ work = {l.split('\t')[0]: l.rstrip('\n').split('\t') for l in open(items) if not
 
 LINES = {'RCC_APB4ENR.LPUART1EN': ['STM32H7_RCC.cs L1010-1012', 'STM32H7_RCC.cs L1355-1364']}  # the reader cited APB4Reset's bit
 VALUES = {'I2C_CR2.AUTOEND': '0x0,0x1'}  # the generated boards write 1 (CR2 0x201248C, 0x20124EC, 0x206248C: spike/1100/data/writes.tsv); 1100's queue has null
+
+
+import re
+# Where a row's text on main is wrong for a value now read, its replacement (from the checked reading)
+OLD = {'I2C_CR2.AUTOEND': "the stock model: with AUTOEND = 1 a STOP after NBYTES (STOPF); with AUTOEND = 0 TC is set and the controller "
+                          "waits for a START or a STOP (p2004-2005, p2011); a NACKed address's STOP comes whatever AUTOEND (p1975; TVI-WO-1306a)"}
+TEXT = re.compile(r'R\("[^"]+", [^,]+, "[^"]*", "[^"]+", \d+, \d+, (?:new uint\[\] \{[^}]*\}|[^,]+), (?:"(?:[^"\\]|\\.)*"|Inherited), "((?:[^"\\]|\\.)*)", \d+\)')
+def old_text(f):
+    if f in OLD: return OLD[f]
+    path, n = work[f][1].split(':')
+    line = open(os.path.join(main_model, os.path.basename(path))).read().split('\n')[int(n) - 1]
+    return TEXT.search(line).group(1).replace('\\"', '"').replace('\\\\', '\\')
 
 
 def cite(f, pages=None, lines=None):
@@ -165,9 +180,9 @@ for f in sorted(work):
     if f in owner:
         n = owner[f]
         print('\t'.join([f, 'acknowledged', str(n), 'acknowledged by name',
-                         'read for %s: %s (TVI-WO-1206 A%d; %s)' % (vals, ACK[n][0], n, cite(f))]))
+                         '%s; read for %s: %s (TVI-WO-1206 A%d; %s)' % (old_text(f), vals, ACK[n][0], n, cite(f))]))
     elif f in SW:
         what, why = SW[f]
-        print('\t'.join([f, 'stock-wrong', '-', 'stock, wrong (%s; unaffected: %s)' % (what, why), 'read for %s (TVI-WO-1206; %s)' % (vals, cite(f))]))
+        print('\t'.join([f, 'stock-wrong', '-', 'stock, wrong (%s; unaffected: %s)' % (what, why), '%s; read for %s (TVI-WO-1206; %s)' % (old_text(f), vals, cite(f))]))
     else:
         print('\t'.join([f, 'held', '-', '-', '-']))
