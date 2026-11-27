@@ -53,7 +53,8 @@ ACK = {
         "decode every value as the manual does",
         'RCC_D1CFGR.D1CPRE RCC_D1CFGR.D1PPRE RCC_D1CFGR.HPRE RCC_D2CFGR.D2PPRE1 RCC_D2CFGR.D2PPRE2'),
     6: ("for the value written the twin's PLL1 frequency equals the manual's formula (p347: VCO = ref x (DIVN + 1), out = VCO / (DIVy + 1)), "
-        "PLL1 running VCOH on a 16 MHz reference, inside p346's 2-16 MHz",
+        "inside p346's input ranges: the armed run's VCOH on 16 MHz (HSI / 4), the generated boards' VCOH on 3.2 MHz (hse-crystal-16: HSE 16 / 5) "
+        "and VCOL on 1.6 MHz (hse-external-8: 8 / 5), each VCO in its range (p404)",
         'RCC_PLL1DIVR.DIVN1 RCC_PLL1DIVR.DIVP1 RCC_PLL1DIVR.DIVQ1 RCC_PLL1DIVR.DIVR1'),
     13: ("by TVI-WO-1300c's ruling Q1 (2026-11-26T04:03Z), on field evidence: PLL2 runs VCOL (PLLCFGR 0x1BF0FFD, PLL2VCOSEL = 1) on an 8 MHz "
          "reference (PLLCKSELR 0x408040: HSI 64 MHz / DIVM2 8), where p346 gives VCOL 1 to 2 MHz and p347 says VCOL must be chosen only at or "
@@ -119,15 +120,15 @@ SW = {
     'I2C_CR1.ERRIE': ("the twin raises no bus error (BERR, ARLO), where silicon can on a misplaced START or STOP or a lost arbitration (p1997-1998)",
                       "the twin's bus has one controller and no line faults, and the other four error sources (OVR, TIMEOUT, PECERR, ALERT) need modes their own rows allow only at 0"),
     'I2C_CR2.AUTOEND': ("a STOP does not clear TC in the stock model, where silicon clears it when START or STOP is set (p2011); and TC (AUTOEND = 0) or STOPF (1) comes at the last RXDR read, not at the last byte received",
-                        "ArduPilot, after each software STOP, clears TCIE in its next write and PE in the one after (CR2 0x6448C, CR1 0x97, 0x96: the armed run), and PE = 0 clears TC on both sides (p2011), with no event interrupt taken between; the generated boards run I2C with CR1 = 0x1 (no interrupts) and end with AUTOEND = 1 (spike/1100/data/writes.tsv)"),
+                        "the generated boards' polling sees TC or STOPF at once, as I2C_TXDR.TXDATA's row says, and takes the same branches; ArduPilot, after each software STOP, clears TCIE in its next write and PE in the one after (CR2 0x6448C, CR1 0x97, 0x96: the armed run), and PE = 0 clears TC on both sides (p2011), with no event interrupt taken between; the generated boards run I2C with CR1 = 0x1 (no interrupts) and end with AUTOEND = 1 (spike/1100/data/writes.tsv)"),
     'I2C_TXDR.TXDATA': ("TXIS stays 1 from START to the last byte and TXE always reads 1, with no bus time (p2011, p2014)",
-                        "the bytes, their order and their addressing are those silicon sends; only flag timing and bus time differ, which no rule of the twin times"),
+                        "the bytes, their order and their addressing are those silicon sends; a firmware polling I2C_ISR sees TXIS, TXE and TC at once where silicon sets them a byte time later (the generated boots poll so: genlog hse-crystal-16, i2c1 at 0.000042 s), so it polls fewer times and takes the same branches; no rule of the twin times the bus"),
     'SPI_TXDR.TXDR': ("TXP always reads 1 and RXP, EOT and TXC are set at the write, with no bus time (p2226-2227)",
                       "the frames and their order are those silicon shifts; 16- and 32-bit writes refuse TVI-SPI-WIDTH; only flag timing and bus time differ"),
     'GPIOx_OSPEEDR.OSPEEDR[15:0]': ("the speed sets the output driver's edge rate on silicon (p542, figures in DS12117); the stock port stores it with no effect",
                                     "the twin's pins carry logic levels only, which the speed does not change; the field reads back as written on both sides"),
     'USART_BRR.BRR': ("the twin's transmitter has no frame time: a TDR write sends the byte and sets TC at once, so BRR times no transmission (p2034-2035)",
-                      "the bytes and their order are those silicon sends; IDLE's frame time is the kernel clock over BRR in the guard (TVI-USART-IDLE); baud accuracy is Aethelgard's"),
+                      "the bytes and their order are those silicon sends; a firmware polling USART_ISR sees TC = 1 at once (d1-drv8876 reads 0x206000C0 between back-to-back TDR writes) where silicon sets it a frame later, so it polls fewer times and takes the same branches; IDLE's frame time is the kernel clock over BRR in the guard (TVI-USART-IDLE); baud accuracy is Aethelgard's"),
     'USART_CR2.STOP': ("silicon's frame and TC timing grow with the stop bits (p2021, p2076); the stock transmitter ignores them (the guard's IDLE frame time counts them)",
                        "STOP = 10 is written only on ArduPilot's usart2, which receives and sends no byte in the armed run (no RDR read; %s)" % EVID),
     'USART_TDR.TDR': ("TC is set at the write, TXFNF never drops, and a DMA stream is unpaced, where silicon times each frame (p2026, p2089)",

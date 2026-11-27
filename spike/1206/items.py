@@ -1,25 +1,26 @@
 """TVI-WO-1206: the work list. Every `inherited-unaudited` ledger field behind the 129 items above the cut, with its model row
 and the values the armed run writes.
 
-Usage: python3 -I spike/1206/items.py STATES REACH MODEL_DIR QUEUE OUT
+Usage: python3 -I spike/1206/items.py STATES REACH MODEL_DIR WRITES OUT
 
   STATES     1205's join rows (spike/1205/data/main-5d4a61a/states.tsv)
   REACH      1205's armed registers outside rows (…/arm-reach-outside.tsv)
   MODEL_DIR  model/, whose guards' field tables hold the rows: R(reg, off, section, field, hi, lo, allowed, class, text, page)
-  QUEUE      1100's queue (spike/1100/data/queue.tsv): column 10 is each generated board's value for a row
+  WRITES     1100's generated boards' writes in order (spike/1100/data/writes.tsv): every `W ... fw` row, cut to each field's
+             bits (the adversarial re-read found 1100's queue keeps one value per board, missing others)
   OUT        one line per ledger field: field, model file:line, bits, allowed, page, the items (rows and registers) it is
              behind, and the values written in the armed run (a row's arm_field_values; a register's values, cut to the
-             field's bits; a register the join lists only as many:N distinct values is carried as `<instance> many:N`), and the generated boards' values for its rows (1100's queue)
+             field's bits; a register the join lists only as many:N distinct values is carried as `<instance> many:N`), and every value the generated boards' firmware writes there
 
 Above the cut, as 1205: a row whose reach names `arm`, and a register, each off path `other`."""
 import glob, os, re, sys
 
-states, reach, model_dir, queue, out = sys.argv[1:6]
-gen = {}
-for l in open(queue):
+states, reach, model_dir, writes, out = sys.argv[1:6]
+fw = {}  # (instance, offset) -> register values the generated boards' firmware writes
+for l in open(writes):
     c = l.rstrip('\n').split('\t')
-    if len(c) > 9:
-        gen[c[5]] = {v.split('=')[1] for v in c[9].split() if '=' in v}
+    if len(c) > 7 and c[0] == 'W' and c[3] == 'fw':
+        fw.setdefault((c[4], int(c[6], 16)), set()).add(int(c[7], 16))
 UNAUD = 'inherited-unaudited'
 
 
@@ -55,7 +56,7 @@ for r in rd(states):
                 e['items'].append('row ' + r['id'])
                 e['paths'].add(r['path'])
                 e['vals'].update(v for v in r['arm_field_values'].split(',') if v)
-                e.setdefault('gen', set()).update(gen.get(r['id'], ()))
+                e.setdefault('at', set()).add((r['instance'], int(r['offset'], 16)))
 for r in rd(reach):
     if on(r) and r['state'] == 'acknowledged':
         for name, cls, *_ in fields(r):
@@ -63,6 +64,7 @@ for r in rd(reach):
                 e = need.setdefault(name, dict(items=[], vals=set(), paths=set()))
                 e['items'].append('reg %s.%s@%s' % (r['instance'], r['register'], r['offset']))
                 e['paths'].add(r['path'].split(' (')[0])
+                e.setdefault('at', set()).add((r['instance'], int(r['offset'], 16)))
                 e.setdefault('regvals', set()).update(v for v in r['values'].split(',') if v.startswith('0x'))
                 e.setdefault('many', set()).update('%s %s' % (r['instance'], v) for v in r['values'].split(',') if v.startswith('many'))
 
@@ -79,9 +81,10 @@ with open(out, 'w') as o:
         width = m['hi'] - m['lo'] + 1
         for v in e.get('regvals', ()):
             vals.add(hex((int(v, 16) >> m['lo']) & ((1 << width) - 1)))
+        gen = {hex((v >> m['lo']) & ((1 << width) - 1)) for k in e.get('at', ()) for v in fw.get(k, ())}
         o.write('\t'.join([name, m['src'], '%d:%d' % (m['hi'], m['lo']), m['allowed'], m['page'], ','.join(sorted(e['paths'])),
                            ','.join(sorted(vals, key=lambda x: int(x, 16)) + sorted(e.get('many', ()))) or '-',
-                           ','.join(sorted(e.get('gen', ()), key=lambda x: (not x.startswith('0x') and not x.isdigit(), int(x, 0) if x[:1].isdigit() else 0))) or '-', ' | '.join(e['items']),
+                           ','.join(sorted(gen, key=lambda x: int(x, 16))) or '-', ' | '.join(e['items']),
                            # CI's inventory refuses a code file that names a document: a quoted row's work-order document loses its suffix here
                            re.sub(r'\b(TVI-WO-\w+(?:\.[\w-]+)?)\.md\b', r'\1', m['text'])]) + '\n')
 print('%d fields, %d items (%d rows, %d registers) written to %s; %d without a unique model row' % (
