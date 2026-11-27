@@ -4,6 +4,16 @@
 Q8-Q11) and, for the NACK, 2026-11-26T00:22Z (TVI-WO-1306a). Prints the C# `R(...)` rows of model/GuardedSTM32F7_I2C.cs's `Fields`; tests/1306/i2c.sh `regen` checks them byte for
 byte. Usage: python3 -I tests/1306/fields.py tests/1306/data/rm0433-rev9-i2c-fields.tsv"""
 import sys
+# TVI-WO-1206 readings BEGIN (spike/1206/apply.py writes this block; spike/1206/readings.py derives it)
+READ_1206 = {
+    ('I2C_CR1', 'ERRIE'): ("stock, wrong (the twin raises no bus error (BERR, ARLO), where silicon can on a misplaced START or STOP or a lost arbitration (p1997-1998); unaffected: the twin's bus has one controller and no line faults, and the other four error sources (OVR, TIMEOUT, PECERR, ALERT) need modes their own rows allow only at 0)", 'read for 0x1 (TVI-WO-1206; p1997, p1998, p2003, p2004, p2009, p2010; STM32F7_I2C.cs L128-129; PeripheralRegisterExtensions.cs L455-458)'),
+    ('I2C_CR2', 'ADD10'): ('acknowledged by name', 'read for 0x0: written 0 only: 7-bit addressing, no reload, and a 0 written to ADDRCF clears nothing, alike on both sides (TVI-WO-1206 A8; p2005, p2006; STM32F7_I2C.cs L150; STM32F7_I2C.cs L346)'),
+    ('I2C_CR2', 'AUTOEND'): ('stock, wrong (a STOP does not clear TC in the stock model, where silicon clears it when START or STOP is set (p2011); and TC (AUTOEND = 0) or STOPF (1) comes at the last RXDR read, not at the last byte received; unaffected: ArduPilot, after each software STOP, clears TCIE in its next write and PE in the one after (CR2 0x6448C, CR1 0x97, 0x96: the armed run), and PE = 0 clears TC on both sides (p2011), with no event interrupt taken between; the generated boards run I2C with CR1 = 0x1 (no interrupts) and end with AUTOEND = 1 (spike/1100/data/writes.tsv))', 'read for 0x0 (TVI-WO-1206; p1962, p1975, p1978, p1979, p2004, p2005, p2011; STM32F7_I2C.cs L157; STM32F7_I2C.cs L426-434)'),
+    ('I2C_CR2', 'RELOAD'): ('acknowledged by name', 'read for 0x0: written 0 only: 7-bit addressing, no reload, and a 0 written to ADDRCF clears nothing, alike on both sides (TVI-WO-1206 A8; p2004, p2010; STM32F7_I2C.cs L156; STM32F7_I2C.cs L436-441)'),
+    ('I2C_ICR', 'ADDRCF'): ('acknowledged by name', 'read for 0x0: written 0 only: 7-bit addressing, no reload, and a 0 written to ADDRCF clears nothing, alike on both sides (TVI-WO-1206 A8; p101, p2011, p2012; STM32F7_I2C.cs L267-277; PeripheralRegister.cs L666-669)'),
+    ('I2C_TXDR', 'TXDATA'): ('stock, wrong (TXIS stays 1 from START to the last byte and TXE always reads 1, with no bus time (p2011, p2014); unaffected: the bytes, their order and their addressing are those silicon sends; only flag timing and bus time differ, which no rule of the twin times)', 'read for every value (9 distinct written) (TVI-WO-1206; p1961, p1975, p2011, p2014; STM32F7_I2C.cs L301-303; STM32F7_I2C.cs L398-408)'),
+}
+# TVI-WO-1206 readings END
 
 G, I, RES, RO, T, U = ('modeled by the guard', 'inherited, unaudited (acknowledged by name)', 'reserved', 'read-only', 'tag',
                        'undefined in the stock model')
@@ -147,4 +157,5 @@ for reg, off, sec, f, msb, lsb, page, line in rows:
             allowed, c, behaves = 'Any', I, CHIBI
         else:
             allowed, c, behaves = cls(reg, 'Reserved' if name.startswith('Res') else name, a, b, page)
+        c, behaves = READ_1206.get((reg, name), (c, behaves))  # TVI-WO-1206
         print('            R("%s", 0x%03X, "%s", "%s", %d, %d, %s, "%s", "%s", %d),' % (reg, int(off, 16), sec, name, a, b, allowed, esc(c), esc(behaves), page))
