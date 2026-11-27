@@ -7,7 +7,7 @@
 
 **Grounds:**
 - **Scotty's ruling, 2026-11-26, on `1205`'s clause 1: (b).** RUL-17's "inherited, unaudited (acknowledged by name)" does not count as acknowledged for the gate. Clause 1 is **not met** until each such field on the flight paths is read, as `TIMx_SR` was (architect, 17:02Z; `TVI-WO-0100b.rm0433.md` A10). In his words: "I want to make sure that we stay as honest and accurate as possible."
-- **The list:** `1205`'s join on `main` `5d4a61a` (`spike/1205/data/main-5d4a61a/states.tsv`). It is **105 rows above the cut and 24 armed registers outside rows, 129 items**, acknowledged only through `inherited-unaudited` fields:
+- **The list:** `1205`'s join on `main` `5d4a61a` (`spike/1205/data/main-5d4a61a/states.tsv`). It is **105 rows above the cut and 24 armed registers outside rows, 129 items**, that hold `inherited-unaudited` fields. For 104 rows that is the row's one field. `I2C1.ICR`'s row also holds a reserved `Res0`, and 23 of the 24 registers hold other fields too, already read (`1205` FEEDBACK R8). Only the `inherited-unaudited` fields need reading:
 
   | Family | Rows | Example |
   |---|---|---|

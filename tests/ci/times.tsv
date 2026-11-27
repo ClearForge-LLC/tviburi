@@ -564,6 +564,7 @@ mutant	U08-stockPin	14.8
 mutant	U09-runnerRenodeBuild	19.7
 mutant	F01-allowedList	1.7
 mutant	U10-ledgerRowsBound	3.4
+mutant	U11-ackHomeRow	3.4
 mutant	C01-muxSwitch	13.7
 mutant	C02-muxPending	6.8
 mutant	C03-muxKeptOnReset	6.2

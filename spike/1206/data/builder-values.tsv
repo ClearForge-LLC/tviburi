@@ -1,0 +1,6 @@
+# TVI-WO-1206: values written that a reader's row does not list, each covered by the builder's own check (field, values, why); check-reads.py --builder accepts them
+# field	values	why
+RCC_PLL1DIVR.DIVN1	0xf,0x4f,0x9f	the generated boards' PLL1 configurations, each VCO inside p346's input range and p404's VCO range (A6; gen-writes.tsv): the twin's frequency is the formula's, as for 0x31
+RCC_PLL1DIVR.DIVP1	0x3	as DIVN1: /4 (odd encodings divide by value + 1, p404); the stock divider and the guard take value + 1 alike
+USART_BRR.BRR	all	the reading's difference (no transmit frame time) and its "unaffected" hold for every BRR value; IDLE's frame time is the guard's kernel clock over BRR at any value
+USART_TDR.TDR	all	every byte written by every run is an 8N1 byte with PCE = 0 (no run sets PCE but ArduPilot's usart2, which sends nothing: gen-writes.tsv, reads.tsv); the reading's difference (TC at the write) holds for every byte

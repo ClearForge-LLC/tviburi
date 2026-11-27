@@ -11,6 +11,8 @@
 - **19:10Z:** `adv-removed`, by its two independent lines; the four removed copies accepted.
 - **22:53Z, Scotty's ruling on 18:49Z point 1, relayed:** (b). `inherited-unaudited` is not acknowledged for the gate; `RUL-17` amended in docs PR #70. Clause 1 is **not met**; `TVI-WO-1206` reads the 129 items and re-judges it.
 
+**Addendum (`TVI-WO-1206`, 2026-11-27): clause 1 is re-judged by a per-field measure.** 1100a's join, used here, counted only queue rows and registers with no row. A field written at a register that has another row was counted nowhere, so the 129 undercounted: 174 more fields were open above the cut (`spike/1206/gap.py`). `TVI-WO-1206` read all 295. Its per-field measure, now the gate's, finds 0 open of 1,982 fields above the cut, and it lists the armed run's three unmapped writes, each off the cut (`TVI-WO-1206.rm0433.md` §5).
+
 **The deliverables:**
 - `TVI-WO-1205.gate.md`: clauses 1–7, clause by clause.
 - `TVI-WO-1205.consumer.md`: the checklist.

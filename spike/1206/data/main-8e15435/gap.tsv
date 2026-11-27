@@ -1,0 +1,253 @@
+# instance	offset	register.field	bits	written	register_paths (its armed rows)
+dma1	0x008	DMA_LIFCR.CTCIF0	5	ever-1	command,sensor
+dma1	0x008	DMA_LIFCR.CTCIF1	11	ever-1	command,sensor
+dma1	0x008	DMA_LIFCR.CTCIF2	21	ever-1	command,sensor
+dma1	0x008	DMA_LIFCR.CTCIF3	27	ever-1	command,sensor
+dma1	0x00C	DMA_HIFCR.CTCIF4	5	ever-1	command,sensor
+dma1	0x00C	DMA_HIFCR.CTCIF5	11	ever-1	command,sensor
+dma1	0x00C	DMA_HIFCR.CTCIF6	21	ever-1	command,sensor
+dma1	0x00C	DMA_HIFCR.CTCIF7	27	ever-1	command,sensor
+dma1	0x010	DMA_SxCR.MINC	10	ever-1	command
+dma1	0x010	DMA_SxCR.MSIZE[1:0]	14:13	only-0	command
+dma1	0x010	DMA_SxCR.PINC	9	only-0	command
+dma1	0x010	DMA_SxCR.PSIZE[1:0]	12:11	only-0	command
+dma1	0x024	DMA_SxFCR.DMDIS	2	only-0	command
+dma2	0x008	DMA_LIFCR.CTCIF0	5	only-0	other,sensor
+dma2	0x008	DMA_LIFCR.CTCIF1	11	only-0	other,sensor
+dma2	0x008	DMA_LIFCR.CTCIF2	21	ever-1	other,sensor
+dma2	0x008	DMA_LIFCR.CTCIF3	27	ever-1	other,sensor
+flashController	0x014	FLASH_CCR1.CLR_DBECCERR1	26	ever-1	other
+flashController	0x014	FLASH_CCR1.CLR_EOP1	16	ever-1	other
+flashController	0x014	FLASH_CCR1.CLR_INCERR1	21	ever-1	other
+flashController	0x014	FLASH_CCR1.CLR_OPERR1	22	ever-1	other
+flashController	0x014	FLASH_CCR1.CLR_PGSERR1	18	ever-1	other
+flashController	0x014	FLASH_CCR1.CLR_SNECCERR1	25	ever-1	other
+flashController	0x014	FLASH_CCR1.Res20_20	20	ever-1	other
+flashController	0x014	FLASH_CCR1.Res31_28	31:28	ever-1	other
+flashController	0x10C	FLASH_CR2.BER2	3	only-0	other
+flashController	0x10C	FLASH_CR2.CRCENDIE2	27	only-0	other
+flashController	0x10C	FLASH_CR2.CRCRDERRIE2	28	only-0	other
+flashController	0x10C	FLASH_CR2.DBECCERRIE2	26	only-0	other
+flashController	0x10C	FLASH_CR2.EOPIE2	16	only-0	other
+flashController	0x10C	FLASH_CR2.FW2	6	only-0	other
+flashController	0x10C	FLASH_CR2.INCERRIE2	21	only-0	other
+flashController	0x10C	FLASH_CR2.OPERRIE2	22	only-0	other
+flashController	0x10C	FLASH_CR2.PG2	1	ever-1	other
+flashController	0x10C	FLASH_CR2.PGSERRIE2	18	only-0	other
+flashController	0x10C	FLASH_CR2.RDPERRIE2	23	only-0	other
+flashController	0x10C	FLASH_CR2.RDSERRIE2	24	only-0	other
+flashController	0x10C	FLASH_CR2.SER2	2	ever-1	other
+flashController	0x10C	FLASH_CR2.SNB2	10:8	ever-1	other
+flashController	0x10C	FLASH_CR2.SNECCERRIE2	25	only-0	other
+flashController	0x10C	FLASH_CR2.START2	7	ever-1	other
+flashController	0x10C	FLASH_CR2.STRBERRIE2	19	only-0	other
+flashController	0x10C	FLASH_CR2.WRPERRIE2	17	only-0	other
+flashController	0x114	FLASH_CCR2.CLR_DBECCERR2	26	ever-1	other
+flashController	0x114	FLASH_CCR2.CLR_EOP2	16	ever-1	other
+flashController	0x114	FLASH_CCR2.CLR_INCERR2	21	ever-1	other
+flashController	0x114	FLASH_CCR2.CLR_OPERR2	22	ever-1	other
+flashController	0x114	FLASH_CCR2.CLR_PGSERR2	18	ever-1	other
+flashController	0x114	FLASH_CCR2.CLR_SNECCERR2	25	ever-1	other
+flashController	0x114	FLASH_CCR2.Res20_20	20	ever-1	other
+flashController	0x114	FLASH_CCR2.Res31_28	31:28	ever-1	other
+i2c1	0x000	I2C_CR1.ADDRIE	3	only-0	sensor
+i2c1	0x000	I2C_CR1.NOSTRETCH	17	only-0	sensor
+i2c1	0x000	I2C_CR1.RXDMAEN	15	only-0	sensor
+i2c1	0x000	I2C_CR1.RXIE	2	ever-1	sensor
+i2c1	0x000	I2C_CR1.STOPIE	5	only-0	sensor
+i2c1	0x000	I2C_CR1.TCIE	6	ever-1	sensor
+i2c1	0x000	I2C_CR1.TXIE	1	ever-1	sensor
+i2c1	0x004	I2C_CR2.NBYTES	23:16	ever-1	sensor
+i2c1	0x004	I2C_CR2.RD_WRN	10	ever-1	sensor
+i2c1	0x004	I2C_CR2.SADD	9:0	ever-1	sensor
+i2c1	0x01C	I2C_ICR.Res6	6	ever-1	sensor
+i2c2	0x000	I2C_CR1.ADDRIE	3	only-0	other,sensor
+i2c2	0x000	I2C_CR1.NOSTRETCH	17	only-0	other,sensor
+i2c2	0x000	I2C_CR1.RXDMAEN	15	only-0	other,sensor
+i2c2	0x000	I2C_CR1.RXIE	2	only-0	other,sensor
+i2c2	0x000	I2C_CR1.STOPIE	5	only-0	other,sensor
+i2c2	0x000	I2C_CR1.TCIE	6	ever-1	other,sensor
+i2c2	0x000	I2C_CR1.TXIE	1	ever-1	other,sensor
+i2c2	0x004	I2C_CR2.NBYTES	23:16	ever-1	sensor
+i2c2	0x004	I2C_CR2.RD_WRN	10	only-0	sensor
+i2c2	0x004	I2C_CR2.SADD	9:0	ever-1	sensor
+i2c2	0x01C	I2C_ICR.Res2_1	2:1	only-0	sensor
+i2c2	0x01C	I2C_ICR.Res6	6	only-0	sensor
+rcc	0x000	RCC_CR.CSION	7	only-0	clock tree
+rcc	0x000	RCC_CR.HSECSSON	19	only-0	clock tree
+rcc	0x000	RCC_CR.HSEON	16	only-0	clock tree
+rcc	0x000	RCC_CR.HSI48ON	12	ever-1	clock tree
+rcc	0x000	RCC_CR.HSIDIV	4:3	only-0	clock tree
+rcc	0x000	RCC_CR.HSION	0	ever-1	clock tree
+rcc	0x000	RCC_CR.PLL1ON	24	ever-1	clock tree
+rcc	0x000	RCC_CR.PLL2ON	26	ever-1	clock tree
+rcc	0x000	RCC_CR.PLL3ON	28	ever-1	clock tree
+rcc	0x010	RCC_CFGR.SW	2:0	ever-1	clock tree
+rcc	0x010	RCC_CFGR.TIMPRE	15	ever-1	clock tree
+rcc	0x07C	RCC_AHB3RSTR.DMA2DRST	4	ever-1	clock tree
+rcc	0x07C	RCC_AHB3RSTR.FMCRST	12	only-0	clock tree
+rcc	0x07C	RCC_AHB3RSTR.JPGDECRST	5	ever-1	clock tree
+rcc	0x07C	RCC_AHB3RSTR.MDMARST	0	ever-1	clock tree
+rcc	0x07C	RCC_AHB3RSTR.QSPIRST	14	ever-1	clock tree
+rcc	0x07C	RCC_AHB3RSTR.SDMMC1RST	16	ever-1	clock tree
+rcc	0x080	RCC_AHB1RSTR.ADC12RST	5	ever-1	clock tree
+rcc	0x080	RCC_AHB1RSTR.DMA1RST	0	ever-1	clock tree
+rcc	0x080	RCC_AHB1RSTR.DMA2RST	1	ever-1	clock tree
+rcc	0x080	RCC_AHB1RSTR.ETH1MACRST	15	ever-1	clock tree
+rcc	0x080	RCC_AHB1RSTR.USB1OTGRST	25	ever-1	clock tree
+rcc	0x080	RCC_AHB1RSTR.USB2OTGRST	27	ever-1	clock tree
+rcc	0x084	RCC_AHB2RSTR.CRYPTRST	4	ever-1	clock tree
+rcc	0x084	RCC_AHB2RSTR.DCMIRST	0	ever-1	clock tree
+rcc	0x084	RCC_AHB2RSTR.HASHRST	5	ever-1	clock tree
+rcc	0x084	RCC_AHB2RSTR.RNGRST	6	ever-1	clock tree
+rcc	0x084	RCC_AHB2RSTR.SDMMC2RST	9	ever-1	clock tree
+rcc	0x088	RCC_AHB4RSTR.ADC3RST	24	ever-1	clock tree
+rcc	0x088	RCC_AHB4RSTR.BDMARST	21	ever-1	clock tree
+rcc	0x088	RCC_AHB4RSTR.CRCRST	19	ever-1	clock tree
+rcc	0x088	RCC_AHB4RSTR.GPIOARST	0	ever-1	clock tree
+rcc	0x088	RCC_AHB4RSTR.GPIOBRST	1	ever-1	clock tree
+rcc	0x088	RCC_AHB4RSTR.GPIOCRST	2	ever-1	clock tree
+rcc	0x088	RCC_AHB4RSTR.GPIODRST	3	ever-1	clock tree
+rcc	0x088	RCC_AHB4RSTR.GPIOERST	4	ever-1	clock tree
+rcc	0x088	RCC_AHB4RSTR.GPIOFRST	5	ever-1	clock tree
+rcc	0x088	RCC_AHB4RSTR.GPIOGRST	6	ever-1	clock tree
+rcc	0x088	RCC_AHB4RSTR.GPIOHRST	7	ever-1	clock tree
+rcc	0x088	RCC_AHB4RSTR.GPIOIRST	8	ever-1	clock tree
+rcc	0x088	RCC_AHB4RSTR.GPIOJRST	9	ever-1	clock tree
+rcc	0x088	RCC_AHB4RSTR.GPIOKRST	10	ever-1	clock tree
+rcc	0x088	RCC_AHB4RSTR.HSEMRST	25	ever-1	clock tree
+rcc	0x08C	RCC_APB3RSTR.LTDCRST	3	ever-1	clock tree
+rcc	0x090	RCC_APB1LRSTR.CECRST	27	ever-1	clock tree
+rcc	0x090	RCC_APB1LRSTR.DAC12RST	29	ever-1	clock tree
+rcc	0x090	RCC_APB1LRSTR.I2C1RST	21	ever-1	clock tree
+rcc	0x090	RCC_APB1LRSTR.I2C2RST	22	ever-1	clock tree
+rcc	0x090	RCC_APB1LRSTR.I2C3RST	23	ever-1	clock tree
+rcc	0x090	RCC_APB1LRSTR.LPTIM1RST	9	ever-1	clock tree
+rcc	0x090	RCC_APB1LRSTR.SPDIFRXRST	16	ever-1	clock tree
+rcc	0x090	RCC_APB1LRSTR.SPI2RST	14	ever-1	clock tree
+rcc	0x090	RCC_APB1LRSTR.SPI3RST	15	ever-1	clock tree
+rcc	0x090	RCC_APB1LRSTR.TIM12RST	6	ever-1	clock tree
+rcc	0x090	RCC_APB1LRSTR.TIM13RST	7	ever-1	clock tree
+rcc	0x090	RCC_APB1LRSTR.TIM14RST	8	ever-1	clock tree
+rcc	0x090	RCC_APB1LRSTR.TIM2RST	0	ever-1	clock tree
+rcc	0x090	RCC_APB1LRSTR.TIM3RST	1	ever-1	clock tree
+rcc	0x090	RCC_APB1LRSTR.TIM4RST	2	ever-1	clock tree
+rcc	0x090	RCC_APB1LRSTR.TIM5RST	3	ever-1	clock tree
+rcc	0x090	RCC_APB1LRSTR.TIM6RST	4	ever-1	clock tree
+rcc	0x090	RCC_APB1LRSTR.TIM7RST	5	ever-1	clock tree
+rcc	0x090	RCC_APB1LRSTR.UART4RST	19	ever-1	clock tree
+rcc	0x090	RCC_APB1LRSTR.UART5RST	20	ever-1	clock tree
+rcc	0x090	RCC_APB1LRSTR.UART7RST	30	ever-1	clock tree
+rcc	0x090	RCC_APB1LRSTR.UART8RST	31	ever-1	clock tree
+rcc	0x090	RCC_APB1LRSTR.USART2RST	17	ever-1	clock tree
+rcc	0x090	RCC_APB1LRSTR.USART3RST	18	ever-1	clock tree
+rcc	0x094	RCC_APB1HRSTR.CRSRST	1	ever-1	clock tree
+rcc	0x094	RCC_APB1HRSTR.FDCANRST	8	ever-1	clock tree
+rcc	0x094	RCC_APB1HRSTR.MDIOSRST	5	ever-1	clock tree
+rcc	0x094	RCC_APB1HRSTR.OPAMPRST	4	ever-1	clock tree
+rcc	0x094	RCC_APB1HRSTR.SWPRST	2	ever-1	clock tree
+rcc	0x098	RCC_APB2RSTR.DFSDM1RST	28	ever-1	clock tree
+rcc	0x098	RCC_APB2RSTR.HRTIMRST	29	ever-1	clock tree
+rcc	0x098	RCC_APB2RSTR.SAI1RST	22	ever-1	clock tree
+rcc	0x098	RCC_APB2RSTR.SAI2RST	23	ever-1	clock tree
+rcc	0x098	RCC_APB2RSTR.SAI3RST	24	ever-1	clock tree
+rcc	0x098	RCC_APB2RSTR.SPI1RST	12	ever-1	clock tree
+rcc	0x098	RCC_APB2RSTR.SPI4RST	13	ever-1	clock tree
+rcc	0x098	RCC_APB2RSTR.SPI5RST	20	ever-1	clock tree
+rcc	0x098	RCC_APB2RSTR.TIM15RST	16	ever-1	clock tree
+rcc	0x098	RCC_APB2RSTR.TIM16RST	17	ever-1	clock tree
+rcc	0x098	RCC_APB2RSTR.TIM17RST	18	ever-1	clock tree
+rcc	0x098	RCC_APB2RSTR.TIM1RST	0	ever-1	clock tree
+rcc	0x098	RCC_APB2RSTR.TIM8RST	1	ever-1	clock tree
+rcc	0x098	RCC_APB2RSTR.USART1RST	4	ever-1	clock tree
+rcc	0x098	RCC_APB2RSTR.USART6RST	5	ever-1	clock tree
+rcc	0x09C	RCC_APB4RSTR.COMP12RST	14	ever-1	clock tree
+rcc	0x09C	RCC_APB4RSTR.I2C4RST	7	ever-1	clock tree
+rcc	0x09C	RCC_APB4RSTR.LPTIM2RST	9	ever-1	clock tree
+rcc	0x09C	RCC_APB4RSTR.LPTIM3RST	10	ever-1	clock tree
+rcc	0x09C	RCC_APB4RSTR.LPTIM4RST	11	ever-1	clock tree
+rcc	0x09C	RCC_APB4RSTR.LPTIM5RST	12	ever-1	clock tree
+rcc	0x09C	RCC_APB4RSTR.LPUART1RST	3	ever-1	clock tree
+rcc	0x09C	RCC_APB4RSTR.SAI4RST	21	ever-1	clock tree
+rcc	0x09C	RCC_APB4RSTR.SPI6RST	5	ever-1	clock tree
+rcc	0x09C	RCC_APB4RSTR.SYSCFGRST	1	only-0	clock tree
+rcc	0x09C	RCC_APB4RSTR.VREFRST	15	ever-1	clock tree
+rcc	0x0E0	RCC_AHB4ENR.BDMAEN	21	ever-1	clock tree
+rcc	0x0E0	RCC_AHB4ENR.BKPRAMEN	28	only-0	clock tree
+rcc	0x0E0	RCC_AHB4ENR.CRCEN	19	only-0	clock tree
+rcc	0x0E0	RCC_AHB4ENR.GPIOAEN	0	ever-1	clock tree
+rcc	0x0E0	RCC_AHB4ENR.GPIOBEN	1	ever-1	clock tree
+rcc	0x0E0	RCC_AHB4ENR.GPIOGEN	6	ever-1	clock tree
+rcc	0x0E0	RCC_AHB4ENR.GPIOHEN	7	ever-1	clock tree
+rcc	0x0E0	RCC_AHB4ENR.GPIOIEN	8	ever-1	clock tree
+rcc	0x0E0	RCC_AHB4ENR.GPIOJEN	9	ever-1	clock tree
+rcc	0x0E0	RCC_AHB4ENR.GPIOKEN	10	ever-1	clock tree
+rcc	0x0E0	RCC_AHB4ENR.HSEMEN	25	only-0	clock tree
+rcc	0x0E8	RCC_APB1LENR.CECEN	27	only-0	clock tree,motor
+rcc	0x0E8	RCC_APB1LENR.DAC12EN	29	only-0	clock tree,motor
+rcc	0x0E8	RCC_APB1LENR.I2C3EN	23	only-0	clock tree,motor
+rcc	0x0E8	RCC_APB1LENR.LPTIM1EN	9	only-0	clock tree,motor
+rcc	0x0E8	RCC_APB1LENR.SPDIFRXEN	16	only-0	clock tree,motor
+rcc	0x0E8	RCC_APB1LENR.SPI3EN	15	only-0	clock tree,motor
+rcc	0x0E8	RCC_APB1LENR.TIM12EN	6	only-0	clock tree,motor
+rcc	0x0E8	RCC_APB1LENR.TIM13EN	7	only-0	clock tree,motor
+rcc	0x0E8	RCC_APB1LENR.TIM14EN	8	only-0	clock tree,motor
+rcc	0x0E8	RCC_APB1LENR.TIM3EN	1	only-0	clock tree,motor
+rcc	0x0E8	RCC_APB1LENR.TIM4EN	2	only-0	clock tree,motor
+rcc	0x0E8	RCC_APB1LENR.TIM5EN	3	ever-1	clock tree,motor
+rcc	0x0E8	RCC_APB1LENR.TIM6EN	4	only-0	clock tree,motor
+rcc	0x0E8	RCC_APB1LENR.TIM7EN	5	only-0	clock tree,motor
+rcc	0x0E8	RCC_APB1LENR.UART4EN	19	only-0	clock tree,motor
+rcc	0x0E8	RCC_APB1LENR.UART5EN	20	only-0	clock tree,motor
+rcc	0x0E8	RCC_APB1LENR.UART7EN	30	only-0	clock tree,motor
+rcc	0x0E8	RCC_APB1LENR.UART8EN	31	only-0	clock tree,motor
+spi1	0x000	SPI_CR1.CSTART	9	ever-1	sensor
+spi1	0x000	SPI_CR1.CSUSP	10	ever-1	sensor
+spi1	0x000	SPI_CR1.SPE	0	ever-1	sensor
+spi1	0x004	SPI_CR2.TSIZE	15:0	only-0	sensor
+spi1	0x008	SPI_CFG1.DSIZE	4:0	ever-1	sensor
+spi1	0x008	SPI_CFG1.RXDMAEN	14	ever-1	sensor
+spi1	0x008	SPI_CFG1.TXDMAEN	15	ever-1	sensor
+spi1	0x010	SPI_IER.EOTIE	3	only-0	sensor
+spi1	0x010	SPI_IER.RXPIE	0	only-0	sensor
+spi1	0x010	SPI_IER.TXPIE	1	only-0	sensor
+spi1	0x018	SPI_IFCR.EOTC	3	ever-1	sensor
+spi1	0x018	SPI_IFCR.SUSPC	11	ever-1	sensor
+spi2	0x000	SPI_CR1.CSTART	9	ever-1	sensor
+spi2	0x000	SPI_CR1.CSUSP	10	ever-1	sensor
+spi2	0x000	SPI_CR1.SPE	0	ever-1	sensor
+spi2	0x004	SPI_CR2.TSIZE	15:0	only-0	sensor
+spi2	0x008	SPI_CFG1.DSIZE	4:0	ever-1	sensor
+spi2	0x008	SPI_CFG1.RXDMAEN	14	ever-1	sensor
+spi2	0x008	SPI_CFG1.TXDMAEN	15	ever-1	sensor
+spi2	0x010	SPI_IER.EOTIE	3	only-0	sensor
+spi2	0x010	SPI_IER.RXPIE	0	only-0	sensor
+spi2	0x010	SPI_IER.TXPIE	1	only-0	sensor
+spi2	0x018	SPI_IFCR.EOTC	3	ever-1	sensor
+spi2	0x018	SPI_IFCR.SUSPC	11	ever-1	sensor
+timer1	0x000	TIMx_CR1.OPM	3	only-0	motor
+timer1	0x014	TIMx_EGR.UG	0	ever-1	motor
+usart1	0x008	USART_CR3.DMAT	7	ever-1	command
+usart1	0x020	USART_ICR.RTOCF	11	ever-1	command
+usart1	0x020	USART_ICR.Res10_10	10	ever-1	command
+usart1	0x020	USART_ICR.Res16_14	16:14	ever-1	command
+usart1	0x020	USART_ICR.Res19_18	19:18	ever-1	command
+usart1	0x020	USART_ICR.Res31_21	31:21	ever-1	command
+usart1	0x020	USART_ICR.TCCF	6	ever-1	command
+usart1	0x020	USART_ICR.UDRCF	13	ever-1	command
+usart2	0x008	USART_CR3.DMAT	7	ever-1	command
+usart2	0x020	USART_ICR.RTOCF	11	ever-1	command
+usart2	0x020	USART_ICR.Res10_10	10	ever-1	command
+usart2	0x020	USART_ICR.Res16_14	16:14	ever-1	command
+usart2	0x020	USART_ICR.Res19_18	19:18	ever-1	command
+usart2	0x020	USART_ICR.Res31_21	31:21	ever-1	command
+usart2	0x020	USART_ICR.TCCF	6	ever-1	command
+usart2	0x020	USART_ICR.UDRCF	13	ever-1	command
+usart3	0x008	USART_CR3.DMAT	7	ever-1	command
+usart3	0x020	USART_ICR.RTOCF	11	ever-1	command
+usart3	0x020	USART_ICR.Res10_10	10	ever-1	command
+usart3	0x020	USART_ICR.Res16_14	16:14	ever-1	command
+usart3	0x020	USART_ICR.Res19_18	19:18	ever-1	command
+usart3	0x020	USART_ICR.Res31_21	31:21	ever-1	command
+usart3	0x020	USART_ICR.TCCF	6	ever-1	command
+usart3	0x020	USART_ICR.UDRCF	13	ever-1	command
