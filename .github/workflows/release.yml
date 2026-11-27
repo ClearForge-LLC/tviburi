@@ -1,0 +1,74 @@
+# The release job (TVI-WO-2100 (1)): given a commit on main, ci/release.sh builds the release twice in the pinned tools
+# image, from two `git archive` extractions, compares the two builds byte for byte, runs `tviburi-release verify` on one
+# against the hash it printed, and keeps the tarball, MANIFEST and LEDGER.jsonl as this run's artifact, with the commit and
+# the hashes in the job summary. It fails on any difference, on a commit not on main, or on a dirty checkout. It never
+# creates a tag or a GitHub Release: its token can only read (`contents: read`), and no step writes to the repository.
+# The tag is the architect's, after TVI-WO-1205's verdict and Scotty's go (TVI-WO-2100).
+# On a pull request that touches the release's own files (ruled 2026-11-26T18:38Z Q24 (a)) it runs the same steps on the
+# pull request's base commit, a commit on main, so the off-main refusal stays as built and the workflow is proven before
+# it merges; a dispatch on the release commit follows the merge. On a pull request it also builds the pull request's own
+# tree twice (`ci/release.sh dry`, never a release), runs the planted failures (spike/2100/planted.sh) and the consumer's
+# binding check with its plants (spike/2100/consumer-verify*.sh), the last once more inside the image against its own
+# Renode assemblies, so a change to the release's tools is exercised before it merges (TVI-WO-2100 adversarial pass, 4).
+name: release
+on:
+  pull_request:
+    paths:
+      - "ci/**"
+      - ".github/workflows/release.yml"
+      - "tools/tviburi-release/**"
+      - "scripts/build-release"
+      - "spike/2100/**"
+      - "tests/ci/common.sh"
+      - "tests/spike.sh"
+      - "tools/tviburi-check/**"
+  workflow_dispatch:
+    inputs:
+      commit:
+        description: "The commit on main to release (full sha)"
+        required: true
+        type: string
+permissions:
+  contents: read
+jobs:
+  release:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          ref: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || inputs.commit }}
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Pull the pinned tools image, by digest
+        run: podman pull "$(sed -n 's/^IMAGE=//p' tests/spike.sh)"
+      - name: Build twice, compare byte for byte, verify, keep (ci/release.sh all)
+        env:
+          COMMIT: ${{ github.event_name == 'pull_request' && github.event.pull_request.base.sha || inputs.commit }}
+        run: |
+          TVIBURI_CI=1 TVIBURI_SCRATCH="$RUNNER_TEMP/tviburi" RELEASE_OUT="$RUNNER_TEMP/release" ci/release.sh all "$COMMIT" origin/main
+          cat "$RUNNER_TEMP/release/summary.md" >>"$GITHUB_STEP_SUMMARY"
+      - name: "Pull request: its own tree built twice, compared and verified (ci/release.sh dry; not a release)"
+        if: github.event_name == 'pull_request'
+        env:
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: TVIBURI_CI=1 TVIBURI_SCRATCH="$RUNNER_TEMP/tviburi" RELEASE_OUT="$RUNNER_TEMP/release" ci/release.sh dry "$HEAD_SHA"
+      - name: "Pull request: the release job's planted failures (spike/2100/planted.sh)"
+        if: github.event_name == 'pull_request'
+        run: TVIBURI_CI=1 TVIBURI_SCRATCH="$RUNNER_TEMP/planted" spike/2100/planted.sh
+      - name: "Pull request: the consumer's binding check and its plants, on the pull request's tarball, then in the image against its assemblies"
+        if: github.event_name == 'pull_request'
+        run: |
+          d="$RUNNER_TEMP/release/dry"
+          sh spike/2100/consumer-verify-test.sh "$d/tviburi-release.tar" "$(cat "$d/hash")"
+          podman run --rm --network none -v "$d:/rel:ro" -v "$PWD/spike/2100:/s:ro" "$(sed -n 's/^IMAGE=//p' tests/spike.sh)" \
+            sh /s/consumer-verify.sh /rel/tviburi-release.tar "$(cat "$d/hash")" /opt/renode
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: tviburi-release-${{ github.event_name == 'pull_request' && github.event.pull_request.base.sha || inputs.commit }}
+          path: |
+            ${{ runner.temp }}/release/tviburi-release.tar
+            ${{ runner.temp }}/release/MANIFEST
+            ${{ runner.temp }}/release/LEDGER.jsonl
+            ${{ runner.temp }}/release/summary.md
+          if-no-files-found: error

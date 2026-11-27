@@ -1,7 +1,15 @@
 # The release's pins (TVI-WO-1200), tab-separated, one home for each. Read by tools/tviburi-release, which
 # names every row in the MANIFEST it writes.
-#   build  <assembly> <build string>   the consumer's pinned Renode (RUL-09), read from the image's assemblies
-#                                      (TVI-WO-0100b FEEDBACK §2 item 5); Tviburi's runner checks the first
+#   build  <assembly> <build string> <sha256>   the consumer's pinned Renode (RUL-09), read from the image's assemblies
+#                                      (TVI-WO-0100b FEEDBACK §2 item 5): `renode` is Renode.dll, `infrastructure` is
+#                                      Infrastructure.dll, each under the Renode root. Tviburi's runner checks the first's
+#                                      string against `renode --version`. The release refuses to build unless each
+#                                      assembly's sha256 is the one named here, so a release names only the assemblies it
+#                                      was built against (TVI-WO-2100 Q25). The sha256 is there because the string alone
+#                                      cannot name the rebuilt Infrastructure.dll (AET-WO-1605): it reports the unpatched
+#                                      string, 1.0.0+cd4b002a..., because the rebuild sets SourceRevisionId to that same
+#                                      commit, so only its hash tells it from Antmicro's build. The MANIFEST's `build` lines
+#                                      carry both, string and sha256.
 #   stock  <sha256> <path>             the stm32h753.repl include chain, in include order, as Aethelgard pins it
 #                                      (crates/aethelgard-twin/src/platform.rs RENODE_FILES); read under Renode's root
 #   class  <stock type> <guard type> <stock instances> <consumer instances>   the class map (RUL-09): one row per
@@ -15,8 +23,27 @@
 #                                      tests/1301/fixtures/) declares it with the stock type and one of the replay's
 #                                      re-typing rules turns it into the guard, names compared case-sensitively (SPI's
 #                                      spi1, spi2). Planted and refused by tests/spike.sh manifest
-build	renode	1.17.0+20260907gitf1dd1b4af.aet1605
-build	infrastructure	1.0.0+cd4b002aac2398994c4a61a34a8b31b5700facf2
+#   property <guard type> <name> required|optional <meaning>   one row per public constructor parameter of every
+#                                      peripheral Tviburi class (TVI-WO-2100 Q23 (B), ruled 2026-11-26T18:38Z): Renode binds a
+#                                      .repl entry's properties to its type's constructor parameters by name, so the release
+#                                      reads each list from the class's C# source in model/ and refuses, by name, a parameter
+#                                      with no row, a row naming no parameter, and a row `optional` for a parameter with no C#
+#                                      default (a platform without one does not load). Renode supplies the first parameter,
+#                                      `IMachine machine` or `Machine machine`, itself: it has no row. A peripheral Tviburi
+#                                      class is every guard of the class map, and every other class model/*.cs declares (with
+#                                      any attributes, modifiers and type parameters; comments and literals ignored) whose
+#                                      base list names a type with `Peripheral` in its name (IDoubleWordPeripheral,
+#                                      BasicDoubleWordPeripheral, ...), a stock peripheral type (a class row's stock type, or a
+#                                      type the pinned chain declares), or another peripheral Tviburi class. A helper with no
+#                                      such base, such as Records (model/Refusal.cs) or a class nested in a guard, takes no
+#                                      rows; the release constant's class is not in model/.
+#                                      `required`: without it the guard refuses or the platform does not load; its meaning
+#                                      cites the case that shows it, or says the parameter has no default. `optional`: its
+#                                      meaning says what absence does. The meaning is free ASCII text. The rows go into the
+#                                      MANIFEST as `property <guard> <name> <required|optional> <meaning>` lines, in this
+#                                      file's order: what the consumer's platform must declare on each guard's entry.
+build	renode	1.17.0+20260907gitf1dd1b4af.aet1605	5734eb0cd95a2e6b84f2c0d449cf51e73a63a301db4098cbc40d2fcbe789f633
+build	infrastructure	1.0.0+cd4b002aac2398994c4a61a34a8b31b5700facf2	ddb19d7bf7224525677cbcf77e7890901412eed4ea014e23618dd94f6cd524b5
 stock	13c5571ea3c2a66d23d7dc5e49d09c6013d31c946abdbfc450aebb08929d10ce	platforms/cpus/stm32h753.repl
 stock	86b2c2c5f524a3f2b65da8ce20101c7a83690b1fb8c98a8cff96d399c15f231c	platforms/cpus/stm32h743.repl
 stock	b85cb4af7a7e98f784ed822941ddc2ec4ddc0c3928c3efe7ef7bb4702764251e	platforms/cpus/stm32h7.repl
@@ -31,3 +58,42 @@ class	I2C.STM32F7_I2C	Tviburi.GuardedSTM32F7_I2C	i2c1 i2c2 i2c3	-
 class	Analog.STM32H7_ADC	Tviburi.GuardedSTM32H7_ADC	adc3 adcM1S2	-
 class	Miscellaneous.STM32_DMAMUX	Tviburi.GuardedSTM32H7_DMAMUX	dmamux1	-
 class	Python.PythonPeripheral	Tviburi.GuardedSTM32H7_PWR	pwr	-
+property	Tviburi.GuardedSTM32H7_SPI	mode	optional	"enforcing" when none is declared, or "recorded" (RUL-19); any other value -> TVI-LOAD at every access (load)
+property	Tviburi.GuardedSTM32H7_RCC	systick	optional	the stock entry's (stm32h7.repl `systick: nvic`), passed through to the owned stock RCC; none -> the stock model's own null default
+property	Tviburi.GuardedSTM32H7_RCC	hseFrequency	optional	the board's HSE in Hz; none declared (or 0) -> TVI-RCC-HSE unmodeled at the HSE's start (rcc-hse-none, rcc-hse-zero), never a default
+property	Tviburi.GuardedSTM32H7_RCC	csiFrequency	optional	the CSI in Hz, passed through to the owned stock RCC; none -> 4000000, the stock model's default
+property	Tviburi.GuardedSTM32H7_RCC	mode	optional	"enforcing" when none is declared, or "recorded" (RUL-19); any other value -> TVI-LOAD at every access (load)
+property	Tviburi.GuardedSTM32_GPIOPort	modeResetValue	required	RM0433 Rev 9's GPIOx_MODER reset value (p541): port A 0xABFFFFFF, port B 0xFFFFFEBF, ports C-K 0xFFFFFFFF; no stock entry declares it, so the consumer states it; the default 0 is no port's, so without it TVI-GPIO-CONFIG unmodeled refuses every access (gpio-config)
+property	Tviburi.GuardedSTM32_GPIOPort	outputSpeedResetValue	required	RM0433 Rev 9's GPIOx_OSPEEDR reset value (p542): port A 0x0C000000, port B 0x000000C0, ports C-K 0x00000000; no stock entry declares it, so the consumer states it; the default 0 is right for ports C-K only: on port A or B, TVI-GPIO-CONFIG unmodeled refuses every access without it (spike/2100/gpio-reset.sh: ospeedrreset)
+property	Tviburi.GuardedSTM32_GPIOPort	pullUpPullDownResetValue	required	RM0433 Rev 9's GPIOx_PUPDR reset value (p542): port A 0x64000000, port B 0x00000100, ports C-K 0x00000000; no stock entry declares it, so the consumer states it; the default 0 is right for ports C-K only: on port A or B, TVI-GPIO-CONFIG unmodeled refuses every access without it (spike/2100/gpio-reset.sh: pupdrreset)
+property	Tviburi.GuardedSTM32_GPIOPort	numberOfAFs	optional	the stock entry's; none -> 16, DS12117 Table 9's; any other value -> TVI-GPIO-CONFIG at every access
+property	Tviburi.GuardedSTM32_GPIOPort	invertedAFPins	optional	the stock entry's, passed through and read by the guard's AF levels; none -> no AF input inverted
+property	Tviburi.GuardedSTM32_GPIOPort	mode	optional	"enforcing" when none is declared, or "recorded" (RUL-19); any other value -> TVI-LOAD at every access (load)
+property	Tviburi.GuardedSTM32_GPIOPort	package	optional	the part's package, "LQFP144" (the one bonding the guard holds); none -> the package rule off (gpio-nopackage); another -> TVI-GPIO-CONFIG at every access
+property	Tviburi.GuardedSTM32_GPIOPort	external	optional	the board's levels on this port's pins, "PB6:up PB7:up"; none -> a pin nothing drives takes PUPDR's pull (not in analog mode, p539), else reads low; a form the guard cannot read -> TVI-GPIO-CONFIG (gpio-externalbad)
+property	Tviburi.GuardedSTM32_Timer	frequency	required	the stock entry's, unless the consumer's own platform updates it (as Aethelgard's does), when the consumer's value moves onto the guard: an untyped update binds to the cancelled entry (RUL-09 (b)); no default: the platform does not load without it
+property	Tviburi.GuardedSTM32_Timer	initialLimit	required	the stock entry's, 0xFFFF; no default: the platform does not load without it; any other value -> TVI-TIM-CONFIG at every access (timer-config)
+property	Tviburi.GuardedSTM32_Timer	mode	optional	"enforcing" when none is declared, or "recorded" (RUL-19); any other value -> TVI-LOAD at every access (load)
+property	Tviburi.GuardedSTM32DMA	dmamux	required	the DMAMUX1 entry that routes this controller's requests (the stock dmamux1, or its guard where one is declared); none -> TVI-DMA-CONFIG unmodeled at every access (dma-config)
+property	Tviburi.GuardedSTM32DMA	mode	optional	"enforcing" when none is declared, or "recorded" (RUL-19); any other value -> TVI-LOAD at every access (load)
+property	Tviburi.GuardedSTM32H7_Flash	flash1	required	the stock entry's bank 1 memory, passed through; no default: the platform does not load without it
+property	Tviburi.GuardedSTM32H7_Flash	flash2	required	the stock entry's bank 2 memory, passed through; no default: the platform does not load without it
+property	Tviburi.GuardedSTM32H7_Flash	optionBytes	optional	the part's whole FLASH_OPTSR_CUR word; no stock entry declares it: it is the consumer's own (Aethelgard's flashController init writes it to OPTSR_PRG), and an init on the cancelled entry fails to load (E29), so the word moves here; none (-1) -> TVI-FLASH-OPTSR unmodeled at an OPTSR_CUR read (flash-optsrnone), never a default; outside 32 bits -> TVI-FLASH-CONFIG at every access
+property	Tviburi.GuardedSTM32H7_Flash	mode	optional	"enforcing" when none is declared, or "recorded" (RUL-19); any other value -> TVI-LOAD at every access (load)
+property	Tviburi.GuardedSTM32F7_USART	frequency	required	the stock entry's, unless the consumer's own platform updates it (as Aethelgard's does), when the consumer's value moves onto the guard: an untyped update binds to the cancelled entry (RUL-09 (b)); no default: the platform does not load without it
+property	Tviburi.GuardedSTM32F7_USART	lowPowerMode	optional	the stock entry's; none -> false; true (LPUART1, which the guard does not model) -> TVI-USART-CONFIG at every access
+property	Tviburi.GuardedSTM32F7_USART	mode	optional	"enforcing" when none is declared, or "recorded" (RUL-19); any other value -> TVI-LOAD at every access (load)
+property	Tviburi.GuardedSTM32F7_I2C	mode	optional	"enforcing" when none is declared, or "recorded" (RUL-19); any other value -> TVI-LOAD at every access (load)
+property	Tviburi.GuardedSTM32H7_ADC	referenceVoltage	required	the stock entry's VREF+ in volts, passed through and used to convert the declared levels; no default: the platform does not load without it
+property	Tviburi.GuardedSTM32H7_ADC	externalEventFrequency	required	the stock entry's, passed through; no default: the platform does not load without it
+property	Tviburi.GuardedSTM32H7_ADC	dmaChannel	optional	the stock entry's DMAMUX1 request id, passed through; none -> 0; ADSTART with DMNGT = 01 and no DMA guard stream selecting this request -> TVI-ADC-DMNGT
+property	Tviburi.GuardedSTM32H7_ADC	dmaPeripheral	optional	the stock entry's (dmamux1), passed through; none -> no DMA request is raised, and ADSTART with DMNGT = 01 -> TVI-ADC-DMNGT (no stream serves it)
+property	Tviburi.GuardedSTM32H7_ADC	mode	optional	"enforcing" when none is declared, or "recorded" (RUL-19); any other value -> TVI-LOAD at every access (load)
+property	Tviburi.GuardedSTM32H7_ADC	revision	required	the part's silicon revision, "V" or "Y"; none or another -> TVI-ADC-CONFIG unmodeled at every access (adc-norevision), never a default
+property	Tviburi.GuardedSTM32H7_ADC	levels	optional	the board's levels at this instance's pins, "<channel>:<volts> ..." (adcM1S2 is the ADC1/ADC2 pair at 0x40022000, its channels ADC1's; adc3 is ADC3); none -> a DR read holding the conversion of a channel neither levels nor SetVoltage declared refuses TVI-ADC-LEVEL (adc-undeclared), never 0 V; a form the guard cannot read -> TVI-ADC-CONFIG (adc-badlevels)
+property	Tviburi.GuardedSTM32H7_DMAMUX	numberOfInputRequestChannels	required	the stock entry's, passed through; no default: the platform does not load without it
+property	Tviburi.GuardedSTM32H7_DMAMUX	numberOfOutputRequestChannels	required	the stock entry's, 16; no default: the platform does not load without it; any other value -> TVI-DMAMUX-CONFIG at every access
+property	Tviburi.GuardedSTM32H7_DMAMUX	numberOfRequestGeneratorChannels	required	the stock entry's, 8; no default: the platform does not load without it; any other value -> TVI-DMAMUX-CONFIG at every access
+property	Tviburi.GuardedSTM32H7_DMAMUX	mode	optional	"enforcing" when none is declared, or "recorded" (RUL-19); any other value -> TVI-LOAD at every access (load)
+property	Tviburi.GuardedSTM32H7_PWR	mode	optional	"enforcing" when none is declared, or "recorded" (RUL-19); any other value -> TVI-LOAD at every access (load)
+property	Tviburi.GuardedSTM32H7_PWR	revision	required	the part's silicon revision, "V" or "Y"; none or another -> TVI-PWR-CONFIG unmodeled at load and at every access after (pwr-norev), never a default

@@ -5,8 +5,9 @@
 //!         Tviburi.cs                 the overlay as one C# file (overlay.rs): the body, then the template filled
 //!                                    with the release hash;
 //!         TviburiRelease.cs.template the release constant's template;
-//!         MANIFEST                   the build strings, the stock pins, the class map, the sha256 of every source
-//!                                    and released file, and the two excluded files with how each is checked.
+//!         MANIFEST                   the build strings with each assembly's sha256 (checked against <renode-root>),
+//!                                    the stock pins, the class map, the guards' properties, the sha256 of every
+//!                                    source and released file, and the two excluded files with how each is checked.
 //!                                    The release hash is the sha256 of its bytes;
 //!         LEDGER.jsonl               the gap ledger, whose first line names the release hash;
 //!         tviburi-release.tar        those four files, with fixed order and metadata.
@@ -27,6 +28,7 @@ mod json;
 mod fields;
 mod ledger;
 mod overlay;
+mod props;
 mod sha256;
 mod stock;
 mod tar;
@@ -46,7 +48,9 @@ const LEDGER: &str = "LEDGER.jsonl";
 const TARBALL: &str = "tviburi-release.tar";
 const TOOL: &str = "tools/tviburi-release";
 const BENCH: &str = "model/bench-checks.tsv";
-const MANIFEST_FORMAT: &str = "tviburi-release-manifest 1";
+/// 2 since TVI-WO-2100 (Q23, Q25): a `build` line carries its assembly's sha256 after the string, so a format-1 reader taking
+/// the rest of the line as the string would misread it; and the `property` lines are new.
+const MANIFEST_FORMAT: &str = "tviburi-release-manifest 2";
 /// The committed replay (TVI-WO-1203 (1)): it loads every restatement and re-types the consumer's instances; a release
 /// source, since the release reads it.
 const REPLAY: &str = "tests/1301/replay-1301.sh";
@@ -55,7 +59,8 @@ const REPLAY: &str = "tests/1301/replay-1301.sh";
 const FIXTURE: &str = "tests/1301/fixtures/aet-1c32c8ea-ardupilot/varlib";
 
 struct Pins {
-    builds: Vec<(String, String)>,
+    /// (assembly, build string, sha256)
+    builds: Vec<(String, String, String)>,
     stock: Vec<stock::Pin>,
     /// (stock type, guard type)
     classes: Vec<(String, String)>,
@@ -64,6 +69,13 @@ struct Pins {
     instances: BTreeMap<String, Vec<String>>,
     /// A class row's fifth column: the consumer's own instances it retypes (TVI-WO-1203 (1); `-` for none).
     consumer: BTreeMap<String, Vec<String>>,
+    /// The `property` rows, in pins.tsv's order (TVI-WO-2100 Q23 (B)).
+    props: Vec<props::Prop>,
+}
+
+/// 64 lowercase hex digits.
+fn hex64(h: &str) -> bool {
+    h.len() == 64 && h.bytes().all(|b| b.is_ascii_hexdigit() && !b.is_ascii_uppercase())
 }
 
 /// Tab-separated rows of `min` to `max` non-empty fields; `#` lines are comments.
@@ -86,14 +98,29 @@ fn tsv<'a>(path: &str, text: &'a str, min: usize, max: usize) -> Result<Vec<Vec<
 fn pins(repo: &Path) -> Result<Pins, String> {
     let path = format!("{TOOL}/pins.tsv");
     let src = Source { path: path.clone(), bytes: fs::read(repo.join(&path)).map_err(|e| format!("{path}: {e}"))? };
-    let mut p = Pins { builds: vec![], stock: vec![], classes: vec![], instances: BTreeMap::new(), consumer: BTreeMap::new() };
-    for f in tsv(&path, overlay::text(&src)?, 3, 5)? {
-        if f.len() > 3 && f[0] != "class" {
-            return Err(format!("{path}: only a class row takes a fourth and fifth column (its instances): {}", f.join(" ")));
+    read_pins(&path, overlay::text(&src)?)
+}
+
+fn read_pins(path: &str, text: &str) -> Result<Pins, String> {
+    let mut p = Pins { builds: vec![], stock: vec![], classes: vec![], instances: BTreeMap::new(), consumer: BTreeMap::new(), props: vec![] };
+    for f in tsv(path, text, 3, 5)? {
+        let width = match f[0] {
+            "build" => 4,
+            "class" | "property" => 5,
+            _ => 3,
+        };
+        if f.len() != width && f[0] != "class" {
+            return Err(format!("{path}: a {} row of {} fields, not {width}: {}", f[0], f.len(), f.join(" ")));
         }
         match f[0] {
-            "build" => p.builds.push((f[1].into(), f[2].into())),
-            "stock" if f[1].len() == 64 && f[1].bytes().all(|b| b.is_ascii_hexdigit() && !b.is_ascii_uppercase()) => {
+            "build" if hex64(f[3]) => p.builds.push((f[1].into(), f[2].into(), f[3].into())),
+            "property" => {
+                if !f[1].starts_with("Tviburi.") || !matches!(f[3], "required" | "optional") || !f[4].bytes().all(|b| (0x20..0x7f).contains(&b)) {
+                    return Err(format!("{path}: a property row is `property <Tviburi. guard> <name> required|optional <ASCII meaning>`: {}", f.join(" ")));
+                }
+                p.props.push(props::Prop { guard: f[1].into(), name: f[2].into(), required: f[3] == "required", meaning: f[4].into() });
+            }
+            "stock" if hex64(f[1]) => {
                 p.stock.push(stock::Pin { sha256: f[1].into(), path: f[2].into() })
             }
             "class" => {
@@ -208,6 +235,14 @@ fn field_rows(guard: &str, path: &str, rows: &[fields::Row]) -> Result<Vec<Row>,
         .collect()
 }
 
+/// Is this canned stock instance one a class row restates onto its guard (a Python stub the chain declares only as canned,
+/// such as `pwr`; TVI-WO-1308 Q19)? Its ledger row is then a guarded `model` row, never the stub's `canned` row (TVI-WO-2100
+/// Q26, granted 2026-11-26T19:45Z): a ledger that says `pwr` is still the stub would misstate what the release runs.
+fn restated_stub(chain: &stock::Chain, pins: &Pins, c: &(String, String, String, String)) -> bool {
+    pins.classes.iter().any(|(ty, g)| *ty == c.2 && pins.instances.get(g).is_some_and(|n| n.contains(&c.0)))
+        && !chain.declared.iter().any(|d| d.1 == c.0)
+}
+
 /// The acknowledgements' homes and the section each one's A-rows are in (TVI-WO-1206 (A), ruled 2026-11-27T00:10Z). The release
 /// reads them, so each is a source, and each routes as code (tools/tviburi-route `READ_DOCS`).
 const HOMES: [(&str, &str); 3] = [
@@ -263,7 +298,8 @@ fn stock_rows(chain: &stock::Chain, pins: &Pins) -> Vec<Row> {
     // A stock file is named with its pinned sha256 (RUL-16: the rows are keyed by the pinned files' hashes).
     let pinned = |f: &str| format!("{f} sha256:{}", pins.stock.iter().find(|p| p.path == f).map_or("", |p| p.sha256.as_str()));
     let mut models: BTreeMap<&str, (Vec<&str>, Vec<&str>)> = BTreeMap::new();
-    for (ty, inst, file) in &chain.declared {
+    let stubs = chain.canned.iter().filter(|c| restated_stub(chain, pins, c)).map(|c| (&c.2, &c.0, &c.1));
+    for (ty, inst, file) in chain.declared.iter().map(|d| (&d.0, &d.1, &d.2)).chain(stubs) {
         let e = models.entry(ty).or_default();
         e.0.push(inst);
         e.1.push(file.as_str());
@@ -314,7 +350,7 @@ fn stock_rows(chain: &stock::Chain, pins: &Pins) -> Vec<Row> {
         m.insert("behaves_as".into(), s("reads 0; a write is discarded (a stock Renode tag; TVI-WO-0100, architecture §2.0a)"));
         rows.push(m);
     }
-    for (inst, file, ty, what) in &chain.canned {
+    for (inst, file, ty, what) in chain.canned.iter().filter(|c| !restated_stub(chain, pins, c)) {
         let mut m = Row::new();
         m.insert("row".into(), s("canned"));
         m.insert("peripheral".into(), s(ty));
@@ -516,14 +552,55 @@ fn bench_rows(src: &Source, pins: &Pins) -> Result<Vec<Row>, String> {
     Ok(rows)
 }
 
+/// Every peripheral Tviburi class, with its public constructor's properties (TVI-WO-2100 Q23 (B); widened by its adversarial
+/// pass): each guard of the class map, and every other class a model file declares whose base list names a type with
+/// `Peripheral` in its name, a stock peripheral type (the class map's or the pinned chain's), or such a class of the overlay;
+/// read from the files with their comments and literals masked. As (guard type, in the class map, parameters).
+fn peripherals(models: &[&Source], pins: &Pins, chain: &stock::Chain) -> Result<Vec<(String, bool, Vec<props::Param>)>, String> {
+    let (mut texts, mut declared, mut home) = (Vec::new(), Vec::new(), Vec::new());
+    for (k, m) in models.iter().enumerate() {
+        let t = props::mask(&m.path, overlay::text(m)?)?;
+        for d in props::classes(&t) {
+            declared.push(d);
+            home.push(k);
+        }
+        texts.push(t);
+    }
+    let mapped: Vec<String> = pins.classes.iter().map(|c| c.1.strip_prefix("Tviburi.").unwrap_or(&c.1).to_string()).collect();
+    let stock: Vec<String> = pins.classes.iter().map(|c| props::bare(&c.0)).chain(chain.declared.iter().map(|d| props::bare(&d.0))).collect();
+    let names = props::peripheral_names(&declared, &mapped, &stock);
+    let mut out = Vec::new();
+    for name in &names {
+        let at: Vec<usize> = declared.iter().zip(&home).filter(|(d, _)| &d.0 == name).map(|(_, k)| *k).collect();
+        let [k] = at.as_slice() else {
+            return Err(format!("Tviburi.{name}: declared {} times in model/, not once", at.len()));
+        };
+        out.push((format!("Tviburi.{name}"), mapped.contains(name), props::constructor(&models[*k].path, &texts[*k], name)?));
+    }
+    if let Some(g) = mapped.iter().find(|g| !names.contains(g)) {
+        return Err(format!("Tviburi.{g}: the class map's guard has no declaration this release reads its constructor from"));
+    }
+    Ok(out)
+}
+
 fn build(repo: &Path, renode: &Path, out: &Path) -> Result<(String, String), String> {
     let pins = pins(repo)?;
+    // TVI-WO-2100 Q25: a release is built only against the assemblies its `build` rows name, by sha256.
+    for (asm, _, pin) in &pins.builds {
+        let file = if asm == "renode" { "Renode.dll" } else { "Infrastructure.dll" };
+        let got = sha256::hex(&fs::read(renode.join(file)).map_err(|e| format!("{file}: {e}"))?);
+        if got != *pin {
+            return Err(format!("{file} is sha256 {got}, not the pinned {pin} (pins.tsv `build {asm}`): a release is built only against the assemblies it names"));
+        }
+    }
     let model_files = overlay::regular_files(repo, "model")?;
     let models = overlay::models(&model_files)?;
     let template_path = format!("{TOOL}/{TEMPLATE}");
     let template = Source { path: template_path.clone(), bytes: fs::read(repo.join(&template_path)).map_err(|e| format!("{template_path}: {e}"))? };
     overlay::check_template(&template)?;
     let body = overlay::body(&models)?;
+    let chain = stock::read(renode, &pins.stock)?;
+    props::check(&peripherals(&models, &pins, &chain)?, &pins.props)?;
 
     // What the committed restatements run guarded, read before the model files become sources (TVI-WO-1203 (1)), and the
     // committed replay that loads them and the consumer's platform it re-types (R1); both are sources.
@@ -555,7 +632,6 @@ fn build(repo: &Path, renode: &Path, out: &Path) -> Result<(String, String), Str
         }
         rows.extend(field_rows(guard, &home.path, &fields::read(&home.path, t)?)?);
     }
-    let chain = stock::read(renode, &pins.stock)?;
     rows.extend(stock_rows(&chain, &pins));
     let bench = model_files.iter().find(|f| f.path == BENCH).ok_or(format!("{BENCH}: missing"))?;
     rows.extend(bench_rows(bench, &pins)?);
@@ -582,8 +658,10 @@ fn build(repo: &Path, renode: &Path, out: &Path) -> Result<(String, String), Str
 
     let mut m = format!("{MANIFEST_FORMAT}\n");
     m += "sources every file the release reads is a source line, its generator included, so that one release hash names one overlay and one ledger (northstar invariant 3)\n";
-    for (asm, b) in &pins.builds {
-        m += &format!("build {asm} {b}\n");
+    m += "properties each property line is one public constructor parameter of a guard, in pins.tsv's order, which the consumer's platform declares by that name on the guard's entry: required, without it the guard refuses or the platform does not load; optional, its meaning says what absence does (Renode supplies the first parameter, machine, itself); a stock entry's property that no line names for the guard is not the guard's, and the restated entry drops it (the canned pwr's size, initable and script)\n";
+    m += "builds the consumer's Renode must be this build: `renode` is Renode.dll and `infrastructure` Infrastructure.dll, under the Renode root; check each file's sha256, because the strings alone cannot name a rebuilt assembly\n";
+    for (asm, b, sha) in &pins.builds {
+        m += &format!("build {asm} {b} {sha}\n");
     }
     for p in &pins.stock {
         m += &format!("stock {} {}\n", p.sha256, p.path);
@@ -609,6 +687,9 @@ fn build(repo: &Path, renode: &Path, out: &Path) -> Result<(String, String), Str
             }
             m += &format!("retype {stock_ty} {inst}\n");
         }
+    }
+    for p in &pins.props {
+        m += &format!("property {} {} {} {}\n", p.guard, p.name, if p.required { "required" } else { "optional" }, p.meaning);
     }
     for src in &sources {
         m += &format!("source {} {}\n", sha256::hex(&src.bytes), src.path);
@@ -785,7 +866,7 @@ fn cases(ledger_text: &str, guard: &str, base: u32, size: u32, enable: Option<(u
 
 fn hex_pin(a: &str) -> Option<String> {
     let h = a.strip_prefix("sha256:").unwrap_or(a);
-    (h.len() == 64 && h.bytes().all(|b| b.is_ascii_hexdigit() && !b.is_ascii_uppercase())).then(|| h.to_string())
+    hex64(h).then(|| h.to_string())
 }
 
 fn main() -> ExitCode {
@@ -980,6 +1061,71 @@ mod tests {
         assert!(restated(&chain.declared, py, &names(&["pwr"]), &[]).unwrap_err().contains("does not declare as Python.PythonPeripheral"));
         let other = declared_for(&chain, "DMA.STM32DMA", &names(&["dma1", "pwr"]));
         assert!(restated(&other, "DMA.STM32DMA", &names(&["dma1", "pwr"]), &[]).unwrap_err().contains("names pwr, which the pinned stock chain does not declare as DMA.STM32DMA"));
+    }
+
+    #[test]
+    fn a_restated_stub_is_its_guards_model_row_and_an_unguarded_stub_stays_canned() {
+        // TVI-WO-2100 Q26: pwr, a Python stub the PWR guard's class row restates, is a guarded model row; fmc stays canned.
+        let f = "platforms/cpus/stm32h7.repl".to_string();
+        let stub = |i: &str| (i.to_string(), f.clone(), "Python.PythonPeripheral".to_string(), "a stock Python script's fixed answers".to_string());
+        let chain = stock::Chain { declared: vec![], canned: vec![stub("pwr"), stub("fmc")], tags: vec![] };
+        let g = "Tviburi.GuardedSTM32H7_PWR".to_string();
+        let pins = Pins {
+            builds: vec![],
+            stock: vec![stock::Pin { sha256: "a".repeat(64), path: f.clone() }],
+            classes: vec![("Python.PythonPeripheral".into(), g.clone())],
+            instances: BTreeMap::from([(g.clone(), vec!["pwr".to_string()])]),
+            consumer: BTreeMap::from([(g.clone(), vec![])]),
+            props: vec![],
+        };
+        let text = ledger::rows(stock_rows(&chain, &pins)).unwrap();
+        let lines: Vec<&str> = text.lines().collect();
+        assert_eq!(lines.len(), 2, "{text}");
+        let model = lines.iter().find(|l| l.contains("\"row\":\"model\"")).expect("a model row for pwr");
+        for want in ["\"guarded_by\":\"Tviburi.GuardedSTM32H7_PWR\"", "\"instances\":[\"pwr\"]", "\"peripheral\":\"Python.PythonPeripheral\"", &format!("\"files\":[\"{f} sha256:{}\"]", "a".repeat(64))] {
+            assert!(model.contains(want), "{model}: {want}");
+        }
+        let canned = lines.iter().find(|l| l.contains("\"row\":\"canned\"")).expect("fmc's canned row");
+        assert!(canned.contains("\"register\":\"fmc\"") && !text.contains("\"register\":\"pwr\""), "{text}");
+    }
+
+    #[test]
+    fn a_pins_row_of_the_wrong_width_or_a_property_row_of_the_wrong_form_refuses() {
+        // Adversarial pass X4, X1: each line of pins.tsv must be read whole, or refuse.
+        let ok = "build\trenode\ts\t" .to_string() + &"a".repeat(64) + "\nbuild\tinfrastructure\ts\t" + &"b".repeat(64)
+            + "\nstock\t" + &"c".repeat(64) + "\tp.repl\nclass\tT.X\tTviburi.X\t-\t-\nproperty\tTviburi.X\tmode\toptional\tm\n";
+        assert_eq!(read_pins("pins.tsv", &ok).unwrap().props.len(), 1);
+        for (from, to, why) in [
+            ("\tp.repl\n", "\tp.repl\textra\n", "a stock row of 4 fields, not 3"),
+            ("\toptional\tm\n", "\trequird\tm\n", "a property row is `property"),
+            ("property\tTviburi.X", "property\tX", "a property row is `property"),
+            ("\toptional\tm\n", "\toptional\tm\u{e9}\n", "a property row is `property"),
+        ] {
+            assert_eq!(ok.matches(from).count(), 1, "{from}");
+            let e = read_pins("pins.tsv", &ok.replace(from, to)).err().unwrap_or_default();
+            assert!(e.contains(why), "{to}: {e}");
+        }
+    }
+
+    #[test]
+    fn the_class_maps_guard_must_be_read_and_a_peripheral_declared_once() {
+        // Adversarial pass X2, X6.
+        let src = |path: &str, t: &str| Source { path: path.into(), bytes: t.as_bytes().to_vec() };
+        let a = src("model/A.cs", "namespace N\n{\n    public unsafe class GuardedA : IBytePeripheral\n    {\n        public GuardedA(IMachine machine, string mode = \"x\") { }\n    }\n}\n");
+        let pins = |guards: &[&str]| Pins {
+            builds: vec![], stock: vec![], props: vec![],
+            classes: guards.iter().map(|g| ("Stock.T".to_string(), g.to_string())).collect(),
+            instances: BTreeMap::new(), consumer: BTreeMap::new(),
+        };
+        let chain = stock::Chain { declared: vec![], canned: vec![], tags: vec![] };
+        let got = peripherals(&[&a], &pins(&["Tviburi.GuardedA"]), &chain).unwrap();
+        assert_eq!((got[0].0.as_str(), got[0].1, got[0].2.len()), ("Tviburi.GuardedA", true, 1));
+        let e = peripherals(&[&a], &pins(&["Tviburi.GuardedA", "Tviburi.GuardedZ"]), &chain).unwrap_err();
+        assert_eq!(e, "Tviburi.GuardedZ: the class map's guard has no declaration this release reads its constructor from");
+        let commented = src("model/Z.cs", "// public class GuardedZ : IBytePeripheral { public GuardedZ(IMachine machine) { } }\n");
+        assert!(peripherals(&[&a, &commented], &pins(&["Tviburi.GuardedZ"]), &chain).unwrap_err().starts_with("Tviburi.GuardedZ: the class map's guard"));
+        let b = src("model/B.cs", "    public class GuardedA : IWordPeripheral { public GuardedA(IMachine machine) { } }\n");
+        assert_eq!(peripherals(&[&a, &b], &pins(&[]), &chain).unwrap_err(), "Tviburi.GuardedA: declared 2 times in model/, not once");
     }
 
     #[test]
