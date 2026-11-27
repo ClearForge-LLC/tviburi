@@ -11,12 +11,14 @@ own rules stays true) and appends its reading; where that text is wrong for a va
 import glob, json, os, sys
 
 reads_dir, items = sys.argv[1:3]
+# the second work list (architect 2026-11-27T00:43Z): its readings and items beside the first's
+reads_dir2, items2 = os.path.join(os.path.dirname(reads_dir.rstrip('/')), 'reads2'), os.path.join(os.path.dirname(items), 'items2.tsv')
 main_model = sys.argv[3] if len(sys.argv) > 3 and not sys.argv[3].startswith('--') else os.path.expanduser('~/.cache/tvi-1206/main/model')
 R = {}
-for p in glob.glob(os.path.join(reads_dir, '*.jsonl')):
+for p in glob.glob(os.path.join(reads_dir, '*.jsonl')) + glob.glob(os.path.join(reads_dir2, '*.jsonl')):
     for l in open(p):
         r = json.loads(l); R[r['field']] = r
-work = {l.split('\t')[0]: l.rstrip('\n').split('\t') for l in open(items) if not l.startswith('#')}
+work = {l.split('\t')[0]: l.rstrip('\n').split('\t') for f in (items, items2) for l in open(f) if not l.startswith('#')}
 
 LINES = {'RCC_APB4ENR.LPUART1EN': ['STM32H7_RCC.cs L1010-1012', 'STM32H7_RCC.cs L1355-1364']}  # the reader cited APB4Reset's bit
 VALUES = {}  # every value is now in items.tsv, from the logged boots (spike/1206/data/main-8e15435/gen-writes.tsv)
@@ -51,13 +53,18 @@ ACK = {
         'RCC_AHB1ENR.ADC12EN RCC_AHB1ENR.DMA1EN RCC_AHB1ENR.DMA2EN RCC_AHB1ENR.ETH1MACEN RCC_AHB4ENR.ADC3EN RCC_AHB4ENR.GPIOCEN '
         'RCC_AHB4ENR.GPIODEN RCC_AHB4ENR.GPIOEEN RCC_AHB4ENR.GPIOFEN RCC_APB1LENR.TIM2EN RCC_APB2ENR.TIM1EN RCC_APB2ENR.TIM8EN '
         'RCC_APB2ENR.TIM15EN RCC_APB2ENR.TIM16EN RCC_APB2ENR.TIM17EN RCC_APB2ENR.SPI4EN RCC_APB2ENR.USART6EN RCC_APB4ENR.I2C4EN '
-        'RCC_APB4ENR.LPTIM2EN RCC_APB4ENR.LPTIM3EN RCC_APB4ENR.LPTIM4EN RCC_APB4ENR.LPTIM5EN RCC_APB4ENR.LPUART1EN RCC_APB4ENR.SYSCFGEN'),
+        'RCC_APB4ENR.LPTIM2EN RCC_APB4ENR.LPTIM3EN RCC_APB4ENR.LPTIM4EN RCC_APB4ENR.LPTIM5EN RCC_APB4ENR.LPUART1EN RCC_APB4ENR.SYSCFGEN '
+        'RCC_AHB4ENR.GPIOAEN RCC_AHB4ENR.GPIOBEN RCC_AHB4ENR.GPIOGEN RCC_AHB4ENR.GPIOHEN RCC_AHB4ENR.GPIOIEN RCC_AHB4ENR.GPIOJEN '
+        'RCC_AHB4ENR.GPIOKEN RCC_AHB4ENR.BDMAEN RCC_AHB4ENR.CRCEN RCC_AHB4ENR.HSEMEN RCC_APB1LENR.TIM3EN RCC_APB1LENR.TIM4EN RCC_APB1LENR.TIM5EN '
+        'RCC_APB1LENR.TIM6EN RCC_APB1LENR.TIM7EN RCC_APB1LENR.TIM12EN RCC_APB1LENR.TIM13EN RCC_APB1LENR.TIM14EN RCC_APB1LENR.LPTIM1EN '
+        'RCC_APB1LENR.I2C3EN RCC_APB1LENR.UART4EN RCC_APB1LENR.UART5EN RCC_APB1LENR.UART7EN RCC_APB1LENR.UART8EN'),
     2: ("written 0 only: the bit is stored and reads back from the guard's copy as silicon's does, and the stock RCC registers no "
         "peripheral at it, so it gates nothing; no firmware accesses a peripheral behind it (ethernet, the one present, has no access in any "
         "run: " + ACCESS + ")",
         'RCC_AHB1ENR.ETH1RXEN RCC_AHB1ENR.ETH1TXEN RCC_AHB1ENR.USB1OTGHSULPIEN RCC_AHB1ENR.USB2OTGHSULPIEN RCC_AHB2ENR.DCMIEN '
         'RCC_AHB2ENR.HASHEN RCC_AHB2ENR.SDMMC2EN RCC_APB2ENR.HRTIMEN RCC_APB2ENR.DFSDM1EN RCC_APB2ENR.SAI1EN RCC_APB2ENR.SAI2EN '
-        'RCC_APB2ENR.SAI3EN RCC_APB2ENR.SPI5EN RCC_APB4ENR.SAI4EN RCC_APB4ENR.SPI6EN RCC_APB4ENR.COMP12EN RCC_APB4ENR.VREFEN'),
+        'RCC_APB2ENR.SAI3EN RCC_APB2ENR.SPI5EN RCC_APB4ENR.SAI4EN RCC_APB4ENR.SPI6EN RCC_APB4ENR.COMP12EN RCC_APB4ENR.VREFEN '
+        'RCC_APB1LENR.CECEN RCC_APB1LENR.DAC12EN RCC_APB1LENR.SPDIFRXEN RCC_APB1LENR.SPI3EN'),
     3: ("written 0, then 1 at 4.93 s (BDCR 0x8000), and read back 1 every 100 ms (90 reads): silicon's register holds it and the guard "
         "serves its copy (the guard keeps rtc on the bus itself); with RTCSEL = 00 rtc_ck has no source on either side (p427), and the "
         "firmware uses only the RTC's backup registers, which follow RCC_APB4ENR.RTCAPBEN (p366): no time register is read",
@@ -81,7 +88,7 @@ ACK = {
     7: ("written 0 only, the mode the timer runs in on both sides: outputs (CCxS = 00), edge-aligned upcounting, updates enabled, no input XOR, "
         "no trigger interrupt (the guard holds SMCR.SMS at 0 and refuses EGR.TG)",
         'TIMx_CCMR1.CC1S[1:0] TIMx_CCMR1.CC2S[1:0] TIMx_CCMR2.CC3S[1:0] TIMx_CCMR2.CC4S[1:0] TIMx_CR1.CMS[1:0] TIMx_CR1.DIR TIMx_CR1.UDIS '
-        'TIMx_CR2.TI1S TIMx_DIER.TIE'),
+        'TIMx_CR2.TI1S TIMx_DIER.TIE TIMx_CR1.OPM'),
     8: ("written 0 only: 7-bit addressing, no reload, and a 0 written to ADDRCF clears nothing, alike on both sides",
         'I2C_CR2.ADD10 I2C_CR2.RELOAD I2C_ICR.ADDRCF'),
     9: ("written 0 only: oversampling by 16, no receiver-timeout, transfer-complete or TX-FIFO interrupt, alike on both sides",
@@ -89,7 +96,7 @@ ACK = {
     10: ("a 1 clears its ISR flag and a 0 does nothing, on both sides; the twin never sets the flag, which is its own read-only row's matter. "
          "The guard type also binds uart4/5/7/8, where some of these bits are reserved (Table 402, p2018); none is accessed in any run",
          'USART_ICR.CMCF USART_ICR.CTSCF USART_ICR.EOBCF USART_ICR.FECF USART_ICR.LBDCF USART_ICR.NECF USART_ICR.ORECF USART_ICR.PECF '
-         'USART_ICR.TCBGTCF USART_ICR.TXFECF USART_ICR.WUCF'),
+         'USART_ICR.TCBGTCF USART_ICR.TXFECF USART_ICR.WUCF USART_ICR.RTOCF USART_ICR.UDRCF'),
     11: ("by the architect's ruling, 2026-11-27T00:10Z, on field evidence: p347 says \"To insure an optimal behavior of the PLL when one of "
          "the post-divider (DIVP, DIVQ or DIVR) is not used, the application shall set the enable bit (DIVyEN) as well as the corresponding "
          "post-divider bits (DIVP, DIVQ or DIVR) to '0'. If the above rules are not respected, the PLL output frequency is not guaranteed.\" "
@@ -101,8 +108,37 @@ ACK = {
     12: ("by the architect's ruling of 2026-11-25T05:06Z Q10 (a clear register: the write clears nothing), on field evidence: p2012 says only "
          "\"Reserved, must be kept at reset value\", so RM0433 gives no behaviour for the 1s ChibiOS writes here (ICR = 0x2, 0x4); the twin "
          "ignores the bits, and a 0 behaves alike on both sides. ChibiOS flies with these writes on silicon, which is field evidence, not the "
-         "manual. Bench row BR2 (TVI-WO-1206 FEEDBACK §5): read I2C_ISR after ICR = 0x2 and 0x4 on the Nucleo",
-         'I2C_ICR.Res2_1'),
+         "manual. Bit 6 alike, as ruled 2026-11-27T00:43Z: ChibiOS writes ICR = 0x40 (TC's position in ISR) 2,901 times in the armed run, "
+         "and p2012 gives it no behaviour either. Bench row BR2 (TVI-WO-1206 FEEDBACK §5): read I2C_ISR after ICR = 0x2, 0x4 and 0x40 on the Nucleo",
+         'I2C_ICR.Res2_1 I2C_ICR.Res6'),
+    14: ("written 0 only: a 0 resets nothing, on either side (the stock callback acts only on a 1)",
+         'RCC_AHB3RSTR.FMCRST RCC_APB4RSTR.SYSCFGRST'),
+    15: ("written its reset value, or to a state both sides take at once: HSI on (HSIRDY), HSIDIV /1 (hsi_ck 64 MHz), CSI off, and HSECSSON "
+         "a set-only bit kept on both, with no HSE failure in the twin to detect",
+         'RCC_CR.HSION RCC_CR.HSIDIV RCC_CR.CSION RCC_CR.HSECSSON'),
+    16: ("the switch is to a clock already ready (HSI, or PLL1 after PLL1RDY), so SWS follows SW on both sides, and the guard's TVI-RCC-SW "
+         "judges its readiness; TIMPRE with every APB prescaler written /1 or /2 gives the timers the AHB clock either way (Table 57, p393)",
+         'RCC_CFGR.SW RCC_CFGR.TIMPRE'),
+    17: ("a 1 clears the stream's TCIF and a 0 does nothing, on both sides; the guard then redraws the stream's interrupt line",
+         'DMA_LIFCR.CTCIF0 DMA_LIFCR.CTCIF1 DMA_LIFCR.CTCIF2 DMA_LIFCR.CTCIF3 DMA_HIFCR.CTCIF4 DMA_HIFCR.CTCIF5 DMA_HIFCR.CTCIF6 DMA_HIFCR.CTCIF7'),
+    18: ("for the values written each request moves one item of PSIZE from an address stepped as written (PINC 0; MSIZE equal to PSIZE on every "
+         "enabled stream; direct mode with DMDIS 0), as silicon's peripheral-to-memory transfers do",
+         'DMA_SxCR.MSIZE[1:0] DMA_SxCR.PSIZE[1:0] DMA_SxCR.PINC DMA_SxFCR.DMDIS'),
+    19: ("written 0 only: the interrupt is off on both sides", 'SPI_IER.EOTIE SPI_IER.RXPIE SPI_IER.TXPIE'),
+    20: ("for the values written: 8-bit frames (DSIZE 7; 0 only with SPE = 0), a receive DMA request per frame received, and SUSPC clears SUSP, "
+         "alike on both sides",
+         'SPI_CFG1.DSIZE SPI_CFG1.RXDMAEN SPI_IFCR.SUSPC'),
+    21: ("written 0 only: no target mode, no clock-stretch disable, no receive DMA, no STOP interrupt, alike on both sides",
+         'I2C_CR1.ADDRIE I2C_CR1.NOSTRETCH I2C_CR1.RXDMAEN I2C_CR1.STOPIE'),
+    22: ("the interrupt is the flag AND the enable on both sides; ArduPilot takes all three (CR1 0xD3, 0xD7), each of the armed run's 12,750 "
+         "handler entries with an enabled flag set; when the flags fire is I2C_TXDR.TXDATA's and I2C_CR2.AUTOEND's matter",
+         'I2C_CR1.RXIE I2C_CR1.TCIE I2C_CR1.TXIE'),
+    23: ("each transfer goes to the address written, in the direction written, for NBYTES bytes (8,339 RXDR reads = 1,378 x 6 + 71 x 1 in the "
+         "armed run; no START with NBYTES 0), as silicon's; at 0x90 ten generated boards address a TMP117 the platform has no model for, so the "
+         "twin NACKs where silicon would ACK: the platform's missing device (TVI-WO-1306 Q9), not this field",
+         'I2C_CR2.NBYTES I2C_CR2.RD_WRN I2C_CR2.SADD'),
+    24: ("a 1 clears TC and a 0 does nothing, on both sides; every ISR read comes at least 37.5 ms after silicon's line would be idle, and TCIE is 0",
+         'USART_ICR.TCCF'),
 }
 
 # stock-wrong: field -> (what differs, why the flight path is unaffected)
@@ -156,7 +192,39 @@ SW = {
     'USART_CR1.RXFNEIE': ("the twin never sets ORE, so the interrupt never fires on an overrun as silicon's does (p2090)",
                           "an overrunning byte with the FIFO off refuses TVI-USART-OVERRUN; with the FIFO on, FIFOEN's own stock-wrong row holds it"),
 }
-HELD = set()  # the five held fields were ruled 2026-11-27T00:10Z (A11, A12)
+SW.update({f: ("the twin resets a registered peripheral once, at the write of 1, and a block with no registered alias not at all, where RM0433 "
+                 "says '1: resets' the block (whether silicon holds it in reset while the bit is 1 is not quoted, so nothing here rests on it)",
+                 "no run accesses a block while its reset bit is 1 (spike/1206/data/main-8e15435/reset-windows.tsv: the armed run's only accesses "
+                 "then are 3 adcM1S2 reads during APB2Reset, which holds no ADC bit; the generated boots write no reset register), and no run "
+                 "accesses a block whose reset alias has no registered peripheral (%s)" % ACCESS) for f in """RCC_AHB1RSTR.ADC12RST RCC_AHB1RSTR.DMA1RST RCC_AHB1RSTR.DMA2RST RCC_AHB1RSTR.ETH1MACRST RCC_AHB1RSTR.USB1OTGRST RCC_AHB1RSTR.USB2OTGRST RCC_AHB2RSTR.CRYPTRST RCC_AHB2RSTR.DCMIRST RCC_AHB2RSTR.HASHRST RCC_AHB2RSTR.RNGRST RCC_AHB2RSTR.SDMMC2RST RCC_AHB3RSTR.DMA2DRST RCC_AHB3RSTR.JPGDECRST RCC_AHB3RSTR.MDMARST RCC_AHB3RSTR.QSPIRST RCC_AHB3RSTR.SDMMC1RST RCC_AHB4RSTR.ADC3RST RCC_AHB4RSTR.BDMARST RCC_AHB4RSTR.CRCRST RCC_AHB4RSTR.GPIOARST RCC_AHB4RSTR.GPIOBRST RCC_AHB4RSTR.GPIOCRST RCC_AHB4RSTR.GPIODRST RCC_AHB4RSTR.GPIOERST RCC_AHB4RSTR.GPIOFRST RCC_AHB4RSTR.GPIOGRST RCC_AHB4RSTR.GPIOHRST RCC_AHB4RSTR.GPIOIRST RCC_AHB4RSTR.GPIOJRST RCC_AHB4RSTR.GPIOKRST RCC_AHB4RSTR.HSEMRST RCC_APB1HRSTR.CRSRST RCC_APB1HRSTR.FDCANRST RCC_APB1HRSTR.MDIOSRST RCC_APB1HRSTR.OPAMPRST RCC_APB1HRSTR.SWPRST RCC_APB1LRSTR.CECRST RCC_APB1LRSTR.DAC12RST RCC_APB1LRSTR.I2C1RST RCC_APB1LRSTR.I2C2RST RCC_APB1LRSTR.I2C3RST RCC_APB1LRSTR.LPTIM1RST RCC_APB1LRSTR.SPDIFRXRST RCC_APB1LRSTR.SPI2RST RCC_APB1LRSTR.SPI3RST RCC_APB1LRSTR.TIM12RST RCC_APB1LRSTR.TIM13RST RCC_APB1LRSTR.TIM14RST RCC_APB1LRSTR.TIM2RST RCC_APB1LRSTR.TIM3RST RCC_APB1LRSTR.TIM4RST RCC_APB1LRSTR.TIM5RST RCC_APB1LRSTR.TIM6RST RCC_APB1LRSTR.TIM7RST RCC_APB1LRSTR.UART4RST RCC_APB1LRSTR.UART5RST RCC_APB1LRSTR.UART7RST RCC_APB1LRSTR.UART8RST RCC_APB1LRSTR.USART2RST RCC_APB1LRSTR.USART3RST RCC_APB2RSTR.DFSDM1RST RCC_APB2RSTR.HRTIMRST RCC_APB2RSTR.SAI1RST RCC_APB2RSTR.SAI2RST RCC_APB2RSTR.SAI3RST RCC_APB2RSTR.SPI1RST RCC_APB2RSTR.SPI4RST RCC_APB2RSTR.SPI5RST RCC_APB2RSTR.TIM15RST RCC_APB2RSTR.TIM16RST RCC_APB2RSTR.TIM17RST RCC_APB2RSTR.TIM1RST RCC_APB2RSTR.TIM8RST RCC_APB2RSTR.USART1RST RCC_APB2RSTR.USART6RST RCC_APB3RSTR.LTDCRST RCC_APB4RSTR.COMP12RST RCC_APB4RSTR.I2C4RST RCC_APB4RSTR.LPTIM2RST RCC_APB4RSTR.LPTIM3RST RCC_APB4RSTR.LPTIM4RST RCC_APB4RSTR.LPTIM5RST RCC_APB4RSTR.LPUART1RST RCC_APB4RSTR.SAI4RST RCC_APB4RSTR.SPI6RST RCC_APB4RSTR.VREFRST""".split()})
+for f in 'RCC_CR.HSI48ON RCC_CR.HSEON RCC_CR.PLL1ON RCC_CR.PLL2ON RCC_CR.PLL3ON'.split():
+    SW[f] = ("the stock ready flag follows the ON bit at once, where silicon sets it once the oscillator is stable or the PLL locked (p340, p343, p347-348)",
+             "each firmware reads the flag once after the enable and finds it set (the armed run; hse-crystal-16, sentinel-01's boots); the "
+             "generated firmware's waits are bounded polls whose next step is the same once the flag is set (aethelgard-svd-hal firmware.rs "
+             "L87-91, L1231-1235), so only the polls and the time differ, and its timeout path is taken on neither side; that ArduPilot's read "
+             "is ChibiOS's wait loop on the flag is not quoted here (from memory), so for ArduPilot this rests on that loop")
+SW['RCC_AHB4ENR.BKPRAMEN'] = ("the twin's backup SRAM is plain memory the enable never gates, where silicon clocks it by this bit (p458)",
+                              "written 0 only, and no run is seen to access the backup SRAM; the access log covers peripherals, not memory, so that is not measured (a row)")
+SW['DMA_SxCR.MINC'] = ("on a memory-to-peripheral stream with MINC = 0 and NDT > 1 the stock model sends the memory item once and then zeros, where silicon "
+                       "sends the item NDT times (p663)",
+                       "the armed run's 32 such streams (DMA1 stream 4, SPI1 TX, NDT 256, 0xFF) are the dummy bytes of Read commands to U4, the "
+                       "stock GenericSpiFlash, which ignores MOSI while it reads (8,192 Read bytes handled); a device that reads MOSI there would see "
+                       "the difference (a finding, TVI-WO-1206 FEEDBACK)")
+SW['TIMx_EGR.UG'] = ("at UG silicon sets UIF whatever UIE (p1597, p1599) and clears the prescaler's sub-count; the stock model sets UIF only with UIE = 1 "
+                     "and keeps the clock's fractional sub-count",
+                     "no firmware reads TIMx_SR or CNT (%s); every UG comes with CR1 = 0, the counter stopped, ARR and PSC already in force on both sides; "
+                     "the sub-count can shift the phase by under one counter tick at ArduPilot's second setup (7.77 s), which no firmware reads" % EVID)
+SW['SPI_CR2.TSIZE'] = ("SR.TXTF reads 0 in the twin, a stock tag, where silicon sets it once TSIZE frames are in the TxFIFO (p2226)",
+                       "the armed run never reads SPI_SR; the generated boards poll SR but test only RXP and EOT (Aethelgard boards/sentinel-01/src/board.rs L259, L702), so neither control flow nor data changes")
+SW['SPI_CR1.CSUSP'] = ("the stock model sets SR.EOT at a suspend, where silicon sets only SUSP (p2216)",
+                       "no run reads SPI_SR while EOTIE is 0 (always), and the guard would refuse such a read; chip selects are untouched (the multiplexer drops the stock FinishTransmission)")
+SW['SPI_IFCR.EOTC'] = ("the stock model also clears CSTART and resets its frame counter, where silicon clears EOT and TXTF only (p2227)",
+                       "CSTART is already 0 at every IFCR write, and SR is never read between EOTC and the disable")
+SW['USART_CR3.DMAT'] = ("the twin's memory-to-peripheral stream moves the whole transfer at EN, unpaced by any request, where silicon moves one byte per free "
+                        "transmit slot (p2059): the DMA guard's acknowledgement, ruled 2026-11-24T14:10Z Q5 (c) (requests 42, 46)",
+                        "the bytes and their order are those silicon sends; ArduPilot sees usart1's TX transfer-complete 2 us after EN where silicon takes "
+                        "about 1.8 ms, and 15 of 102 usart1 bursts start before silicon's previous one would have finished: what Q5 (c) accepts")
+HELD = set('SPI_CR1.CSTART SPI_CR1.SPE SPI_CFG1.TXDMAEN USART_ICR.Res10_10 USART_ICR.Res16_14 USART_ICR.Res19_18 USART_ICR.Res31_21'.split())  # asked 2026-11-27
 
 if len(sys.argv) > 3 and sys.argv[3] == '--table':  # TVI-WO-1206.rm0433.md §3, from the same data as the rows
     print('| A | Fields | Reading (both sides, for the values written) | Each row cites |')
