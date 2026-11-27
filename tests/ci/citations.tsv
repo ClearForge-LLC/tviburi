@@ -27,6 +27,9 @@ model/stm32h7-timer-restate.repl	TVI-WO-1302.measure.md
 model/tviburi-nucleo-h753zi.repl	TVI-WO-1301.rm0433.md
 spike/1150/overlay/GuardedSpi1150.cs	docs/
 spike/1150/overlay/GuardedSpi1150.cs	TVI-WO-0100a.rm0433.md
+spike/1206/data/readings.tsv	TVI-WO-1303.measure.md
+spike/1206/data/readings.tsv	TVI-WO-1305.measure.md
+spike/1206/data/readings.tsv	TVI-WO-1306.measure.md
 tests/1300/rcc.sh	TVI-WO-1300a.measure.md
 tests/1301/fixtures/aet-1c32c8ea-ardupilot/SOURCE.md	FEEDBACK.md
 tests/1301/fixtures/aet-1c32c8ea-ardupilot/SOURCE.md	TVI-WO-1301.rm0433.md
