@@ -4,7 +4,8 @@ data/readings.tsv: field, state (acknowledged | stock-wrong | held), the A-numbe
 behaves-as text the field's ledger row takes. Each text cites RM0433 Rev 9 by page and the stock source (renode-infrastructure
 066a7f13) by file and line, from the checked reading.
 
-Usage: python3 -I spike/1206/readings.py READS_DIR spike/1206/data/items.tsv > spike/1206/data/readings.tsv"""
+Usage: python3 -I spike/1206/readings.py READS_DIR spike/1206/data/items.tsv > spike/1206/data/readings.tsv
+       python3 -I spike/1206/readings.py READS_DIR spike/1206/data/items.tsv --table   (TVI-WO-1206.rm0433.md §3's table)"""
 import glob, json, os, sys
 
 reads_dir, items = sys.argv[1:3]
@@ -110,6 +111,12 @@ SW = {
 }
 HELD = {'RCC_PLL3DIVR.DIVN3', 'RCC_PLL3DIVR.DIVP3', 'RCC_PLL3DIVR.DIVQ3', 'RCC_PLL3DIVR.DIVR3', 'I2C_ICR.Res2_1'}
 
+if len(sys.argv) > 3 and sys.argv[3] == '--table':  # TVI-WO-1206.rm0433.md §3, from the same data as the rows
+    print('| A | Fields | Reading (both sides, for the values written) | Each row cites |')
+    print('|---|---|---|---|')
+    for n, (why, fs) in sorted(ACK.items()):
+        print('| A%d | %s | %s | its own page(s) and stock line(s) |' % (n, ', '.join('`%s`' % f for f in fs.split()), why))
+    sys.exit(0)
 owner = {}
 for n, (_, fs) in ACK.items():
     for f in fs.split():
