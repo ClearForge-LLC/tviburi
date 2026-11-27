@@ -20,6 +20,13 @@ use std::process::ExitCode;
 /// The documentation at the repository's root (ruled 2026-11-24T10:30Z, Q3). Everything else outside `docs/**/*.md`
 /// is code.
 const ROOT_DOCS: [&str; 5] = ["README.md", "FEEDBACK.md", "CLAUDE.md", "LICENSE-MIT", "LICENSE-APACHE"];
+/// The three Markdown files the release reads (the acknowledgements' homes, whose A-rows `tviburi-release` checks):
+/// a document the release reads is a source, so each routes as code (ruled 2026-11-27T00:10Z, TVI-WO-1206 (A)).
+const READ_DOCS: [&str; 3] = [
+    "docs/work-orders/TVI-WO-0100b.rm0433.md",
+    "docs/work-orders/TVI-WO-1300.rm0433.md",
+    "docs/work-orders/TVI-WO-1206.rm0433.md",
+];
 /// The memory budget's code: a change here runs the budget's own tests on a pull request (ruled 10:30Z, Q2). A
 /// trailing `/` is a directory.
 const BUDGET: [&str; 7] = [
@@ -36,7 +43,7 @@ const BUDGET_READERS: [&str; 3] = ["tests/1201/test-budget.sh", "tests/1301/ci-m
 
 fn is_docs(p: &str) -> bool {
     !p.split('/').any(|c| c.is_empty() || c == "." || c == "..")
-        && (ROOT_DOCS.contains(&p) || (p.starts_with("docs/") && p.ends_with(".md")))
+        && (ROOT_DOCS.contains(&p) || (p.starts_with("docs/") && p.ends_with(".md") && !READ_DOCS.contains(&p)))
 }
 
 fn under(list: &[&str], p: &str) -> bool {
@@ -316,6 +323,13 @@ mod tests {
         }
         assert_eq!(classify(&["docs/a.md", "README.md"]), (true, false));
         assert_eq!(classify(&["docs/a.md", "docs/b.tsv"]), (false, false), "one unclassified path routes code");
+        // TVI-WO-1206 (A): the three documents the release reads route as code, alone or with documentation.
+        for p in READ_DOCS {
+            assert!(!is_docs(p), "{p}");
+            assert_eq!(classify(&[p]), (false, false), "{p} alone runs the suite");
+            assert_eq!(classify(&["docs/a.md", p]), (false, false));
+        }
+        assert!(is_docs("docs/work-orders/TVI-WO-1206.md") && is_docs("docs/work-orders/TVI-WO-1206.FEEDBACK.md"));
         assert_eq!(classify(&[]), (false, false), "an empty diff routes code");
         assert_eq!(classify(&["tests/1301/gpio.sh"]), (false, true));
         assert_eq!(classify(&[".github/workflows/ci.yml"]).1, true);

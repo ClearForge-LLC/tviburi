@@ -2,9 +2,8 @@
 # a comment, or a string a record or the ledger carries. tools/tviburi-route's inventory fails on a name not listed here
 # (a new reader: make the path code, or list it after checking it only cites) and on a row that no longer holds.
 # Checked by hand 2026-11-24 (TVI-WO-1202), every row read in its file. FILE<tab>NAME.
+# TVI-WO-1206 (A), ruled 2026-11-27T00:10Z: the release reads TVI-WO-0100b.rm0433.md, TVI-WO-1300.rm0433.md and TVI-WO-1206.rm0433.md (their A-rows), so they route as code (tools/tviburi-route READ_DOCS) and a file naming them is listed no more; tools/tviburi-release/src/main.rs names their directory, docs/, to read them (HOMES).
 firmware/gpio.rs	TVI-WO-1301.rm0433.md
-firmware/rcc.rs	TVI-WO-1300.rm0433.md
-firmware/spi1.rs	TVI-WO-0100b.rm0433.md
 firmware/timer.rs	TVI-WO-1302.measure.md
 model/bench-checks.tsv	FEEDBACK.md
 model/bench-checks.tsv	TVI-WO-0100b.FEEDBACK.md
@@ -12,12 +11,9 @@ model/GuardedSTM32_GPIOPort.cs	docs/
 model/GuardedSTM32_GPIOPort.cs	TVI-WO-1301.ds12117.md
 model/GuardedSTM32_GPIOPort.cs	TVI-WO-1301.rm0433.md
 model/GuardedSTM32H7_RCC.cs	docs/
-model/GuardedSTM32H7_RCC.cs	TVI-WO-0100b.rm0433.md
 model/GuardedSTM32H7_RCC.cs	TVI-WO-1300a.measure.md
-model/GuardedSTM32H7_RCC.cs	TVI-WO-1300.rm0433.md
 model/GuardedSTM32H7_SPI.cs	docs/
 model/GuardedSTM32H7_SPI.cs	TVI-WO-0100a.rm0433.md
-model/GuardedSTM32H7_SPI.cs	TVI-WO-0100b.rm0433.md
 model/GuardedSTM32_Timer.cs	docs/
 model/GuardedSTM32_Timer.cs	FEEDBACK.md
 model/GuardedSTM32_Timer.cs	TVI-WO-1302.FEEDBACK.md
@@ -25,26 +21,17 @@ model/GuardedSTM32_Timer.cs	TVI-WO-1302.measure.md
 model/stm32h7-gpio-restate.awk	TVI-WO-1301.rm0433.md
 model/stm32h7-timer-restate.awk	TVI-WO-1302.measure.md
 model/stm32h7-timer-restate.repl	TVI-WO-1302.measure.md
-model/tviburi-nucleo-h753zi.repl	TVI-WO-1300.rm0433.md
 model/tviburi-nucleo-h753zi.repl	TVI-WO-1301.rm0433.md
 spike/1150/overlay/GuardedSpi1150.cs	docs/
 spike/1150/overlay/GuardedSpi1150.cs	TVI-WO-0100a.rm0433.md
-tests/1300/allowlist.py	TVI-WO-1300.rm0433.md
 tests/1300/rcc.sh	TVI-WO-1300a.measure.md
-tests/1300/rcc.sh	TVI-WO-1300.rm0433.md
-tests/1300/replay-1300.sh	TVI-WO-1300.rm0433.md
 tests/1301/fixtures/aet-1c32c8ea-ardupilot/SOURCE.md	FEEDBACK.md
 tests/1301/fixtures/aet-1c32c8ea-ardupilot/SOURCE.md	TVI-WO-1301.rm0433.md
 tests/1301/replay-1301.sh	TVI-WO-1302.measure.md
 tests/1302/fields.py	TVI-WO-1302.measure.md
 tests/1302/timer.sh	TVI-WO-1302.measure.md
-tests/conditions.resc	TVI-WO-0100b.rm0433.md
-tests/mutants.tsv	TVI-WO-0100b.rm0433.md
-tests/mutants.tsv	TVI-WO-1300.rm0433.md
-tools/tviburi-release/src/main.rs	TVI-WO-0100b.rm0433.md
-tools/tviburi-release/src/main.rs	TVI-WO-1300.rm0433.md
-tools/tviburi-release/src/main.rs	TVI-WO-1206.rm0433.md
 tools/tviburi-route/src/main.rs	CLAUDE.md
+tools/tviburi-release/src/main.rs	docs/
 tools/tviburi-route/src/main.rs	docs/
 tools/tviburi-route/src/main.rs	FEEDBACK.md
 tools/tviburi-route/src/main.rs	LICENSE-APACHE
@@ -60,7 +47,6 @@ model/stm32h7-dma-restate.awk	TVI-WO-1303.measure.md
 tests/1303/dma.sh	TVI-WO-1303.measure.md
 tests/1303/fields.py	TVI-WO-1303.measure.md
 model/GuardedSTM32DMA.cs	TVI-WO-1303.FEEDBACK.md
-firmware/flash.rs	TVI-WO-1300.rm0433.md
 firmware/flash.rs	TVI-WO-1304.measure.md
 model/GuardedSTM32H7_Flash.cs	TVI-WO-1304.measure.md
 model/GuardedSTM32H7_Flash.cs	docs/
@@ -125,5 +111,4 @@ tests/1308/dmamux.sh	docs/
 # TVI-WO-1308: the PWR guard's citations of its measurement and of 1300's and 1304's, each a comment or a record string, checked by hand 2026-11-26.
 model/GuardedSTM32H7_PWR.cs	TVI-WO-1308.measure.md
 model/GuardedSTM32H7_PWR.cs	docs/
-firmware/pwr.rs	TVI-WO-1300.rm0433.md
 firmware/pwr.rs	TVI-WO-1304.measure.md
