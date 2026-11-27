@@ -4,16 +4,19 @@ data/readings.tsv: field, state (acknowledged | stock-wrong | held), the A-numbe
 behaves-as text the field's ledger row takes. Each text cites RM0433 Rev 9 by page and the stock source (renode-infrastructure
 066a7f13) by file and line, from the checked reading.
 
-Usage: python3 -I spike/1206/readings.py READS_DIR spike/1206/data/items.tsv [MAIN_MODEL_DIR] > spike/1206/data/readings.tsv
-Each row keeps its text on main (MAIN_MODEL_DIR, default ~/.cache/tvi-1206/main/model: what the row said about the guard's
-own rules stays true) and appends its reading; where that text is wrong for a value now read, OLD replaces it.
-       python3 -I spike/1206/readings.py READS_DIR spike/1206/data/items.tsv --table   (TVI-WO-1206.rm0433.md §3's table)"""
-import glob, json, os, sys
+Usage (from the repository root; everything it reads is in the repository, TVI-WO-1206a):
+       python3 -I spike/1206/readings.py > spike/1206/data/readings.tsv
+       python3 -I spike/1206/readings.py --table   (TVI-WO-1206.rm0433.md §3's table)
+The readings are spike/1206/data/readings/reads (the first list's) and reads2 (the second's); the work lists items.tsv and
+items2.tsv. Each row keeps its text on main at BASE (8e15435, read with git: what the row said about the guard's own rules
+stays true) and appends its reading; where that text is wrong for a value now read, OLD replaces it.
+spike/1206/rebuild.sh checks that this rebuilds every row byte for byte."""
+import glob, json, os, subprocess, sys
 
-reads_dir, items = sys.argv[1:3]
-# the second work list (architect 2026-11-27T00:43Z): its readings and items beside the first's
-reads_dir2, items2 = os.path.join(os.path.dirname(reads_dir.rstrip('/')), 'reads2'), os.path.join(os.path.dirname(items), 'items2.tsv')
-main_model = sys.argv[3] if len(sys.argv) > 3 and not sys.argv[3].startswith('--') else os.path.expanduser('~/.cache/tvi-1206/main/model')
+DATA = 'spike/1206/data'
+reads_dir, reads_dir2 = DATA + '/readings/reads', DATA + '/readings/reads2'  # the first and second lists' readings
+items, items2 = DATA + '/items.tsv', DATA + '/items2.tsv'
+BASE = '8e15435'  # main, the rows' text before this work order
 R = {}
 for p in glob.glob(os.path.join(reads_dir, '*.jsonl')) + glob.glob(os.path.join(reads_dir2, '*.jsonl')):
     for l in open(p):
@@ -32,7 +35,7 @@ TEXT = re.compile(r'R\("[^"]+", [^,]+, "[^"]*", "[^"]+", \d+, \d+, (?:new uint\[
 def old_text(f):
     if f in OLD: return OLD[f]
     path, n = work[f][1].split(':')
-    line = open(os.path.join(main_model, os.path.basename(path))).read().split('\n')[int(n) - 1]
+    line = subprocess.run(['git', 'show', '%s:%s' % (BASE, path)], check=True, capture_output=True, text=True).stdout.split('\n')[int(n) - 1]
     return TEXT.search(line).group(1).replace('\\"', '"').replace('\\\\', '\\')
 
 
@@ -279,7 +282,7 @@ SW['RCC_AHB1RSTR.USB1OTGRST'] = (SW['RCC_AHB1RSTR.USB1OTGRST'][0] + "; and the s
                                  SW['RCC_AHB1RSTR.USB1OTGRST'][1])
 HELD = set()  # the seven asked were ruled 2026-11-27T01:37Z (A25-A28)
 
-if len(sys.argv) > 3 and sys.argv[3] == '--table':  # TVI-WO-1206.rm0433.md §3, from the same data as the rows
+if sys.argv[1:] == ['--table']:  # TVI-WO-1206.rm0433.md §3, from the same data as the rows
     print('| A | Fields | Reading (both sides, for the values written) | Each row cites |')
     print('|---|---|---|---|')
     for n, (why, fs) in sorted(ACK.items()):
