@@ -2,6 +2,8 @@
 
 **The verdict:** clauses 2–7 are **met**. Clause 1 is **not met**: 129 items above your cut hold fields nobody has read (below). `TVI-WO-1206` reads them, then re-judges it.
 
+**Addendum (`TVI-WO-1206`, 2026-11-27): clause 1 is met by the per-field measure, with two items open.** Every field the armed run writes is now judged: 1,982 above the cut, 399 guarded, 1,583 read, 0 open. The 129 (121 fields) and 174 more the old join missed are read: 168 acknowledged, 127 stock-wrong (`TVI-WO-1206.rm0433.md`). These rest on field evidence where the manual is silent, each with a bench row: PLL2 (every USART, 72 MHz) and PLL3 (I2C and the ADC, 30 MHz); SPI's suspend, restart and disable; `TXDMAEN`'s order; the reserved ICR bits ChibiOS writes. Open: SPI `TSIZE` (p2179) and DMAMUX2 (an unmapped ADC3 route).
+
 **What it was judged on:**
 - `main` with `TVI-WO-1308` merged (`5d4a61a`), and this PR's CI on `33dd82e` (45881160764): 1,166 items (518 cases, 648 mutants, the 21 new ones among them), 0 failures; memory budget −15.0 MiB.
 - Clauses 2–7 were also green on `63fe557`, CI 45858432173: 1,000 items, 0 failures.
