@@ -139,6 +139,28 @@ ACK = {
          'I2C_CR2.NBYTES I2C_CR2.RD_WRN I2C_CR2.SADD'),
     24: ("a 1 clears TC and a 0 does nothing, on both sides; every ISR read comes at least 37.5 ms after silicon's line would be idle, and TCIE is 0",
          'USART_ICR.TCCF'),
+    25: ("by the architect's ruling, 2026-11-27T01:37Z, on field evidence: p2216 says \"the SUSP flag has to be cleared and the SPI disabled and "
+         "re-enabled before any next transaction starts\" and p2175 \"SPI must always be disabled after such software suspension\"; spi1 restarts "
+         "a transfer straight after a suspend with SPE kept at 1 679 times in the armed run (CR1 0x701 then 0x301). RM0433 gives no behaviour for "
+         "that; the twin restarts the transfer. ArduPilot flies this sequence on silicon, which is field evidence, not the manual. Bench row BR3 "
+         "(TVI-WO-1206 FEEDBACK §5): spi1's restart after a suspend without an SPE toggle, on the Nucleo",
+         'SPI_CR1.CSTART'),
+    26: ("by the architect's ruling, 2026-11-27T01:37Z, on field evidence: p2225 says SUSP \"has to be cleared prior SPI is disabled\"; every "
+         "armed disable follows a suspend with SUSP still set (spi1 2,022 times, spi2 37,677). RM0433 gives no behaviour for that; the twin "
+         "disables normally and keeps SUSP until the next start's IFCR write. ArduPilot flies this sequence on silicon, which is field evidence, "
+         "not the manual. Bench row BR4 (TVI-WO-1206 FEEDBACK §5): disable with SUSP set, on the Nucleo",
+         'SPI_CR1.SPE'),
+    27: ("by the architect's ruling, 2026-11-27T01:37Z, on field evidence: p2180 orders the stream's enable before TXDMAEN \"to prevent DMA "
+         "channel management raising error events\", naming no error; ArduPilot sets TXDMAEN first for every SPI transmit stream. RM0433 gives "
+         "no behaviour for the other order; the twin raises no error, and its transmit stream is unpaced, the DMA guard's acknowledgement "
+         "(ruled 2026-11-24T14:10Z Q5 (c), requests 38 and 40). ArduPilot flies this order on silicon, which is field evidence, not the manual. "
+         "Bench row BR5 (TVI-WO-1206 FEEDBACK §5): read SPI_SR and the DMA flags after this order, on the Nucleo",
+         'SPI_CFG1.TXDMAEN'),
+    28: ("by the architect's ruling, 2026-11-27T01:37Z, on field evidence: p2097 says only \"Reserved, must be kept at reset value\"; ChibiOS "
+         "writes USART_ICR = 0xFFFFFFFF at each init (49 writes in the armed run), and usart1's IDLE handler echoes its ISR read (0x206000D0 x19, "
+         "0x20600090 x2). RM0433 gives no behaviour for those 1s; the twin ignores the bits. ChibiOS flies with these writes on silicon, which is "
+         "field evidence, not the manual. Bench row BR2, extended (TVI-WO-1206 FEEDBACK §5): read USART_ISR after ICR = 0xFFFFFFFF on the Nucleo",
+         'USART_ICR.Res10_10 USART_ICR.Res16_14 USART_ICR.Res19_18 USART_ICR.Res31_21'),
 }
 
 # stock-wrong: field -> (what differs, why the flight path is unaffected)
@@ -224,7 +246,7 @@ SW['USART_CR3.DMAT'] = ("the twin's memory-to-peripheral stream moves the whole 
                         "transmit slot (p2059): the DMA guard's acknowledgement, ruled 2026-11-24T14:10Z Q5 (c) (requests 42, 46)",
                         "the bytes and their order are those silicon sends; ArduPilot sees usart1's TX transfer-complete 2 us after EN where silicon takes "
                         "about 1.8 ms, and 15 of 102 usart1 bursts start before silicon's previous one would have finished: what Q5 (c) accepts")
-HELD = set('SPI_CR1.CSTART SPI_CR1.SPE SPI_CFG1.TXDMAEN USART_ICR.Res10_10 USART_ICR.Res16_14 USART_ICR.Res19_18 USART_ICR.Res31_21'.split())  # asked 2026-11-27
+HELD = set()  # the seven asked were ruled 2026-11-27T01:37Z (A25-A28)
 
 if len(sys.argv) > 3 and sys.argv[3] == '--table':  # TVI-WO-1206.rm0433.md §3, from the same data as the rows
     print('| A | Fields | Reading (both sides, for the values written) | Each row cites |')
