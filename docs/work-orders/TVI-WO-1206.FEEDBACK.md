@@ -65,7 +65,24 @@ A miss is not a defect: the predictions guard against reading toward a total, an
 - **`spike/1100/data/writes.tsv` lacks writes:** some RCC `CR` writes, and all of one board's `CR` and `CFGR`. Every generated value and claim now comes from the 15 logged boots (`gen-writes.tsv`), and each claim was re-checked there: TIM1's write order, I2C's CR1, PCE, the PLL1 ranges. All hold.
 - **The rows' text had been replaced, not appended to,** dropping true facts about the guard's rules. #72's first CI failed two ledger cases on it. Fixed as ruled at 00:59Z.
 
-**The second re-read and review** (35 fields, seed 12062; a fresh review of the 174): [FILLED WHEN THEY RETURN]
+**The second re-read** (35 fields, seed 12062, an independent Opus reader):
+- **Agreed on 19 of 35.**
+- **Disagreed on 16, recorded, not averaged:**
+  - **11 registered reset bits:** it says the same, since the twin resets the block; the builder says stock-wrong, since silicon's hold while the bit is 1 is not quoted.
+  - **I2C RXIE:** it says it differs, because RXNE rises at START; the builder credits that to RXNE's and START's model (R4), with RXIE's gate matching.
+  - **BDMAEN:** it says it differs, through DMAMUX2 and BDMA channel 7; that is the DMAMUX2 item raised with the architect.
+  - **DSIZE 0 and USART `Res16_14`:** it says the manual is silent; A20 and A28 say so.
+  - **SPI SPE:** it found that the stock model also clears TSIZE and EOT at the disable; A26 now states it.
+
+**The second review** (a fresh Opus reviewer of the 174's rows; no acknowledged row cites another register's line):
+- **Fixed:**
+  - the reset windows' scan missed `APB1ResetLow/High` (82,558 writes, not 4,074; the conclusion stands);
+  - DMAT's count (15–22 of 102) and its computed 1.8 ms;
+  - the ready flags and SW now cite ArduPilot's ChibiOS source (Aethelgard 4400h's tree, `hal_lld.c` L266, L299, L306, L398, L465), no longer from memory, and SW is stock-wrong alike;
+  - wording: USB1OTGRST (stock resets USB2's alias), CSUSP, A1 (no locked read of an A1 peripheral), A12 (NACKCF), A22 (i2c1 only), the TSIZE and MINC cites.
+- **Raised:**
+  - **TSIZE,** whose "unaffected" rests on p2179's ambiguous "the RXP flag is not set when EOT is set" (§7);
+  - **DMAMUX2,** an unmapped route (`C7CR` = 0x11, ADC3 to BDMA channel 7) the per-field measure cannot see (§7).
 
 ## 5. Findings and rows
 
@@ -87,7 +104,14 @@ A miss is not a defect: the predictions guard against reading toward a total, an
 
 ## 6. Reduction pass
 
-[FILLED AFTER THE PASS]
+Diff-sized, over what this WO added in `spike/1206/` and its edits elsewhere.
+- **Removed:** the generated-value helpers repeated in `items.py` and `items2.py`, moved to `genvals.py` (−50 lines, +4, +29 for the module; both work lists byte-identical after); `RULING`, unused once 1206's join took RUL-17 as amended.
+- **Kept, each a copy with a reason in its header:** `reader/fields.py`'s six-line `ledger_offset` (as `join.py`'s, which runs on import); `harness/gen-inner.sh` (`inner.sh`'s patch point, with the boot's own RunFor kept); `reader/join.py` (1205's with one change).
+- **Findings:**
+  - `items.py` and `items2.py` still share their model-row parser; merging them would change two tools' inputs for no fewer facts.
+  - `check-reads.py`'s value test is a substring match, coarse by design; the builder's own pass is the check.
+
+Reduction pass (diff): −18 net · 2 duplicates removed · 1 dead path removed · 0 protected kept · 2 findings above
 
 ## 7. Gates
 
