@@ -13,6 +13,15 @@
 
 **The deliverables:** `TVI-WO-1206.rm0433.md` (the readings' sources, method and acknowledgements A1–A28); the ledger rows themselves (295 fields in seven guards); the addendum in `TVI-WO-1205.verdict.md` and `TVI-WO-1205.FEEDBACK.md`.
 
+## 0. The verdict (WO §1.4)
+
+**Clause 1 is met,** by the gate's per-field measure on `f398a8b`: 1,982 fields above the cut at 208 registers, 399 guarded, 1,583 read, **0 open**. On `main` the same measure finds 434 open. Written as the addendum in `TVI-WO-1205.verdict.md` and `TVI-WO-1205.FEEDBACK.md`, as the fence asks.
+- **What was read:** 295 fields, each against RM0433 Rev 9 by page and the pinned stock source by line, for every value the armed run, the 14 generated boots and the fixture write. 169 are `acknowledged` (A1–A29) and 126 `stock-wrong`, each with why the flight path is unaffected.
+- **What the verdict rests on beyond the manual:** 18 acknowledgements are field evidence by the architect's rulings, because RM0433 is silent for what the firmware does (A11, A12, A13, A25–A29; `TVI-WO-1206.rm0433.md` §4). Each quotes the manual's words, the run's counts and the twin's behaviour, and each has a bench row for Phase 4. If any is overruled, clause 1 is not met by that field: a one-line change in `spike/1206/readings.py`.
+- **What the measure lists outside its field count:** three unmapped writes, each judged off the cut or on no flight path (§5 of `TVI-WO-1206.rm0433.md`). DMAMUX2 is a Phase 4 row (R9).
+- **What the adversarial pass left on record:** the second re-read disagreed on 16 of 35 fields; each is resolved in §4 with its reason. No resolution changes the count, since both states count as read. One disagreement was a real gap, now in A26.
+- **Nothing behavioural moved:** `LEDGER.jsonl` differs from `main` on exactly the 295 fields, in state and text only. The 16 replays are identical, and the armed run arms at 9.332 s with 0 records. CI 45927404214: 1,167 items, 0 failures.
+
 ## 1. What was built
 
 **The readings, 295 fields in two work lists:**
