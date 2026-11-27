@@ -72,7 +72,10 @@ A miss is not a defect: the predictions guard against reading toward a total, an
 
 **The first re-read** (25 fields, seed 1206, an independent Opus reader that saw neither the readings nor the rows' text):
 - **Agreed on 23 of 25.**
-- **Disagreed on 2, recorded, not averaged:** SRAM1EN (it: same for the value 1; the builder: stock-wrong for the window before the enable) and PSC (it: same, since every write precedes UG; the builder: stock-wrong, since stock applies PSC at the write).
+- **Disagreed on 2, each resolved by the builder with its reason:**
+  - **SRAM1EN, stock-wrong:** the twin never gates SRAM1 (p369), and the reset-to-enable window is unmeasured.
+  - **PSC, stock-wrong:** stock applies PSC at the write, not at UG (p1531).
+  - In both, the reader's "same" holds for the run's own write order, which each row's "unaffected" states. Both states count as read, so clause 1's count does not depend on the choice.
 - **It also found** that 1100's queue kept one value per board, so the generated boards' values now come from every write.
 
 **Found by the second readers and fixed:**
@@ -81,12 +84,12 @@ A miss is not a defect: the predictions guard against reading toward a total, an
 
 **The second re-read** (35 fields, seed 12062, an independent Opus reader):
 - **Agreed on 19 of 35.**
-- **Disagreed on 16, recorded, not averaged:**
-  - **11 registered reset bits:** it says the same, since the twin resets the block; the builder says stock-wrong, since silicon's hold while the bit is 1 is not quoted.
-  - **I2C RXIE:** it says it differs, because RXNE rises at START; the builder credits that to RXNE's and START's model (R4), with RXIE's gate matching.
-  - **BDMAEN:** it says it differs, through DMAMUX2 and BDMA channel 7; that is the DMAMUX2 item raised with the architect.
-  - **DSIZE 0 and USART `Res16_14`:** it says the manual is silent; A20 and A28 say so.
-  - **SPI SPE:** it found that the stock model also clears TSIZE and EOT at the disable; A26 now states it.
+- **Disagreed on 16, each resolved by the builder (both sides count as read, so clause 1's count is the same either way):**
+  - **11 registered reset bits, stock-wrong kept:** it says the same, since the twin resets the block. The builder keeps stock-wrong because RM0433 says only "1: resets", so the twin's one-shot reset is not shown to equal silicon's; `reset-windows.tsv` shows no firmware can tell them apart.
+  - **I2C RXIE, acknowledged kept:** it says it differs, because RXNE rises at START. The builder credits that to RXNE's and START's model (R4), since RXIE's own gate (flag AND enable) matches.
+  - **BDMAEN, acknowledged kept:** it says it differs, through DMAMUX2 and BDMA channel 7. That is DMAMUX2's matter, ruled off the cut at 02:12Z; the enable's own gate matches (p373).
+  - **DSIZE 0 and USART `Res16_14`, acknowledged kept:** it says the manual is silent, and A20 and A28 already say so (A28 by ruling).
+  - **SPI SPE, the reader was right:** the stock model also clears TSIZE and EOT at the disable. A26 now states it.
 
 **The second review** (a fresh Opus reviewer of the 174's rows; no acknowledged row cites another register's line):
 - **Fixed:**
