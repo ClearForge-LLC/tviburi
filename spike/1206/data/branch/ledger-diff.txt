@@ -1,0 +1,3 @@
+1946 rows each side; 121 changed, all work-list fields, keys changed: {'behaves_as': 121, 'state': 121, 'detail': 27, 'reason': 94}
+state moves: {('inherited-unaudited', 'stock-wrong'): 27, ('inherited-unaudited', 'acknowledged'): 94}
+work-list fields not changed: none
