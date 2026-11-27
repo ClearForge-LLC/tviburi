@@ -125,15 +125,25 @@ An independent Opus reviewer worked on `afd88a4` from the code, the WO's three a
 **The merges of `main`.**
 - **`8e15435` (1205, #68):** `tests/mutants.tsv` conflicted on the two appends. Kept both. My first merge commit carried the conflict markers; I amended it before any push, and all 670 rows checked.
 - **`e9b569f` (1206, #72):** `tools/tviburi-release/src/main.rs` conflicted at one seam. Kept both sides: this WO's `restated_stub` (Q26), and `1206`'s `HOMES` and `check_acknowledged`. All 671 mutant rows hold: ASCII, 5 fields, `old` once.
+- **`dc0142f` (1206a, #74; ruled 03:58Z and 05:02Z):** it merged clean. It moves one release source, `TVI-WO-1206.rm0433.md`.
 
-**The release, built locally on the merged tree (`6170cd9`), as ruled 03:46Z.**
+**The release, built locally on the merged tree (`f0046af`), as ruled 03:46Z and 05:02Z.**
 - **Build:** `ci/release.sh dry` gives two builds byte-identical and `VERIFY PASS`.
 - **Hashes:**
-  - release `sha256:df5f52583a4df39c9ddda5e663355ea20834549154a3d0a362f72e6de01659c7`;
-  - ledger `sha256:53265b30…7203`;
+  - release `sha256:0b9fff7e499374d5687b98da1546cdd5c563608cc9c1a6f590aaf0e689676003`;
+  - ledger `sha256:6275b2c6…8f5b`;
   - `ledger-rows` `413ad37b…4e90`;
-  - tarball `a7999392…1fd8`.
-- **The hash moved with `1206`:** its ledger rows, and its three acknowledgement homes, which are now `source` lines.
+  - tarball `f364ecc7…76c1`.
+- **The hash moved with `1206`:** its ledger rows, and its three acknowledgement homes, which are now `source` lines. It moved again with `1206a`'s edit to one home.
+- **Against `main` `dc0142f`'s own release** (`sha256:39164e13…dad4`, built the same way), the MANIFESTs differ only by this WO's work:
+  - format 2;
+  - the `properties` and `builds` description lines;
+  - the assemblies' sha256s on the `build` lines;
+  - the 39 `property` lines;
+  - the `pins.tsv`, `main.rs` and `props.rs` source lines;
+  - `ledger-rows`, by one row: Q26's guarded `pwr` model row replaces the stub's `canned` row.
+
+  The `overlay` line and every other source line are identical.
 - **What the notes change:** only files that are not sources, so the head's release hash is this one. The PR-mode job's `dry` build on the head shows it.
 - **Checks on that build:**
   - `consumer-verify-test.sh` (8 plants);
