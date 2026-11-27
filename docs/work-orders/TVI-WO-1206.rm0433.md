@@ -7,18 +7,18 @@
 
 | Source | What | How it was used |
 |---|---|---|
-| RM0433 Rev 9 | `~/.cache/aet-held/rm0433-rev9.txt`; pages printed by `spike/1206/page.sh` (the convention of `tests/1300/rmpage.sh`) | every `rm` quote checked on its printed page |
+| RM0433 Rev 9 | the held text, sha256 `8e02c0c01d35d22a…` (as `tests/1203/rm0433-p2184.sh` pins it; ST's manual, not committed); pages printed by `spike/1206/page.sh` (the convention of `tests/1300/rmpage.sh`) | every `rm` quote checked on its printed page |
 | The stock source | renode-infrastructure `066a7f13`, the pinned build's tree (`TVI-WO-0100b.rm0433` §1): `STM32H7_RCC.cs` `7f10d491…` and `STM32H7_SPI.cs` `bc3f1348…` (the hashes 1300 and 0100b pinned), `STM32F7_USART.cs` `d62666e1…`, `STM32_Timer.cs` `7e99f48c…`, `STM32F7_I2C.cs` `4c8e30b7…`, `STM32_GPIOPort.cs` `16ffaed5…` | every `stock` quote checked at its cited lines |
 | The guards | `model/` at `8e15435` | every `guard` quote checked at its cited lines |
 | The values written | `spike/1206/data/items.tsv`: the armed run's values (1205's join) and every value the 14 generated boots and the fixture write, every access logged (`spike/1206/data/main-8e15435/gen-writes.tsv`) | each reading covers them |
 | What firmware reads | `spike/1206/data/main-8e15435/reads.tsv` (the armed run, every access logged) and `gen-reads.tsv` (the 14 generated boots and ArduPilot's fixture, every access logged by `spike/1206/harness/gen-log.sh`) | every "never read" and "never accessed" |
-| Write order | the armed run's log (run B on `main` `8e15435`) and the logged boots (`~/.cache/tvi-1206/genlog/`, summarised in `gen-writes.tsv`) | every claim about when a field is written |
+| Write order | the armed run's log (run B on `main` `8e15435`) and the 15 logged boots, by sha256 and with the command that regenerates them (`spike/1206/data/main-8e15435/genlog-manifest.tsv`), summarised in `gen-writes.tsv` | every claim about when a field is written |
 
 ## 2. How each field was read
 
 - **The unit:** the 129 items above the cut (105 rows, 24 registers) hold **121 distinct ledger fields** (the first list); the per-field measure found **174 more** open above the cut (the second list, `items2.tsv`; ruled 2026-11-27T00:43Z). One reading per field covers every instance bound to that guard type. The readers checked per instance; the stock code differs between instances only in constructor frequencies, which none of these readings uses.
 - **Predictions first:** `spike/1206/predictions.md`, committed before any reading (`fe69aa5`).
-- **The readers:** five workers, one per family slice, each returning verbatim quotes with page and `file Ln`, and what each side does per value (`~/.cache/tvi-1206/reads/`). They assigned no state.
+- **The readers:** five workers, one per family slice, each returning verbatim quotes with page and `file Ln`, and what each side does per value (`spike/1206/data/readings/reads/` and `reads2/`; the seeded re-reads in `reads-reread/` and `reads-reread2/`). They assigned no state.
 - **The checks:** `spike/1206/check-reads.py`: 121 rows, 0 quotes off their page or lines. The builder then checked each claim against the runs above and assigned every state (`spike/1206/readings.py`, which writes the rows and this document's §3).
 
 | Family | First list | Second list | `acknowledged` | `stock-wrong` |
