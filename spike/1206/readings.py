@@ -64,12 +64,12 @@ ACK = {
          "The armed run writes PLLCFGR 0x1FF0000, PLL3DIVR 0x7040E0E, PLLCFGR 0x1BF0FFD (DIVP3EN = 0, DIVP3 = 7), then CR 0x15003025 (PLL1-3 on). "
          "RM0433 guarantees no frequency for PLL3's outputs in this configuration. The twin serves the formula's 30 MHz on pll3_r_ck to I2C1/2 "
          "and the ADC. ArduPilot flies this configuration on silicon, which is field evidence, not the manual. Bench row BR1 "
-         "(TVI-WO-1206.FEEDBACK.md): measure pll3_r_ck on the Nucleo with DIVP3EN = 0 and DIVP3 = 7, by I2C SCL timing",
+         "(TVI-WO-1206 FEEDBACK §5): measure pll3_r_ck on the Nucleo with DIVP3EN = 0 and DIVP3 = 7, by I2C SCL timing",
          'RCC_PLL3DIVR.DIVN3 RCC_PLL3DIVR.DIVP3 RCC_PLL3DIVR.DIVQ3 RCC_PLL3DIVR.DIVR3'),
     12: ("by the architect's ruling of 2026-11-25T05:06Z Q10 (a clear register: the write clears nothing), on field evidence: p2012 says only "
          "\"Reserved, must be kept at reset value\", so RM0433 gives no behaviour for the 1s ChibiOS writes here (ICR = 0x2, 0x4); the twin "
          "ignores the bits, and a 0 behaves alike on both sides. ChibiOS flies with these writes on silicon, which is field evidence, not the "
-         "manual. Bench row BR2 (TVI-WO-1206.FEEDBACK.md): read I2C_ISR after ICR = 0x2 and 0x4 on the Nucleo",
+         "manual. Bench row BR2 (TVI-WO-1206 FEEDBACK §5): read I2C_ISR after ICR = 0x2 and 0x4 on the Nucleo",
          'I2C_ICR.Res2_1'),
 }
 

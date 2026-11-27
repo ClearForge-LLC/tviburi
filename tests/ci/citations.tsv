@@ -3,6 +3,9 @@
 # (a new reader: make the path code, or list it after checking it only cites) and on a row that no longer holds.
 # Checked by hand 2026-11-24 (TVI-WO-1202), every row read in its file. FILE<tab>NAME.
 # TVI-WO-1206 (A), ruled 2026-11-27T00:10Z: the release reads TVI-WO-0100b.rm0433.md, TVI-WO-1300.rm0433.md and TVI-WO-1206.rm0433.md (their A-rows), so they route as code (tools/tviburi-route READ_DOCS) and a file naming them is listed no more; tools/tviburi-release/src/main.rs names their directory, docs/, to read them (HOMES).
+docs/work-orders/TVI-WO-0100b.rm0433.md	FEEDBACK.md
+docs/work-orders/TVI-WO-0100b.rm0433.md	architecture.md
+docs/work-orders/TVI-WO-1300.rm0433.md	architecture.md
 firmware/gpio.rs	TVI-WO-1301.rm0433.md
 firmware/timer.rs	TVI-WO-1302.measure.md
 model/bench-checks.tsv	FEEDBACK.md

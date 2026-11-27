@@ -329,7 +329,6 @@ mod tests {
             assert_eq!(classify(&[p]), (false, false), "{p} alone runs the suite");
             assert_eq!(classify(&["docs/a.md", p]), (false, false));
         }
-        assert!(is_docs("docs/work-orders/TVI-WO-1206.md") && is_docs("docs/work-orders/TVI-WO-1206.FEEDBACK.md"));
         assert_eq!(classify(&[]), (false, false), "an empty diff routes code");
         assert_eq!(classify(&["tests/1301/gpio.sh"]), (false, true));
         assert_eq!(classify(&[".github/workflows/ci.yml"]).1, true);

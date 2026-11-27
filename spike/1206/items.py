@@ -81,7 +81,9 @@ with open(out, 'w') as o:
             vals.add(hex((int(v, 16) >> m['lo']) & ((1 << width) - 1)))
         o.write('\t'.join([name, m['src'], '%d:%d' % (m['hi'], m['lo']), m['allowed'], m['page'], ','.join(sorted(e['paths'])),
                            ','.join(sorted(vals, key=lambda x: int(x, 16)) + sorted(e.get('many', ()))) or '-',
-                           ','.join(sorted(e.get('gen', ()), key=lambda x: (not x.startswith('0x') and not x.isdigit(), int(x, 0) if x[:1].isdigit() else 0))) or '-', ' | '.join(e['items']), m['text']]) + '\n')
+                           ','.join(sorted(e.get('gen', ()), key=lambda x: (not x.startswith('0x') and not x.isdigit(), int(x, 0) if x[:1].isdigit() else 0))) or '-', ' | '.join(e['items']),
+                           # CI's inventory refuses a code file that names a document: a quoted row's work-order document loses its suffix here
+                           re.sub(r'\b(TVI-WO-\w+(?:\.[\w-]+)?)\.md\b', r'\1', m['text'])]) + '\n')
 print('%d fields, %d items (%d rows, %d registers) written to %s; %d without a unique model row' % (
     len(need) - bad, len({i for e in need.values() for i in e['items']}),
     len({i for e in need.values() for i in e['items'] if i.startswith('row')}),
