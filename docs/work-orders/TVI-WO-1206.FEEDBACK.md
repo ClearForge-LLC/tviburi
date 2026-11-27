@@ -34,7 +34,19 @@
 
 ## 2. Acceptance
 
-[FILLED AFTER THE FINAL RUNS]
+All on the branch's head `4c7ffae` (the commits after it change `TVI-WO-1205`'s verdict and FEEDBACK and this file only).
+- **0 above-cut fields on `inherited-unaudited`,** by the gate's per-field measure: 1,982 fields above the cut at 208 registers, 399 guarded, 1,583 read, 0 open; none unlisted, none stock-bound (`spike/1206/data/branch/coverage.tsv`). On `main` the same measure finds 434 open.
+- **Every changed row cites a manual page and a stock source line:** `spike/1206/check-rows.py 8e15435 …`, 295 rows changed, 0 failures. Every A-number cited is a §3 row, and the release refuses any other.
+- **Every reading's quotes are on their page and at their lines:**
+  - `check-reads.py`: the first list 121 rows, 0 failures (with `builder-values.tsv` for four fields' extra values).
+  - The second list: 174 rows. Its failures are `from_memory` notes no row rests on, and DMAT's quotes from the DMA guard, checked by hand (§4).
+- **Nothing behavioural moved:**
+  - **The 16 replays** are identical to the baseline in records (0), witnesses, boot hash and boot lines (`data/branch/replays.txt`). The armed run arms at 9.332 s with 34 witnesses, 34 ends and 0 records.
+  - **`LEDGER.jsonl`, `main` against the branch:** 1,946 rows each side, 295 changed, exactly the two work lists (`data/branch/ledger-diff.txt`). Keys changed: `state` 295, `behaves_as` 295, `reason` 168, `detail` 127. Every other key of every row is identical.
+  - **The model tables:** 295 rows changed in class and text only; allowed sets, bits and everything outside the tables are byte-identical.
+- **CI:** [CI on the head]
+- **The addendum fits the page:** `TVI-WO-1205.verdict.md` is 825 words with it (722 before).
+- **Off the cut, not counted:** `FLASH_CCR1/2.Res15_0` (path `other`) stay `inherited-unaudited` (R8).
 
 ## 3. Predictions, scored
 
@@ -121,5 +133,8 @@ Reduction pass (diff): −18 net · 2 duplicates removed · 1 dead path removed 
   - PLL3's unguaranteed frequency (00:02Z, ruled 00:10Z);
   - the 129's undercount (00:38Z, ruled 00:43Z);
   - the four field-evidence items (01:18Z, ruled 01:37Z).
+- **Open with the architect at the addendum (my 01:41Z note):**
+  - **SPI `TSIZE`:** p2179's "In reception, the RXP flag is not set when EOT is set" is ambiguous. If it holds for a complete final packet, the generated boards' bounded RXP poll fails on silicon (cap-gen `board.rs` L269) and their control flow changes. The twin sets RXP and EOT together (SR 0x100F). Proposed (a): the incomplete-packet reading, with bench row BR7.
+  - **DMAMUX2:** the armed run's `C7CR` = 0x11 (ADC3 to BDMA channel 7) lands on no peripheral in the twin, and the stock BDMA leaves channel 7's registers unhandled. The per-field measure reads mapped CPU writes only, so this route is outside it.
 - **The addendum is the WO's last stop.**
 - **Not merged by me.**
