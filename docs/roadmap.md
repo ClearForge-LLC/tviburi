@@ -339,6 +339,7 @@ Not planned until Phase 4 has run once. *(Amended 2026-11-23: was "until Phase 2
 | 2026-11-27 | Phase 1, exit gate, Phase 4 | `TVI-WO-1205` (#68) and `TVI-WO-1206` (#72) merged: **Phase 1's exit gate is met.** Clause 1 is judged per field, every field the armed run writes, which replaces `1100a`'s row-and-register join. Phase 4 gains the field-evidence bench rows, and Phase 1 gains `1206`'s findings | `TVI-WO-1205.verdict.md` and its addendum; `1206` FEEDBACK §5 |
 | 2026-11-27 | Phase 1, Phase 2 | `TVI-WO-1206a` (#74) and `TVI-WO-2100` (#69) merged: the readings rebuild from the repository, and the first release built by the release job on `53478fa` (run 45950893687, release `sha256:0b9fff7e…6003`), its notes' hashes reproduced. The tag waits for Scotty. Four rows from their FEEDBACK | the merges; `1206a` and `2100` FEEDBACK |
 | 2026-11-26 | Phase 1, Phase 2 | `TVI-WO-1308` merged (#64), its rows recorded; DMAMUX1's `1303` row done. Phase 2's first work order, `TVI-WO-2100` (the first release), written: built beside `1205`, tagged only after the gate's verdict | the merge; `1308` FEEDBACK §6; Phase 2's work |
+| 2026-11-28 | Phase 2 | v0.1.0 published as a GitHub Release (tag at `53478fa`), its asset's GitHub digest equal to the release job's tarball sha256; immutable releases turned on for later releases (v0.1.0 itself stays editable, so `docs/releases/v0.1.0.md` holds the hash to check against) | Scotty, 2026-11-28; the release API |
 
 ## Provenance
 
